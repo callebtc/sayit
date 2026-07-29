@@ -41,7 +41,11 @@ struct DownloadStatusView: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button(actionTitle, action: performAction)
+            HStack {
+                Spacer()
+                Button(actionTitle, action: performAction)
+                    .controlSize(.small)
+            }
         }
     }
 

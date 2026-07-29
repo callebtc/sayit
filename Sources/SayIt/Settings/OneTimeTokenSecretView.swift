@@ -7,23 +7,29 @@ struct OneTimeTokenSecretView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Label("Token created", systemImage: "checkmark.circle.fill")
-                .font(.title2)
+                .font(.title3)
+                .fontWeight(.semibold)
                 .foregroundStyle(.green)
 
-            Text(
-                "Copy this secret now. It cannot be displayed again."
-            )
+            Text("Copy this secret now. It cannot be displayed again.")
+                .foregroundStyle(.secondary)
+
             Text(state.oneTimeTokenSecret ?? "")
                 .font(.body.monospaced())
                 .textSelection(.enabled)
-                .padding(12)
-                .background(.quaternary, in: .rect(cornerRadius: 8))
+                .padding(DesignTokens.standardSpacing)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    .quaternary.opacity(0.55),
+                    in: .rect(cornerRadius: DesignTokens.cardCornerRadius)
+                )
 
             HStack {
                 Button("Copy", systemImage: "doc.on.doc", action: copy)
                     .buttonStyle(.borderedProminent)
                 Spacer()
                 Button("Done", action: state.dismissOneTimeToken)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)

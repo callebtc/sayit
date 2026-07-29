@@ -7,7 +7,7 @@ struct MenuFooterView: View {
     @Environment(\.openSettings) private var showSettings
 
     var body: some View {
-        HStack {
+        HStack(spacing: DesignTokens.compactSpacing) {
             if let model = state.models.first(where: {
                 $0.id == state.settings.activeModelID
             }) {
@@ -16,16 +16,15 @@ struct MenuFooterView: View {
                         ? model.displayName
                         : "\(model.displayName) · \(state.settings.activeVoice)"
                 )
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             Button("Settings…", action: openSettingsWindow)
-            .buttonStyle(.plain)
-            Divider()
-                .frame(height: 16)
+                .buttonStyle(.sayItInline)
             Button("Quit", action: state.quit)
-                .buttonStyle(.plain)
+                .buttonStyle(.sayItInline)
         }
         .font(.callout)
     }

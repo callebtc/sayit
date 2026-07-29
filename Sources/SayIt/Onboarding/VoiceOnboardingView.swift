@@ -6,48 +6,37 @@ struct VoiceOnboardingView: View {
     @State private var isChoosingAnotherModel = false
 
     var body: some View {
-        VStack(spacing: DesignTokens.generousSpacing) {
-            Image(systemName: "waveform.circle")
-                .font(.system(size: 48))
-                .symbolRenderingMode(.hierarchical)
-                .accessibilityHidden(true)
-            VStack(spacing: DesignTokens.compactSpacing) {
-                Text("Choose a voice")
-                    .font(.largeTitle)
-                    .fontDesign(.rounded)
-                    .bold()
-                    .accessibilityAddTraits(.isHeader)
-                Text("Kokoro is compact, multilingual, and recommended for this Mac.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
+        OnboardingPage(
+            symbol: "waveform.circle",
+            title: "Choose a voice",
+            subtitle: "Kokoro is compact, multilingual, and recommended for this Mac."
+        ) {
+            VStack(spacing: DesignTokens.standardSpacing) {
+                if let model = recommendedModel {
+                    RecommendedOnboardingModelView(model: model)
+                }
 
-            if let model = recommendedModel {
-                RecommendedOnboardingModelView(model: model)
-            }
-
-            Button(
-                "Choose another model…",
-                systemImage: "list.bullet",
-                action: showModelPicker
-            )
-            .buttonStyle(.link)
-            .popover(isPresented: $isChoosingAnotherModel) {
-                OnboardingModelPickerView(
-                    recommendedModelID: recommendedModel?.id
+                Button(
+                    "Choose another model…",
+                    systemImage: "list.bullet",
+                    action: showModelPicker
                 )
-                .environment(state)
-            }
+                .popover(isPresented: $isChoosingAnotherModel) {
+                    OnboardingModelPickerView(
+                        recommendedModelID: recommendedModel?.id
+                    )
+                    .environment(state)
+                }
 
-            if let progress = state.downloadProgress,
-               progress.modelID != recommendedModel?.id {
-                OnboardingModelDownloadView(
-                    progress: progress,
-                    modelName: modelName(for: progress.modelID)
-                )
+                if let progress = state.downloadProgress,
+                   progress.modelID != recommendedModel?.id {
+                    OnboardingModelDownloadView(
+                        progress: progress,
+                        modelName: modelName(for: progress.modelID)
+                    )
+                }
             }
         }
-        .padding(32)
     }
 
     private var recommendedModel: ModelDescriptor? {

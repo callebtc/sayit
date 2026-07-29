@@ -9,14 +9,18 @@ struct ReadClipboardButton: View {
                 Label("Read Clipboard", systemImage: "doc.on.clipboard")
                 Spacer()
                 Text(state.settings.globalShortcut.displayName)
-                    .font(.callout.monospaced())
+                    .font(.caption.monospaced())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        .quaternary,
+                        in: .rect(cornerRadius: 5)
+                    )
                     .foregroundStyle(.secondary)
             }
-            .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sayItRow)
         .disabled(!state.isServiceOnline)
-        .frame(minHeight: DesignTokens.minimumControlSize)
         .accessibilityHint(
             state.isServiceOnline
                 ? "Reads the clipboard once and speaks its text locally"

@@ -7,5 +7,7 @@ enum DesignTokens {
     static let generousSpacing: Double = 16
     static let minimumControlSize: Double = 28
     static let ribbonHeight: Double = 42
+    static let cardCornerRadius: Double = 10
+    static let rowCornerRadius: Double = 6
     static let quickAnimation = Animation.easeOut(duration: 0.14)
 }

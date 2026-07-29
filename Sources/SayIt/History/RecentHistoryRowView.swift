@@ -10,7 +10,7 @@ struct RecentHistoryRowView: View {
                 Image(systemName: item.hasAudio ? "waveform" : "arrow.clockwise")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(item.title)
                         .lineLimit(1)
                     Text(
@@ -29,19 +29,15 @@ struct RecentHistoryRowView: View {
                 Image(
                     systemName: item.hasAudio
                         ? "play.circle.fill"
-                        : "arrow.clockwise.circle"
+                        : "arrow.clockwise.circle.fill"
                 )
-                .foregroundStyle(.secondary)
+                .font(.title3)
+                .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             }
-            .contentShape(.rect)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: DesignTokens.minimumControlSize,
-                alignment: .leading
-            )
+            .frame(minHeight: DesignTokens.minimumControlSize)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sayItRow)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
         .disabled(!state.isServiceOnline)

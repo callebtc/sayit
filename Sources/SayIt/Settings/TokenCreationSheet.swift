@@ -52,6 +52,7 @@ struct TokenCreationSheet: View {
                 Button("Cancel", role: .cancel) {
                     dismiss()
                 }
+                .keyboardShortcut(.cancelAction)
                 Spacer()
                 if isCreating {
                     ProgressView()
@@ -61,6 +62,7 @@ struct TokenCreationSheet: View {
                     create()
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(
                     name.trimmingCharacters(
                         in: .whitespacesAndNewlines

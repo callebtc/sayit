@@ -46,6 +46,7 @@ struct CommunityModelSheet: View {
 
             HStack {
                 Button("Cancel", role: .cancel, action: dismiss.callAsFunction)
+                    .keyboardShortcut(.cancelAction)
                 Spacer()
                 if isResolving {
                     ProgressView()
@@ -53,6 +54,7 @@ struct CommunityModelSheet: View {
                 }
                 Button("Add Model", action: addModel)
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .disabled(
                         repository.trimmingCharacters(
                             in: .whitespacesAndNewlines

@@ -7,37 +7,33 @@ struct SpeechPreviewView: View {
         "Say It turns the words on your Mac into calm, private audio."
 
     var body: some View {
-        GroupBox("Voice Preview") {
-            VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
-                TextField(
-                    "Sample sentence",
-                    text: $sampleText,
-                    axis: .vertical
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+            TextField(
+                "Sample sentence",
+                text: $sampleText,
+                axis: .vertical
+            )
+            .lineLimit(2...4)
+
+            HStack {
+                Text(
+                    "Speaking pace is generated into new audio. Playback speed changes listening instantly."
                 )
-                .lineLimit(2...4)
-
-                HStack {
-                    Text(
-                        "Speaking pace is generated into new audio. Playback speed changes listening instantly."
-                    )
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(
-                        "Test Voice",
-                        systemImage: "speaker.wave.2.fill",
-                        action: testVoice
-                    )
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canTestVoice)
-                }
-
-                if state.playback.state != .idle {
-                    Divider()
-                    PlaybackSectionView()
-                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                Spacer()
+                Button(
+                    "Test Voice",
+                    systemImage: "speaker.wave.2.fill",
+                    action: testVoice
+                )
+                .disabled(!canTestVoice)
             }
-            .padding(DesignTokens.compactSpacing)
+
+            if state.playback.state != .idle {
+                Divider()
+                PlaybackSectionView()
+            }
         }
     }
 

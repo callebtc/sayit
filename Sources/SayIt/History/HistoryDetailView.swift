@@ -10,69 +10,79 @@ struct HistoryDetailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(.title2)
-                    .fontDesign(.rounded)
-                    .bold()
+                    .fontWeight(.semibold)
                     .accessibilityAddTraits(.isHeader)
-                Text(item.createdAt, format: .dateTime)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(item.createdAt, format: .dateTime)
+                    if item.duration > 0 {
+                        Text("·")
+                        Text(item.duration.formattedDuration)
+                            .monospacedDigit()
+                    }
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
 
             ScrollView {
                 Text(item.cleanedText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
+                    .padding(DesignTokens.standardSpacing)
             }
-
-            Divider()
-            HStack {
-                Button(
-                    "Play",
-                    systemImage: "play.fill",
-                    action: replay
-                )
-                .buttonStyle(.borderedProminent)
-                .disabled(item.state != .completed)
+            .background(
+                .quaternary.opacity(0.55),
+                in: .rect(cornerRadius: DesignTokens.cardCornerRadius)
+            )
+        }
+        .padding(20)
+        .disabled(!state.isServiceOnline)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button("Play", systemImage: "play.fill", action: replay)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(item.state != .completed)
 
                 Menu("Export", systemImage: "square.and.arrow.up") {
                     Button("Export M4A", action: exportM4A)
-                    .disabled(item.state != .completed)
+                        .disabled(item.state != .completed)
                     Button("Export WAV", action: exportWAV)
-                    .disabled(item.state != .completed)
+                        .disabled(item.state != .completed)
                     Button("Export Text", action: exportText)
                 }
+
                 Button(
                     "Regenerate",
                     systemImage: "arrow.clockwise",
                     action: regenerate
                 )
+
                 Button(
                     item.isPinned ? "Unpin" : "Pin",
                     systemImage: item.isPinned ? "pin.slash" : "pin",
                     action: togglePinned
                 )
-                Spacer()
+
                 Button(
                     "Delete",
                     systemImage: "trash",
                     role: .destructive,
                     action: confirmDelete
                 )
-                .confirmationDialog(
-                    "Delete this history item?",
-                    isPresented: $isConfirmingDelete
-                ) {
-                    Button(
-                        "Delete",
-                        role: .destructive,
-                        action: deleteItem
-                    )
-                } message: {
-                    Text("Saved text and generated audio will be deleted.")
-                }
             }
         }
-        .padding(24)
-        .disabled(!state.isServiceOnline)
+        .confirmationDialog(
+            "Delete this history item?",
+            isPresented: $isConfirmingDelete
+        ) {
+            Button(
+                "Delete",
+                role: .destructive,
+                action: deleteItem
+            )
+        } message: {
+            Text("Saved text and generated audio will be deleted.")
+        }
     }
 
     private func replay() {

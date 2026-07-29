@@ -6,55 +6,53 @@ struct AnywhereOnboardingView: View {
     @State private var launchError: String?
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "cursorarrow.click.2")
-                .font(.system(size: 48))
-                .symbolRenderingMode(.hierarchical)
-                .accessibilityHidden(true)
-            VStack(spacing: DesignTokens.compactSpacing) {
-                Text("Use Say It anywhere")
-                    .font(.largeTitle)
-                    .fontDesign(.rounded)
-                    .bold()
-                    .accessibilityAddTraits(.isHeader)
-                Text(
-                    "Select text and choose Services → Say It, or copy text and use your global shortcut."
+        OnboardingPage(
+            symbol: "cursorarrow.click.2",
+            title: "Use Say It anywhere",
+            subtitle: "Select text and choose Services → Say It, or copy text and use your global shortcut."
+        ) {
+            VStack(spacing: DesignTokens.standardSpacing) {
+                VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                    LabeledContent("Selected text") {
+                        Text("Services → Say It")
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("Clipboard") {
+                        ShortcutRecorderView(
+                            shortcut: state.settings.globalShortcut,
+                            onRecord: state.updateGlobalShortcut
+                        )
+                    }
+                    Divider()
+                    Toggle("Launch Say It at login", isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { _, enabled in
+                            updateLaunchAtLogin(enabled)
+                        }
+                    if let launchError {
+                        Label(
+                            launchError,
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                    }
+                }
+                .padding(DesignTokens.generousSpacing)
+                .frame(maxWidth: 400)
+                .background(
+                    .quaternary.opacity(0.55),
+                    in: .rect(cornerRadius: DesignTokens.cardCornerRadius)
                 )
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 430)
-            }
-            VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
-                LabeledContent("Selected text") {
-                    Text("Services → Say It")
-                }
-                LabeledContent("Clipboard") {
-                    ShortcutRecorderView(
-                        shortcut: state.settings.globalShortcut,
-                        onRecord: state.updateGlobalShortcut
-                    )
-                }
+
                 Text(
                     "Some applications place Say It in a Services submenu. Clipboard text is read only when you invoke it."
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                Toggle("Launch Say It at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in
-                        updateLaunchAtLogin(enabled)
-                    }
-                if let launchError {
-                    Label(
-                        launchError,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
             }
-            .frame(maxWidth: 410)
         }
-        .padding(32)
         .task {
             state.launchAtLogin.refresh()
             launchAtLogin = state.launchAtLogin.isEnabled

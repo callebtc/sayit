@@ -17,22 +17,28 @@ struct OnboardingView: View {
                     AnywhereOnboardingView()
                 }
             }
+            .id(step)
+            .transition(.opacity)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
             HStack {
                 if step != .privacy {
                     Button("Back", action: goBack)
+                        .controlSize(.large)
                 }
                 Spacer()
                 OnboardingProgressView(currentStep: step)
                 Spacer()
                 Button(nextButtonTitle, action: goForward)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
                     .disabled(step == .voice && state.installedModelIDs.isEmpty)
             }
             .padding(DesignTokens.generousSpacing)
         }
+        .animation(DesignTokens.quickAnimation, value: step)
         .frame(width: 540, height: 430)
         .onDisappear(perform: state.onboardingWindowDidClose)
     }

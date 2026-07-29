@@ -4,48 +4,48 @@ struct PlaybackControlsView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        HStack(spacing: DesignTokens.standardSpacing) {
+        HStack {
             PlaybackRateMenu()
 
-            Button(
-                "Back \(Int(state.settings.rewindInterval)) seconds",
-                systemImage: "gobackward.\(Int(state.settings.rewindInterval))",
-                action: skipBackward
-            )
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .controlSize(.large)
-
             Spacer()
 
-            Button(
-                state.playback.state == .playing ? "Pause" : "Play",
-                systemImage: state.playback.state == .playing
-                    ? "pause.fill"
-                    : "play.fill",
-                action: togglePlayback
-            )
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            HStack(spacing: DesignTokens.generousSpacing) {
+                Button(
+                    "Back \(Int(state.settings.rewindInterval)) seconds",
+                    systemImage: "gobackward.\(Int(state.settings.rewindInterval))",
+                    action: skipBackward
+                )
+                .labelStyle(.iconOnly)
+                .buttonStyle(CircularIconButtonStyle())
+
+                Button(
+                    state.playback.state == .playing ? "Pause" : "Play",
+                    systemImage: state.playback.state == .playing
+                        ? "pause.fill"
+                        : "play.fill",
+                    action: togglePlayback
+                )
+                .labelStyle(.iconOnly)
+                .buttonStyle(CircularIconButtonStyle(size: 36, prominent: true))
+
+                Button(
+                    "Forward \(Int(state.settings.forwardInterval)) seconds",
+                    systemImage: "goforward.\(Int(state.settings.forwardInterval))",
+                    action: skipForward
+                )
+                .labelStyle(.iconOnly)
+                .buttonStyle(CircularIconButtonStyle())
+            }
 
             Spacer()
-
-            Button(
-                "Forward \(Int(state.settings.forwardInterval)) seconds",
-                systemImage: "goforward.\(Int(state.settings.forwardInterval))",
-                action: skipForward
-            )
-            .labelStyle(.iconOnly)
-            .buttonStyle(.plain)
-            .controlSize(.large)
 
             Button(
                 "Clear",
                 systemImage: "xmark",
                 action: state.clearCurrentSpeech
             )
-            .buttonStyle(.plain)
+            .labelStyle(.iconOnly)
+            .buttonStyle(CircularIconButtonStyle())
         }
         .disabled(!state.isServiceOnline)
         .accessibilityHint(

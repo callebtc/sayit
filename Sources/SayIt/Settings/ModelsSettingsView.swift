@@ -8,23 +8,10 @@ struct ModelsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: DesignTokens.compactSpacing) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                TextField("Search models", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 280)
-                Spacer()
-            }
-            .padding(.horizontal, DesignTokens.standardSpacing)
-            .padding(.vertical, DesignTokens.compactSpacing)
-
-            Divider()
-
             List(filteredModels) { model in
                 ModelRowView(model: model)
             }
+            .searchable(text: $searchText, prompt: "Search models")
             .overlay {
                 if filteredModels.isEmpty {
                     if searchText.isEmpty {
@@ -50,10 +37,9 @@ struct ModelsSettingsView: View {
             Divider()
 
             HStack {
-                Text(
-                    "\(state.installedModelIDs.count) installed"
-                )
-                .foregroundStyle(.secondary)
+                Text("\(state.installedModelIDs.count) installed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Button(
                     "Add Hugging Face Model…",

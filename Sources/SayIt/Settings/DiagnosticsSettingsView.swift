@@ -10,29 +10,36 @@ struct DiagnosticsSettingsView: View {
                 ContentUnavailableView(
                     "No diagnostic events",
                     systemImage: "checkmark.circle",
-                    description: Text("Say It records timings and stable error codes, never source text.")
+                    description: Text(
+                        "Say It records timings and stable error codes, never source text."
+                    )
                 )
             } else {
                 List(state.diagnosticEvents.reversed()) { event in
-                    HStack {
+                    HStack(spacing: DesignTokens.compactSpacing) {
                         Image(systemName: symbol(for: event.severity))
+                            .foregroundStyle(color(for: event.severity))
+                            .frame(width: 20)
                             .accessibilityHidden(true)
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(event.code)
-                                .font(.body.monospaced())
+                                .font(.callout.monospaced())
                             Text(event.timestamp, format: .dateTime)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text(event.category.rawValue)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 2)
                 }
             }
             Divider()
             HStack {
                 Text("Text, tokens, filenames, and local paths are excluded.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Export…", action: state.exportDiagnostics)
@@ -48,9 +55,18 @@ struct DiagnosticsSettingsView: View {
     private func symbol(for severity: DiagnosticSeverity) -> String {
         switch severity {
         case .debug: "ladybug"
-        case .info: "info.circle"
-        case .warning: "exclamationmark.triangle"
-        case .error: "xmark.octagon"
+        case .info: "info.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .error: "xmark.octagon.fill"
+        }
+    }
+
+    private func color(for severity: DiagnosticSeverity) -> Color {
+        switch severity {
+        case .debug: .secondary
+        case .info: .accentColor
+        case .warning: .orange
+        case .error: .red
         }
     }
 }

@@ -57,6 +57,7 @@ struct SettingsRootView: View {
                 AboutSettingsView()
             }
         }
+        .formStyle(.grouped)
         .environment(state)
     }
 }

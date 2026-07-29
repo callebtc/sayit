@@ -4,14 +4,15 @@ struct HistoryRowView: View {
     let item: HistoryItemSnapshot
 
     var body: some View {
-        HStack {
+        HStack(spacing: DesignTokens.compactSpacing) {
             Image(systemName: item.isPinned ? "pin.fill" : "waveform")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(item.isPinned ? Color.accentColor : .secondary)
+                .frame(width: 16)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .lineLimit(1)
-                HStack {
+                HStack(spacing: 4) {
                     Text(item.createdAt, format: .relative(presentation: .named))
                     if item.duration > 0 {
                         Text("·")
@@ -23,6 +24,7 @@ struct HistoryRowView: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
     }
 }

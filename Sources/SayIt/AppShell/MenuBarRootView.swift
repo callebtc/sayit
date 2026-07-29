@@ -28,8 +28,8 @@ struct MenuBarRootView: View {
 
             Divider()
             ReadClipboardButton()
-                .padding(.horizontal, DesignTokens.standardSpacing)
-                .padding(.vertical, DesignTokens.compactSpacing)
+                .padding(.horizontal, DesignTokens.compactSpacing)
+                .padding(.vertical, 6)
 
             Divider()
             RecentHistoryView()
@@ -37,7 +37,7 @@ struct MenuBarRootView: View {
 
             Divider()
             MenuFooterView()
-                .padding(.horizontal, DesignTokens.standardSpacing)
+                .padding(.horizontal, DesignTokens.generousSpacing)
                 .padding(.vertical, DesignTokens.compactSpacing)
         }
         .frame(width: DesignTokens.popoverWidth)

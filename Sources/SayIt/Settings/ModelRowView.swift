@@ -12,22 +12,18 @@ struct ModelRowView: View {
         HStack(alignment: .top, spacing: DesignTokens.standardSpacing) {
             Image(systemName: statusSymbol)
                 .font(.title2)
-                .foregroundStyle(statusStyle)
+                .foregroundStyle(statusColor)
                 .frame(width: 28)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                HStack(spacing: 6) {
                     Text(model.displayName)
-                        .bold()
+                        .fontWeight(.semibold)
                     if model.stability == .recommended {
-                        Text("Recommended")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        SayItBadge(title: "Recommended")
                     } else if model.stability == .experimental {
-                        Text("Experimental")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                        SayItBadge(title: "Experimental", tint: .orange)
                     }
                 }
                 Text(modelSummary)
@@ -76,6 +72,8 @@ struct ModelRowView: View {
                     action: confirmDelete
                 )
                 .labelStyle(.iconOnly)
+                .buttonStyle(CircularIconButtonStyle(size: 22))
+                .foregroundStyle(.secondary)
                 .confirmationDialog(
                     "Delete \(model.displayName)?",
                     isPresented: $isConfirmingDelete
@@ -161,8 +159,12 @@ struct ModelRowView: View {
         }
     }
 
-    private var statusStyle: HierarchicalShapeStyle {
-        .secondary
+    private var statusColor: Color {
+        if state.installedModelIDs.contains(model.id) {
+            .green
+        } else {
+            .secondary
+        }
     }
 
     private var modelSummary: String {

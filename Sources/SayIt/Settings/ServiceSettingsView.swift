@@ -12,127 +12,130 @@ struct ServiceSettingsView: View {
     @State private var tokenToRevoke: APITokenMetadata?
 
     var body: some View {
-        SettingsPage(
-            title: "Service",
-            subtitle: "Keep speech available to Say It and trusted automation."
-        ) {
-            Form {
-                Section("Background service") {
-                    Toggle(
-                        "Run Say It in the background",
-                        isOn: $backgroundEnabled
+        Form {
+            Section {
+                Toggle(
+                    "Run Say It in the background",
+                    isOn: $backgroundEnabled
+                )
+                .onChange(of: backgroundEnabled) { _, enabled in
+                    updateBackgroundService(enabled)
+                }
+
+                LabeledContent("Registration") {
+                    Text(state.backgroundService.statusDescription)
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Connection") {
+                    Text(state.serviceConnection.label)
+                        .foregroundStyle(.secondary)
+                }
+                if case .online(let version) = state.serviceConnection {
+                    LabeledContent("Service version", value: version)
+                }
+
+                HStack {
+                    Button(
+                        "Restart Service",
+                        systemImage: "arrow.clockwise",
+                        action: state.restartBackgroundService
                     )
-                    .onChange(of: backgroundEnabled) { _, enabled in
-                        updateBackgroundService(enabled)
-                    }
-
-                    LabeledContent("Registration") {
-                        Text(state.backgroundService.statusDescription)
-                            .foregroundStyle(.secondary)
-                    }
-                    LabeledContent("Connection") {
-                        Text(state.serviceConnection.label)
-                            .foregroundStyle(.secondary)
-                    }
-                    if case .online(let version) = state.serviceConnection {
-                        LabeledContent("Service version", value: version)
-                    }
-
-                    HStack {
+                    .disabled(!backgroundEnabled)
+                    if state.backgroundService.status == .requiresApproval {
                         Button(
-                            "Restart Service",
-                            systemImage: "arrow.clockwise",
-                            action: state.restartBackgroundService
+                            "Open Login Items",
+                            action: state.backgroundService
+                                .openLoginItemsSettings
                         )
-                        .disabled(!backgroundEnabled)
-                        if state.backgroundService.status == .requiresApproval {
-                            Button(
-                                "Open Login Items",
-                                action: state.backgroundService
-                                    .openLoginItemsSettings
-                            )
-                        }
-                    }
-
-                    if let message = state.backgroundService.errorMessage {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
                     }
                 }
 
-                Section("Local HTTP API") {
-                    Toggle("Enable HTTP API", isOn: $httpEnabled)
-                        .onChange(of: httpEnabled) { _, _ in
-                            updateHTTP()
-                        }
-                    TextField(
-                        "Port",
-                        value: $httpPort,
-                        format: .number.grouping(.never)
-                    )
-                    .frame(width: 110)
-                    .disabled(!httpEnabled)
-                    .onSubmit(updateHTTP)
+                if let message = state.backgroundService.errorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Background service")
+            }
 
-                    LabeledContent("Base URL") {
-                        HStack {
-                            Text(baseURL)
-                                .textSelection(.enabled)
-                            Button(
-                                "Copy",
-                                systemImage: "doc.on.doc",
-                                action: copyBaseURL
-                            )
-                            .labelStyle(.iconOnly)
-                        }
+            Section {
+                Toggle("Enable HTTP API", isOn: $httpEnabled)
+                    .onChange(of: httpEnabled) { _, _ in
+                        updateHTTP()
                     }
+                TextField(
+                    "Port",
+                    value: $httpPort,
+                    format: .number.grouping(.never)
+                )
+                .frame(width: 110)
+                .disabled(!httpEnabled)
+                .onSubmit(updateHTTP)
 
-                    Text(
-                        "The API listens only on this Mac’s loopback interface. Requests require a scoped bearer token."
+                LabeledContent("Base URL") {
+                    HStack {
+                        Text(baseURL)
+                            .textSelection(.enabled)
+                        Button(
+                            "Copy",
+                            systemImage: "doc.on.doc",
+                            action: copyBaseURL
+                        )
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(CircularIconButtonStyle(size: 22))
+                    }
+                }
+            } header: {
+                Text("Local HTTP API")
+            } footer: {
+                Text(
+                    "The API listens only on this Mac’s loopback interface. Requests require a scoped bearer token."
+                )
+            }
+
+            Section("API tokens") {
+                if state.apiTokens.isEmpty {
+                    Text("No API tokens")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(state.apiTokens) { token in
+                    APITokenRow(
+                        token: token,
+                        onRevoke: {
+                            tokenToRevoke = token
+                        }
+                    )
+                }
+                Button(
+                    "Create Token…",
+                    systemImage: "plus",
+                    action: showTokenCreation
+                )
+            }
+
+            Section("Command line") {
+                if let url = state.commandLineToolURL {
+                    LabeledContent("Bundled tool") {
+                        Text(url.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("Link command") {
+                        Text(linkCommand(for: url))
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label(
+                        "The command-line tool is missing from this build.",
+                        systemImage: "exclamationmark.triangle"
                     )
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("API tokens") {
-                    if state.apiTokens.isEmpty {
-                        Text("No API tokens")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(state.apiTokens) { token in
-                        APITokenRow(
-                            token: token,
-                            onRevoke: {
-                                tokenToRevoke = token
-                            }
-                        )
-                    }
-                    Button(
-                        "Create Token…",
-                        systemImage: "plus",
-                        action: showTokenCreation
-                    )
-                }
-
-                Section("Command line") {
-                    if let url = state.commandLineToolURL {
-                        LabeledContent("Bundled tool") {
-                            Text(url.path)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .textSelection(.enabled)
-                        }
-                        LabeledContent("Link command") {
-                            Text(linkCommand(for: url))
-                                .font(.body.monospaced())
-                                .textSelection(.enabled)
-                        }
-                    } else {
-                        Label(
-                            "The command-line tool is missing from this build.",
-                            systemImage: "exclamationmark.triangle"
-                        )
-                    }
+                    .foregroundStyle(.red)
                 }
             }
         }

@@ -9,34 +9,37 @@ struct GeneralSettingsView: View {
     var body: some View {
         @Bindable var settings = state.settings
 
-        SettingsPage(
-            title: "General",
-            subtitle: "Choose how Say It starts and how you invoke it."
-        ) {
-            Form {
+        Form {
+            Section {
                 Toggle("Launch Say It at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
                         updateLaunchAtLogin(newValue)
                     }
+                if let launchError {
+                    Label(launchError, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+            }
 
+            Section {
                 LabeledContent("Global shortcut") {
                     ShortcutRecorderView(
                         shortcut: settings.globalShortcut,
                         onRecord: state.updateGlobalShortcut
                     )
                 }
-
-                LabeledContent("Selected text service") {
+                LabeledContent("Selected text") {
                     Text("Services → Say It")
                         .foregroundStyle(.secondary)
                 }
-
+            } footer: {
                 Text(
                     "macOS controls where Services appear. Say It does not need Accessibility permission."
                 )
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            }
 
+            Section("Playback") {
                 Picker("Rewind interval", selection: $settings.rewindInterval) {
                     ForEach([5.0, 10, 15, 30], id: \.self) {
                         Text("\(Int($0)) seconds").tag($0)
@@ -54,15 +57,13 @@ struct GeneralSettingsView: View {
                 .onChange(of: settings.forwardInterval) { _, interval in
                     updateForwardInterval(interval)
                 }
+            }
 
+            Section("Updates") {
                 Toggle(
                     "Check for updates daily",
                     isOn: $settings.checkForUpdates
                 )
-            }
-            if let launchError {
-                Label(launchError, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.red)
             }
         }
         .task {

@@ -10,12 +10,13 @@ struct OnboardingProgressView: View {
                     .fill(
                         step == currentStep
                             ? Color.accentColor
-                            : Color.secondary
+                            : Color.secondary.opacity(0.35)
                     )
                     .frame(width: 7, height: 7)
                     .accessibilityHidden(true)
             }
         }
+        .animation(DesignTokens.quickAnimation, value: currentStep)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Onboarding progress")
         .accessibilityValue(

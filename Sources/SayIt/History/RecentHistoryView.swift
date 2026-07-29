@@ -11,11 +11,13 @@ struct RecentHistoryView: View {
             Text("Recent")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, DesignTokens.compactSpacing)
                 .accessibilityAddTraits(.isHeader)
 
             if state.history.items.isEmpty {
                 Text("Spoken items appear here.")
                     .foregroundStyle(.secondary)
+                    .padding(.horizontal, DesignTokens.compactSpacing)
                     .frame(minHeight: DesignTokens.minimumControlSize)
             } else {
                 ForEach(state.history.items.prefix(3)) { item in
@@ -24,7 +26,9 @@ struct RecentHistoryView: View {
             }
 
             Button("View All History…", action: openHistory)
-            .buttonStyle(.link)
+                .buttonStyle(.sayItInline)
+                .font(.callout)
+                .foregroundStyle(Color.accentColor)
         }
     }
 
