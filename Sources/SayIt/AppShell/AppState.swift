@@ -703,10 +703,11 @@ final class AppState {
             currentChunkPreview = preview
         case .audio(let chunk):
             try playback.enqueue(chunk)
-            if playback.generatedDuration >= 1.2,
-               playback.state != .playing {
+            if playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
+            } else if playback.state == .buffering {
+                statusText = "Buffering"
             }
         case .metrics(let metrics):
             await diagnostics.record(

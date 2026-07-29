@@ -5,6 +5,18 @@ import Testing
 
 @Suite("Audio archive")
 struct AudioArchiveTests {
+    @Test("Playback uses high quality time stretching")
+    @MainActor
+    func playbackUsesHighQualityTimeStretching() {
+        #expect(PlaybackController.highQualityTimePitchOverlap == 32)
+        #expect(
+            PlaybackController.preferredStartBufferDuration(for: 1) == 1.2
+        )
+        #expect(
+            PlaybackController.preferredStartBufferDuration(for: 2) == 2.4
+        )
+    }
+
     @Test("Generated speech is saved as audible AAC")
     func generatedSpeechIsSavedAsAudibleAAC() async throws {
         let directory = FileManager.default.temporaryDirectory

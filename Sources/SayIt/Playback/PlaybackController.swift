@@ -7,6 +7,15 @@ import SayItCore
 @MainActor
 @Observable
 final class PlaybackController: PlaybackControlling {
+    private static let baseStartBufferDuration: TimeInterval = 1.2
+    static let highQualityTimePitchOverlap: Float = 32
+
+    static func preferredStartBufferDuration(
+        for rate: Double
+    ) -> TimeInterval {
+        baseStartBufferDuration * max(rate, 1)
+    }
+
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let timePitch = AVAudioUnitTimePitch()
@@ -37,6 +46,16 @@ final class PlaybackController: PlaybackControlling {
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
     private(set) var failureMessage: String?
+    var preferredStartBufferDuration: TimeInterval {
+        Self.preferredStartBufferDuration(for: rate)
+    }
+    var shouldStartWhenBuffered: Bool {
+        guard state == .preparing || state == .buffering else {
+            return false
+        }
+        return synthesisIsComplete
+            || bufferedDuration >= preferredStartBufferDuration
+    }
     var showTitleInNowPlaying = false {
         didSet { updateNowPlaying() }
     }
@@ -67,6 +86,8 @@ final class PlaybackController: PlaybackControlling {
         engine.attach(player)
         engine.attach(timePitch)
         timePitch.rate = Float(rate)
+        timePitch.pitch = 0
+        timePitch.overlap = Self.highQualityTimePitchOverlap
         configureRemoteCommands()
         startTimeline()
         monitorAudioConfiguration()
@@ -296,6 +317,8 @@ final class PlaybackController: PlaybackControlling {
             format: format
         )
         timePitch.rate = Float(rate)
+        timePitch.pitch = 0
+        timePitch.overlap = Self.highQualityTimePitchOverlap
         engine.prepare()
         configuredSampleRate = format.sampleRate
         try ensureEngineRunning()
@@ -460,12 +483,30 @@ final class PlaybackController: PlaybackControlling {
     }
 
     private func finishPlaybackIfReady() {
-        guard synthesisIsComplete,
-              !accumulatedSamples.isEmpty,
+        guard !accumulatedSamples.isEmpty,
               scheduledBufferCount == 0 else {
             return
         }
-        completePlayback()
+        if synthesisIsComplete {
+            completePlayback()
+        } else if state == .playing {
+            enterBufferingState()
+        }
+    }
+
+    private var bufferedDuration: TimeInterval {
+        let playbackPosition = state == .playing
+            ? currentPlaybackTime()
+            : elapsed
+        return max(generatedDuration - playbackPosition, 0)
+    }
+
+    private func enterBufferingState() {
+        elapsed = generatedDuration
+        invalidateScheduledAudio()
+        scheduleOffset = elapsed
+        state = .buffering
+        updateNowPlaying()
     }
 
     private func startTimeline() {
