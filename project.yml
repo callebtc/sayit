@@ -1,0 +1,143 @@
+name: SayIt
+
+options:
+  bundleIdPrefix: com.sayit
+  deploymentTarget:
+    macOS: "15.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+packages:
+  MLXAudio:
+    url: https://github.com/Blaizzy/mlx-audio-swift.git
+    exactVersion: 0.1.3
+
+settings:
+  base:
+    ARCHS: arm64
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
+    DEAD_CODE_STRIPPING: true
+    ENABLE_APP_SANDBOX: true
+    ENABLE_HARDENED_RUNTIME: true
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: true
+    SWIFT_VERSION: "6.0"
+
+targets:
+  SayItCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/SayItCore
+        excludes:
+          - Resources
+      - path: Sources/SayItCore/Resources
+        buildPhase: resources
+    settings:
+      base:
+        DEFINES_MODULE: true
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.core
+        PRODUCT_NAME: SayItCore
+        SKIP_INSTALL: true
+
+  SayIt:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/SayIt
+        excludes:
+          - Resources
+      - path: Sources/SayIt/Resources
+        buildPhase: resources
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Say It
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LSUIElement: true
+        NSServices:
+          - NSMenuItem:
+              default: Say It
+            NSMessage: saySelectedText
+            NSPortName: SayIt
+            NSRequiredContext: {}
+            NSRestricted: false
+            NSReturnTypes: []
+            NSServiceCategory: public.text
+            NSSendTypes:
+              - public.utf8-plain-text
+              - NSStringPboardType
+              - public.html
+              - public.rtf
+              - public.rtfd
+        NSHumanReadableCopyright: "Copyright © 2026 Say It"
+    entitlements:
+      path: Config/SayIt.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.network.client: true
+    dependencies:
+      - target: SayItCore
+        embed: true
+      - package: MLXAudio
+        product: MLXAudioCore
+      - package: MLXAudio
+        product: MLXAudioTTS
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Config/SayIt.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        EXECUTABLE_NAME: SayIt
+        INFOPLIST_FILE: Config/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac
+        PRODUCT_NAME: SayIt
+
+  SayItCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItCoreTests
+        excludes:
+          - Fixtures
+      - path: Tests/SayItCoreTests/Fixtures
+        buildPhase: resources
+    dependencies:
+      - target: SayItCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.core-tests
+
+  SayItUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: Tests/SayItUITests
+    dependencies:
+      - target: SayIt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.ui-tests
+        TEST_TARGET_NAME: SayIt
+
+schemes:
+  SayIt:
+    build:
+      targets:
+        SayIt: all
+        SayItCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SayItCoreTests
+        - SayItUITests
+    archive:
+      config: Release

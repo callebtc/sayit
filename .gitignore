@@ -1,0 +1,37 @@
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+Build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.xcresult
+*.dSYM
+*.xcarchive
+
+# Release artifacts
+*.dmg
+*.pkg
+*.zip
+
+# Local configuration and signing material
+.env
+.env.*
+!.env.example
+*.cer
+*.key
+*.mobileprovision
+*.p12
+*.provisionprofile
+
+# Downloaded model weights
+*.bin
+*.gguf
+*.onnx
+*.safetensors
