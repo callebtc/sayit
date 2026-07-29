@@ -9,6 +9,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.servicesProvider = serviceProvider
         NSUpdateDynamicServices()
 
+        let center = NotificationCenter.default
+        for name in [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didExposeNotification,
+            NSWindow.willCloseNotification,
+            NSWindow.didMiniaturizeNotification,
+            NSWindow.didDeminiaturizeNotification
+        ] {
+            center.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    self.updateDockPresence()
+                }
+            }
+        }
+
         do {
             try GlobalHotKeyManager.shared.register(
                 AppState.shared.settings.globalShortcut
@@ -24,8 +43,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = notification
     }
 
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        Task {
+            await AppState.shared.terminateBackgroundServiceForQuit()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         GlobalHotKeyManager.shared.unregister()
         _ = notification
+    }
+
+    private func updateDockPresence() {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                let hasVisibleWindow = NSApp.windows.contains { window in
+                    window.isVisible && window.canBecomeMain
+                }
+                let target: NSApplication.ActivationPolicy =
+                    hasVisibleWindow ? .regular : .accessory
+                if NSApp.activationPolicy() != target {
+                    NSApp.setActivationPolicy(target)
+                }
+            }
+        }
     }
 }

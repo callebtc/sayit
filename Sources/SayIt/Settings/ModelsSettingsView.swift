@@ -8,10 +8,21 @@ struct ModelsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField("Search models", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding(.horizontal, DesignTokens.standardSpacing)
+            .padding(.vertical, DesignTokens.compactSpacing)
+
+            Divider()
+
             List(filteredModels) { model in
                 ModelRowView(model: model)
             }
-            .searchable(text: $searchText, prompt: "Search models")
             .overlay {
                 if filteredModels.isEmpty {
                     if searchText.isEmpty {

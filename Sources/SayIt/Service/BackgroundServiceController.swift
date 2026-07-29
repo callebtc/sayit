@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import SayItCore
 import SayItProtocol
 import ServiceManagement
 
@@ -7,6 +8,8 @@ import ServiceManagement
 @Observable
 final class BackgroundServiceController {
     static let userDisabledDefaultsKey = "backgroundServiceUserDisabled"
+    private static let legacyCleanupDefaultsKey =
+        "backgroundServiceLegacyCleanupDone"
 
     private let service = SMAppService.agent(
         plistName: SayItServiceIdentifiers.launchAgentPlist
@@ -14,22 +17,21 @@ final class BackgroundServiceController {
 
     private(set) var status: SMAppService.Status
     private(set) var errorMessage: String?
-#if DEBUG
+    private(set) var isWorking = false
+    #if DEBUG
     private(set) var isDevelopmentServiceRunning = false
-#endif
+    #endif
 
     init() {
         status = service.status
     }
 
     var isEnabled: Bool {
-#if DEBUG
-        status == .enabled
-            || status == .requiresApproval
-            || isDevelopmentServiceRunning
-#else
+        #if DEBUG
+        isDevelopmentServiceRunning
+        #else
         status == .enabled || status == .requiresApproval
-#endif
+        #endif
     }
 
     var isUserDisabled: Bool {
@@ -39,11 +41,12 @@ final class BackgroundServiceController {
     }
 
     var statusDescription: String {
-#if DEBUG
-        if isDevelopmentServiceRunning {
-            return "Running"
+        if isWorking {
+            return "Working…"
         }
-#endif
+        #if DEBUG
+        return isDevelopmentServiceRunning ? "Running" : "Off"
+        #else
         return switch status {
         case .notRegistered:
             "Off"
@@ -56,110 +59,218 @@ final class BackgroundServiceController {
         @unknown default:
             "Unknown"
         }
+        #endif
     }
 
     func refresh() {
         status = service.status
     }
 
+    func ensureRunning() async {
+        guard !isUserDisabled else { return }
+        await perform {
+            await legacyCleanupIfNeeded()
+            writeParentProcessFile()
+            #if DEBUG
+            try await ensureDevelopmentServiceRunning()
+            #else
+            if status == .enabled, parentProcessFileMatches {
+                return
+            }
+            try await restartRegisteredService()
+            #endif
+        }
+    }
+
     func enable() async {
-        errorMessage = nil
         UserDefaults.standard.set(
             false,
             forKey: Self.userDisabledDefaultsKey
         )
-        var registrationError: Error?
-        do {
-            if service.status != .enabled
-                && service.status != .requiresApproval {
-                try service.register()
-            }
-        } catch {
-            registrationError = error
-        }
-        refresh()
-
-#if DEBUG
-        do {
-            try await DevelopmentServiceLauncher.ensureRunning(
-                agentURL: agentURL
-            )
-            isDevelopmentServiceRunning = true
-            registrationError = nil
-        } catch {
-            isDevelopmentServiceRunning = false
-            if status != .enabled && status != .requiresApproval {
-                registrationError = error
-            }
-        }
-#endif
-        errorMessage = registrationError?.localizedDescription
+        await ensureRunning()
     }
 
     func disable() async {
-        errorMessage = nil
-#if DEBUG
-        if isDevelopmentServiceRunning {
-            do {
+        await perform {
+            #if DEBUG
+            if DevelopmentServiceLauncher.isLoaded {
                 try DevelopmentServiceLauncher.unregister()
-                isDevelopmentServiceRunning = false
-            } catch {
-                errorMessage = error.localizedDescription
             }
+            isDevelopmentServiceRunning = false
+            #else
+            await unregisterAndWait()
+            #endif
+            removeParentProcessFile()
+            UserDefaults.standard.set(
+                true,
+                forKey: Self.userDisabledDefaultsKey
+            )
         }
-#endif
-        do {
-            if service.status == .enabled
-                || service.status == .requiresApproval {
-                try await service.unregister()
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        UserDefaults.standard.set(
-            true,
-            forKey: Self.userDisabledDefaultsKey
-        )
-        refresh()
     }
 
     func restart() async {
-        errorMessage = nil
-#if DEBUG
-        if isDevelopmentServiceRunning {
-            do {
-                try DevelopmentServiceLauncher.unregister()
-                try await DevelopmentServiceLauncher.ensureRunning(
-                    agentURL: agentURL
-                )
-            } catch {
-                isDevelopmentServiceRunning = false
-                errorMessage = error.localizedDescription
-            }
-            return
+        await perform {
+            writeParentProcessFile()
+            #if DEBUG
+            try await ensureDevelopmentServiceRunning()
+            #else
+            try await restartRegisteredService()
+            #endif
         }
-#endif
-        do {
-            if service.status == .enabled
-                || service.status == .requiresApproval {
-                try await service.unregister()
-            }
-            try service.register()
-        } catch {
-            errorMessage = error.localizedDescription
+    }
+
+    func terminateForQuit() async {
+        #if DEBUG
+        if DevelopmentServiceLauncher.isLoaded {
+            try? DevelopmentServiceLauncher.unregister()
         }
-        refresh()
+        isDevelopmentServiceRunning = false
+        #else
+        if service.status == .enabled || service.status == .requiresApproval {
+            try? await service.unregister()
+        }
+        #endif
+        removeParentProcessFile()
     }
 
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-#if DEBUG
+    private func perform(_ work: () async throws -> Void) async {
+        guard !isWorking else { return }
+        isWorking = true
+        errorMessage = nil
+        do {
+            try await work()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        refresh()
+        isWorking = false
+    }
+
+    private func legacyCleanupIfNeeded() async {
+        #if DEBUG
+        guard !UserDefaults.standard.bool(
+            forKey: Self.legacyCleanupDefaultsKey
+        ) else {
+            return
+        }
+        UserDefaults.standard.set(
+            true,
+            forKey: Self.legacyCleanupDefaultsKey
+        )
+        DevelopmentServiceLauncher.removeLegacyJobIfNeeded()
+        if service.status == .enabled || service.status == .requiresApproval {
+            try? await service.unregister()
+        }
+        refresh()
+        #endif
+    }
+
+    private func restartRegisteredService() async throws {
+        await unregisterAndWait()
+        try await registerAndWait()
+    }
+
+    private func unregisterAndWait() async {
+        guard service.status == .enabled
+            || service.status == .requiresApproval else {
+            return
+        }
+        do {
+            try await service.unregister()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        for _ in 0..<50 {
+            if service.status == .notRegistered {
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        refresh()
+    }
+
+    private func registerAndWait() async throws {
+        var lastError: Error?
+        for attempt in 0..<2 {
+            do {
+                if service.status != .enabled
+                    && service.status != .requiresApproval {
+                    try service.register()
+                }
+                lastError = nil
+            } catch {
+                lastError = error
+            }
+            for _ in 0..<50 {
+                if service.status == .enabled
+                    || service.status == .requiresApproval {
+                    refresh()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            if attempt == 0 {
+                await unregisterAndWait()
+            }
+        }
+        refresh()
+        throw lastError ?? ControllerError.registrationFailed
+    }
+
+    private var parentProcessFileMatches: Bool {
+        guard let directory = serviceDataDirectory,
+              let pid = ParentProcessFile.readPID(from: directory) else {
+            return false
+        }
+        return pid == ProcessInfo.processInfo.processIdentifier
+    }
+
+    private func writeParentProcessFile() {
+        guard let directory = serviceDataDirectory else { return }
+        ParentProcessFile.write(
+            pid: ProcessInfo.processInfo.processIdentifier,
+            in: directory
+        )
+    }
+
+    private func removeParentProcessFile() {
+        guard let directory = serviceDataDirectory else { return }
+        ParentProcessFile.remove(from: directory)
+    }
+
+    private var serviceDataDirectory: URL? {
+        try? AppDirectories.shared(
+            appGroupIdentifier: SayItServiceIdentifiers.appGroup
+        ).applicationSupport
+    }
+
+    private enum ControllerError: LocalizedError {
+        case registrationFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .registrationFailed:
+                "The background service could not be registered."
+            }
+        }
+    }
+
+    #if DEBUG
+    private func ensureDevelopmentServiceRunning() async throws {
+        try await DevelopmentServiceLauncher.ensureRunning(
+            agentURL: agentURL
+        )
+        isDevelopmentServiceRunning = true
+    }
+
     private var agentURL: URL {
         Bundle.main.bundleURL.appending(
             path: "Contents/Library/LaunchServices/SayItAgent"
         )
     }
-#endif
+    #endif
 }

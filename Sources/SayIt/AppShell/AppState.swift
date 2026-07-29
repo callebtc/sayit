@@ -22,6 +22,7 @@ final class AppState {
     private let updateChecker = UpdateChecker()
     private var pollingTask: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
+    private var serviceRepairTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
@@ -72,7 +73,7 @@ final class AppState {
         }
 
         if !backgroundService.isUserDisabled {
-            await backgroundService.enable()
+            await backgroundService.ensureRunning()
         }
 
         startPolling()
@@ -448,6 +449,18 @@ final class AppState {
         }
     }
 
+    func enableBackgroundService() {
+        Task {
+            await backgroundService.enable()
+            await client.invalidate()
+            serviceConnection = .connecting
+        }
+    }
+
+    func terminateBackgroundServiceForQuit() async {
+        await backgroundService.terminateForQuit()
+    }
+
     func checkForUpdates() {
         updateStatus = "Checking…"
         Task {
@@ -523,10 +536,26 @@ final class AppState {
                     self.serviceConnection = .offline
                     self.statusText = "Background service unavailable"
                     await self.client.invalidate()
+                    self.scheduleServiceRepair()
                     try? await Task.sleep(for: retryDelay)
                     retryDelay = min(retryDelay * 2, .seconds(8))
                 }
             }
+        }
+    }
+
+    private func scheduleServiceRepair() {
+        guard serviceRepairTask == nil,
+              !backgroundService.isUserDisabled,
+              !backgroundService.isWorking else {
+            return
+        }
+        serviceRepairTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard let self, !Task.isCancelled else { return }
+            await self.backgroundService.ensureRunning()
+            await self.client.invalidate()
+            self.serviceRepairTask = nil
         }
     }
 

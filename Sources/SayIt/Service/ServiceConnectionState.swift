@@ -21,4 +21,13 @@ enum ServiceConnectionState: Equatable {
             "Update required"
         }
     }
+
+    var showsRepair: Bool {
+        switch self {
+        case .disabled, .offline, .updateRequired:
+            true
+        case .connecting, .online:
+            false
+        }
+    }
 }

@@ -222,10 +222,12 @@ public final class SayItBackendService: SayItService {
         case .play:
             playback.play()
             updateActiveJobState(.playing)
+            revision &+= 1
             return .accepted
         case .pause:
             playback.pause()
             updateActiveJobState(.paused)
+            revision &+= 1
             return .accepted
         case .clear:
             cancelActiveJob()
@@ -239,9 +241,11 @@ public final class SayItBackendService: SayItService {
             return .accepted
         case .seek(let seconds):
             playback.seek(to: seconds)
+            revision &+= 1
             return .accepted
         case .skip(let seconds):
             playback.skip(by: seconds)
+            revision &+= 1
             return .accepted
         case .setPlaybackRate(let rate):
             try setPlaybackRate(rate)
@@ -606,6 +610,8 @@ public final class SayItBackendService: SayItService {
     private func cancelActiveJob(startNext: Bool = true) {
         guard let id = activeJobID else {
             playback.stop()
+            statusText = "Ready to speak"
+            revision &+= 1
             if startNext {
                 startNextJobIfNeeded()
             }

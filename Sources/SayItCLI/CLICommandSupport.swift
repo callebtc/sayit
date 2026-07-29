@@ -15,7 +15,9 @@ enum CLICommandSupport {
             CLIOutput.status(failure.message)
             throw CLIExitCode.rejected
         } catch {
-            CLIOutput.status("Say It background service is unavailable.")
+            CLIOutput.status(
+                "Say It background service is unavailable. Start it with: sayit service start"
+            )
             throw CLIExitCode.unavailable
         }
     }

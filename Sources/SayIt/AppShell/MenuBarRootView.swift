@@ -8,7 +8,11 @@ struct MenuBarRootView: View {
             StatusHeaderView()
                 .padding(DesignTokens.generousSpacing)
 
-            if let progress = state.downloadProgress {
+            if state.serviceConnection.showsRepair {
+                Divider()
+                ServiceRepairView()
+                    .padding(DesignTokens.generousSpacing)
+            } else if let progress = state.downloadProgress {
                 Divider()
                 DownloadStatusView(progress: progress)
                     .padding(DesignTokens.generousSpacing)

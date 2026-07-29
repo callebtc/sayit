@@ -5,7 +5,6 @@ import SwiftUI
 
 struct ServiceSettingsView: View {
     @Environment(AppState.self) private var state
-    @State private var backgroundEnabled = false
     @State private var httpEnabled = false
     @State private var httpPort = 59_125
     @State private var isCreatingToken = false
@@ -16,15 +15,19 @@ struct ServiceSettingsView: View {
             Section {
                 Toggle(
                     "Run Say It in the background",
-                    isOn: $backgroundEnabled
+                    isOn: backgroundServiceEnabled
                 )
-                .onChange(of: backgroundEnabled) { _, enabled in
-                    updateBackgroundService(enabled)
-                }
+                .disabled(state.backgroundService.isWorking)
 
                 LabeledContent("Registration") {
-                    Text(state.backgroundService.statusDescription)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        if state.backgroundService.isWorking {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(state.backgroundService.statusDescription)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 LabeledContent("Connection") {
                     Text(state.serviceConnection.label)
@@ -40,7 +43,10 @@ struct ServiceSettingsView: View {
                         systemImage: "arrow.clockwise",
                         action: state.restartBackgroundService
                     )
-                    .disabled(!backgroundEnabled)
+                    .disabled(
+                        state.backgroundService.isWorking
+                            || !state.backgroundService.isEnabled
+                    )
                     if state.backgroundService.status == .requiresApproval {
                         Button(
                             "Open Login Items",
@@ -193,23 +199,23 @@ struct ServiceSettingsView: View {
 
     private func synchronize() {
         state.backgroundService.refresh()
-        backgroundEnabled = state.backgroundService.isEnabled
         httpEnabled = state.backendSettings.httpEnabled
         httpPort = state.backendSettings.httpPort
     }
 
-    private func updateBackgroundService(_ enabled: Bool) {
-        if enabled {
-            Task {
-                await state.backgroundService.enable()
-                backgroundEnabled = state.backgroundService.isEnabled
+    private var backgroundServiceEnabled: Binding<Bool> {
+        Binding(
+            get: { state.backgroundService.isEnabled },
+            set: { enabled in
+                Task {
+                    if enabled {
+                        await state.backgroundService.enable()
+                    } else {
+                        await state.backgroundService.disable()
+                    }
+                }
             }
-        } else {
-            Task {
-                await state.backgroundService.disable()
-                backgroundEnabled = state.backgroundService.isEnabled
-            }
-        }
+        )
     }
 
     private func updateHTTP() {
