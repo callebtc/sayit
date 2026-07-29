@@ -54,6 +54,13 @@ let package = Package(
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
+        ),
+        .testTarget(
+            name: "SayItPlaybackTests",
+            dependencies: ["SayIt"],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
+            ]
         )
     ]
 )

@@ -83,6 +83,9 @@ final class AppState {
                 fileURL: directories.diagnostics.appending(path: "events.jsonl")
             )
             isShowingOnboarding = !settings.onboardingComplete
+            playback.onFailure = { [weak self] message in
+                self?.presentError(message)
+            }
         } catch {
             fatalError("Say It could not initialize its local storage.")
         }
@@ -721,13 +724,37 @@ final class AppState {
         case .completed:
             playback.finishBuffering()
             statusText = "Playing"
-            let archive = try await playback.archive(using: audioArchive)
-            try history.complete(
-                id: request.id,
-                duration: archive.duration,
-                audioRelativePath: archive.relativePath,
-                audioByteCount: archive.byteCount
-            )
+            do {
+                let archive = try await playback.archive(using: audioArchive)
+                do {
+                    try history.complete(
+                        id: request.id,
+                        duration: archive.duration,
+                        audioRelativePath: archive.relativePath,
+                        audioByteCount: archive.byteCount
+                    )
+                } catch {
+                    await audioArchive.remove(
+                        relativePath: archive.relativePath
+                    )
+                    throw error
+                }
+            } catch {
+                statusText = "Playing · History unavailable"
+                try? history.markIncomplete(
+                    id: request.id,
+                    state: .failed,
+                    code: "history.audio_archive_failed"
+                )
+                await diagnostics.record(
+                    DiagnosticEvent(
+                        severity: .error,
+                        category: .history,
+                        code: "history.audio_archive_failed",
+                        modelID: request.model.id
+                    )
+                )
+            }
             activeRequest = nil
             currentChunkPreview = ""
         case .cancelled:

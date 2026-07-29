@@ -107,6 +107,7 @@
 		C2F4D9E7CDB5C6281D797919 /* ModelManagerError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7FD527A36C41A4553D41088 /* ModelManagerError.swift */; };
 		C43F98C9225BD0513539126A /* TextSourcePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE9FEAEE8B390CA9BE7F2E8 /* TextSourcePayload.swift */; };
 		C520F5B2D9F044D4EE97D39A /* ModelCatalogLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A6E8F33DBF64C1BFB3CE00 /* ModelCatalogLoader.swift */; };
+		C5DDCD8C2ADA3EC97F5DCF80 /* PlaybackError.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE927B5032990CC7782DB7BF /* PlaybackError.swift */; };
 		C8AC9D0FE1CE408BF436056D /* VoiceOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8AE17E0ADBDD4860F7604D4 /* VoiceOnboardingView.swift */; };
 		CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D11844224540E3E5B3A989 /* AppWindowID.swift */; };
 		CD657C1B79B4D3F8B8786387 /* HistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0988A39F0FE54069C0F6CC /* HistoryDetailView.swift */; };
@@ -287,6 +288,7 @@
 		B825339FFDAD336D58CA0052 /* SpeechChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechChunk.swift; sourceTree = "<group>"; };
 		B87F2C2259F4A52F916707E9 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		B91703C2C565D3CE1A51D108 /* String+Padding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Padding.swift"; sourceTree = "<group>"; };
+		BE927B5032990CC7782DB7BF /* PlaybackError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackError.swift; sourceTree = "<group>"; };
 		C1F03C694936914BB34739D7 /* DiagnosticExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticExport.swift; sourceTree = "<group>"; };
 		C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogError.swift; sourceTree = "<group>"; };
 		C7FD527A36C41A4553D41088 /* ModelManagerError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerError.swift; sourceTree = "<group>"; };
@@ -494,6 +496,7 @@
 				A5AC492CDFA9ACE502640394 /* AudioArchiveResult.swift */,
 				E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */,
 				44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */,
+				BE927B5032990CC7782DB7BF /* PlaybackError.swift */,
 				02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */,
 				396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */,
 			);
@@ -988,6 +991,7 @@
 				25C973535C87B9998DBFE308 /* PasteboardPayloadReader.swift in Sources */,
 				245C2FAE01D5A6E480FDE344 /* PlaybackController.swift in Sources */,
 				22B295F9AD2362B159941CB4 /* PlaybackControlsView.swift in Sources */,
+				C5DDCD8C2ADA3EC97F5DCF80 /* PlaybackError.swift in Sources */,
 				D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */,
 				AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */,
 				1066672AD8F1CD5C55522FFE /* ReadClipboardButton.swift in Sources */,
