@@ -17,7 +17,9 @@ struct SpeechPreviewView: View {
                 .lineLimit(2...4)
 
                 HStack {
-                    Text("Uses the model, voice, language, and speed selected above.")
+                    Text(
+                        "Speaking pace is generated into new audio. Playback speed changes listening instantly."
+                    )
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Spacer()

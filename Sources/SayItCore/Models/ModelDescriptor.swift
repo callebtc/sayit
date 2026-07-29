@@ -83,4 +83,13 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
             files.reduce(0) { $0 + $1.byteCount }
         }
     }
+
+    public var supportsNativeSpeakingPace: Bool {
+        switch modelType.lowercased() {
+        case "kokoro", "kokoro_tts":
+            true
+        default:
+            false
+        }
+    }
 }

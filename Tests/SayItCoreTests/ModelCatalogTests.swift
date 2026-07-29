@@ -47,4 +47,14 @@ struct ModelCatalogTests {
             )
         )
     }
+
+    @Test("Only verified native models advertise speaking pace")
+    func nativeSpeakingPaceSupport() throws {
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let supportedIDs = catalog.models
+            .filter(\.supportsNativeSpeakingPace)
+            .map(\.id)
+
+        #expect(supportedIDs == [ModelID("kokoro-bf16")])
+    }
 }
