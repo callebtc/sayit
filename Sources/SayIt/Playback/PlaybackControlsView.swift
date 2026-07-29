@@ -4,9 +4,9 @@ struct PlaybackControlsView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        @Bindable var playback = state.playback
+        HStack(spacing: DesignTokens.standardSpacing) {
+            playbackRateMenu
 
-        HStack {
             Button(
                 "Back \(Int(state.settings.rewindInterval)) seconds",
                 systemImage: "gobackward.\(Int(state.settings.rewindInterval))"
@@ -14,6 +14,7 @@ struct PlaybackControlsView: View {
                 state.playback.skip(by: -state.settings.rewindInterval)
             }
             .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
             .controlSize(.large)
 
             Spacer()
@@ -43,25 +44,48 @@ struct PlaybackControlsView: View {
                 state.playback.skip(by: state.settings.forwardInterval)
             }
             .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
             .controlSize(.large)
-        }
 
-        HStack {
-            Picker("Playback rate", selection: $playback.rate) {
-                ForEach([0.75, 1, 1.25, 1.5, 1.75, 2], id: \.self) { rate in
-                    Text(rate, format: .number.precision(.fractionLength(0...2)))
-                        .tag(rate)
+            Button(
+                "Clear",
+                systemImage: "xmark",
+                action: state.clearCurrentSpeech
+            )
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var playbackRateMenu: some View {
+        Menu {
+            ForEach([0.75, 1, 1.25, 1.5, 1.75, 2], id: \.self) { rate in
+                Button {
+                    setPlaybackRate(rate)
+                } label: {
+                    if state.playback.rate == rate {
+                        Label(formattedRate(rate), systemImage: "checkmark")
+                    } else {
+                        Text(formattedRate(rate))
+                    }
                 }
             }
-            .labelsHidden()
-            .frame(width: 86)
-            .onChange(of: playback.rate) { _, newRate in
-                state.settings.playbackRate = newRate
-            }
-            Spacer()
-            Button("Stop") {
-                state.cancelCurrentRequest()
-            }
+        } label: {
+            Label(
+                formattedRate(state.playback.rate),
+                systemImage: "speedometer"
+            )
         }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Playback speed")
+    }
+
+    private func setPlaybackRate(_ rate: Double) {
+        state.playback.rate = rate
+        state.settings.playbackRate = rate
+    }
+
+    private func formattedRate(_ rate: Double) -> String {
+        "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RecentHistoryView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -48,6 +49,7 @@ struct RecentHistoryView: View {
     }
 
     private func openHistory() {
+        dismiss()
         openWindow(id: AppWindowID.history)
         NSApp.activate()
     }

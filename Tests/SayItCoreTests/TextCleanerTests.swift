@@ -67,6 +67,27 @@ struct TextCleanerTests {
         #expect(result.title == "First sentence.")
     }
 
+    @Test("Leading whitespace does not prevent Markdown parsing or title creation")
+    func parsesIndentedMarkdownInput() async throws {
+        let input = """
+
+
+              ---
+              draft: true
+              ---
+              # A useful title
+
+              Body text.
+              """
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(result.cleanupSummary.sourceFormat == "Markdown")
+        #expect(result.text.hasPrefix("A useful title"))
+        #expect(result.title == "A useful title")
+    }
+
     @Test("Empty and oversized input are rejected")
     func rejectsInvalidLengths() async {
         await #expect(throws: TextIngestionError.noReadableText) {

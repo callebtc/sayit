@@ -139,10 +139,16 @@ final class AppState {
     }
 
     func speakSample() {
+        speakSample(
+            "Say It turns the words on your Mac into calm, private audio."
+        )
+    }
+
+    func speakSample(_ text: String) {
         receive(
             TextSourcePayload(
-                source: .clipboard,
-                plainText: "Say It turns the words on your Mac into calm, private audio."
+                source: .preview,
+                plainText: text
             )
         )
     }
@@ -179,12 +185,18 @@ final class AppState {
             await synthesizer.cancelCurrentRequest()
         }
         playback.stop()
-        if preserveHistory, let activeRequest {
+        if preserveHistory,
+           let activeRequest,
+           activeRequest.source != .preview {
             try? history.markIncomplete(id: activeRequest.id, state: .canceled)
         }
         activeRequest = nil
         currentChunkPreview = ""
         statusText = "Ready to speak"
+    }
+
+    func clearCurrentSpeech() {
+        cancelCurrentRequest()
     }
 
     func installModel(_ id: ModelID) {
@@ -646,10 +658,12 @@ final class AppState {
             source: source
         )
         activeRequest = request
-        do {
-            try history.begin(request)
-        } catch {
-            logger.error("History begin failed, code: history.begin_failed")
+        if request.source != .preview {
+            do {
+                try history.begin(request)
+            } catch {
+                logger.error("History begin failed, code: history.begin_failed")
+            }
         }
 
         playback.rate = settings.playbackRate
@@ -668,14 +682,18 @@ final class AppState {
                 try await handle(event, request: request)
             }
         } catch is CancellationError {
-            try? history.markIncomplete(id: request.id, state: .canceled)
+            if request.source != .preview {
+                try? history.markIncomplete(id: request.id, state: .canceled)
+            }
         } catch {
             playback.stop()
-            try? history.markIncomplete(
-                id: request.id,
-                state: .failed,
-                code: "synthesis.failed"
-            )
+            if request.source != .preview {
+                try? history.markIncomplete(
+                    id: request.id,
+                    state: .failed,
+                    code: "synthesis.failed"
+                )
+            }
             presentError(error.localizedDescription)
             await diagnostics.record(
                 DiagnosticEvent(
@@ -725,41 +743,45 @@ final class AppState {
         case .completed:
             playback.finishBuffering()
             statusText = "Playing"
-            do {
-                let archive = try await playback.archive(using: audioArchive)
+            if request.source != .preview {
                 do {
-                    try history.complete(
-                        id: request.id,
-                        duration: archive.duration,
-                        audioRelativePath: archive.relativePath,
-                        audioByteCount: archive.byteCount
-                    )
+                    let archive = try await playback.archive(using: audioArchive)
+                    do {
+                        try history.complete(
+                            id: request.id,
+                            duration: archive.duration,
+                            audioRelativePath: archive.relativePath,
+                            audioByteCount: archive.byteCount
+                        )
+                    } catch {
+                        await audioArchive.remove(
+                            relativePath: archive.relativePath
+                        )
+                        throw error
+                    }
                 } catch {
-                    await audioArchive.remove(
-                        relativePath: archive.relativePath
+                    statusText = "Playing · History unavailable"
+                    try? history.markIncomplete(
+                        id: request.id,
+                        state: .failed,
+                        code: "history.audio_archive_failed"
                     )
-                    throw error
+                    await diagnostics.record(
+                        DiagnosticEvent(
+                            severity: .error,
+                            category: .history,
+                            code: "history.audio_archive_failed",
+                            modelID: request.model.id
+                        )
+                    )
                 }
-            } catch {
-                statusText = "Playing · History unavailable"
-                try? history.markIncomplete(
-                    id: request.id,
-                    state: .failed,
-                    code: "history.audio_archive_failed"
-                )
-                await diagnostics.record(
-                    DiagnosticEvent(
-                        severity: .error,
-                        category: .history,
-                        code: "history.audio_archive_failed",
-                        modelID: request.model.id
-                    )
-                )
             }
             activeRequest = nil
             currentChunkPreview = ""
         case .cancelled:
-            try? history.markIncomplete(id: request.id, state: .canceled)
+            if request.source != .preview {
+                try? history.markIncomplete(id: request.id, state: .canceled)
+            }
         }
     }
 

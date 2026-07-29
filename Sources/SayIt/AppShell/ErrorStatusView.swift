@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ErrorStatusView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
     let message: String
 
@@ -26,6 +27,7 @@ struct ErrorStatusView: View {
     }
 
     private func openOnboarding() {
+        dismiss()
         state.showOnboarding()
         openWindow(id: AppWindowID.onboarding)
         NSApp.activate()

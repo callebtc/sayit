@@ -16,14 +16,12 @@ struct SayItApplication: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Say It Settings", id: AppWindowID.settings) {
+        Settings {
             SettingsRootView()
                 .environment(state)
                 .frame(minWidth: 720, minHeight: 500)
         }
         .defaultSize(width: 760, height: 560)
-        .windowResizability(.contentMinSize)
-        .defaultLaunchBehavior(.suppressed)
 
         Window("History", id: AppWindowID.history) {
             HistoryView()

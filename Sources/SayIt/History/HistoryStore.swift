@@ -9,6 +9,7 @@ final class HistoryStore {
     let container: ModelContainer
     private let context: ModelContext
     private let directories: AppDirectories
+    private let titleGenerator = SpeechTitleGenerator()
     private(set) var items: [HistoryItemSnapshot] = []
 
     init(directories: AppDirectories) throws {
@@ -158,10 +159,19 @@ final class HistoryStore {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         descriptor.fetchLimit = 500
+        var repairedTitle = false
         items = try context.fetch(descriptor).map {
-            HistoryItemSnapshot(
+            let storedTitle = titleGenerator.title(from: $0.title)
+            let title = storedTitle == SpeechTitleGenerator.fallbackTitle
+                ? titleGenerator.title(from: $0.cleanedText)
+                : storedTitle
+            if $0.title != title {
+                $0.title = title
+                repairedTitle = true
+            }
+            return HistoryItemSnapshot(
                 id: $0.id,
-                title: $0.title,
+                title: title,
                 cleanedText: $0.cleanedText,
                 createdAt: $0.createdAt,
                 modelID: ModelID($0.modelIDRawValue),
@@ -171,6 +181,9 @@ final class HistoryStore {
                 state: SpeechItemState(rawValue: $0.stateRawValue) ?? .failed,
                 isPinned: $0.isPinned
             )
+        }
+        if repairedTitle {
+            try context.save()
         }
     }
 }
