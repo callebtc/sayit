@@ -43,7 +43,10 @@ struct VoiceOnboardingView: View {
                     DownloadStatusView(progress: progress)
                         .frame(maxWidth: 380)
                 } else {
-                    Button("Download Kokoro", action: { state.installModel(model.id) })
+                    Button(
+                        "Download Kokoro",
+                        action: downloadRecommendedModel
+                    )
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -53,5 +56,10 @@ struct VoiceOnboardingView: View {
 
     private var recommendedModel: ModelDescriptor? {
         state.models.first { $0.stability == .recommended }
+    }
+
+    private func downloadRecommendedModel() {
+        guard let model = recommendedModel else { return }
+        state.installModel(model.id)
     }
 }

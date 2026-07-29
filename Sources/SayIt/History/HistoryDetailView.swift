@@ -25,50 +25,84 @@ struct HistoryDetailView: View {
 
             Divider()
             HStack {
-                Button("Play", systemImage: "play.fill") {
-                    state.replay(item)
-                }
+                Button(
+                    "Play",
+                    systemImage: "play.fill",
+                    action: replay
+                )
                 .buttonStyle(.borderedProminent)
                 .disabled(item.state != .completed)
 
                 Menu("Export", systemImage: "square.and.arrow.up") {
-                    Button("Export M4A") {
-                        state.export(item, kind: .m4a)
-                    }
+                    Button("Export M4A", action: exportM4A)
                     .disabled(item.state != .completed)
-                    Button("Export WAV") {
-                        state.export(item, kind: .wav)
-                    }
+                    Button("Export WAV", action: exportWAV)
                     .disabled(item.state != .completed)
-                    Button("Export Text") {
-                        state.export(item, kind: .text)
-                    }
-                }
-                Button("Regenerate", systemImage: "arrow.clockwise") {
-                    state.regenerate(item)
+                    Button("Export Text", action: exportText)
                 }
                 Button(
+                    "Regenerate",
+                    systemImage: "arrow.clockwise",
+                    action: regenerate
+                )
+                Button(
                     item.isPinned ? "Unpin" : "Pin",
-                    systemImage: item.isPinned ? "pin.slash" : "pin"
-                ) {
-                    state.togglePinned(item)
-                }
+                    systemImage: item.isPinned ? "pin.slash" : "pin",
+                    action: togglePinned
+                )
                 Spacer()
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    isConfirmingDelete = true
-                }
+                Button(
+                    "Delete",
+                    systemImage: "trash",
+                    role: .destructive,
+                    action: confirmDelete
+                )
                 .confirmationDialog(
                     "Delete this history item?",
                     isPresented: $isConfirmingDelete
                 ) {
-                    Button("Delete", role: .destructive) {
-                        state.deleteHistoryItem(item)
-                    }
+                    Button(
+                        "Delete",
+                        role: .destructive,
+                        action: deleteItem
+                    )
                 } message: {
                     Text("Saved text and generated audio will be deleted.")
                 }
             }
         }
         .padding(24)
+    }
+
+    private func replay() {
+        state.replay(item)
+    }
+
+    private func exportM4A() {
+        state.export(item, kind: .m4a)
+    }
+
+    private func exportWAV() {
+        state.export(item, kind: .wav)
+    }
+
+    private func exportText() {
+        state.export(item, kind: .text)
+    }
+
+    private func regenerate() {
+        state.regenerate(item)
+    }
+
+    private func togglePinned() {
+        state.togglePinned(item)
+    }
+
+    private func confirmDelete() {
+        isConfirmingDelete = true
+    }
+
+    private func deleteItem() {
+        state.deleteHistoryItem(item)
     }
 }

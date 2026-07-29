@@ -9,9 +9,10 @@ struct ShortcutRecorderView: View {
     @State private var eventMonitor: Any?
 
     var body: some View {
-        Button(isRecording ? "Type shortcut…" : shortcut.displayName) {
-            beginRecording()
-        }
+        Button(
+            isRecording ? "Type shortcut…" : shortcut.displayName,
+            action: beginRecording
+        )
         .font(.body.monospaced())
         .buttonStyle(.bordered)
         .accessibilityLabel("Global shortcut")

@@ -23,24 +23,34 @@ struct HistorySettingsView: View {
                 LabeledContent("Audio storage limit") {
                     Text(settings.historyQuotaBytes, format: .byteCount(style: .file))
                 }
-                Button("Open History") {
-                    openWindow(id: AppWindowID.history)
-                    NSApp.activate()
-                }
-                Button("Clear History…", role: .destructive) {
-                    isConfirmingClear = true
-                }
+                Button("Open History", action: showHistory)
+                Button(
+                    "Clear History…",
+                    role: .destructive,
+                    action: confirmClearHistory
+                )
                 .confirmationDialog(
                     "Clear all history?",
                     isPresented: $isConfirmingClear
                 ) {
-                    Button("Clear History", role: .destructive) {
-                        state.clearHistory()
-                    }
+                    Button(
+                        "Clear History",
+                        role: .destructive,
+                        action: state.clearHistory
+                    )
                 } message: {
                     Text("This permanently deletes saved text and generated audio.")
                 }
             }
         }
+    }
+
+    private func showHistory() {
+        openWindow(id: AppWindowID.history)
+        NSApp.activate()
+    }
+
+    private func confirmClearHistory() {
+        isConfirmingClear = true
     }
 }

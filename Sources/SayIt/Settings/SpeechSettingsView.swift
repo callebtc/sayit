@@ -17,9 +17,7 @@ struct SpeechSettingsView: View {
                     }
                 }
                 .onChange(of: settings.activeModelID) { _, id in
-                    if let model = state.models.first(where: { $0.id == id }) {
-                        state.selectModel(model)
-                    }
+                    selectModel(id)
                 }
 
                 if let model = activeModel, !model.voices.isEmpty {
@@ -29,7 +27,7 @@ struct SpeechSettingsView: View {
                         }
                     }
                     .onChange(of: settings.activeVoice) { _, voice in
-                        state.updateLanguageForVoice(voice, model: model)
+                        updateLanguage(for: voice, model: model)
                     }
                 }
 
@@ -59,7 +57,7 @@ struct SpeechSettingsView: View {
                     }
                 }
                 .onChange(of: settings.playbackRate) { _, rate in
-                    state.playback.rate = rate
+                    updatePlaybackRate(rate)
                 }
 
                 Toggle(
@@ -67,7 +65,7 @@ struct SpeechSettingsView: View {
                     isOn: $settings.showNowPlayingTitles
                 )
                 .onChange(of: settings.showNowPlayingTitles) { _, showTitles in
-                    state.playback.showTitleInNowPlaying = showTitles
+                    updateNowPlayingTitleVisibility(showTitles)
                 }
             }
 
@@ -83,5 +81,27 @@ struct SpeechSettingsView: View {
 
     private var activeModel: ModelDescriptor? {
         state.models.first { $0.id == settings.activeModelID }
+    }
+
+    private func selectModel(_ id: ModelID) {
+        guard let model = state.models.first(where: { $0.id == id }) else {
+            return
+        }
+        state.selectModel(model)
+    }
+
+    private func updateLanguage(
+        for voice: String,
+        model: ModelDescriptor
+    ) {
+        state.updateLanguageForVoice(voice, model: model)
+    }
+
+    private func updatePlaybackRate(_ rate: Double) {
+        state.playback.rate = rate
+    }
+
+    private func updateNowPlayingTitleVisibility(_ showTitles: Bool) {
+        state.playback.showTitleInNowPlaying = showTitles
     }
 }

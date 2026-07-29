@@ -37,6 +37,7 @@
 		2F98443BCC6A9CE666AFF7D2 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3708667FF2CF32FF6D123AFC /* article.html in Resources */ = {isa = PBXBuildFile; fileRef = F879A4D1F0B1C6C29831ADE1 /* article.html */; };
 		39C253ED1EC6C988E4E8FDEC /* SayItUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5E19E0FDD1DD8B00C3839A /* SayItUITests.swift */; };
+		3C99E640EDA4D3175B6A2DB4 /* OnboardingProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343B30687AD3CFE12DD4CDDE /* OnboardingProgressView.swift */; };
 		3E3BF6D7045D340679DD24DD /* DiagnosticRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFE8094B2B64B9859E711A2 /* DiagnosticRecorder.swift */; };
 		3E69D945BB53BFBF82FCAA9D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68391B4A83D06AD4C1FFAA0 /* OnboardingView.swift */; };
 		4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C074F8772DC89E43CE2A267 /* DesignTokens.swift */; };
@@ -90,6 +91,7 @@
 		9CC2E3B1434FA175E8BF6443 /* ErrorStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */; };
 		9CFB4BC0AAB9F4B89E2D8EF3 /* AudioArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DC4237A8193E8C1B9A28CE /* AudioArchive.swift */; };
 		9DEB2C5B9010F70FA0C1961B /* DiagnosticEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7735064352240AE621CA239 /* DiagnosticEvent.swift */; };
+		9F2F336F030A559A0653D0CF /* PlaybackRateMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */; };
 		9F5FA1C7694F5EDE270C51D7 /* SpeechPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B2409CEE7E510324C9AEDC /* SpeechPreviewView.swift */; };
 		A281FD09EB0ADC747E7FC4D6 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C4AC5009A935780C7B009B /* ModelManager.swift */; };
 		A3070F1EE828AB3AFE51A3C6 /* ModelDownloadProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */; };
@@ -215,6 +217,7 @@
 		2CE9FEAEE8B390CA9BE7F2E8 /* TextSourcePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSourcePayload.swift; sourceTree = "<group>"; };
 		2DCDEEA486A4B8840D1463C5 /* LongTextConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongTextConfirmationView.swift; sourceTree = "<group>"; };
 		31C4AC5009A935780C7B009B /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		343B30687AD3CFE12DD4CDDE /* OnboardingProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingProgressView.swift; sourceTree = "<group>"; };
 		36BC441FD70A479EBA22F750 /* HistoryItemSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemSnapshot.swift; sourceTree = "<group>"; };
 		396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRibbonView.swift; sourceTree = "<group>"; };
 		3DC636BB65E51FA1C527129C /* SynthesisError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisError.swift; sourceTree = "<group>"; };
@@ -226,6 +229,7 @@
 		4750990410DAB9D60949EB46 /* ModelDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDescriptor.swift; sourceTree = "<group>"; };
 		47F82E250E5DDE4747AF9FFA /* CommunityModelResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityModelResolver.swift; sourceTree = "<group>"; };
 		48D55330E6962E057802D765 /* CommunityModelSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityModelSheet.swift; sourceTree = "<group>"; };
+		4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateMenu.swift; sourceTree = "<group>"; };
 		4C074F8772DC89E43CE2A267 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabel.swift; sourceTree = "<group>"; };
 		4E8C5D4E319B7ED9AA559B65 /* JSONEncoder+SayIt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSONEncoder+SayIt.swift"; sourceTree = "<group>"; };
@@ -432,6 +436,7 @@
 			isa = PBXGroup;
 			children = (
 				D9139DB6590D67057C09ABBF /* AnywhereOnboardingView.swift */,
+				343B30687AD3CFE12DD4CDDE /* OnboardingProgressView.swift */,
 				798F5FF5F67AAD0DB93DC48F /* OnboardingStep.swift */,
 				E68391B4A83D06AD4C1FFAA0 /* OnboardingView.swift */,
 				FEF4201E7A00CB96AD7F1F15 /* PrivacyOnboardingView.swift */,
@@ -506,6 +511,7 @@
 				E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */,
 				44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */,
 				BE927B5032990CC7782DB7BF /* PlaybackError.swift */,
+				4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */,
 				02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */,
 				396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */,
 			);
@@ -1001,12 +1007,14 @@
 				C2F4D9E7CDB5C6281D797919 /* ModelManagerError.swift in Sources */,
 				EFB987AC996D3190C88081AF /* ModelRowView.swift in Sources */,
 				E246A995B180E51036FFD2C7 /* ModelsSettingsView.swift in Sources */,
+				3C99E640EDA4D3175B6A2DB4 /* OnboardingProgressView.swift in Sources */,
 				F4DEB3192F7FFA8A44F37867 /* OnboardingStep.swift in Sources */,
 				3E69D945BB53BFBF82FCAA9D /* OnboardingView.swift in Sources */,
 				25C973535C87B9998DBFE308 /* PasteboardPayloadReader.swift in Sources */,
 				245C2FAE01D5A6E480FDE344 /* PlaybackController.swift in Sources */,
 				22B295F9AD2362B159941CB4 /* PlaybackControlsView.swift in Sources */,
 				C5DDCD8C2ADA3EC97F5DCF80 /* PlaybackError.swift in Sources */,
+				9F2F336F030A559A0653D0CF /* PlaybackRateMenu.swift in Sources */,
 				D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */,
 				AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */,
 				1066672AD8F1CD5C55522FFE /* ReadClipboardButton.swift in Sources */,

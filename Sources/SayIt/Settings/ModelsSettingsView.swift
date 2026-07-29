@@ -8,29 +8,59 @@ struct ModelsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: DesignTokens.compactSpacing) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField("Search models", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
+                Spacer()
+            }
+            .padding(.horizontal, DesignTokens.standardSpacing)
+            .padding(.vertical, DesignTokens.compactSpacing)
+
+            Divider()
+
             List(filteredModels) { model in
                 ModelRowView(model: model)
             }
-            .searchable(text: $searchText, prompt: "Search models")
             .overlay {
                 if filteredModels.isEmpty {
-                    ContentUnavailableView.search
+                    if searchText.isEmpty {
+                        ContentUnavailableView(
+                            "No models available",
+                            systemImage: "shippingbox",
+                            description: Text(
+                                "Add a model or rescan to look for local models."
+                            )
+                        )
+                    } else {
+                        ContentUnavailableView(
+                            "No models found",
+                            systemImage: "magnifyingglass",
+                            description: Text(
+                                "No models match “\(searchText)”."
+                            )
+                        )
+                    }
                 }
             }
+
             Divider()
+
             HStack {
                 Text(
                     "\(state.installedModelIDs.count) installed"
                 )
                 .foregroundStyle(.secondary)
                 Spacer()
-                Button("Add Hugging Face Model…") {
-                    isShowingCommunityModelSheet = true
-                }
+                Button(
+                    "Add Hugging Face Model…",
+                    action: showCommunityModelSheet
+                )
                 Button("Import Local Model…", action: state.importLocalModel)
-                Button("Rescan") {
-                    Task { await state.startup() }
-                }
+                Button("Rescan", action: rescanModels)
             }
             .padding(DesignTokens.standardSpacing)
         }
@@ -48,6 +78,16 @@ struct ModelsSettingsView: View {
                 || $0.languages.contains {
                     $0.localizedStandardContains(searchText)
                 }
+        }
+    }
+
+    private func showCommunityModelSheet() {
+        isShowingCommunityModelSheet = true
+    }
+
+    private func rescanModels() {
+        Task {
+            await state.startup()
         }
     }
 }

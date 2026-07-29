@@ -5,14 +5,13 @@ struct PlaybackControlsView: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.standardSpacing) {
-            playbackRateMenu
+            PlaybackRateMenu()
 
             Button(
                 "Back \(Int(state.settings.rewindInterval)) seconds",
-                systemImage: "gobackward.\(Int(state.settings.rewindInterval))"
-            ) {
-                state.playback.skip(by: -state.settings.rewindInterval)
-            }
+                systemImage: "gobackward.\(Int(state.settings.rewindInterval))",
+                action: skipBackward
+            )
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .controlSize(.large)
@@ -23,14 +22,9 @@ struct PlaybackControlsView: View {
                 state.playback.state == .playing ? "Pause" : "Play",
                 systemImage: state.playback.state == .playing
                     ? "pause.fill"
-                    : "play.fill"
-            ) {
-                if state.playback.state == .playing {
-                    state.playback.pause()
-                } else {
-                    state.playback.play()
-                }
-            }
+                    : "play.fill",
+                action: togglePlayback
+            )
             .labelStyle(.iconOnly)
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -39,10 +33,9 @@ struct PlaybackControlsView: View {
 
             Button(
                 "Forward \(Int(state.settings.forwardInterval)) seconds",
-                systemImage: "goforward.\(Int(state.settings.forwardInterval))"
-            ) {
-                state.playback.skip(by: state.settings.forwardInterval)
-            }
+                systemImage: "goforward.\(Int(state.settings.forwardInterval))",
+                action: skipForward
+            )
             .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .controlSize(.large)
@@ -56,36 +49,19 @@ struct PlaybackControlsView: View {
         }
     }
 
-    private var playbackRateMenu: some View {
-        Menu {
-            ForEach([0.75, 1, 1.25, 1.5, 1.75, 2], id: \.self) { rate in
-                Button {
-                    setPlaybackRate(rate)
-                } label: {
-                    if state.playback.rate == rate {
-                        Label(formattedRate(rate), systemImage: "checkmark")
-                    } else {
-                        Text(formattedRate(rate))
-                    }
-                }
-            }
-        } label: {
-            Label(
-                formattedRate(state.playback.rate),
-                systemImage: "speedometer"
-            )
+    private func skipBackward() {
+        state.playback.skip(by: -state.settings.rewindInterval)
+    }
+
+    private func togglePlayback() {
+        if state.playback.state == .playing {
+            state.playback.pause()
+        } else {
+            state.playback.play()
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("Playback speed")
     }
 
-    private func setPlaybackRate(_ rate: Double) {
-        state.playback.rate = rate
-        state.settings.playbackRate = rate
-    }
-
-    private func formattedRate(_ rate: Double) -> String {
-        "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
+    private func skipForward() {
+        state.playback.skip(by: state.settings.forwardInterval)
     }
 }

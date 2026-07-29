@@ -43,7 +43,7 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .onChange(of: settings.rewindInterval) { _, interval in
-                    state.playback.backwardSkipInterval = interval
+                    updateRewindInterval(interval)
                 }
 
                 Picker("Forward interval", selection: $settings.forwardInterval) {
@@ -52,7 +52,7 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .onChange(of: settings.forwardInterval) { _, interval in
-                    state.playback.forwardSkipInterval = interval
+                    updateForwardInterval(interval)
                 }
 
                 Toggle(
@@ -69,6 +69,14 @@ struct GeneralSettingsView: View {
             state.launchAtLogin.refresh()
             launchAtLogin = state.launchAtLogin.isEnabled
         }
+    }
+
+    private func updateRewindInterval(_ interval: Double) {
+        state.playback.backwardSkipInterval = interval
+    }
+
+    private func updateForwardInterval(_ interval: Double) {
+        state.playback.forwardSkipInterval = interval
     }
 
     private func updateLaunchAtLogin(_ enabled: Bool) {

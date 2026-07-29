@@ -25,6 +25,7 @@ struct RecentHistoryView: View {
                                 ? "waveform"
                                 : "arrow.clockwise"
                         )
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading) {
                             Text(item.title)
                                 .lineLimit(1)

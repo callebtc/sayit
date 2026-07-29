@@ -25,7 +25,7 @@ struct OnboardingView: View {
                     Button("Back", action: goBack)
                 }
                 Spacer()
-                progressDots
+                OnboardingProgressView(currentStep: step)
                 Spacer()
                 Button(nextButtonTitle, action: goForward)
                     .buttonStyle(.borderedProminent)
@@ -35,20 +35,6 @@ struct OnboardingView: View {
         }
         .frame(width: 540, height: 430)
         .onDisappear(perform: state.onboardingWindowDidClose)
-    }
-
-    private var progressDots: some View {
-        HStack(spacing: 6) {
-            ForEach(OnboardingStep.allCases, id: \.rawValue) { item in
-                Circle()
-                    .fill(item == step ? Color.accentColor : Color.secondary)
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Onboarding progress")
-        .accessibilityValue("Step \(step.rawValue + 1) of 3")
     }
 
     private var nextButtonTitle: String {

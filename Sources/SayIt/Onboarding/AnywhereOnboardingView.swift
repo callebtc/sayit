@@ -41,13 +41,7 @@ struct AnywhereOnboardingView: View {
                 .foregroundStyle(.secondary)
                 Toggle("Launch Say It at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
-                        do {
-                            try state.launchAtLogin.setEnabled(enabled)
-                            launchError = nil
-                        } catch {
-                            launchError = error.localizedDescription
-                            launchAtLogin = state.launchAtLogin.isEnabled
-                        }
+                        updateLaunchAtLogin(enabled)
                     }
                 if let launchError {
                     Label(
@@ -63,6 +57,16 @@ struct AnywhereOnboardingView: View {
         .padding(32)
         .task {
             state.launchAtLogin.refresh()
+            launchAtLogin = state.launchAtLogin.isEnabled
+        }
+    }
+
+    private func updateLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try state.launchAtLogin.setEnabled(enabled)
+            launchError = nil
+        } catch {
+            launchError = error.localizedDescription
             launchAtLogin = state.launchAtLogin.isEnabled
         }
     }

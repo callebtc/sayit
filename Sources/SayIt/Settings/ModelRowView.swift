@@ -57,44 +57,38 @@ struct ModelRowView: View {
                     Label("Selected", systemImage: "checkmark")
                         .foregroundStyle(.secondary)
                 } else {
-                    Button("Use") {
-                        if requiresMemoryConfirmation {
-                            isConfirmingMemoryUse = true
-                        } else {
-                            state.selectModel(model)
-                        }
-                    }
+                    Button("Use", action: useModel)
                     .confirmationDialog(
                         "Use \(model.displayName)?",
                         isPresented: $isConfirmingMemoryUse
                     ) {
-                        Button("Use Model") {
-                            state.selectModel(model)
-                        }
+                        Button("Use Model", action: selectModel)
                     } message: {
                         Text(
                             "Its estimated peak memory exceeds 70% of this Mac’s physical memory. Other apps may become less responsive."
                         )
                     }
                 }
-                Button("Delete", systemImage: "trash") {
-                    isConfirmingDelete = true
-                }
+                Button(
+                    "Delete",
+                    systemImage: "trash",
+                    action: confirmDelete
+                )
                 .labelStyle(.iconOnly)
                 .confirmationDialog(
                     "Delete \(model.displayName)?",
                     isPresented: $isConfirmingDelete
                 ) {
-                    Button("Delete Model", role: .destructive) {
-                        state.removeModel(model)
-                    }
+                    Button(
+                        "Delete Model",
+                        role: .destructive,
+                        action: deleteModel
+                    )
                 } message: {
                     Text("History audio is not affected.")
                 }
             } else {
-                Button("Download") {
-                    state.installModel(model.id)
-                }
+                Button("Download", action: downloadModel)
                 .buttonStyle(.borderedProminent)
                 .disabled(state.downloadProgress != nil)
             }
@@ -136,5 +130,29 @@ struct ModelRowView: View {
     private var requiresMemoryConfirmation: Bool {
         Double(model.estimatedPeakMemoryBytes)
             > Double(ProcessInfo.processInfo.physicalMemory) * 0.7
+    }
+
+    private func useModel() {
+        if requiresMemoryConfirmation {
+            isConfirmingMemoryUse = true
+        } else {
+            selectModel()
+        }
+    }
+
+    private func selectModel() {
+        state.selectModel(model)
+    }
+
+    private func confirmDelete() {
+        isConfirmingDelete = true
+    }
+
+    private func deleteModel() {
+        state.removeModel(model)
+    }
+
+    private func downloadModel() {
+        state.installModel(model.id)
     }
 }
