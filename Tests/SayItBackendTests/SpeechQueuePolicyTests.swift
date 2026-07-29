@@ -237,6 +237,8 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var spokenText = ""
+    private(set) var spokenChunks: [PlaybackTextChunk] = []
     var shouldStartWhenBuffered = false
     var showTitleInNowPlaying = false
     var rate: Double = 1
@@ -256,6 +258,15 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     func enqueue(_ chunk: AudioChunk) throws {
         generatedDuration += Double(chunk.samples.count) / chunk.sampleRate
         state = .buffering
+    }
+
+    func setSpokenText(_ text: String) {
+        spokenText = text
+        spokenChunks = []
+    }
+
+    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
+        spokenChunks.append(chunk)
     }
 
     func play() {

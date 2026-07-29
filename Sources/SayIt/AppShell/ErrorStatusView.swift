@@ -28,8 +28,11 @@ struct ErrorStatusView: View {
 
     private func openOnboarding() {
         dismiss()
-        state.showOnboarding()
-        openWindow(id: AppWindowID.onboarding)
-        NSApp.activate()
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            state.showOnboarding()
+            openWindow(id: AppWindowID.onboarding)
+            NSApp.activate()
+        }
     }
 }

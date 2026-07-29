@@ -126,6 +126,12 @@ actor SynthesisActor: SpeechSynthesizing {
         while chunkCursor < chunks.count {
             try Task.checkCancellation()
             let chunk = chunks[chunkCursor]
+            continuation.yield(
+                .chunkStarted(
+                    index: completedChunkCount,
+                    text: chunk.text
+                )
+            )
 
             let start = ContinuousClock.now
             var chunkSamples = 0

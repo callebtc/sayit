@@ -33,8 +33,8 @@ struct VoiceRibbonView: View {
             }
             context.stroke(
                 background,
-                with: .foreground,
-                style: StrokeStyle(lineWidth: 1, lineCap: .round)
+                with: .color(.primary.opacity(0.18)),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
             )
             context.opacity = 1
             context.stroke(
@@ -43,7 +43,6 @@ struct VoiceRibbonView: View {
                 style: StrokeStyle(lineWidth: 2, lineCap: .round)
             )
         }
-        .foregroundStyle(.tertiary)
         .frame(height: DesignTokens.ribbonHeight)
         .onGeometryChange(for: Double.self) { proxy in
             proxy.size.width

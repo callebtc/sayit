@@ -34,7 +34,10 @@ struct RecentHistoryView: View {
 
     private func openHistory() {
         dismiss()
-        openWindow(id: AppWindowID.history)
-        NSApp.activate()
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            openWindow(id: AppWindowID.history)
+            NSApp.activate()
+        }
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import SayItCore
+import SayItProtocol
 
 @MainActor
 protocol BackendPlaybackControlling: PlaybackControlling {
@@ -10,6 +11,8 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     var estimatedDuration: TimeInterval { get }
     var amplitudes: [Float] { get }
     var currentTitle: String { get }
+    var spokenText: String { get }
+    var spokenChunks: [PlaybackTextChunk] { get }
     var shouldStartWhenBuffered: Bool { get }
     var showTitleInNowPlaying: Bool { get set }
     var rate: Double { get set }
@@ -21,6 +24,8 @@ protocol BackendPlaybackControlling: PlaybackControlling {
         title: String,
         estimatedDuration: TimeInterval
     )
+    func setSpokenText(_ text: String)
+    func appendSpokenChunk(_ chunk: PlaybackTextChunk)
     func finishBuffering()
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult
     func playFile(at url: URL, title: String) throws

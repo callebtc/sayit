@@ -31,7 +31,10 @@ struct MenuFooterView: View {
 
     private func openSettingsWindow() {
         dismiss()
-        showSettings()
-        NSApp.activate()
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            showSettings()
+            NSApp.activate()
+        }
     }
 }

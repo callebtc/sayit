@@ -12,6 +12,8 @@ final class PlaybackController {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var spokenText = ""
+    private(set) var spokenChunks: [PlaybackTextChunk] = []
     var rate: Double = 1 {
         didSet {
             guard rate != oldValue else { return }
@@ -32,6 +34,8 @@ final class PlaybackController {
         estimatedDuration = snapshot.estimatedDuration
         amplitudes = snapshot.amplitudes
         currentTitle = snapshot.currentTitle
+        spokenText = snapshot.spokenText
+        spokenChunks = snapshot.spokenChunks
         if rate != snapshot.rate {
             let handler = commandHandler
             commandHandler = nil

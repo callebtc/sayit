@@ -76,7 +76,10 @@ struct ServiceRepairView: View {
     private func openServiceSettings() {
         state.settings.selectedSettingsPane = .service
         dismiss()
-        openSettings()
-        NSApp.activate()
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            openSettings()
+            NSApp.activate()
+        }
     }
 }

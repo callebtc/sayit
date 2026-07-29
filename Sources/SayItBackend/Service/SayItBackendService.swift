@@ -492,6 +492,11 @@ public final class SayItBackendService: SayItService {
                 / 14
                 / request.speakingPace.rawValue
         )
+        playback.setSpokenText(cleaned.text)
+        activeSpokenText = cleaned.text
+        spokenTextCursor = cleaned.text.startIndex
+        pendingSpokenChunkRange = nil
+        spokenAudioCursor = 0
         updateJob(id, state: .preparing, progress: 0.08)
         statusText = "Preparing speech"
         errorMessage = nil
@@ -528,8 +533,12 @@ public final class SayItBackendService: SayItService {
         case .modelLoaded:
             statusText = "Preparing speech"
             updateJob(request.id, state: .synthesizing, progress: 0.15)
+        case .chunkStarted(_, let text):
+            registerSpokenChunk(text)
         case .audio(let chunk):
+            flushPendingSpokenChunk()
             try playback.enqueue(chunk)
+            spokenAudioCursor += Double(chunk.samples.count) / chunk.sampleRate
             if playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
@@ -743,6 +752,44 @@ public final class SayItBackendService: SayItService {
         )
     }
 
+    private var activeSpokenText: String?
+    private var spokenTextCursor: String.Index?
+    private var pendingSpokenChunkRange: Range<String.Index>?
+    private var spokenAudioCursor: TimeInterval = 0
+
+    private func registerSpokenChunk(_ chunkText: String) {
+        guard let fullText = activeSpokenText else { return }
+        let cursor = spokenTextCursor ?? fullText.startIndex
+        var range = fullText.range(of: chunkText, range: cursor..<fullText.endIndex)
+        if range == nil {
+            range = fullText.range(of: chunkText)
+        }
+        guard let found = range else { return }
+        pendingSpokenChunkRange = found
+        spokenTextCursor = found.upperBound
+    }
+
+    private func flushPendingSpokenChunk() {
+        guard let fullText = activeSpokenText,
+              let range = pendingSpokenChunkRange else {
+            return
+        }
+        pendingSpokenChunkRange = nil
+        playback.appendSpokenChunk(
+            PlaybackTextChunk(
+                textStart: fullText.distance(
+                    from: fullText.startIndex,
+                    to: range.lowerBound
+                ),
+                textEnd: fullText.distance(
+                    from: fullText.startIndex,
+                    to: range.upperBound
+                ),
+                audioStart: spokenAudioCursor
+            )
+        )
+    }
+
     private func makeSnapshot() -> ServiceSnapshot {
         if activeJobID == nil, playback.state == .playing {
             let tick = Int(playback.elapsed * 10)
@@ -773,7 +820,9 @@ public final class SayItBackendService: SayItService {
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
                 currentTitle: playback.currentTitle,
-                amplitudes: playback.amplitudes
+                amplitudes: playback.amplitudes,
+                spokenText: playback.spokenText,
+                spokenChunks: playback.spokenChunks
             ),
             download: downloadProgress?.serviceSnapshot,
             installedModelIDs: installedModelIDs
@@ -1051,6 +1100,11 @@ public final class SayItBackendService: SayItService {
         }
         cancelActiveJob(startNext: false)
         try playback.playFile(at: url, title: item.title)
+        playback.setSpokenText(item.cleanedText)
+        activeSpokenText = item.cleanedText
+        spokenTextCursor = item.cleanedText.startIndex
+        pendingSpokenChunkRange = nil
+        spokenAudioCursor = 0
         errorMessage = nil
         statusText = "Playing"
         revision &+= 1

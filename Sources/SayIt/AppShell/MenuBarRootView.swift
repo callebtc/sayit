@@ -25,19 +25,29 @@ struct MenuBarRootView: View {
                 LongTextConfirmationView()
                     .padding(DesignTokens.generousSpacing)
             } else if state.playback.state != .idle {
+                Divider()
                 PlaybackSectionView()
                     .padding(.horizontal, DesignTokens.generousSpacing)
-                    .padding(.bottom, DesignTokens.generousSpacing)
+                    .padding(.bottom, DesignTokens.compactSpacing)
+                SpeechLyricsView(
+                    text: state.playback.spokenText,
+                    chunks: state.playback.spokenChunks,
+                    elapsed: state.playback.elapsed,
+                    generatedDuration: state.playback.generatedDuration
+                )
+                .frame(height: 150)
+                .padding(.horizontal, DesignTokens.generousSpacing)
+                .padding(.bottom, DesignTokens.compactSpacing)
+            } else {
+                Divider()
+                ReadClipboardButton()
+                    .padding(.horizontal, DesignTokens.compactSpacing)
+                    .padding(.vertical, 6)
+
+                Divider()
+                RecentHistoryView()
+                    .padding(DesignTokens.generousSpacing)
             }
-
-            Divider()
-            ReadClipboardButton()
-                .padding(.horizontal, DesignTokens.compactSpacing)
-                .padding(.vertical, 6)
-
-            Divider()
-            RecentHistoryView()
-                .padding(DesignTokens.generousSpacing)
 
             Divider()
             MenuFooterView()

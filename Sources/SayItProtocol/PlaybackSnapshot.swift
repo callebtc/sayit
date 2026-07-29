@@ -8,6 +8,8 @@ public struct PlaybackSnapshot: Codable, Sendable {
     public let rate: Double
     public let currentTitle: String
     public let amplitudes: [Float]
+    public let spokenText: String
+    public let spokenChunks: [PlaybackTextChunk]
 
     public init(
         state: String = "idle",
@@ -16,7 +18,9 @@ public struct PlaybackSnapshot: Codable, Sendable {
         estimatedDuration: TimeInterval = 0,
         rate: Double = 1,
         currentTitle: String = "",
-        amplitudes: [Float] = []
+        amplitudes: [Float] = [],
+        spokenText: String = "",
+        spokenChunks: [PlaybackTextChunk] = []
     ) {
         self.state = state
         self.elapsed = elapsed
@@ -25,5 +29,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         self.rate = rate
         self.currentTitle = currentTitle
         self.amplitudes = amplitudes
+        self.spokenText = spokenText
+        self.spokenChunks = spokenChunks
     }
 }

@@ -4,6 +4,7 @@ import Foundation
 @preconcurrency import MediaPlayer
 import Observation
 import SayItCore
+import SayItProtocol
 
 @MainActor
 @Observable
@@ -46,6 +47,8 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var spokenText = ""
+    private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
     var preferredStartBufferDuration: TimeInterval {
         Self.preferredStartBufferDuration(for: rate)
@@ -135,6 +138,15 @@ final class PlaybackController: BackendPlaybackControlling {
         updateNowPlaying()
     }
 
+    func setSpokenText(_ text: String) {
+        spokenText = text
+        spokenChunks = []
+    }
+
+    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
+        spokenChunks.append(chunk)
+    }
+
     func play() {
         do {
             try startPlayback()
@@ -158,6 +170,8 @@ final class PlaybackController: BackendPlaybackControlling {
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil
         currentTitle = ""
+        spokenText = ""
+        spokenChunks = []
         failureMessage = nil
         elapsed = 0
         generatedDuration = 0
