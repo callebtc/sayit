@@ -27,6 +27,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
             if let selectedItem {
                 HistoryDetailView(

@@ -70,6 +70,8 @@ struct SpeechSettingsView: View {
                     state.playback.showTitleInNowPlaying = showTitles
                 }
             }
+
+            SpeechPreviewView()
         }
     }
 
