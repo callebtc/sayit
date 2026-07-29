@@ -38,19 +38,18 @@ public struct AppDirectories: Sendable {
     public static func shared(
         appGroupIdentifier: String
     ) throws -> AppDirectories {
+#if DEBUG
+        if ProcessInfo.processInfo.environment[
+            "SAYIT_USE_APP_GROUP_CONTAINER"
+        ] != "1" {
+            return try debugServiceDirectories()
+        }
+#endif
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else {
 #if DEBUG
-            let support = URL.applicationSupportDirectory.appending(
-                path: "Say It Service (Debug)",
-                directoryHint: .isDirectory
-            )
-            let caches = URL.cachesDirectory.appending(
-                path: "Say It Service (Debug)",
-                directoryHint: .isDirectory
-            )
-            return try create(applicationSupport: support, caches: caches)
+            return try debugServiceDirectories()
 #else
             throw CocoaError(.fileNoSuchFile)
 #endif
@@ -66,6 +65,20 @@ public struct AppDirectories: Sendable {
             )
         )
     }
+
+#if DEBUG
+    private static func debugServiceDirectories() throws -> AppDirectories {
+        let support = URL.applicationSupportDirectory.appending(
+            path: "Say It Service (Debug)",
+            directoryHint: .isDirectory
+        )
+        let caches = URL.cachesDirectory.appending(
+            path: "Say It Service (Debug)",
+            directoryHint: .isDirectory
+        )
+        return try create(applicationSupport: support, caches: caches)
+    }
+#endif
 
     public static func testing(root: URL) throws -> AppDirectories {
         try create(

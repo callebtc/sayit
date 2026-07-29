@@ -136,6 +136,12 @@ targets:
       - path: Sources/SayItAgent
     entitlements:
       path: Config/SayItAgent.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - group.com.sayit.mac
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
     dependencies:
       - target: SayItBackend
       - target: SayItCore
@@ -157,6 +163,11 @@ targets:
       - path: Sources/SayItCLI
     entitlements:
       path: Config/SayItCLI.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - group.com.sayit.mac
+        com.sayit.client: true
     dependencies:
       - target: SayItProtocol
       - target: SayItXPC
@@ -260,6 +271,7 @@ targets:
           cli_products="${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts"
           mkdir -p "${service_dir}" "${agent_dir}" "${cli_dir}"
           ditto "${BUILT_PRODUCTS_DIR}/SayItAgent" "${service_dir}/SayItAgent"
+          ditto "${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle" "${service_dir}/mlx-swift_Cmlx.bundle"
           ditto "${cli_products}/sayit" "${cli_dir}/sayit"
           ditto "${SRCROOT}/Config/com.sayit.mac.agent.plist" "${agent_dir}/com.sayit.mac.agent.plist"
 

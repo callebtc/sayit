@@ -197,8 +197,10 @@ struct ServiceSettingsView: View {
 
     private func updateBackgroundService(_ enabled: Bool) {
         if enabled {
-            state.backgroundService.enable()
-            backgroundEnabled = state.backgroundService.isEnabled
+            Task {
+                await state.backgroundService.enable()
+                backgroundEnabled = state.backgroundService.isEnabled
+            }
         } else {
             Task {
                 await state.backgroundService.disable()

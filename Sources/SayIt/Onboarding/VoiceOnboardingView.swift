@@ -39,6 +39,14 @@ struct VoiceOnboardingView: View {
                             .foregroundStyle(.green)
                         Button("Play sample", action: state.speakSample)
                     }
+                } else if state.requestedModelInstallID == model.id {
+                    HStack(spacing: DesignTokens.compactSpacing) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Starting download…")
+                    }
+                    .frame(maxWidth: 380)
+                    .accessibilityElement(children: .combine)
                 } else if let progress = state.downloadProgress {
                     DownloadStatusView(progress: progress)
                         .frame(maxWidth: 380)
@@ -48,6 +56,7 @@ struct VoiceOnboardingView: View {
                         action: downloadRecommendedModel
                     )
                         .buttonStyle(.borderedProminent)
+                        .disabled(!state.isServiceOnline)
                 }
             }
         }

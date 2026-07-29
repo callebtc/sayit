@@ -31,6 +31,7 @@ final class AppState {
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
     private(set) var downloadProgress: ModelDownloadProgress?
+    private(set) var requestedModelInstallID: ModelID?
     private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
     private(set) var needsLongTextConfirmation = false
@@ -69,11 +70,8 @@ final class AppState {
             return
         }
 
-        backgroundService.refresh()
-        if !UserDefaults.standard.bool(
-            forKey: BackgroundServiceController.userDisabledDefaultsKey
-        ), !backgroundService.isEnabled {
-            backgroundService.enable()
+        if !backgroundService.isUserDisabled {
+            await backgroundService.enable()
         }
 
         startPolling()
@@ -163,7 +161,24 @@ final class AppState {
     }
 
     func installModel(_ id: ModelID) {
-        perform(.installModel(id.rawValue))
+        guard isServiceOnline else {
+            presentError(
+                "The background service is not ready. Try again in a moment."
+            )
+            return
+        }
+        guard requestedModelInstallID == nil else { return }
+
+        requestedModelInstallID = id
+        Task {
+            do {
+                let response = try await send(.installModel(id.rawValue))
+                try requireSuccess(response)
+            } catch {
+                requestedModelInstallID = nil
+                presentError(error.localizedDescription)
+            }
+        }
     }
 
     func downloadByteCount(for model: ModelDescriptor) -> Int64 {
@@ -171,6 +186,7 @@ final class AppState {
     }
 
     func cancelModelInstall() {
+        requestedModelInstallID = nil
         perform(.cancelModelInstall)
     }
 
@@ -481,7 +497,7 @@ final class AppState {
             while !Task.isCancelled {
                 guard let self else { return }
                 self.backgroundService.refresh()
-                guard self.backgroundService.isEnabled else {
+                guard !self.backgroundService.isUserDisabled else {
                     self.serviceConnection = .disabled
                     try? await Task.sleep(for: .seconds(1))
                     continue
@@ -550,6 +566,10 @@ final class AppState {
         installedModelIDs = Set(
             snapshot.installedModelIDs.map { ModelID($0) }
         )
+        if let requestedModelInstallID,
+           installedModelIDs.contains(requestedModelInstallID) {
+            self.requestedModelInstallID = nil
+        }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
 
@@ -594,6 +614,9 @@ final class AppState {
             totalBytes: snapshot.totalBytes,
             bytesPerSecond: Int64(snapshot.bytesPerSecond)
         )
+        if requestedModelInstallID == downloadProgress?.modelID {
+            requestedModelInstallID = nil
+        }
     }
 
     private func refreshModels() async {
@@ -700,7 +723,17 @@ final class AppState {
     private func send(
         _ command: ServiceCommand
     ) async throws -> ServiceResponse {
-        try await client.send(command)
+        do {
+            return try await client.send(command)
+        } catch {
+            if error is SayItXPCClientError {
+                requestedModelInstallID = nil
+                serviceConnection = .offline
+                statusText = "Background service unavailable"
+                await client.invalidate()
+            }
+            throw error
+        }
     }
 
     private func requireSuccess(_ response: ServiceResponse) throws {

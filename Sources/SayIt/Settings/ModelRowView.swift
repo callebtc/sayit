@@ -88,13 +88,32 @@ struct ModelRowView: View {
                     Text("History audio is not affected.")
                 }
             } else {
-                Button("Download", action: downloadModel)
-                .buttonStyle(.borderedProminent)
-                .disabled(state.downloadProgress != nil)
+                if state.requestedModelInstallID == model.id {
+                    HStack(spacing: DesignTokens.compactSpacing) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Starting…")
+                    }
+                    .foregroundStyle(.secondary)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Starting model download")
+                } else {
+                    Button("Download", action: downloadModel)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(
+                            state.downloadProgress != nil
+                                || state.requestedModelInstallID != nil
+                        )
+                }
             }
         }
         .padding(.vertical, DesignTokens.compactSpacing)
         .disabled(!state.isServiceOnline)
+        .help(
+            state.isServiceOnline
+                ? ""
+                : "The background service must be connected to manage models."
+        )
         .accessibilityElement(children: .contain)
     }
 

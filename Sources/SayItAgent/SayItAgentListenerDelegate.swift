@@ -2,9 +2,12 @@ import Foundation
 import SayItBackend
 import SayItXPC
 
-final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate {
+final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate,
+    @unchecked Sendable {
     private let service: SayItXPCExportedService
     private let validator = SayItClientValidator()
+    private let connectionLock = NSLock()
+    private var connections: [ObjectIdentifier: NSXPCConnection] = [:]
 
     init(backend: SayItBackendService) {
         service = SayItXPCExportedService(backend: backend)
@@ -21,6 +24,15 @@ final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate {
             with: SayItXPCProtocol.self
         )
         connection.exportedObject = service
+        let identifier = ObjectIdentifier(connection)
+        connectionLock.withLock {
+            connections[identifier] = connection
+        }
+        connection.invalidationHandler = { [weak self] in
+            self?.connectionLock.withLock {
+                self?.connections[identifier] = nil
+            }
+        }
         connection.resume()
         return true
     }

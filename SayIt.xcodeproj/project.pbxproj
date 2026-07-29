@@ -291,6 +291,7 @@
 		FDDB9383D9EDE9D3692A36B3 /* CLICommandSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9828AEDF7F2EE0C7277DB4 /* CLICommandSupport.swift */; };
 		FEE8A4ECBC18430131EECE5A /* SpeechRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C7DA6B93D00A130CE1C5F1 /* SpeechRequest.swift */; };
 		FFDA6AAAF51DAC39E8D32853 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D47CAB42068B3B8CA73B1C23 /* AppState.swift */; };
+		FFFF4D85067174B0A3BCAC1A /* DevelopmentServiceLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = C93B7EC837D3B6837807659B /* DevelopmentServiceLauncher.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -704,6 +705,7 @@
 		C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueuePolicyTests.swift; sourceTree = "<group>"; };
 		C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogError.swift; sourceTree = "<group>"; };
 		C75E2E573611488A4C502C26 /* ClearCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearCommand.swift; sourceTree = "<group>"; };
+		C93B7EC837D3B6837807659B /* DevelopmentServiceLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentServiceLauncher.swift; sourceTree = "<group>"; };
 		C9C3EEF657685D177B47895A /* SpeechItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechItem.swift; sourceTree = "<group>"; };
 		CB9828AEDF7F2EE0C7277DB4 /* CLICommandSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLICommandSupport.swift; sourceTree = "<group>"; };
 		CC719FAC8BB29024BACE25E2 /* IdempotencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyStore.swift; sourceTree = "<group>"; };
@@ -1469,6 +1471,7 @@
 				94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */,
 				6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */,
 				E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */,
+				C93B7EC837D3B6837807659B /* DevelopmentServiceLauncher.swift */,
 				B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */,
 				73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */,
 			);
@@ -1869,7 +1872,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/com.sayit.mac.agent.plist\" \"${agent_dir}/com.sayit.mac.agent.plist\"\n";
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/com.sayit.mac.agent.plist\" \"${agent_dir}/com.sayit.mac.agent.plist\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2089,6 +2092,7 @@
 				C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */,
 				80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */,
 				4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */,
+				FFFF4D85067174B0A3BCAC1A /* DevelopmentServiceLauncher.swift in Sources */,
 				237FCE4FBE1E65624CCBEF35 /* DiagnosticExport.swift in Sources */,
 				2E66646AAA47CC18D80E876B /* DiagnosticSnapshot+Event.swift in Sources */,
 				AB5E37AC8EDF9B95E2DCB1E7 /* DiagnosticsSettingsView.swift in Sources */,
