@@ -30,4 +30,43 @@ struct TextChunkerTests {
         #expect(chunks.allSatisfy { $0.text.count <= 120 })
         #expect(chunks.map(\.text).joined(separator: " ").contains("done."))
     }
+
+    @Test("Model-aware fitting subdivides chunks without losing text")
+    func respectsModelLimit() {
+        let text = """
+        A long opening sentence has several natural places where it can split. \
+        The next sentence should also remain in the same continuous reading.
+        """
+        let chunks = TextChunker(
+            targetCharacterCount: 200,
+            hardCharacterLimit: 240
+        ).chunks(for: text) { candidate in
+            candidate.count <= 32
+        }
+
+        #expect(chunks.count > 2)
+        #expect(chunks.allSatisfy { $0.text.count <= 32 })
+        #expect(chunks.first?.startsParagraph == true)
+        #expect(chunks.dropFirst().allSatisfy { !$0.startsParagraph })
+        #expect(
+            chunks.flatMap { $0.text.split(separator: " ") }
+                == text.split(separator: " ")
+        )
+        #expect(chunks.map(\.id) == Array(chunks.indices))
+    }
+
+    @Test("Adaptive subdivision makes progress for unbroken Unicode text")
+    func splitsUnbrokenUnicodeText() {
+        let chunk = SpeechChunk(
+            id: 4,
+            text: String(repeating: "界", count: 31),
+            startsParagraph: true
+        )
+        let pieces = TextChunker().subchunks(of: chunk)
+
+        #expect(pieces.count == 2)
+        #expect(pieces.map(\.text).joined() == chunk.text)
+        #expect(pieces[0].startsParagraph)
+        #expect(!pieces[1].startsParagraph)
+    }
 }

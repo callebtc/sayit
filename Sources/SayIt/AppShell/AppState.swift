@@ -38,9 +38,6 @@ final class AppState {
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
     private(set) var downloadProgress: ModelDownloadProgress?
-    private(set) var currentChunkPreview = ""
-    private(set) var currentChunkIndex = 0
-    private(set) var totalChunks = 0
     private(set) var statusText = "Ready to speak"
     private(set) var errorMessage: String?
     private(set) var needsLongTextConfirmation = false
@@ -192,7 +189,6 @@ final class AppState {
             try? history.markIncomplete(id: activeRequest.id, state: .canceled)
         }
         activeRequest = nil
-        currentChunkPreview = ""
         statusText = "Ready to speak"
     }
 
@@ -721,10 +717,6 @@ final class AppState {
             statusText = "Loading \(request.model.displayName)"
         case .modelLoaded:
             statusText = "Preparing speech"
-        case .chunkStarted(let index, let total, let preview):
-            currentChunkIndex = index + 1
-            totalChunks = total
-            currentChunkPreview = preview
         case .audio(let chunk):
             try playback.enqueue(chunk)
             if playback.shouldStartWhenBuffered {
@@ -783,7 +775,6 @@ final class AppState {
                 }
             }
             activeRequest = nil
-            currentChunkPreview = ""
         case .cancelled:
             if request.source != .preview {
                 try? history.markIncomplete(id: request.id, state: .canceled)

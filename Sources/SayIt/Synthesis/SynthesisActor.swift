@@ -1,14 +1,18 @@
 import Foundation
+import MLXAudioCore
 import MLXAudioTTS
 import SayItCore
 
 actor SynthesisActor: SpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
+    private static let kokoroTokenBudget = 500
+
     private let modelURLProvider: ModelURLProvider
     private let chunker: TextChunker
     private var loadedModel: SpeechGenerationModel?
     private var loadedModelID: ModelID?
+    private var loadedTextProcessor: (any TextProcessor)?
     private var currentTask: Task<Void, Never>?
     private var idleUnloadTask: Task<Void, Never>?
 
@@ -61,6 +65,7 @@ actor SynthesisActor: SpeechSynthesizing {
         idleUnloadTask = nil
         loadedModel = nil
         loadedModelID = nil
+        loadedTextProcessor = nil
     }
 
     func prepareDependencies(for model: ModelDescriptor) async throws {
@@ -85,6 +90,7 @@ actor SynthesisActor: SpeechSynthesizing {
         if loadedModelID != request.model.id {
             loadedModel = nil
             loadedModelID = nil
+            loadedTextProcessor = nil
         }
 
         if loadedModel == nil {
@@ -92,11 +98,14 @@ actor SynthesisActor: SpeechSynthesizing {
             guard let modelURL = await modelURLProvider(request.model.id) else {
                 throw SynthesisError.modelNotInstalled
             }
+            let textProcessor = makeTextProcessor(for: request.model)
             loadedModel = try await TTS.loadModel(
                 modelRepo: modelURL.path,
-                modelType: request.model.modelType
+                modelType: request.model.modelType,
+                textProcessor: textProcessor
             )
             loadedModelID = request.model.id
+            loadedTextProcessor = textProcessor
             continuation.yield(.modelLoaded(request.model.id))
         }
 
@@ -109,17 +118,13 @@ actor SynthesisActor: SpeechSynthesizing {
             model: request.model
         )
 
-        let chunks = chunker.chunks(for: request.cleanedText.text)
+        var chunks = try await chunks(for: request, model: loadedModel)
+        var chunkCursor = 0
+        var completedChunkCount = 0
         var generatedSamples = 0
-        for chunk in chunks {
+        while chunkCursor < chunks.count {
             try Task.checkCancellation()
-            continuation.yield(
-                .chunkStarted(
-                    index: chunk.id,
-                    total: chunks.count,
-                    textPreview: String(chunk.text.prefix(120))
-                )
-            )
+            let chunk = chunks[chunkCursor]
 
             let start = ContinuousClock.now
             var chunkSamples = 0
@@ -135,32 +140,51 @@ actor SynthesisActor: SpeechSynthesizing {
                 streamingInterval: request.model.playbackMode == .progressive ? 0.32 : 2
             )
 
-            if chunk.startsParagraph, generatedSamples > 0 {
-                let silenceCount = Int(Double(loadedModel.sampleRate) * 0.18)
-                let silence = AudioChunk(
-                    requestID: request.id,
-                    index: chunk.id,
-                    samples: Array(repeating: 0, count: silenceCount),
-                    sampleRate: Double(loadedModel.sampleRate),
-                    startsParagraph: true
-                )
-                continuation.yield(.audio(silence))
-                generatedSamples += silenceCount
-            }
+            do {
+                for try await samples in stream {
+                    try Task.checkCancellation()
+                    guard !samples.isEmpty else { continue }
 
-            for try await samples in stream {
-                try Task.checkCancellation()
-                guard !samples.isEmpty else { continue }
-                let audio = AudioChunk(
-                    requestID: request.id,
-                    index: chunk.id,
-                    samples: samples,
-                    sampleRate: Double(loadedModel.sampleRate),
-                    startsParagraph: chunk.startsParagraph
+                    if chunk.startsParagraph,
+                       generatedSamples > 0,
+                       chunkSamples == 0 {
+                        let silenceCount = Int(
+                            Double(loadedModel.sampleRate) * 0.18
+                        )
+                        let silence = AudioChunk(
+                            requestID: request.id,
+                            index: completedChunkCount,
+                            samples: Array(repeating: 0, count: silenceCount),
+                            sampleRate: Double(loadedModel.sampleRate),
+                            startsParagraph: true
+                        )
+                        continuation.yield(.audio(silence))
+                        generatedSamples += silenceCount
+                    }
+
+                    let audio = AudioChunk(
+                        requestID: request.id,
+                        index: completedChunkCount,
+                        samples: samples,
+                        sampleRate: Double(loadedModel.sampleRate),
+                        startsParagraph: chunk.startsParagraph
+                    )
+                    continuation.yield(.audio(audio))
+                    chunkSamples += samples.count
+                    generatedSamples += samples.count
+                }
+            } catch {
+                let replacements = chunker.subchunks(of: chunk)
+                guard chunkSamples == 0,
+                      isInputLengthError(error),
+                      replacements.count > 1 else {
+                    throw error
+                }
+                chunks.replaceSubrange(
+                    chunkCursor...chunkCursor,
+                    with: replacements
                 )
-                continuation.yield(.audio(audio))
-                chunkSamples += samples.count
-                generatedSamples += samples.count
+                continue
             }
 
             let duration = start.duration(to: .now)
@@ -169,13 +193,15 @@ actor SynthesisActor: SpeechSynthesizing {
             continuation.yield(
                 .metrics(
                     SynthesisMetrics(
-                        chunkIndex: chunk.id,
+                        chunkIndex: completedChunkCount,
                         generationDuration: generationDuration,
                         audioDuration: Double(chunkSamples)
                             / Double(loadedModel.sampleRate)
                     )
                 )
             )
+            chunkCursor += 1
+            completedChunkCount += 1
         }
 
         guard generatedSamples > 0 else {
@@ -185,6 +211,83 @@ actor SynthesisActor: SpeechSynthesizing {
         continuation.finish()
         currentTask = nil
         scheduleIdleUnload()
+    }
+
+    private func makeTextProcessor(
+        for model: ModelDescriptor
+    ) -> (any TextProcessor)? {
+        switch model.modelType.lowercased() {
+        case "kokoro", "kokoro_tts":
+            KokoroMultilingualProcessor()
+        case "kitten", "kitten_tts":
+            MisakiTextProcessor()
+        default:
+            nil
+        }
+    }
+
+    private func chunks(
+        for request: SpeechRequest,
+        model: SpeechGenerationModel
+    ) async throws -> [SpeechChunk] {
+        guard let loadedTextProcessor else {
+            return chunker.chunks(for: request.cleanedText.text)
+        }
+
+        switch request.model.modelType.lowercased() {
+        case "kokoro", "kokoro_tts":
+            let language = request.language
+                ?? request.voice.flatMap(
+                    KokoroMultilingualProcessor.languageForVoice
+                )
+                ?? "en-us"
+            if let processor =
+                loadedTextProcessor as? KokoroMultilingualProcessor {
+                try await processor.prepare(for: language)
+            }
+            return try chunker.chunks(for: request.cleanedText.text) { text in
+                let processed = try loadedTextProcessor.process(
+                    text: text,
+                    language: language
+                )
+                return processed.unicodeScalars.count
+                    <= Self.kokoroTokenBudget
+            }
+        case "kitten", "kitten_tts":
+            let contextLength =
+                (model as? KittenTTSModel)?
+                    .config.plbert.maxPositionEmbeddings
+                ?? 512
+            let tokenBudget = max(contextLength - 2, 1)
+            return try chunker.chunks(for: request.cleanedText.text) { text in
+                let processed = try loadedTextProcessor.process(
+                    text: text,
+                    language: request.language
+                )
+                return processed.count <= tokenBudget
+            }
+        default:
+            return chunker.chunks(for: request.cleanedText.text)
+        }
+    }
+
+    private func isInputLengthError(_ error: Error) -> Bool {
+        let message: String
+        if case .invalidInput(let detail) = error as? AudioGenerationError {
+            message = detail
+        } else {
+            message = error.localizedDescription
+        }
+        let normalized = message.lowercased()
+        return [
+            "input too long",
+            "inputs too long",
+            "text token count",
+            "max_text_tokens",
+            "maximum context",
+            "context length",
+            "sequence length"
+        ].contains { normalized.contains($0) }
     }
 
     private func applySpeakingPace(

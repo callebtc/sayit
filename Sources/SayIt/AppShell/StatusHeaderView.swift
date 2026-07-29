@@ -14,11 +14,6 @@ struct StatusHeaderView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if state.totalChunks > 0 && state.playback.state != .idle {
-                Text("\(state.currentChunkIndex) of \(state.totalChunks)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }

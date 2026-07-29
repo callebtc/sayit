@@ -93,7 +93,7 @@ playing, and error states.
 
 - Idle: “Ready to speak,” active voice/model, explicit clipboard action,
   shortcut, and recent history.
-- Generating: current chunk, initial-buffer progress, Cancel, and factual status.
+- Generating: initial-buffer progress, Cancel, and factual status.
 - Playing: voice ribbon and transport controls become primary.
 - Downloading: model-level progress, bytes, rate, pause/resume, cancel.
 - Errors always include a direct recovery action.
@@ -219,10 +219,10 @@ UTF-8 text.
 
 `SynthesisActor` owns one loaded model and serializes inference. It validates
 the voice/language, uses `NLTokenizer` for sentence boundaries, assembles
-500–800 character chunks without splitting sentences when possible, reuses the
-active model, and generates ahead of playback. It appends PCM to a temporary
-lossless asset while yielding the same samples to playback. Paragraph joins add
-120–220 ms without duplicating punctuation pauses.
+500–800 character chunks without splitting sentences when possible, and then
+fits them to the active model's processed-token budget. It reuses the active
+model and generates ahead of playback. Chunk boundaries stay internal;
+paragraph joins add 120–220 ms without duplicating punctuation pauses.
 
 Models declare progressive, buffered, or complete-first playback. Qwen3 starts
 in buffered mode. A model unloads after ten idle minutes, on switching, or

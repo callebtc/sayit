@@ -5,14 +5,6 @@ struct PlaybackSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
-            if !state.currentChunkPreview.isEmpty {
-                Text(state.currentChunkPreview)
-                    .font(.body)
-                    .fontDesign(.rounded)
-                    .lineLimit(2)
-                    .foregroundStyle(.secondary)
-                    .transition(.opacity)
-            }
             VoiceRibbonView(
                 amplitudes: state.playback.amplitudes,
                 elapsed: state.playback.elapsed,
@@ -22,9 +14,5 @@ struct PlaybackSectionView: View {
             )
             PlaybackControlsView()
         }
-        .animation(
-            DesignTokens.quickAnimation,
-            value: state.currentChunkPreview
-        )
     }
 }

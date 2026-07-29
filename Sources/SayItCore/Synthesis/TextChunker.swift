@@ -6,7 +6,11 @@ public struct TextChunker: Sendable {
     public let hardCharacterLimit: Int
 
     public init(targetCharacterCount: Int = 650, hardCharacterLimit: Int = 1_000) {
-        self.targetCharacterCount = targetCharacterCount
+        let hardCharacterLimit = max(hardCharacterLimit, 1)
+        self.targetCharacterCount = min(
+            max(targetCharacterCount, 1),
+            hardCharacterLimit
+        )
         self.hardCharacterLimit = hardCharacterLimit
     }
 
@@ -66,6 +70,41 @@ public struct TextChunker: Sendable {
         return output
     }
 
+    public func chunks(
+        for text: String,
+        fitting fits: (String) throws -> Bool
+    ) rethrows -> [SpeechChunk] {
+        var output: [SpeechChunk] = []
+
+        for chunk in chunks(for: text) {
+            let pieces = try fittingPieces(for: chunk.text, fits: fits)
+            for (index, piece) in pieces.enumerated() {
+                output.append(
+                    SpeechChunk(
+                        id: output.count,
+                        text: piece,
+                        startsParagraph: index == 0 && chunk.startsParagraph
+                    )
+                )
+            }
+        }
+
+        return output
+    }
+
+    public func subchunks(of chunk: SpeechChunk) -> [SpeechChunk] {
+        let pieces = splitNearMiddle(chunk.text)
+        guard pieces.count > 1 else { return [chunk] }
+
+        return pieces.enumerated().map { index, text in
+            SpeechChunk(
+                id: index,
+                text: text,
+                startsParagraph: index == 0 && chunk.startsParagraph
+            )
+        }
+    }
+
     private func sentences(in text: String) -> [String] {
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
@@ -84,6 +123,30 @@ public struct TextChunker: Sendable {
         return output
     }
 
+    private func fittingPieces(
+        for text: String,
+        fits: (String) throws -> Bool
+    ) rethrows -> [String] {
+        var output: [String] = []
+        var pending = [text]
+
+        while let candidate = pending.popLast() {
+            if try fits(candidate) {
+                output.append(candidate)
+                continue
+            }
+
+            let pieces = splitNearMiddle(candidate)
+            guard pieces.count > 1 else {
+                output.append(candidate)
+                continue
+            }
+            pending.append(contentsOf: pieces.reversed())
+        }
+
+        return output
+    }
+
     private func splitOversized(_ text: String) -> [String] {
         var output: [String] = []
         var remainder = text[...]
@@ -94,9 +157,12 @@ public struct TextChunker: Sendable {
                 offsetBy: hardCharacterLimit
             )
             let searchRange = remainder.startIndex..<proposedEnd
-            let breakIndex = remainder[searchRange].lastIndex(where: {
+            let boundaryIndex = remainder[searchRange].lastIndex(where: {
                 $0.isWhitespace || $0 == "," || $0 == ";"
-            }) ?? proposedEnd
+            })
+            let breakIndex = boundaryIndex.map {
+                remainder.index(after: $0)
+            } ?? proposedEnd
             let piece = remainder[..<breakIndex]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !piece.isEmpty {
@@ -111,5 +177,61 @@ public struct TextChunker: Sendable {
             output.append(final)
         }
         return output
+    }
+
+    private func splitNearMiddle(_ text: String) -> [String] {
+        guard text.count > 1 else { return [text] }
+
+        let characterCount = text.count
+        let midpointOffset = characterCount / 2
+        let lowerOffset = max(characterCount / 5, 1)
+        let upperOffset = min(characterCount - characterCount / 5, characterCount - 1)
+        let lowerBound = text.index(text.startIndex, offsetBy: lowerOffset)
+        let upperBound = text.index(text.startIndex, offsetBy: upperOffset)
+
+        let strongBoundaries = ".!?。！？\n"
+        let softBoundaries = ",;:—–，、；："
+        let splitIndex =
+            nearestBoundary(
+                in: text,
+                range: lowerBound..<upperBound,
+                midpointOffset: midpointOffset,
+                matching: { strongBoundaries.contains($0) }
+            )
+            ?? nearestBoundary(
+                in: text,
+                range: lowerBound..<upperBound,
+                midpointOffset: midpointOffset,
+                matching: { softBoundaries.contains($0) }
+            )
+            ?? nearestBoundary(
+                in: text,
+                range: lowerBound..<upperBound,
+                midpointOffset: midpointOffset,
+                matching: \.isWhitespace
+            )
+            ?? text.index(text.startIndex, offsetBy: midpointOffset)
+
+        let left = text[..<splitIndex]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = text[splitIndex...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !left.isEmpty, !right.isEmpty else { return [text] }
+        return [left, right]
+    }
+
+    private func nearestBoundary(
+        in text: String,
+        range: Range<String.Index>,
+        midpointOffset: Int,
+        matching predicate: (Character) -> Bool
+    ) -> String.Index? {
+        text[range].indices
+            .filter { predicate(text[$0]) }
+            .min {
+                abs(text.distance(from: text.startIndex, to: $0) - midpointOffset)
+                    < abs(text.distance(from: text.startIndex, to: $1) - midpointOffset)
+            }
+            .map { text.index(after: $0) }
     }
 }
