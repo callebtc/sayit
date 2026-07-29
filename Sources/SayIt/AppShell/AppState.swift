@@ -27,6 +27,7 @@ final class AppState {
     private var lastDiagnosticsRevision: UInt64?
     private var lastServiceRevision: UInt64?
     private var downloadByteCounts: [ModelID: Int64] = [:]
+    private var modelIDToSelectAfterInstallation: ModelID?
 
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
@@ -160,7 +161,10 @@ final class AppState {
         perform(.clear)
     }
 
-    func installModel(_ id: ModelID) {
+    func installModel(
+        _ id: ModelID,
+        selectAfterInstallation: Bool = false
+    ) {
         guard isServiceOnline else {
             presentError(
                 "The background service is not ready. Try again in a moment."
@@ -169,12 +173,15 @@ final class AppState {
         }
         guard requestedModelInstallID == nil else { return }
 
+        modelIDToSelectAfterInstallation =
+            selectAfterInstallation ? id : nil
         requestedModelInstallID = id
         Task {
             do {
                 let response = try await send(.installModel(id.rawValue))
                 try requireSuccess(response)
             } catch {
+                modelIDToSelectAfterInstallation = nil
                 requestedModelInstallID = nil
                 presentError(error.localizedDescription)
             }
@@ -186,6 +193,7 @@ final class AppState {
     }
 
     func cancelModelInstall() {
+        modelIDToSelectAfterInstallation = nil
         requestedModelInstallID = nil
         perform(.cancelModelInstall)
     }
@@ -570,6 +578,11 @@ final class AppState {
            installedModelIDs.contains(requestedModelInstallID) {
             self.requestedModelInstallID = nil
         }
+        if let modelIDToSelectAfterInstallation,
+           installedModelIDs.contains(modelIDToSelectAfterInstallation) {
+            self.modelIDToSelectAfterInstallation = nil
+            perform(.selectModel(modelIDToSelectAfterInstallation.rawValue))
+        }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
 
@@ -727,6 +740,7 @@ final class AppState {
             return try await client.send(command)
         } catch {
             if error is SayItXPCClientError {
+                modelIDToSelectAfterInstallation = nil
                 requestedModelInstallID = nil
                 serviceConnection = .offline
                 statusText = "Background service unavailable"

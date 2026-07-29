@@ -6,6 +6,7 @@ struct ModelRowView: View {
     @State private var isConfirmingDelete = false
     @State private var isConfirmingMemoryUse = false
     let model: ModelDescriptor
+    var selectAfterDownload = false
 
     var body: some View {
         HStack(alignment: .top, spacing: DesignTokens.standardSpacing) {
@@ -97,6 +98,39 @@ struct ModelRowView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Starting model download")
+                } else if let progress = state.downloadProgress,
+                          progress.modelID == model.id {
+                    HStack(spacing: DesignTokens.compactSpacing) {
+                        ProgressView(value: progress.fractionCompleted)
+                            .frame(width: 76)
+                            .accessibilityLabel(
+                                "\(model.displayName) download"
+                            )
+                            .accessibilityValue(
+                                Text(
+                                    progress.fractionCompleted,
+                                    format: .percent
+                                )
+                            )
+                        Text(
+                            progress.fractionCompleted,
+                            format: .percent.precision(
+                                .fractionLength(0)
+                            )
+                        )
+                        .monospacedDigit()
+                        if progress.state == .failed
+                            || progress.state == .paused {
+                            Button("Retry", action: downloadModel)
+                        } else {
+                            Button(
+                                "Cancel",
+                                systemImage: "xmark.circle",
+                                action: state.cancelModelInstall
+                            )
+                            .labelStyle(.iconOnly)
+                        }
+                    }
                 } else {
                     Button("Download", action: downloadModel)
                         .buttonStyle(.borderedProminent)
@@ -173,6 +207,9 @@ struct ModelRowView: View {
     }
 
     private func downloadModel() {
-        state.installModel(model.id)
+        state.installModel(
+            model.id,
+            selectAfterInstallation: selectAfterDownload
+        )
     }
 }

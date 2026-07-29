@@ -4,6 +4,7 @@ import SwiftUI
 struct DownloadStatusView: View {
     @Environment(AppState.self) private var state
     let progress: ModelDownloadProgress
+    var selectAfterDownload = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
@@ -84,7 +85,10 @@ struct DownloadStatusView: View {
     private func performAction() {
         switch progress.state {
         case .paused, .failed:
-            state.installModel(progress.modelID)
+            state.installModel(
+                progress.modelID,
+                selectAfterInstallation: selectAfterDownload
+            )
         default:
             state.cancelModelInstall()
         }

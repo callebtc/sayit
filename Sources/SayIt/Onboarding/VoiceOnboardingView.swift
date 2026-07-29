@@ -3,9 +3,10 @@ import SwiftUI
 
 struct VoiceOnboardingView: View {
     @Environment(AppState.self) private var state
+    @State private var isChoosingAnotherModel = false
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: DesignTokens.generousSpacing) {
             Image(systemName: "waveform.circle")
                 .font(.system(size: 48))
                 .symbolRenderingMode(.hierarchical)
@@ -22,42 +23,28 @@ struct VoiceOnboardingView: View {
             }
 
             if let model = recommendedModel {
-                LabeledContent {
-                    Text(
-                        state.downloadByteCount(for: model),
-                        format: .byteCount(style: .file)
-                    )
-                        .monospacedDigit()
-                } label: {
-                    Label("\(model.displayName) · \(model.defaultVoice ?? "")", systemImage: "speaker.wave.2")
-                }
-                .frame(maxWidth: 380)
+                RecommendedOnboardingModelView(model: model)
+            }
 
-                if state.installedModelIDs.contains(model.id) {
-                    HStack {
-                        Label("Installed and verified", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Button("Play sample", action: state.speakSample)
-                    }
-                } else if state.requestedModelInstallID == model.id {
-                    HStack(spacing: DesignTokens.compactSpacing) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Starting download…")
-                    }
-                    .frame(maxWidth: 380)
-                    .accessibilityElement(children: .combine)
-                } else if let progress = state.downloadProgress {
-                    DownloadStatusView(progress: progress)
-                        .frame(maxWidth: 380)
-                } else {
-                    Button(
-                        "Download Kokoro",
-                        action: downloadRecommendedModel
-                    )
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!state.isServiceOnline)
-                }
+            Button(
+                "Choose another model…",
+                systemImage: "list.bullet",
+                action: showModelPicker
+            )
+            .buttonStyle(.link)
+            .popover(isPresented: $isChoosingAnotherModel) {
+                OnboardingModelPickerView(
+                    recommendedModelID: recommendedModel?.id
+                )
+                .environment(state)
+            }
+
+            if let progress = state.downloadProgress,
+               progress.modelID != recommendedModel?.id {
+                OnboardingModelDownloadView(
+                    progress: progress,
+                    modelName: modelName(for: progress.modelID)
+                )
             }
         }
         .padding(32)
@@ -67,8 +54,11 @@ struct VoiceOnboardingView: View {
         state.models.first { $0.stability == .recommended }
     }
 
-    private func downloadRecommendedModel() {
-        guard let model = recommendedModel else { return }
-        state.installModel(model.id)
+    private func showModelPicker() {
+        isChoosingAnotherModel = true
+    }
+
+    private func modelName(for id: ModelID) -> String {
+        state.models.first { $0.id == id }?.displayName ?? "voice model"
     }
 }
