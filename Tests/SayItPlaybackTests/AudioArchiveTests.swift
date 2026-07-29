@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 import Testing
-@testable import SayIt
+@testable import SayItBackend
 
 @Suite("Audio archive")
 struct AudioArchiveTests {

@@ -1,0 +1,414 @@
+openapi: 3.1.0
+info:
+  title: Say It Local API
+  version: 1.0.0
+  description: Local, loopback-only speech synthesis and playback control.
+servers:
+  - url: http://127.0.0.1:59125/v1
+security:
+  - bearerToken: []
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JSONResponse"
+  /openapi.json:
+    get:
+      operationId: getOpenAPISpecification
+      security: []
+      responses:
+        "200":
+          description: The OpenAPI source document
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /state:
+    get:
+      operationId: getState
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /events:
+    get:
+      operationId: getEvents
+      parameters:
+        - in: header
+          name: Last-Event-ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Ordered state events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /jobs:
+    get:
+      operationId: listJobs
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+    post:
+      operationId: createJob
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeechSubmission"
+      responses:
+        "202":
+          $ref: "#/components/responses/JSONResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+  /jobs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    get:
+      operationId: getJob
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: cancelJob
+      responses:
+        "202":
+          description: Cancellation accepted
+        "404":
+          $ref: "#/components/responses/Problem"
+  /jobs/{id}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    post:
+      operationId: confirmJob
+      responses:
+        "202":
+          description: Confirmation accepted
+  /playback/play:
+    post:
+      operationId: play
+      responses:
+        "202":
+          description: Command accepted
+  /playback/pause:
+    post:
+      operationId: pause
+      responses:
+        "202":
+          description: Command accepted
+  /playback/clear:
+    post:
+      operationId: clear
+      responses:
+        "202":
+          description: Command accepted
+  /playback/seek:
+    post:
+      operationId: seek
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Seconds"
+      responses:
+        "202":
+          description: Command accepted
+  /playback/skip:
+    post:
+      operationId: skip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Seconds"
+      responses:
+        "202":
+          description: Command accepted
+  /playback/rate:
+    patch:
+      operationId: setPlaybackRate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rate]
+              properties:
+                rate:
+                  type: number
+                  minimum: 0.5
+                  maximum: 2
+      responses:
+        "202":
+          description: Command accepted
+  /models:
+    get:
+      operationId: listModels
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+  /models/{id}/select:
+    parameters:
+      - $ref: "#/components/parameters/StringIdentifier"
+    post:
+      operationId: selectModel
+      responses:
+        "202":
+          description: Command accepted
+  /models/{id}/install:
+    parameters:
+      - $ref: "#/components/parameters/StringIdentifier"
+    post:
+      operationId: installModel
+      responses:
+        "202":
+          description: Command accepted
+    delete:
+      operationId: cancelModelInstall
+      responses:
+        "202":
+          description: Command accepted
+  /models/{id}:
+    parameters:
+      - $ref: "#/components/parameters/StringIdentifier"
+    delete:
+      operationId: removeModel
+      responses:
+        "202":
+          description: Command accepted
+  /models/imports:
+    post:
+      operationId: importModel
+      description: Stream an uncompressed TAR archive containing exactly one model folder.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "202":
+          description: Import accepted
+  /history:
+    get:
+      operationId: listHistory
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+    delete:
+      operationId: clearHistory
+      responses:
+        "202":
+          description: Command accepted
+  /history/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    get:
+      operationId: getHistoryItem
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+    delete:
+      operationId: deleteHistoryItem
+      responses:
+        "202":
+          description: Command accepted
+  /history/{id}/replay:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    post:
+      operationId: replayHistoryItem
+      responses:
+        "202":
+          description: Command accepted
+  /history/{id}/regenerate:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    post:
+      operationId: regenerateHistoryItem
+      responses:
+        "202":
+          $ref: "#/components/responses/JSONResponse"
+  /history/{id}/pin:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    post:
+      operationId: toggleHistoryPin
+      responses:
+        "202":
+          description: Command accepted
+  /history/{id}/audio:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum: [m4a, wav, text]
+          default: m4a
+    get:
+      operationId: exportHistoryItem
+      responses:
+        "200":
+          description: Exported history content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /settings:
+    get:
+      operationId: getSettings
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+    patch:
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JSONResponse"
+      responses:
+        "202":
+          description: Command accepted
+  /diagnostics:
+    get:
+      operationId: getDiagnostics
+      responses:
+        "200":
+          $ref: "#/components/responses/JSONResponse"
+    delete:
+      operationId: clearDiagnostics
+      responses:
+        "202":
+          description: Command accepted
+  /diagnostics/export:
+    get:
+      operationId: exportDiagnostics
+      responses:
+        "200":
+          description: Diagnostics JSON
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JSONResponse"
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+  parameters:
+    Identifier:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StringIdentifier:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+  responses:
+    JSONResponse:
+      description: Successful JSON response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JSONResponse"
+    Problem:
+      description: RFC 9457 problem details
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    JSONResponse:
+      type: object
+      additionalProperties: true
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+    SpeechSubmission:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          maxLength: 200000
+        inputFormat:
+          type: string
+          enum: [plainText, markdown, html, ssml]
+          default: plainText
+        modelID:
+          type: string
+        voice:
+          type: string
+        language:
+          type: string
+        voiceDescription:
+          type: string
+        speakingPace:
+          type: number
+        playbackRate:
+          type: number
+        queuePolicy:
+          type: string
+          enum: [enqueue, interruptCurrent, replaceAll]
+          default: enqueue
+        permitsLongText:
+          type: boolean
+          default: false
+    Seconds:
+      type: object
+      required: [seconds]
+      properties:
+        seconds:
+          type: number

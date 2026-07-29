@@ -72,6 +72,7 @@ struct HistoryDetailView: View {
             }
         }
         .padding(24)
+        .disabled(!state.isServiceOnline)
     }
 
     private func replay() {

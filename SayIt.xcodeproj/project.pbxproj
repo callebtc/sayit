@@ -7,54 +7,95 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		014246F80C8D3B170437E965 /* ModelFileDownloadDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF0DD7C05A13BA9B5FC669D /* ModelFileDownloadDelegate.swift */; };
+		0168663A8EC2A4FEDBC79848 /* ServiceEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D3BCCF0B19E3B2BE3B50D2 /* ServiceEvent.swift */; };
 		02436FE64F4012B38FCF9EB9 /* SpeakingPaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9B7FFC824443F2E0B9E50DB /* SpeakingPaceTests.swift */; };
+		024B45D91C00924421BDCB87 /* SayItXPC.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		04A486FFB00918D6EA2CEF6A /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E0FF0F181F96AAD0F1DF98 /* LaunchAtLoginController.swift */; };
+		053CFBBC5981CE9F80D50B43 /* SkipCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B872F10E4B1D9A5C988561 /* SkipCommand.swift */; };
+		05F4361DDBD00ADEC9FA4D25 /* SpeechItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C3EEF657685D177B47895A /* SpeechItem.swift */; };
 		060CE69F47842DF309967978 /* JSONDecoder+SayIt.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CAE821A4FBCC2726632DDA /* JSONDecoder+SayIt.swift */; };
 		064E63BD4C63B4121D192D93 /* ModelInstallationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEDA49E993FE01497009CDAB /* ModelInstallationState.swift */; };
-		07FAC4E112A4D89D7F813428 /* HuggingFaceSibling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30B714E90D675DA2282DD4E /* HuggingFaceSibling.swift */; };
-		08C3669F0AE099B6AB0EF7B6 /* SupportedModelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 719F2DD16D460533010B3A4E /* SupportedModelTypes.swift */; };
+		079CED75E397190489D69C24 /* SayItHTTP.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; };
+		080F4D50872D29D3C1590F8D /* SpeechJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57904CB7418B385CE9136D3 /* SpeechJob.swift */; };
+		0922BE8F5F7353F975466383 /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
+		0933C3DB1F15CB642A263B79 /* HistoryItemSnapshot+ServiceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13E5BA1B40745372B9772E /* HistoryItemSnapshot+ServiceSnapshot.swift */; };
 		09E94756EA98F9506DD13C52 /* DiagnosticCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A092AE8477F880752CF985 /* DiagnosticCategory.swift */; };
 		0A00DCDC6CC2981A2DF8C523 /* ModelID.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB04A144E7B0EC58078BD43A /* ModelID.swift */; };
-		0A6957B0F2BBFE76A0D32E86 /* String+Padding.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91703C2C565D3CE1A51D108 /* String+Padding.swift */; };
+		0B5B5BCD24A338EB27529A01 /* SayItHTTPServer+HistoryRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */; };
+		0B86C452FDF118DF4A2F663B /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		0C7EBC1DACDEBFA00133A526 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		0D57BE565C95A79F2C895D50 /* SpeechChunk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B825339FFDAD336D58CA0052 /* SpeechChunk.swift */; };
-		0EA887F215E78307EF628AF0 /* CommunityModelResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F82E250E5DDE4747AF9FFA /* CommunityModelResolver.swift */; };
+		0ED42576C853998CBE6BE8A9 /* SpeechSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C5CA2C6C2C76CF93698CD1 /* SpeechSubmission.swift */; };
 		1066672AD8F1CD5C55522FFE /* ReadClipboardButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D607DFF8375415948AC3F253 /* ReadClipboardButton.swift */; };
 		1277983D5FFBC76A6CD5274E /* ModelFileDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D4CBC539AFA34387DA49C6 /* ModelFileDescriptor.swift */; };
 		1487C2E135090B89B5290D1F /* JSONEncoder+SayIt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8C5D4E319B7ED9AA559B65 /* JSONEncoder+SayIt.swift */; };
 		1499573C719AFE565957C8DE /* AnywhereOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9139DB6590D67057C09ABBF /* AnywhereOnboardingView.swift */; };
+		14C2C345DED4A876DEB5AABB /* APITokenRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C260D3D114063A57EE6106 /* APITokenRecord.swift */; };
+		14F63953685D0CD2DD646FA8 /* SayItClientValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591762C5B5BB3C128A89AE66 /* SayItClientValidator.swift */; };
+		16A5F34E0F821CFCC1C608D0 /* APITokenMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEF4E9A880944ACA9E6A4AA /* APITokenMetadata.swift */; };
+		19488C0CF76ABE8972AE4980 /* QueuePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E857E910DF547DDF281E5A /* QueuePolicy.swift */; };
 		1AB6750260BF70B395B0F9E5 /* HistorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDA6836016ADDCDC5ACF3AF /* HistorySettingsView.swift */; };
+		1ACA6FA960940632C8EE1B46 /* SeekCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5A1F0B187E695CA0512A6 /* SeekCommand.swift */; };
 		1AE36C4DA4C8909EAD163A6A /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93E5EE6D37AD52B74C09BA2 /* GlobalShortcut.swift */; };
 		1B7DE382603E96F6DCFE8250 /* AboutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E05E5EF26C5160EA80CBEC7 /* AboutSettingsView.swift */; };
+		1D99CE2AEC265E0091F26C5D /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		1DC356FAFFD8093BB0844F9B /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1E6BFAC949F1B9472E9A8D07 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2837701977770F5911182C7A /* HistoryStore.swift */; };
+		1E86814254355D2846A4EC64 /* SayItAgentMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435BC42F39716B2AF01C14DE /* SayItAgentMain.swift */; };
 		1EF5F2DAFB45053DAAE3909A /* ModelDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750990410DAB9D60949EB46 /* ModelDescriptor.swift */; };
+		2002F93C6ECAEBEEE465DB9E /* BackendSettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */; };
+		2132BD3904587DAA3F093A71 /* ModelDownloadProgress+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */; };
 		22B295F9AD2362B159941CB4 /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */; };
+		2353CC07E206CC47B438E4EA /* SayItRootCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB3E6A2673BBD7147C1B8F1 /* SayItRootCommand.swift */; };
 		237FCE4FBE1E65624CCBEF35 /* DiagnosticExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F03C694936914BB34739D7 /* DiagnosticExport.swift */; };
 		245C2FAE01D5A6E480FDE344 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */; };
+		24FCB6E59B79022AB028FB48 /* HTTPAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803A1EDA343EA0D66099E704 /* HTTPAPIError.swift */; };
 		25C973535C87B9998DBFE308 /* PasteboardPayloadReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3DE2FFBD6C986ADC44745A /* PasteboardPayloadReader.swift */; };
+		26837F03C8591D15D7A5C6EA /* CLIOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A39863383170BD4A8E9A68C /* CLIOutput.swift */; };
 		276A0290B85378B837C59629 /* TestBundleToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A48A60CD4D89DFA933338B /* TestBundleToken.swift */; };
 		2BC6435590DB25F699123475 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5842EBC765548471AD55DED2 /* SettingsRootView.swift */; };
 		2CC74AF3F076F05AB170E86F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9E366DE86214B3DDB3FE45A2 /* PrivacyInfo.xcprivacy */; };
+		2E66646AAA47CC18D80E876B /* DiagnosticSnapshot+Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98358E5044F1911C15A82B63 /* DiagnosticSnapshot+Event.swift */; };
 		2F98443BCC6A9CE666AFF7D2 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		30F806119784A3EA06D08732 /* APITokenCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AADDFBAF6765A7A9E46F6F /* APITokenCreation.swift */; };
+		35C5858DED5258F9813091A5 /* SynthesisError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */; };
+		360339154AB4814D00BBCB3B /* TokenCreationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62B45AACA98296E67663E5A /* TokenCreationSheet.swift */; };
+		364005AD51699126DC66000A /* IdempotencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC719FAC8BB29024BACE25E2 /* IdempotencyStore.swift */; };
 		3708667FF2CF32FF6D123AFC /* article.html in Resources */ = {isa = PBXBuildFile; fileRef = F879A4D1F0B1C6C29831ADE1 /* article.html */; };
 		39C253ED1EC6C988E4E8FDEC /* SayItUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5E19E0FDD1DD8B00C3839A /* SayItUITests.swift */; };
+		3A8223BA39074C1F96EBA1E7 /* SayItProtocolVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CCCCC406E665881290ECF79 /* SayItProtocolVersion.swift */; };
+		3C2740D6D5CDFA7E43AA354D /* ServiceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB4CFAC282562BEBAE93BB0 /* ServiceSnapshot.swift */; };
 		3C99E640EDA4D3175B6A2DB4 /* OnboardingProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343B30687AD3CFE12DD4CDDE /* OnboardingProgressView.swift */; };
+		3D42A15E1FDD41183493A7F7 /* SpeechJobSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 266607DF46390FDCA1CDA0BE /* SpeechJobSource.swift */; };
 		3E3BF6D7045D340679DD24DD /* DiagnosticRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFE8094B2B64B9859E711A2 /* DiagnosticRecorder.swift */; };
 		3E69D945BB53BFBF82FCAA9D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68391B4A83D06AD4C1FFAA0 /* OnboardingView.swift */; };
+		40F3797F2C6B54BD494E8C74 /* APITokenDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8697FFA4EB481A4A7FB1A3A /* APITokenDigestTests.swift */; };
+		419CB00AB6F80C7F4A3F46BC /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */; };
 		4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C074F8772DC89E43CE2A267 /* DesignTokens.swift */; };
 		435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13CEBAFD3BF5D864C5BD06D /* SayItApplication.swift */; };
 		45E5E96E262A16E29BC0B1C3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D05793EC7DD8A6AD63C5EB8 /* AppDelegate.swift */; };
-		4777D3D93A31DCAA81FFBA6A /* SynthesisError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC636BB65E51FA1C527129C /* SynthesisError.swift */; };
+		466EF460CC2E6FADDF770B9E /* IdempotencyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */; };
+		47F2189FF5531A33CA2B00DE /* SayItXPCExportedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B452881D666854D351A6EF /* SayItXPCExportedService.swift */; };
 		48D749D47ED1BD0895F0A364 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029B4E9368A75CA1F818245E /* HistoryView.swift */; };
+		49FDF14558C27BFE52DEA9F3 /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 4D514FBB81728B5F7E53FCCE /* openapi.yaml */; };
+		4C03756876697C1768B8C149 /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
+		4C7C91395A2A7B358CB8BA6C /* BackendSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */; };
 		4D59452091289DFCDC2C8742 /* ModelCatalogError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */; };
 		4D7F4B3ABC9D7B95431EDD4D /* ModelSuitability.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD21BC78FB5068E080D2896 /* ModelSuitability.swift */; };
+		4E3AC9A759280B1F3A00E23F /* SayItXPCClientError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79157408B606A6A97170DB7F /* SayItXPCClientError.swift */; };
+		4E78F203D84F8C3ED47C16C5 /* ProtocolRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC8DFA0B3ED1DCC4E493256 /* ProtocolRoundTripTests.swift */; };
 		4F315DBDC73BC93015E2BE5B /* SpeechSynthesizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74CA2A9978AE69F18C1D87F9 /* SpeechSynthesizing.swift */; };
+		4F4C80F9B704A34D4DE00AEB /* String+Padding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22127AF959BA0AC76DF43D20 /* String+Padding.swift */; };
+		4FB1429455F5301CFCB98EB9 /* ServiceResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99A0DD56B5957ED88693CD6 /* ServiceResponse.swift */; };
 		4FFB171905475E82B45ED42F /* TextChunkerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B26ACCB1796A2C2B5F4048A /* TextChunkerTests.swift */; };
+		500B2120BC57AC30D4324BD5 /* APITokenScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA18E0AFEFF10C13815F3D6D /* APITokenScope.swift */; };
 		50F000C6F5AC706BD4EBD9E1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A47804F46DFB604995541E6 /* AppSettings.swift */; };
+		51A0401365D51889E07375E6 /* ModelManagerError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F70E0C325CC84370C425EF07 /* ModelManagerError.swift */; };
 		51C0584024264406E5670233 /* MenuBarRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8077FB8567737F537A02DE3B /* MenuBarRootView.swift */; };
+		52502DAC4AEAFB4BD4596A9D /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 2996022F566B1CA2CFAB59AD /* openapi-generator-config.yaml */; };
 		5284097D44147769C8F5DE13 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 5EE1786A722735766F45829F /* MLXAudioTTS */; };
-		52A017285F107BA8530870DC /* HuggingFaceLFSInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D36C82439E0D76A31C16D0 /* HuggingFaceLFSInfo.swift */; };
 		53280083429EC40EB5447394 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0F462BFFCCB9F7F8B10A64 /* SettingsPane.swift */; };
+		5335E77D09F3E4133ACBB024 /* HuggingFaceLFSInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAAB79ECE86C6928C43363F /* HuggingFaceLFSInfo.swift */; };
 		538BED38870710899B0EAD49 /* ModelManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FD50F093D897C5794716C1 /* ModelManaging.swift */; };
 		53DB45A73F558B1B14F40568 /* PlaybackMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CD41EA706FD7F0233FC5E3 /* PlaybackMode.swift */; };
 		55A0BF360396233B45F0EF2F /* SpeechTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C106BF157F7205F40C061AA /* SpeechTitleGenerator.swift */; };
@@ -65,62 +106,143 @@
 		58F83E662C322E4BC40E6F4B /* MenuBarLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */; };
 		59A9A6B109F8C906DF06087F /* ModelCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */; };
 		5A2DF64A186464BD8109F198 /* VoiceRibbonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */; };
+		5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */; };
 		5E463C8DB9A3EE6B6DCD969B /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
+		5E4F195C99A8660397FBB6A6 /* StopCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3143D35E528697F33A92BD89 /* StopCommand.swift */; };
+		60080A0011D69A2FFB07DFCD /* InputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */; };
+		6031661FBE161FAAE146395D /* SayItService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A4DC744C75D2B42E40DFCC /* SayItService.swift */; };
 		603C870494872101D543D1DC /* StatusHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45838FA1413995858EC9E5C3 /* StatusHeaderView.swift */; };
 		60528682BE9EC7D5352FAF99 /* ModelCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A01AEA98A84423CEE774F61 /* ModelCapabilities.swift */; };
 		60743E7014654842A6336355 /* DiagnosticRecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C03FA9DC155DA090ED679A /* DiagnosticRecorderTests.swift */; };
+		60B48AD0995F27BC9235EF4A /* SayItHTTPServer+CommandHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BDFCA93C53799BE00F9B86 /* SayItHTTPServer+CommandHelpers.swift */; };
 		60DBFCA21F8DE87D1FFDD899 /* ModelInstallation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBFE78D84F25DC3D40DC991F /* ModelInstallation.swift */; };
 		62F3FD33DADA0A478557C864 /* RetentionPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82A3C306187C92E98BA08E3 /* RetentionPlannerTests.swift */; };
+		64E597F0729C5832060A65D1 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = E452F8ABB24767BF7794A92D /* ArgumentParser */; };
+		655F0772A2C3FA320720CA2A /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		65660AA297D0C8DC90D9D553 /* SayItHTTPServer+Upload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5C8FD44D6CA11CEA0B6212 /* SayItHTTPServer+Upload.swift */; };
 		656AACB1A3C56D27819DB755 /* HistoryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56631767F22E065003A55DA8 /* HistoryRowView.swift */; };
+		65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */; };
+		660B9287719F72B11783D3C1 /* ResumeCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C159E47E305909312F3675A5 /* ResumeCommand.swift */; };
+		690DD7FC6DABD5D8A65B7A48 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
+		6B2A2003079910D0A146A378 /* SayItHTTPServer+PlaybackRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */; };
 		6C69A69B7EEEEBDFFFF0952E /* DiagnosticSeverity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810121170E2B03BC942F9CF3 /* DiagnosticSeverity.swift */; };
+		6D7BC63EED554722AFF0B04F /* PauseCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4527699AF5875AD4FC468DF5 /* PauseCommand.swift */; };
+		6E52A0435904D6D6FDB609BF /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = FD20A7112C89EF1EA775887A /* OpenAPIRuntime */; };
 		6F00A9E66B1543D0A1FA4014 /* ModelDependencyDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE2146938E2B5731D39082E5 /* ModelDependencyDescriptor.swift */; };
+		6FAD03578FF45B9F0DD51DA5 /* InterruptMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A114503EEA29B96D47D643 /* InterruptMonitor.swift */; };
 		74104E6B15D75A7822590DD1 /* UpdateResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C640391D6C6DECE4012194E /* UpdateResult.swift */; };
+		741209B74AB521E4341DE52B /* ExportedFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB3A6AAC6675A003A0ACE47C /* ExportedFile.swift */; };
 		76903DE1E3B650737C2E4C40 /* TextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6779E36EE1B11B74EFC4C4 /* TextParser.swift */; };
-		78320379F180A31FE8BFA81B /* HuggingFaceCardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9853DA38445F3A95C3D8CC3F /* HuggingFaceCardData.swift */; };
+		773D97FBBC1137FED7BFF3F9 /* AudioArchiveResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5168863C71F245E6BAFF50 /* AudioArchiveResult.swift */; };
+		7856CCAA37B79FD97834762B /* BackendPlaybackControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71504F663D18FC89EA4403 /* BackendPlaybackControlling.swift */; };
 		7926E925ACC463D96004B5DC /* DownloadStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64688820F285E6E664A7F21C /* DownloadStatusView.swift */; };
 		79B2A90D313E92D540E57C1D /* AudioChunk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B118CD87A4B24F27D08007B9 /* AudioChunk.swift */; };
 		7A1728F9E6F89BA0549FAB93 /* ModelInstallationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB00365B7888BA872FDEED0C /* ModelInstallationTests.swift */; };
+		7A8C3D617826E8577AA252BC /* HistoryCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382FC0930FEB1526D9B8C8ED /* HistoryCommand.swift */; };
+		7A9CE2127601A523727C4683 /* SayItHTTP.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; };
+		7AE751EA7DE12B38E00969F8 /* SayItBackendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E46EB83C78D6FE379603B90 /* SayItBackendService.swift */; };
 		7B2FC5474684463F29330890 /* ModelLicense.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0607E47123E83EC79342535 /* ModelLicense.swift */; };
+		7B74C3E06CFE1D1CC86C1B4B /* ServiceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F395CE405E435EB38E630E /* ServiceSettingsView.swift */; };
+		7CFF37CCAEC02ABD34865DC9 /* PendingSpeechJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA89480BA5C3A491BEAB81A1 /* PendingSpeechJob.swift */; };
+		7E512A306F97FFFAC8E597BE /* ModelSnapshot+Descriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB589732A789AF6BE59CA74 /* ModelSnapshot+Descriptor.swift */; };
+		8031E3C162346A93D6DC988C /* BackendMigrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */; };
+		80BFAE22448B0EAB7E67A249 /* ClearCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75E2E573611488A4C502C26 /* ClearCommand.swift */; };
 		80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D55330E6962E057802D765 /* CommunityModelSheet.swift */; };
+		819369E4BE67473156C2F517 /* AudioArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7290E2C92C8AB52D08CC0B1 /* AudioArchive.swift */; };
+		81C66B4F2522D000131B2B9A /* StatusCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEBAE1424977EEAAB66E2B6 /* StatusCommand.swift */; };
+		82741D859B1FF46D9898F67E /* ServiceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B8CBFB37FE7F7FAB4C34F0 /* ServiceCommand.swift */; };
+		87D72908294EA29CE78FE004 /* ModelsCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BA4BDA03C479DA055875A9F /* ModelsCommand.swift */; };
+		87E78A91A66292F711C87D5D /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6CD55E927CF113AB7D91466 /* HistoryStore.swift */; };
+		880FA583B8A21CB73DAF01DB /* SayItHTTPServer+SystemRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBF73237570E80D42747421 /* SayItHTTPServer+SystemRoutes.swift */; };
+		89AD3D4D8907B9BD8BC76B7F /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		89D4D1F9824FDC6B29ECA9AA /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
+		89FB85395B38ED936E9041C6 /* SayItAgentListenerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDE2008B198AA58D2CCB9D1 /* SayItAgentListenerDelegate.swift */; };
+		8C37C42D200745BF0203A5AD /* PlaybackError.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD7CD1882C35D31525620E7 /* PlaybackError.swift */; };
+		8C75E37B81E956CB8F3ADC37 /* SayItHTTPServer+Responses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2263B37D07FDBD6AAD94452F /* SayItHTTPServer+Responses.swift */; };
+		8C86A585B42AAC5091C2515A /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = B085212FC4B8B933B6D6E28B /* Yams */; };
 		8D145BFDAAA4427BDA29F932 /* SettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83C5C6BD90942793E418123 /* SettingsPage.swift */; };
 		8D4E3A679632C065A6CA4B17 /* TextCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0AC916C8F3D571E4E78407 /* TextCleaner.swift */; };
+		8D4EBDD04C3B06E93203E143 /* APIRateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 356A58229DE0CCCFD9915867 /* APIRateLimiter.swift */; };
+		8E9DE65CE5B6479B61E209C5 /* SayItXPC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; };
+		906F6FEB715C41544642F1CF /* APITokenDigest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E705EEFA323ECDF9CB0C03E /* APITokenDigest.swift */; };
 		92F7AFC98D4FD17999991ACA /* RetentionPeriod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF16666B0AD7C529898B79C /* RetentionPeriod.swift */; };
 		937DC7149D4BF19AEA44A3E1 /* ModelCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 70120889C7D5939C0578DB4D /* ModelCatalog.json */; };
+		945A39481BECA04AEDA50C1F /* DiagnosticEvent+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */; };
 		95C03B8BF70FFF18F99B80F8 /* SpeechItemState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD51CABBD6A4B66774A1984 /* SpeechItemState.swift */; };
+		969D61B2F282C219FF951296 /* DiagnosticSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8F4DCDC453E07A4518905B /* DiagnosticSnapshot.swift */; };
+		980814CF3D25517505F78C03 /* SayItHTTP.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		99144A0E1446A1EC04D2EA22 /* TriggerSource+SpeechJobSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */; };
+		9A25C707A79C52C03BD5BB7D /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
+		9A468EF5A94031E08CFEE119 /* CommunityModelResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F82CDFD943568E864550065 /* CommunityModelResolver.swift */; };
 		9A551BA00DBE4C31FA3FC402 /* HardwareTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789D50F733AE1AF2033A988B /* HardwareTier.swift */; };
 		9B39AA03CBD27C79BB07C6B7 /* GitHubRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC5588F06EF897327ABB4F2 /* GitHubRelease.swift */; };
+		9BB4F1D68B609492CD7B3737 /* ModelSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14E6F09D7A8D43565BD371C /* ModelSnapshot.swift */; };
+		9BE94003FF79DC47D54D4E5A /* SecondsRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B59C1431DC3F3B4E084DCB7C /* SecondsRequest.swift */; };
 		9CC2E3B1434FA175E8BF6443 /* ErrorStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */; };
-		9CFB4BC0AAB9F4B89E2D8EF3 /* AudioArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DC4237A8193E8C1B9A28CE /* AudioArchive.swift */; };
+		9D66CEC06590EB81EE8C74DA /* CLIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E887931831C3AE85FF36919 /* CLIService.swift */; };
 		9DEB2C5B9010F70FA0C1961B /* DiagnosticEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7735064352240AE621CA239 /* DiagnosticEvent.swift */; };
+		9E527BB986FDD54C6DEC79F1 /* ServiceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394B28198A8E456598D193AE /* ServiceRequest.swift */; };
 		9F2F336F030A559A0653D0CF /* PlaybackRateMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */; };
+		9F3A06ACFC59D72F85ABCF59 /* HuggingFaceModelResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C653B2059CA0C0A44D0172 /* HuggingFaceModelResponse.swift */; };
 		9F5FA1C7694F5EDE270C51D7 /* SpeechPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B2409CEE7E510324C9AEDC /* SpeechPreviewView.swift */; };
-		A281FD09EB0ADC747E7FC4D6 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C4AC5009A935780C7B009B /* ModelManager.swift */; };
+		A1250E6CC74EF0A5452B14B2 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A3070F1EE828AB3AFE51A3C6 /* ModelDownloadProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */; };
+		A38649ACD452781EC3169E5D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077D725F6B2841CB8D718F24 /* ModelManager.swift */; };
+		A3FB45BF87BFC016D4935383 /* APITokenScope+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */; };
+		A4FFF134C8CCF5D4A4673FEE /* SayItHTTPServer+SettingsRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */; };
+		A55D01E23657A9AEC04FF8AF /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		A599889B95C6B4AF68C31EDA /* SayItWireCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = D110E067E893E21EA4B05686 /* SayItWireCodec.swift */; };
 		A63DE17B0E6CB0604EB0B083 /* HistoryItemSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36BC441FD70A479EBA22F750 /* HistoryItemSnapshot.swift */; };
-		AA0EFEA0010CCAA0CC68782C /* SpeechItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4F5E0BCFCD7309E0C20401 /* SpeechItem.swift */; };
+		A7412271ED12DDEA24E130CB /* SayItXPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE1191A01FC022FE06707AD /* SayItXPCProtocol.swift */; };
+		A75DB9B824D2FF3AC9285396 /* APITokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */; };
 		AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF4201E7A00CB96AD7F1F15 /* PrivacyOnboardingView.swift */; };
 		AB5E37AC8EDF9B95E2DCB1E7 /* DiagnosticsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */; };
+		ABB053936127AD65EFDBF1F5 /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		AC7F2812FD464707EE4D6006 /* SynthesisActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C900418213D0916ED7E5673 /* SynthesisActor.swift */; };
 		ADFE18B1B816866D75DD9484 /* SpeakingPace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A78B1E50C30F43CAE87675A /* SpeakingPace.swift */; };
+		B04D737763D887612F91CA02 /* SayItXPC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; };
+		B078626A4589356599B6609F /* HuggingFaceCardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB8C131295E9BCA8721ABA0 /* HuggingFaceCardData.swift */; };
 		B1DA3D5F4400F8B175FD088D /* TriggerSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CCC911D85E459D5331ED12B /* TriggerSource.swift */; };
 		B2382A343B76E60A2D77D41A /* RetentionPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF17B89448E3EDD98A91AC47 /* RetentionPlanner.swift */; };
 		B24786ECB0895EA3225C363A /* ShortcutRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E211D8C8FAE5F52F6DE4AF /* ShortcutRecorderView.swift */; };
+		B2EDB1786D33F2043CCC9956 /* SayItCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC95C922639DA5E240A1C7A /* SayItCommand.swift */; };
 		B5677AD3CAE8F0FB0A6430A0 /* AppWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233AA2BFB1498E7AE7F086BC /* AppWindowCoordinator.swift */; };
 		B76DE719243390797EE91A60 /* TextCleanerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2130024C092CAAC5A51905C0 /* TextCleanerTests.swift */; };
 		B83FA15D8A10EF436FF53DF9 /* ModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5295712E06C02DB72DFDD7AD /* ModelCatalog.swift */; };
+		B936622D4C0ADF9D079FB168 /* HTTPSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A2C77FAF415C25A265B262 /* HTTPSubmission.swift */; };
+		B95A804F262234D3231DD46F /* OneTimeTokenSecretView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AA5F5AB8D3484FBAE06795 /* OneTimeTokenSecretView.swift */; };
 		BA0E846F8D1DFC39EBE22B02 /* PlaybackControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119ABD163EB0CEAA78357FC2 /* PlaybackControlling.swift */; };
+		BC777898E233D8551231A00C /* CLIExitCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4721772B92A83D55E5373290 /* CLIExitCode.swift */; };
 		BD604084C8E309239D84FEBE /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = D32C1E8AC5B0B86155A50698 /* MLXAudioCore */; };
 		BE86A8D46C752BA2CA27C7EC /* RecentHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA2774E4BA33E2F3264E324 /* RecentHistoryView.swift */; };
+		BF0630623FAA40DDBD4DBD8E /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = 5998E2DDB565ABE0CAAD3F16 /* ArgumentParser */; };
+		BF93DE1D2B25E06EC0FA2815 /* SpeechJobSource+TriggerSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE5C34234C6C62438D71E5A /* SpeechJobSource+TriggerSource.swift */; };
 		BFA39F8341C9F2098B5085A3 /* ExportKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E69C5B004A8649EF5386AF /* ExportKind.swift */; };
 		C295C3BC8859EA3F82DBDBA6 /* HardwareAdvisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97148A0FEF50FCD1CCAF9C6 /* HardwareAdvisor.swift */; };
-		C2F4D9E7CDB5C6281D797919 /* ModelManagerError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7FD527A36C41A4553D41088 /* ModelManagerError.swift */; };
+		C31C3C75AE072D1F3F55DB80 /* SayItHTTPServer+JobRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B46ED4E3593D6AD4A329B7 /* SayItHTTPServer+JobRoutes.swift */; };
+		C3A7E7DC7E33CEE9B8165B17 /* APITokenPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C4FDBB3A3112F47070537F /* APITokenPreset.swift */; };
 		C43F98C9225BD0513539126A /* TextSourcePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CE9FEAEE8B390CA9BE7F2E8 /* TextSourcePayload.swift */; };
+		C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */; };
 		C520F5B2D9F044D4EE97D39A /* ModelCatalogLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A6E8F33DBF64C1BFB3CE00 /* ModelCatalogLoader.swift */; };
-		C5DDCD8C2ADA3EC97F5DCF80 /* PlaybackError.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE927B5032990CC7782DB7BF /* PlaybackError.swift */; };
+		C6CA386BB11586E35FBF163A /* ModelDescriptor+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B643C036FE29C1A2C8547AC /* ModelDescriptor+Snapshot.swift */; };
+		C7258BC34FD32FA78F2560B8 /* CLIQueuePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F4790CC40B333B29FB16A3 /* CLIQueuePolicy.swift */; };
+		C805C1B80DD09A84D5ABFBFC /* PlaybackRateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */; };
 		C8AC9D0FE1CE408BF436056D /* VoiceOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8AE17E0ADBDD4860F7604D4 /* VoiceOnboardingView.swift */; };
+		C8FCEB8C93FE777FE1F6C463 /* JobsCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE20722F67E395754CEB06B /* JobsCommand.swift */; };
+		C954B0D29C84E30D2E872C4F /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
+		C96E3BB72911998A81131B5E /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		C972B0684EB1C95B0F6F013E /* InterruptState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357DA3D4FC416C8C10ACAD26 /* InterruptState.swift */; };
+		CB4BCFDF950ABA3F028C97BB /* ModelFileDownloadDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDABCE697A7EEB2ABFE94DF /* ModelFileDownloadDelegate.swift */; };
+		CC09F1D03D3EDE29C62AA352 /* HuggingFaceSibling.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1AFC6EE2B82BB5175239C0 /* HuggingFaceSibling.swift */; };
 		CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D11844224540E3E5B3A989 /* AppWindowID.swift */; };
 		CD657C1B79B4D3F8B8786387 /* HistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0988A39F0FE54069C0F6CC /* HistoryDetailView.swift */; };
+		CF9A01A54BE9B5BF2AC55EC6 /* ServiceFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = B505BBBD717AD2DD95A53A71 /* ServiceFailure.swift */; };
 		D039C27B12FC10F17D34BFDB /* TextIngesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E66744D40D68014ECE91FD4 /* TextIngesting.swift */; };
+		D0FB0EDD489F54EC19171E70 /* HTTPServerSupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22AF325892B4DA31F4DF982E /* HTTPServerSupervisor.swift */; };
 		D10494E4D7D0AE2CC2DC7211 /* CleanupSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8F80F5D7F20A70547C1417 /* CleanupSummary.swift */; };
+		D2104E9CE0AB13E222B9047C /* SayItXPC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; };
+		D22CB839B0E58587F414A88E /* PlaybackSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3238BA973C01646E22A935 /* PlaybackSnapshot.swift */; };
+		D2FAB8F8B684BF21199B35B7 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D35472040E92E56DCA04F3B2 /* RetentionCandidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10A73BA42E64EDE0FFA4E02 /* RetentionCandidate.swift */; };
 		D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */; };
 		D6412CDA4CB9297F9C24C1DA /* SpeechSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087891890981FE4C0A6CD185 /* SpeechSettingsView.swift */; };
@@ -128,31 +250,106 @@
 		D6C53887860DA1FAB00BFA00 /* AppDirectories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78AA1834FC29849DD67B79F9 /* AppDirectories.swift */; };
 		D8CBDFC068CF036EF067E269 /* ModelStability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC54E4BF0EA930425020F07 /* ModelStability.swift */; };
 		D9439B3E92690CBD90209315 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87F2C2259F4A52F916707E9 /* UpdateChecker.swift */; };
-		DBA2119FF927F27A7AC579F0 /* SynthesisActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E376F1786EA4376F080B15A1 /* SynthesisActor.swift */; };
+		D97E9E105EF2424B630AE11E /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
+		D99CE5A7A1F008A1B317B1E8 /* APIProblem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E3DF056A02DF0552D8EE5E /* APIProblem.swift */; };
+		DAD0B8CD692D8177F3F3D345 /* SayItHTTPServer+ModelRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE5C86653DE1BC1C89CBCA9 /* SayItHTTPServer+ModelRoutes.swift */; };
 		DC09BC8CD78C2EA737B30CB4 /* LongTextConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DCDEEA486A4B8840D1463C5 /* LongTextConfirmationView.swift */; };
+		DC3537F1F093936D660CC7DB /* RateLimitWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D5840F137CD49046F6AD9C /* RateLimitWindow.swift */; };
+		DDE91548092439266D6EDF7D /* ModelArchiveImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C679C3BD54B83C5BCE6E2E /* ModelArchiveImporter.swift */; };
+		DF1A7B327CD86174A5E88962 /* APITokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E98872A898E387F0E9D41D /* APITokenStore.swift */; };
+		DFB7C6CFF86DE53C733F2CDE /* SayItServiceIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237C50A94D70BEA1B215CA30 /* SayItServiceIdentifiers.swift */; };
+		E0D9FF0CFEFFF92FA76A2283 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D14E180FC88D852A4F45409 /* PlaybackController.swift */; };
+		E1E9D02A137084C5FFE4EFC3 /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
 		E246A995B180E51036FFD2C7 /* ModelsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB628EB0BC6022040D88381 /* ModelsSettingsView.swift */; };
-		E2EDE56E1790874AFB5A3B6F /* HuggingFaceModelResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30411F0503DEC3542D2B952 /* HuggingFaceModelResponse.swift */; };
+		E2EC3F4FDF5F57D59B375F62 /* HealthResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA8150FAAAA5955808EBE01 /* HealthResponse.swift */; };
 		E335892358D6C6B2C47FFAEE /* SynthesisEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56CCEF096A897C16E532418 /* SynthesisEvent.swift */; };
 		E58FD5D5C18D857F9C7893F2 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 6DEF26A91625D0058B8D2295 /* Localizable.xcstrings */; };
+		E70CB86990DB91139F05A377 /* SupportedModelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7300175D3859BFBAAE93CFD /* SupportedModelTypes.swift */; };
+		E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431BE087EDC0779B11802FCC /* SayItXPCClient.swift */; };
 		E7773CBAD241FE2DF197C8E8 /* PlaybackState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BFC5B0C7315AC02FFB29E20 /* PlaybackState.swift */; };
 		E900FFE2EA7D7743A097327C /* ServiceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E837AD53D454D02C55AF41 /* ServiceProvider.swift */; };
 		E9734ED2A66998CD107C98D6 /* ModelCatalogBundleToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DCE962475D7651F58F5FD8 /* ModelCatalogBundleToken.swift */; };
 		EA35384F5AA70C899CA1EF92 /* GlobalHotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA4C656CF4B6B4016530003 /* GlobalHotKeyManager.swift */; };
 		EAB3B01129105A4F84EE1C91 /* TextChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB27A1CEECF4CE170EE394A0 /* TextChunker.swift */; };
-		EC2F62E8B8B5F60A521B5ABF /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69093FDD3CAF3054F47E0669 /* KeychainTokenStore.swift */; };
+		EB9A60DB0D9FC7A16FB2B097 /* JobJournalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DAC08EDC3B2C762800ACFE /* JobJournalStore.swift */; };
+		EC4704F893DBF5310D765684 /* OpenAPIHummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 31863F3224A3AC66E6B10238 /* OpenAPIHummingbird */; };
 		EC57B9AE415924E0DF0B7BC4 /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
+		EC9841D91F602C9A42D56702 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7947A1B766A97606F2097C /* KeychainTokenStore.swift */; };
 		EDB302CC129BB4E3169C971F /* SynthesisMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D6383581E3DD184F3105CF5 /* SynthesisMetrics.swift */; };
+		EECE7B3F7BACB09CA84DA1D6 /* HistorySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE5F16E197CCDD51CC8BEC73 /* HistorySnapshot.swift */; };
 		EFB987AC996D3190C88081AF /* ModelRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0550FD90B6416B868A98A89 /* ModelRowView.swift */; };
 		F1117CAFD7B8384CBDD42C9E /* TextIngestionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714FE91E9E9B6DD5FD7EEA80 /* TextIngestionError.swift */; };
+		F1C9759FFD7F42B474603F0F /* HistoryItemSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90333F6EA2A7FFDB276CCF77 /* HistoryItemSnapshot.swift */; };
 		F3C0BE22B46B4C9096F9D3AE /* CleanedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE5F90F8700618CBFF89611 /* CleanedText.swift */; };
 		F4DEB3192F7FFA8A44F37867 /* OnboardingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798F5FF5F67AAD0DB93DC48F /* OnboardingStep.swift */; };
+		F584C1627A6C318C06C8A4E5 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = A39050CFC31E1CAFAD4CAFB6 /* Hummingbird */; };
 		F589786607987C69B5420B5A /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		F8749377DCF9DCF7ECD60D75 /* AudioArchiveResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5AC492CDFA9ACE502640394 /* AudioArchiveResult.swift */; };
+		F639B38795383E43347A9A95 /* SayItHTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575B1BE275B2F840E61C8252 /* SayItHTTPServer.swift */; };
+		F88A3CF15CA4053F7D587898 /* SpeechQueuePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */; };
+		F9882AEA31FACA3D95BD96A5 /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		FA5D14317857B5754D28667E /* SpeechJobState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38D707F2139917BDA968CD00 /* SpeechJobState.swift */; };
+		FDDB9383D9EDE9D3692A36B3 /* CLICommandSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9828AEDF7F2EE0C7277DB4 /* CLICommandSupport.swift */; };
 		FEE8A4ECBC18430131EECE5A /* SpeechRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C7DA6B93D00A130CE1C5F1 /* SpeechRequest.swift */; };
 		FFDA6AAAF51DAC39E8D32853 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D47CAB42068B3B8CA73B1C23 /* AppState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0259104F39DFA715CF04FE48 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		0392070E44122DF92CD0A746 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4CD6DF3FF16CD2ACEF30207;
+			remoteInfo = SayItCore;
+		};
+		14BDA408B8C9B3D44B2F1D2F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A4303A3D2D6CF1067B59EC0;
+			remoteInfo = SayItXPC;
+		};
+		1F063F274CBD4638AC6004BA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08A937CF27D492EAD096D59D;
+			remoteInfo = SayItBackend;
+		};
+		2D4CD6DC879B21651CBB79DD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		38461510A29B9655F3E71FA4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4CD6DF3FF16CD2ACEF30207;
+			remoteInfo = SayItCore;
+		};
+		420AFE277A4DE7206FFE9EA9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A4303A3D2D6CF1067B59EC0;
+			remoteInfo = SayItXPC;
+		};
+		48601C1C50E3A508EDF5E9C1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08A937CF27D492EAD096D59D;
+			remoteInfo = SayItBackend;
+		};
 		56D7D3D146117616A2971B94 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
@@ -167,12 +364,103 @@
 			remoteGlobalIDString = 8F86AD8C9F6B4A4C4524329A;
 			remoteInfo = SayIt;
 		};
+		7C5259373F52D5353383162F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		90DB7FE87B8B34CC7B8890BA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		91DC36769485AF290905B924 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		938520AE0B3D569D415B67F4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 06B8B306387E5860F2C96821;
+			remoteInfo = SayItAgent;
+		};
 		94A06DA8C175FF2FEB7383DD /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A4CD6DF3FF16CD2ACEF30207;
 			remoteInfo = SayItCore;
+		};
+		958FE8B59461CA365C1B5A64 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		95F49AB20F6B33BF847F51CF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		A6A9618335832C32F8452DB0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 805D294C1B998FB17D83063C;
+			remoteInfo = SayItHTTP;
+		};
+		C5FC8F9C682468831A8365F3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
+		CBF3C043E00C2AD2B1D43833 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08A937CF27D492EAD096D59D;
+			remoteInfo = SayItBackend;
+		};
+		CCACBF1EDF552E62F279FD67 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 08A937CF27D492EAD096D59D;
+			remoteInfo = SayItBackend;
+		};
+		D3E42D271BFC553BDD9F6458 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E6A4DF449BCF8EC396A9A2F;
+			remoteInfo = SayItCLI;
+		};
+		D637764A95361951569F0EF7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 805D294C1B998FB17D83063C;
+			remoteInfo = SayItHTTP;
+		};
+		E2DEA465019FBA8B61D67DD3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A4303A3D2D6CF1067B59EC0;
+			remoteInfo = SayItXPC;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -188,13 +476,40 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B641224137319169B5DA22AE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				D2FAB8F8B684BF21199B35B7 /* SayItProtocol.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EEFFFCAE31E15325C45E3FA0 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				655F0772A2C3FA320720CA2A /* SayItBackend.framework in Embed Frameworks */,
 				2F98443BCC6A9CE666AFF7D2 /* SayItCore.framework in Embed Frameworks */,
+				0C7EBC1DACDEBFA00133A526 /* SayItProtocol.framework in Embed Frameworks */,
+				024B45D91C00924421BDCB87 /* SayItXPC.framework in Embed Frameworks */,
+				980814CF3D25517505F78C03 /* SayItHTTP.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FE5F2A8F9EFDB0AA60D7555D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				1DC356FAFFD8093BB0844F9B /* SayItBackend.framework in Embed Frameworks */,
+				A1250E6CC74EF0A5452B14B2 /* SayItProtocol.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -202,89 +517,164 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		00445B56A690FA19B85A8F34 /* SayItXPC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItXPC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		01D5840F137CD49046F6AD9C /* RateLimitWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateLimitWindow.swift; sourceTree = "<group>"; };
 		029B4E9368A75CA1F818245E /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSectionView.swift; sourceTree = "<group>"; };
+		03B452881D666854D351A6EF /* SayItXPCExportedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItXPCExportedService.swift; sourceTree = "<group>"; };
 		04A092AE8477F880752CF985 /* DiagnosticCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticCategory.swift; sourceTree = "<group>"; };
 		04D4CBC539AFA34387DA49C6 /* ModelFileDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFileDescriptor.swift; sourceTree = "<group>"; };
+		068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyEntry.swift; sourceTree = "<group>"; };
+		06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendSettingsStore.swift; sourceTree = "<group>"; };
+		077D725F6B2841CB8D718F24 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 		087891890981FE4C0A6CD185 /* SpeechSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechSettingsView.swift; sourceTree = "<group>"; };
-		0D4F5E0BCFCD7309E0C20401 /* SpeechItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechItem.swift; sourceTree = "<group>"; };
+		0BE5C34234C6C62438D71E5A /* SpeechJobSource+TriggerSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpeechJobSource+TriggerSource.swift"; sourceTree = "<group>"; };
+		0C7947A1B766A97606F2097C /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		0C900418213D0916ED7E5673 /* SynthesisActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisActor.swift; sourceTree = "<group>"; };
 		119ABD163EB0CEAA78357FC2 /* PlaybackControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlling.swift; sourceTree = "<group>"; };
+		14DAC08EDC3B2C762800ACFE /* JobJournalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobJournalStore.swift; sourceTree = "<group>"; };
 		14E0FF0F181F96AAD0F1DF98 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
+		1A39863383170BD4A8E9A68C /* CLIOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIOutput.swift; sourceTree = "<group>"; };
+		1AAAB79ECE86C6928C43363F /* HuggingFaceLFSInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceLFSInfo.swift; sourceTree = "<group>"; };
+		1E705EEFA323ECDF9CB0C03E /* APITokenDigest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenDigest.swift; sourceTree = "<group>"; };
 		1F0F462BFFCCB9F7F8B10A64 /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
 		20DCE962475D7651F58F5FD8 /* ModelCatalogBundleToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogBundleToken.swift; sourceTree = "<group>"; };
 		2130024C092CAAC5A51905C0 /* TextCleanerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleanerTests.swift; sourceTree = "<group>"; };
+		22127AF959BA0AC76DF43D20 /* String+Padding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Padding.swift"; sourceTree = "<group>"; };
+		2263B37D07FDBD6AAD94452F /* SayItHTTPServer+Responses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+Responses.swift"; sourceTree = "<group>"; };
+		22AF325892B4DA31F4DF982E /* HTTPServerSupervisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServerSupervisor.swift; sourceTree = "<group>"; };
 		233AA2BFB1498E7AE7F086BC /* AppWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppWindowCoordinator.swift; sourceTree = "<group>"; };
+		237C50A94D70BEA1B215CA30 /* SayItServiceIdentifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItServiceIdentifiers.swift; sourceTree = "<group>"; };
 		25C7DA6B93D00A130CE1C5F1 /* SpeechRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRequest.swift; sourceTree = "<group>"; };
+		265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSnapshot.swift; sourceTree = "<group>"; };
+		266607DF46390FDCA1CDA0BE /* SpeechJobSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechJobSource.swift; sourceTree = "<group>"; };
 		2837701977770F5911182C7A /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		2996022F566B1CA2CFAB59AD /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
 		2CE9FEAEE8B390CA9BE7F2E8 /* TextSourcePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSourcePayload.swift; sourceTree = "<group>"; };
 		2DCDEEA486A4B8840D1463C5 /* LongTextConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongTextConfirmationView.swift; sourceTree = "<group>"; };
-		31C4AC5009A935780C7B009B /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		2DE20722F67E395754CEB06B /* JobsCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsCommand.swift; sourceTree = "<group>"; };
+		2E46EB83C78D6FE379603B90 /* SayItBackendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItBackendService.swift; sourceTree = "<group>"; };
+		2EA8150FAAAA5955808EBE01 /* HealthResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthResponse.swift; sourceTree = "<group>"; };
+		3143D35E528697F33A92BD89 /* StopCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCommand.swift; sourceTree = "<group>"; };
+		33B872F10E4B1D9A5C988561 /* SkipCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipCommand.swift; sourceTree = "<group>"; };
+		33C679C3BD54B83C5BCE6E2E /* ModelArchiveImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveImporter.swift; sourceTree = "<group>"; };
 		343B30687AD3CFE12DD4CDDE /* OnboardingProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingProgressView.swift; sourceTree = "<group>"; };
+		356A58229DE0CCCFD9915867 /* APIRateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIRateLimiter.swift; sourceTree = "<group>"; };
+		357DA3D4FC416C8C10ACAD26 /* InterruptState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterruptState.swift; sourceTree = "<group>"; };
 		36BC441FD70A479EBA22F750 /* HistoryItemSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemSnapshot.swift; sourceTree = "<group>"; };
+		382FC0930FEB1526D9B8C8ED /* HistoryCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryCommand.swift; sourceTree = "<group>"; };
+		38D707F2139917BDA968CD00 /* SpeechJobState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechJobState.swift; sourceTree = "<group>"; };
+		38E3DF056A02DF0552D8EE5E /* APIProblem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIProblem.swift; sourceTree = "<group>"; };
+		394B28198A8E456598D193AE /* ServiceRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceRequest.swift; sourceTree = "<group>"; };
 		396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRibbonView.swift; sourceTree = "<group>"; };
-		3DC636BB65E51FA1C527129C /* SynthesisError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisError.swift; sourceTree = "<group>"; };
+		3BA4BDA03C479DA055875A9F /* ModelsCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsCommand.swift; sourceTree = "<group>"; };
+		3DDABCE697A7EEB2ABFE94DF /* ModelFileDownloadDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFileDownloadDelegate.swift; sourceTree = "<group>"; };
 		3E5B162BA286FB4707D990A4 /* SayItCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E887931831C3AE85FF36919 /* CLIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIService.swift; sourceTree = "<group>"; };
+		3EE5C86653DE1BC1C89CBCA9 /* SayItHTTPServer+ModelRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+ModelRoutes.swift"; sourceTree = "<group>"; };
+		3EEBAE1424977EEAAB66E2B6 /* StatusCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusCommand.swift; sourceTree = "<group>"; };
 		3F0988A39F0FE54069C0F6CC /* HistoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDetailView.swift; sourceTree = "<group>"; };
-		44DC4237A8193E8C1B9A28CE /* AudioArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioArchive.swift; sourceTree = "<group>"; };
+		3F82CDFD943568E864550065 /* CommunityModelResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityModelResolver.swift; sourceTree = "<group>"; };
+		431BE087EDC0779B11802FCC /* SayItXPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItXPCClient.swift; sourceTree = "<group>"; };
+		435BC42F39716B2AF01C14DE /* SayItAgentMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItAgentMain.swift; sourceTree = "<group>"; };
 		44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
+		4527699AF5875AD4FC468DF5 /* PauseCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseCommand.swift; sourceTree = "<group>"; };
 		45838FA1413995858EC9E5C3 /* StatusHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusHeaderView.swift; sourceTree = "<group>"; };
+		46A2C77FAF415C25A265B262 /* HTTPSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPSubmission.swift; sourceTree = "<group>"; };
+		46C4FDBB3A3112F47070537F /* APITokenPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenPreset.swift; sourceTree = "<group>"; };
+		4721772B92A83D55E5373290 /* CLIExitCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIExitCode.swift; sourceTree = "<group>"; };
 		4750990410DAB9D60949EB46 /* ModelDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDescriptor.swift; sourceTree = "<group>"; };
-		47F82E250E5DDE4747AF9FFA /* CommunityModelResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityModelResolver.swift; sourceTree = "<group>"; };
 		48D55330E6962E057802D765 /* CommunityModelSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityModelSheet.swift; sourceTree = "<group>"; };
+		4B643C036FE29C1A2C8547AC /* ModelDescriptor+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelDescriptor+Snapshot.swift"; sourceTree = "<group>"; };
 		4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateMenu.swift; sourceTree = "<group>"; };
 		4C074F8772DC89E43CE2A267 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+HistoryRoutes.swift"; sourceTree = "<group>"; };
 		4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabel.swift; sourceTree = "<group>"; };
+		4D514FBB81728B5F7E53FCCE /* openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = openapi.yaml; sourceTree = "<group>"; };
 		4E8C5D4E319B7ED9AA559B65 /* JSONEncoder+SayIt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSONEncoder+SayIt.swift"; sourceTree = "<group>"; };
+		4ED5A1F0B187E695CA0512A6 /* SeekCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekCommand.swift; sourceTree = "<group>"; };
 		4EE5F90F8700618CBFF89611 /* CleanedText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanedText.swift; sourceTree = "<group>"; };
-		4EF0DD7C05A13BA9B5FC669D /* ModelFileDownloadDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFileDownloadDelegate.swift; sourceTree = "<group>"; };
 		4FA2774E4BA33E2F3264E324 /* RecentHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentHistoryView.swift; sourceTree = "<group>"; };
 		504A1CDB257EFB01D742FAE6 /* MenuFooterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuFooterView.swift; sourceTree = "<group>"; };
 		50E837AD53D454D02C55AF41 /* ServiceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceProvider.swift; sourceTree = "<group>"; };
 		5295712E06C02DB72DFDD7AD /* ModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalog.swift; sourceTree = "<group>"; };
 		56631767F22E065003A55DA8 /* HistoryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryRowView.swift; sourceTree = "<group>"; };
+		575B1BE275B2F840E61C8252 /* SayItHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItHTTPServer.swift; sourceTree = "<group>"; };
 		5842EBC765548471AD55DED2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		591762C5B5BB3C128A89AE66 /* SayItClientValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItClientValidator.swift; sourceTree = "<group>"; };
+		5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateRequest.swift; sourceTree = "<group>"; };
+		5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+PlaybackRoutes.swift"; sourceTree = "<group>"; };
+		5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+SettingsRoutes.swift"; sourceTree = "<group>"; };
+		5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputFormat.swift; sourceTree = "<group>"; };
 		60CD41EA706FD7F0233FC5E3 /* PlaybackMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackMode.swift; sourceTree = "<group>"; };
+		61A4DC744C75D2B42E40DFCC /* SayItService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItService.swift; sourceTree = "<group>"; };
 		64688820F285E6E664A7F21C /* DownloadStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadStatusView.swift; sourceTree = "<group>"; };
-		69093FDD3CAF3054F47E0669 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		66F395CE405E435EB38E630E /* ServiceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSettingsView.swift; sourceTree = "<group>"; };
 		6A47804F46DFB604995541E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendMigrationCoordinator.swift; sourceTree = "<group>"; };
 		6A78B1E50C30F43CAE87675A /* SpeakingPace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakingPace.swift; sourceTree = "<group>"; };
+		6AC8DFA0B3ED1DCC4E493256 /* ProtocolRoundTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolRoundTripTests.swift; sourceTree = "<group>"; };
 		6BB69A7620D3CE582DB267B3 /* SayItCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SayItCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6BC54E4BF0EA930425020F07 /* ModelStability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelStability.swift; sourceTree = "<group>"; };
+		6C5C8FD44D6CA11CEA0B6212 /* SayItHTTPServer+Upload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+Upload.swift"; sourceTree = "<group>"; };
+		6DB8C131295E9BCA8721ABA0 /* HuggingFaceCardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceCardData.swift; sourceTree = "<group>"; };
 		6DD8B7FE7FADB3FA2DEA3D88 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		6DEF26A91625D0058B8D2295 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		6E66744D40D68014ECE91FD4 /* TextIngesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextIngesting.swift; sourceTree = "<group>"; };
+		6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendSettingsSnapshot.swift; sourceTree = "<group>"; };
 		6F0AC916C8F3D571E4E78407 /* TextCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleaner.swift; sourceTree = "<group>"; };
+		6F5168863C71F245E6BAFF50 /* AudioArchiveResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioArchiveResult.swift; sourceTree = "<group>"; };
+		6FB4CFAC282562BEBAE93BB0 /* ServiceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSnapshot.swift; sourceTree = "<group>"; };
 		70120889C7D5939C0578DB4D /* ModelCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ModelCatalog.json; sourceTree = "<group>"; };
 		714FE91E9E9B6DD5FD7EEA80 /* TextIngestionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextIngestionError.swift; sourceTree = "<group>"; };
-		719F2DD16D460533010B3A4E /* SupportedModelTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedModelTypes.swift; sourceTree = "<group>"; };
+		72B8CBFB37FE7F7FAB4C34F0 /* ServiceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCommand.swift; sourceTree = "<group>"; };
 		7392C8CFFBB121658EBD9597 /* TimeInterval+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TimeInterval+Formatting.swift"; sourceTree = "<group>"; };
+		73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TriggerSource+SpeechJobSource.swift"; sourceTree = "<group>"; };
 		74CA2A9978AE69F18C1D87F9 /* SpeechSynthesizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechSynthesizing.swift; sourceTree = "<group>"; };
+		75F4790CC40B333B29FB16A3 /* CLIQueuePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIQueuePolicy.swift; sourceTree = "<group>"; };
 		789D50F733AE1AF2033A988B /* HardwareTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareTier.swift; sourceTree = "<group>"; };
 		78AA1834FC29849DD67B79F9 /* AppDirectories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDirectories.swift; sourceTree = "<group>"; };
+		79157408B606A6A97170DB7F /* SayItXPCClientError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItXPCClientError.swift; sourceTree = "<group>"; };
 		798F5FF5F67AAD0DB93DC48F /* OnboardingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStep.swift; sourceTree = "<group>"; };
 		7A01AEA98A84423CEE774F61 /* ModelCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCapabilities.swift; sourceTree = "<group>"; };
 		7B26ACCB1796A2C2B5F4048A /* TextChunkerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextChunkerTests.swift; sourceTree = "<group>"; };
 		7C640391D6C6DECE4012194E /* UpdateResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateResult.swift; sourceTree = "<group>"; };
 		7CCC911D85E459D5331ED12B /* TriggerSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSource.swift; sourceTree = "<group>"; };
+		7D14E180FC88D852A4F45409 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		7D6383581E3DD184F3105CF5 /* SynthesisMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisMetrics.swift; sourceTree = "<group>"; };
+		7E0D0C006406346A39E5C37E /* SayItHTTP.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItHTTP.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E69CC9DD867211672C68925 /* SayItBackendTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SayItBackendTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItBackend.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		803A1EDA343EA0D66099E704 /* HTTPAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPAPIError.swift; sourceTree = "<group>"; };
 		8077FB8567737F537A02DE3B /* MenuBarRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarRootView.swift; sourceTree = "<group>"; };
 		810121170E2B03BC942F9CF3 /* DiagnosticSeverity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticSeverity.swift; sourceTree = "<group>"; };
 		82A711EE958FDE745E330925 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		85B2409CEE7E510324C9AEDC /* SpeechPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPreviewView.swift; sourceTree = "<group>"; };
 		8A6779E36EE1B11B74EFC4C4 /* TextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextParser.swift; sourceTree = "<group>"; };
 		8A8F80F5D7F20A70547C1417 /* CleanupSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupSummary.swift; sourceTree = "<group>"; };
+		8C71504F663D18FC89EA4403 /* BackendPlaybackControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendPlaybackControlling.swift; sourceTree = "<group>"; };
 		8CB628EB0BC6022040D88381 /* ModelsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsSettingsView.swift; sourceTree = "<group>"; };
 		8E05E5EF26C5160EA80CBEC7 /* AboutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutSettingsView.swift; sourceTree = "<group>"; };
 		8FF16666B0AD7C529898B79C /* RetentionPeriod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionPeriod.swift; sourceTree = "<group>"; };
+		90333F6EA2A7FFDB276CCF77 /* HistoryItemSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemSnapshot.swift; sourceTree = "<group>"; };
+		91BDFCA93C53799BE00F9B86 /* SayItHTTPServer+CommandHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+CommandHelpers.swift"; sourceTree = "<group>"; };
 		92A6E8F33DBF64C1BFB3CE00 /* ModelCatalogLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogLoader.swift; sourceTree = "<group>"; };
-		9853DA38445F3A95C3D8CC3F /* HuggingFaceCardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceCardData.swift; sourceTree = "<group>"; };
+		93C653B2059CA0C0A44D0172 /* HuggingFaceModelResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceModelResponse.swift; sourceTree = "<group>"; };
+		94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APITokenScope+Presentation.swift"; sourceTree = "<group>"; };
+		96AADDFBAF6765A7A9E46F6F /* APITokenCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenCreation.swift; sourceTree = "<group>"; };
+		97C260D3D114063A57EE6106 /* APITokenRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenRecord.swift; sourceTree = "<group>"; };
+		98358E5044F1911C15A82B63 /* DiagnosticSnapshot+Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DiagnosticSnapshot+Event.swift"; sourceTree = "<group>"; };
+		9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItProtocol.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9AE1191A01FC022FE06707AD /* SayItXPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItXPCProtocol.swift; sourceTree = "<group>"; };
+		9B8F4DCDC453E07A4518905B /* DiagnosticSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticSnapshot.swift; sourceTree = "<group>"; };
 		9BFC5B0C7315AC02FFB29E20 /* PlaybackState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackState.swift; sourceTree = "<group>"; };
 		9C106BF157F7205F40C061AA /* SpeechTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTitleGenerator.swift; sourceTree = "<group>"; };
+		9CCCCC406E665881290ECF79 /* SayItProtocolVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItProtocolVersion.swift; sourceTree = "<group>"; };
 		9D05793EC7DD8A6AD63C5EB8 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9DD51CABBD6A4B66774A1984 /* SpeechItemState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechItemState.swift; sourceTree = "<group>"; };
 		9E366DE86214B3DDB3FE45A2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A0607E47123E83EC79342535 /* ModelLicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLicense.swift; sourceTree = "<group>"; };
-		A5AC492CDFA9ACE502640394 /* AudioArchiveResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioArchiveResult.swift; sourceTree = "<group>"; };
+		A34B5CCE5898CC0D0B34624D /* SayItCLI */ = {isa = PBXFileReference; includeInIndex = 0; path = SayItCLI; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadProgress.swift; sourceTree = "<group>"; };
 		A5E69C5B004A8649EF5386AF /* ExportKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportKind.swift; sourceTree = "<group>"; };
 		A7FD50F093D897C5794716C1 /* ModelManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManaging.swift; sourceTree = "<group>"; };
@@ -294,65 +684,181 @@
 		AB04A144E7B0EC58078BD43A /* ModelID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelID.swift; sourceTree = "<group>"; };
 		AB27A1CEECF4CE170EE394A0 /* TextChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextChunker.swift; sourceTree = "<group>"; };
 		ABD21BC78FB5068E080D2896 /* ModelSuitability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSuitability.swift; sourceTree = "<group>"; };
+		ABD7CD1882C35D31525620E7 /* PlaybackError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackError.swift; sourceTree = "<group>"; };
 		AF5E19E0FDD1DD8B00C3839A /* SayItUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItUITests.swift; sourceTree = "<group>"; };
 		B118CD87A4B24F27D08007B9 /* AudioChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioChunk.swift; sourceTree = "<group>"; };
-		B30411F0503DEC3542D2B952 /* HuggingFaceModelResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceModelResponse.swift; sourceTree = "<group>"; };
-		B30B714E90D675DA2282DD4E /* HuggingFaceSibling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceSibling.swift; sourceTree = "<group>"; };
+		B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelDownloadProgress+Snapshot.swift"; sourceTree = "<group>"; };
+		B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceConnectionState.swift; sourceTree = "<group>"; };
 		B4CFE223B3C0E813CCD15803 /* SayItUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SayItUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B505BBBD717AD2DD95A53A71 /* ServiceFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFailure.swift; sourceTree = "<group>"; };
+		B57904CB7418B385CE9136D3 /* SpeechJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechJob.swift; sourceTree = "<group>"; };
+		B59C1431DC3F3B4E084DCB7C /* SecondsRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondsRequest.swift; sourceTree = "<group>"; };
+		B7C5CA2C6C2C76CF93698CD1 /* SpeechSubmission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechSubmission.swift; sourceTree = "<group>"; };
 		B825339FFDAD336D58CA0052 /* SpeechChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechChunk.swift; sourceTree = "<group>"; };
 		B87F2C2259F4A52F916707E9 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
-		B91703C2C565D3CE1A51D108 /* String+Padding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Padding.swift"; sourceTree = "<group>"; };
-		BE927B5032990CC7782DB7BF /* PlaybackError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackError.swift; sourceTree = "<group>"; };
+		BA18E0AFEFF10C13815F3D6D /* APITokenScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenScope.swift; sourceTree = "<group>"; };
+		BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DiagnosticEvent+Snapshot.swift"; sourceTree = "<group>"; };
+		C159E47E305909312F3675A5 /* ResumeCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeCommand.swift; sourceTree = "<group>"; };
 		C1F03C694936914BB34739D7 /* DiagnosticExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticExport.swift; sourceTree = "<group>"; };
+		C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenRow.swift; sourceTree = "<group>"; };
+		C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechQueuePolicyTests.swift; sourceTree = "<group>"; };
 		C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogError.swift; sourceTree = "<group>"; };
-		C7FD527A36C41A4553D41088 /* ModelManagerError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerError.swift; sourceTree = "<group>"; };
+		C75E2E573611488A4C502C26 /* ClearCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearCommand.swift; sourceTree = "<group>"; };
+		C9C3EEF657685D177B47895A /* SpeechItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechItem.swift; sourceTree = "<group>"; };
+		CB9828AEDF7F2EE0C7277DB4 /* CLICommandSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLICommandSupport.swift; sourceTree = "<group>"; };
+		CC719FAC8BB29024BACE25E2 /* IdempotencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyStore.swift; sourceTree = "<group>"; };
+		CDEF4E9A880944ACA9E6A4AA /* APITokenMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenMetadata.swift; sourceTree = "<group>"; };
+		CEB589732A789AF6BE59CA74 /* ModelSnapshot+Descriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelSnapshot+Descriptor.swift"; sourceTree = "<group>"; };
 		CEC5588F06EF897327ABB4F2 /* GitHubRelease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubRelease.swift; sourceTree = "<group>"; };
+		CEDE2008B198AA58D2CCB9D1 /* SayItAgentListenerDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItAgentListenerDelegate.swift; sourceTree = "<group>"; };
 		D10A73BA42E64EDE0FFA4E02 /* RetentionCandidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionCandidate.swift; sourceTree = "<group>"; };
+		D110E067E893E21EA4B05686 /* SayItWireCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItWireCodec.swift; sourceTree = "<group>"; };
+		D14E6F09D7A8D43565BD371C /* ModelSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSnapshot.swift; sourceTree = "<group>"; };
 		D1C03FA9DC155DA090ED679A /* DiagnosticRecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticRecorderTests.swift; sourceTree = "<group>"; };
 		D1D11844224540E3E5B3A989 /* AppWindowID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppWindowID.swift; sourceTree = "<group>"; };
+		D3E857E910DF547DDF281E5A /* QueuePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueuePolicy.swift; sourceTree = "<group>"; };
 		D47CAB42068B3B8CA73B1C23 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		D607DFF8375415948AC3F253 /* ReadClipboardButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadClipboardButton.swift; sourceTree = "<group>"; };
+		D6D3BCCF0B19E3B2BE3B50D2 /* ServiceEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceEvent.swift; sourceTree = "<group>"; };
+		D7290E2C92C8AB52D08CC0B1 /* AudioArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioArchive.swift; sourceTree = "<group>"; };
 		D7735064352240AE621CA239 /* DiagnosticEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticEvent.swift; sourceTree = "<group>"; };
 		D7E211D8C8FAE5F52F6DE4AF /* ShortcutRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderView.swift; sourceTree = "<group>"; };
+		D8697FFA4EB481A4A7FB1A3A /* APITokenDigestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenDigestTests.swift; sourceTree = "<group>"; };
 		D9139DB6590D67057C09ABBF /* AnywhereOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnywhereOnboardingView.swift; sourceTree = "<group>"; };
+		D9B46ED4E3593D6AD4A329B7 /* SayItHTTPServer+JobRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+JobRoutes.swift"; sourceTree = "<group>"; };
+		DA89480BA5C3A491BEAB81A1 /* PendingSpeechJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingSpeechJob.swift; sourceTree = "<group>"; };
+		DAB3E6A2673BBD7147C1B8F1 /* SayItRootCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItRootCommand.swift; sourceTree = "<group>"; };
+		DE3238BA973C01646E22A935 /* PlaybackSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSnapshot.swift; sourceTree = "<group>"; };
 		DE3DE2FFBD6C986ADC44745A /* PasteboardPayloadReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardPayloadReader.swift; sourceTree = "<group>"; };
 		DEDA49E993FE01497009CDAB /* ModelInstallationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallationState.swift; sourceTree = "<group>"; };
+		DF1AFC6EE2B82BB5175239C0 /* HuggingFaceSibling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceSibling.swift; sourceTree = "<group>"; };
 		DF89D0850C4A3A612A71C738 /* SpeechTitleGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTitleGeneratorTests.swift; sourceTree = "<group>"; };
 		DFDA6836016ADDCDC5ACF3AF /* HistorySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySettingsView.swift; sourceTree = "<group>"; };
 		E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsSettingsView.swift; sourceTree = "<group>"; };
 		E0A48A60CD4D89DFA933338B /* TestBundleToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestBundleToken.swift; sourceTree = "<group>"; };
 		E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
-		E376F1786EA4376F080B15A1 /* SynthesisActor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisActor.swift; sourceTree = "<group>"; };
+		E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundServiceController.swift; sourceTree = "<group>"; };
+		E2E98872A898E387F0E9D41D /* APITokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenStore.swift; sourceTree = "<group>"; };
+		E4A114503EEA29B96D47D643 /* InterruptMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterruptMonitor.swift; sourceTree = "<group>"; };
 		E56CCEF096A897C16E532418 /* SynthesisEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisEvent.swift; sourceTree = "<group>"; };
+		E62B45AACA98296E67663E5A /* TokenCreationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenCreationSheet.swift; sourceTree = "<group>"; };
 		E68391B4A83D06AD4C1FFAA0 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		E6CD55E927CF113AB7D91466 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		E7300175D3859BFBAAE93CFD /* SupportedModelTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportedModelTypes.swift; sourceTree = "<group>"; };
 		E8AE17E0ADBDD4860F7604D4 /* VoiceOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOnboardingView.swift; sourceTree = "<group>"; };
 		E97148A0FEF50FCD1CCAF9C6 /* HardwareAdvisor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareAdvisor.swift; sourceTree = "<group>"; };
 		E9B7FFC824443F2E0B9E50DB /* SpeakingPaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakingPaceTests.swift; sourceTree = "<group>"; };
 		E9CAE821A4FBCC2726632DDA /* JSONDecoder+SayIt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSONDecoder+SayIt.swift"; sourceTree = "<group>"; };
+		EA062DB47D6A9A2BF47B4B11 /* SayItProtocolTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SayItProtocolTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogTests.swift; sourceTree = "<group>"; };
 		EBFE78D84F25DC3D40DC991F /* ModelInstallation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallation.swift; sourceTree = "<group>"; };
+		ECC95C922639DA5E240A1C7A /* SayItCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItCommand.swift; sourceTree = "<group>"; };
 		ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStatusView.swift; sourceTree = "<group>"; };
+		ED8FA9418526551FA54A3047 /* SayItAgent */ = {isa = PBXFileReference; includeInIndex = 0; path = SayItAgent; sourceTree = BUILT_PRODUCTS_DIR; };
 		EEFE8094B2B64B9859E711A2 /* DiagnosticRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticRecorder.swift; sourceTree = "<group>"; };
+		EFBF73237570E80D42747421 /* SayItHTTPServer+SystemRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+SystemRoutes.swift"; sourceTree = "<group>"; };
 		F0550FD90B6416B868A98A89 /* ModelRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRowView.swift; sourceTree = "<group>"; };
 		F13CEBAFD3BF5D864C5BD06D /* SayItApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItApplication.swift; sourceTree = "<group>"; };
+		F2AA5F5AB8D3484FBAE06795 /* OneTimeTokenSecretView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTimeTokenSecretView.swift; sourceTree = "<group>"; };
+		F70E0C325CC84370C425EF07 /* ModelManagerError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerError.swift; sourceTree = "<group>"; };
 		F82A3C306187C92E98BA08E3 /* RetentionPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionPlannerTests.swift; sourceTree = "<group>"; };
 		F879A4D1F0B1C6C29831ADE1 /* article.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = article.html; sourceTree = "<group>"; };
-		F9D36C82439E0D76A31C16D0 /* HuggingFaceLFSInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceLFSInfo.swift; sourceTree = "<group>"; };
+		F99A0DD56B5957ED88693CD6 /* ServiceResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceResponse.swift; sourceTree = "<group>"; };
 		FB00365B7888BA872FDEED0C /* ModelInstallationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallationTests.swift; sourceTree = "<group>"; };
+		FB3A6AAC6675A003A0ACE47C /* ExportedFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportedFile.swift; sourceTree = "<group>"; };
 		FCA4C656CF4B6B4016530003 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
+		FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisError.swift; sourceTree = "<group>"; };
+		FE13E5BA1B40745372B9772E /* HistoryItemSnapshot+ServiceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HistoryItemSnapshot+ServiceSnapshot.swift"; sourceTree = "<group>"; };
 		FE2146938E2B5731D39082E5 /* ModelDependencyDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDependencyDescriptor.swift; sourceTree = "<group>"; };
+		FE5F16E197CCDD51CC8BEC73 /* HistorySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySnapshot.swift; sourceTree = "<group>"; };
 		FEF4201E7A00CB96AD7F1F15 /* PrivacyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyOnboardingView.swift; sourceTree = "<group>"; };
 		FF17B89448E3EDD98A91AC47 /* RetentionPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionPlanner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		12722A47E6878920783450B0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4C03756876697C1768B8C149 /* SayItBackend.framework in Frameworks */,
+				1D99CE2AEC265E0091F26C5D /* SayItProtocol.framework in Frameworks */,
+				F584C1627A6C318C06C8A4E5 /* Hummingbird in Frameworks */,
+				6E52A0435904D6D6FDB609BF /* OpenAPIRuntime in Frameworks */,
+				EC4704F893DBF5310D765684 /* OpenAPIHummingbird in Frameworks */,
+				8C86A585B42AAC5091C2515A /* Yams in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		34D057331FAABBAF23C2C1B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0922BE8F5F7353F975466383 /* SayItCore.framework in Frameworks */,
+				89AD3D4D8907B9BD8BC76B7F /* SayItProtocol.framework in Frameworks */,
+				690DD7FC6DABD5D8A65B7A48 /* MLXAudioCore in Frameworks */,
+				419CB00AB6F80C7F4A3F46BC /* MLXAudioTTS in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		694B96306AEE986493C6187D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A25C707A79C52C03BD5BB7D /* SayItBackend.framework in Frameworks */,
+				D97E9E105EF2424B630AE11E /* SayItCore.framework in Frameworks */,
+				079CED75E397190489D69C24 /* SayItHTTP.framework in Frameworks */,
+				C96E3BB72911998A81131B5E /* SayItProtocol.framework in Frameworks */,
+				B04D737763D887612F91CA02 /* SayItXPC.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		70D1C07CB639FDE79DA76FD6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ABB053936127AD65EFDBF1F5 /* SayItProtocol.framework in Frameworks */,
+				8E9DE65CE5B6479B61E209C5 /* SayItXPC.framework in Frameworks */,
+				BF0630623FAA40DDBD4DBD8E /* ArgumentParser in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		87736D3CBCC000AE3E94B8A9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				89D4D1F9824FDC6B29ECA9AA /* SayItBackend.framework in Frameworks */,
+				E1E9D02A137084C5FFE4EFC3 /* SayItProtocol.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9F238D5F14F06815D6DA2741 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C954B0D29C84E30D2E872C4F /* SayItBackend.framework in Frameworks */,
 				5E463C8DB9A3EE6B6DCD969B /* SayItCore.framework in Frameworks */,
+				A55D01E23657A9AEC04FF8AF /* SayItProtocol.framework in Frameworks */,
+				D2104E9CE0AB13E222B9047C /* SayItXPC.framework in Frameworks */,
+				7A9CE2127601A523727C4683 /* SayItHTTP.framework in Frameworks */,
 				BD604084C8E309239D84FEBE /* MLXAudioCore in Frameworks */,
 				5284097D44147769C8F5DE13 /* MLXAudioTTS in Frameworks */,
+				64E597F0729C5832060A65D1 /* ArgumentParser in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A98875AA3997B37790FE20E6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F9882AEA31FACA3D95BD96A5 /* SayItProtocol.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA4C161C5932BB9067930908 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B86C452FDF118DF4A2F663B /* SayItProtocol.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -388,7 +894,6 @@
 				2837701977770F5911182C7A /* HistoryStore.swift */,
 				029B4E9368A75CA1F818245E /* HistoryView.swift */,
 				4FA2774E4BA33E2F3264E324 /* RecentHistoryView.swift */,
-				0D4F5E0BCFCD7309E0C20401 /* SpeechItem.swift */,
 			);
 			path = History;
 			sourceTree = "<group>";
@@ -415,6 +920,15 @@
 				45838FA1413995858EC9E5C3 /* StatusHeaderView.swift */,
 			);
 			path = AppShell;
+			sourceTree = "<group>";
+		};
+		1118723792BA1B5E6001E5A3 /* SayItProtocolTests */ = {
+			isa = PBXGroup;
+			children = (
+				6AC8DFA0B3ED1DCC4E493256 /* ProtocolRoundTripTests.swift */,
+			);
+			name = SayItProtocolTests;
+			path = Tests/SayItProtocolTests;
 			sourceTree = "<group>";
 		};
 		121B9A0B1D53DA9B34651210 /* Diagnostics */ = {
@@ -459,6 +973,7 @@
 				AF60EDD8FDECB0310D3B524B /* Models */,
 				15DA7A222FD7D77C97A350C2 /* Onboarding */,
 				3E7904DF53B8D957614FE472 /* Playback */,
+				FBD0603A94F9B8D839DBC472 /* Service */,
 				3059ABEC81E1D5A006ACCBCE /* Settings */,
 				9F4805DABF447CD18F7FC3FF /* Synthesis */,
 				40C779B47D6DD2B74FBBE14F /* TextIngestion */,
@@ -472,7 +987,6 @@
 		192DB3844B60C00B1536E8A2 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
-				B91703C2C565D3CE1A51D108 /* String+Padding.swift */,
 				7392C8CFFBB121658EBD9597 /* TimeInterval+Formatting.swift */,
 			);
 			path = Utilities;
@@ -492,29 +1006,39 @@
 			isa = PBXGroup;
 			children = (
 				8E05E5EF26C5160EA80CBEC7 /* AboutSettingsView.swift */,
+				C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */,
 				48D55330E6962E057802D765 /* CommunityModelSheet.swift */,
 				E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */,
 				6DD8B7FE7FADB3FA2DEA3D88 /* GeneralSettingsView.swift */,
 				DFDA6836016ADDCDC5ACF3AF /* HistorySettingsView.swift */,
 				F0550FD90B6416B868A98A89 /* ModelRowView.swift */,
 				8CB628EB0BC6022040D88381 /* ModelsSettingsView.swift */,
+				F2AA5F5AB8D3484FBAE06795 /* OneTimeTokenSecretView.swift */,
+				66F395CE405E435EB38E630E /* ServiceSettingsView.swift */,
 				A83C5C6BD90942793E418123 /* SettingsPage.swift */,
 				5842EBC765548471AD55DED2 /* SettingsRootView.swift */,
 				D7E211D8C8FAE5F52F6DE4AF /* ShortcutRecorderView.swift */,
 				85B2409CEE7E510324C9AEDC /* SpeechPreviewView.swift */,
 				087891890981FE4C0A6CD185 /* SpeechSettingsView.swift */,
+				E62B45AACA98296E67663E5A /* TokenCreationSheet.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		37558F4A8A7FE53F777E3F58 /* Synthesis */ = {
+			isa = PBXGroup;
+			children = (
+				0C900418213D0916ED7E5673 /* SynthesisActor.swift */,
+				FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */,
+			);
+			path = Synthesis;
 			sourceTree = "<group>";
 		};
 		3E7904DF53B8D957614FE472 /* Playback */ = {
 			isa = PBXGroup;
 			children = (
-				44DC4237A8193E8C1B9A28CE /* AudioArchive.swift */,
-				A5AC492CDFA9ACE502640394 /* AudioArchiveResult.swift */,
 				E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */,
 				44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */,
-				BE927B5032990CC7782DB7BF /* PlaybackError.swift */,
 				4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */,
 				02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */,
 				396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */,
@@ -555,6 +1079,54 @@
 			);
 			name = SayItCoreTests;
 			path = Tests/SayItCoreTests;
+			sourceTree = "<group>";
+		};
+		4BE29EA20E92E9754640F284 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				D7290E2C92C8AB52D08CC0B1 /* AudioArchive.swift */,
+				6F5168863C71F245E6BAFF50 /* AudioArchiveResult.swift */,
+				8C71504F663D18FC89EA4403 /* BackendPlaybackControlling.swift */,
+				7D14E180FC88D852A4F45409 /* PlaybackController.swift */,
+				ABD7CD1882C35D31525620E7 /* PlaybackError.swift */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		52BF1BEF2AACEFA006369AAC /* Authentication */ = {
+			isa = PBXGroup;
+			children = (
+				1E705EEFA323ECDF9CB0C03E /* APITokenDigest.swift */,
+				97C260D3D114063A57EE6106 /* APITokenRecord.swift */,
+				E2E98872A898E387F0E9D41D /* APITokenStore.swift */,
+			);
+			path = Authentication;
+			sourceTree = "<group>";
+		};
+		5BDED558E315484E146E9EE5 /* Service */ = {
+			isa = PBXGroup;
+			children = (
+				BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */,
+				FE13E5BA1B40745372B9772E /* HistoryItemSnapshot+ServiceSnapshot.swift */,
+				14DAC08EDC3B2C762800ACFE /* JobJournalStore.swift */,
+				4B643C036FE29C1A2C8547AC /* ModelDescriptor+Snapshot.swift */,
+				B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */,
+				DA89480BA5C3A491BEAB81A1 /* PendingSpeechJob.swift */,
+				2E46EB83C78D6FE379603B90 /* SayItBackendService.swift */,
+				0BE5C34234C6C62438D71E5A /* SpeechJobSource+TriggerSource.swift */,
+			);
+			path = Service;
+			sourceTree = "<group>";
+		};
+		6010154271823344F95623D2 /* SayItXPC */ = {
+			isa = PBXGroup;
+			children = (
+				431BE087EDC0779B11802FCC /* SayItXPCClient.swift */,
+				79157408B606A6A97170DB7F /* SayItXPCClientError.swift */,
+				9AE1191A01FC022FE06707AD /* SayItXPCProtocol.swift */,
+			);
+			name = SayItXPC;
+			path = Sources/SayItXPC;
 			sourceTree = "<group>";
 		};
 		6CD5A092F6EC5005219D3E5F /* Synthesis */ = {
@@ -607,6 +1179,49 @@
 			path = Playback;
 			sourceTree = "<group>";
 		};
+		838233EB11C083AC8674432F /* SayItProtocol */ = {
+			isa = PBXGroup;
+			children = (
+				96AADDFBAF6765A7A9E46F6F /* APITokenCreation.swift */,
+				CDEF4E9A880944ACA9E6A4AA /* APITokenMetadata.swift */,
+				46C4FDBB3A3112F47070537F /* APITokenPreset.swift */,
+				BA18E0AFEFF10C13815F3D6D /* APITokenScope.swift */,
+				6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */,
+				9B8F4DCDC453E07A4518905B /* DiagnosticSnapshot.swift */,
+				265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */,
+				FB3A6AAC6675A003A0ACE47C /* ExportedFile.swift */,
+				FE5F16E197CCDD51CC8BEC73 /* HistorySnapshot.swift */,
+				5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */,
+				D14E6F09D7A8D43565BD371C /* ModelSnapshot.swift */,
+				DE3238BA973C01646E22A935 /* PlaybackSnapshot.swift */,
+				D3E857E910DF547DDF281E5A /* QueuePolicy.swift */,
+				9CCCCC406E665881290ECF79 /* SayItProtocolVersion.swift */,
+				61A4DC744C75D2B42E40DFCC /* SayItService.swift */,
+				237C50A94D70BEA1B215CA30 /* SayItServiceIdentifiers.swift */,
+				D110E067E893E21EA4B05686 /* SayItWireCodec.swift */,
+				72B8CBFB37FE7F7FAB4C34F0 /* ServiceCommand.swift */,
+				D6D3BCCF0B19E3B2BE3B50D2 /* ServiceEvent.swift */,
+				B505BBBD717AD2DD95A53A71 /* ServiceFailure.swift */,
+				394B28198A8E456598D193AE /* ServiceRequest.swift */,
+				F99A0DD56B5957ED88693CD6 /* ServiceResponse.swift */,
+				6FB4CFAC282562BEBAE93BB0 /* ServiceSnapshot.swift */,
+				B57904CB7418B385CE9136D3 /* SpeechJob.swift */,
+				266607DF46390FDCA1CDA0BE /* SpeechJobSource.swift */,
+				38D707F2139917BDA968CD00 /* SpeechJobState.swift */,
+				B7C5CA2C6C2C76CF93698CD1 /* SpeechSubmission.swift */,
+			);
+			name = SayItProtocol;
+			path = Sources/SayItProtocol;
+			sourceTree = "<group>";
+		};
+		85E88D277ED8871B3BF41317 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		87E25D5B80E0D6D94DD25735 = {
 			isa = PBXGroup;
 			children = (
@@ -614,20 +1229,76 @@
 				04D76396770A2F14616CD133 /* Resources */,
 				4835E83DFC07A19B7BC7DEF9 /* Resources */,
 				180CF2F43C8748887CC1F6A5 /* SayIt */,
+				8EE0D6189A4911CEA9D2F756 /* SayItAgent */,
+				9D691964438E5C687089858B /* SayItBackend */,
+				FD0D9D2B3FB2800A402244E1 /* SayItBackendTests */,
+				888FD776B908645E4D96827F /* SayItCLI */,
 				A6B40193C52BBBC7E0F1D293 /* SayItCore */,
 				4A370B7537C8E8DA092467CC /* SayItCoreTests */,
+				EF875F90BE82D9FC4425C99C /* SayItHTTP */,
+				838233EB11C083AC8674432F /* SayItProtocol */,
+				1118723792BA1B5E6001E5A3 /* SayItProtocolTests */,
 				95CD80A8DA8EE69FC986C9B6 /* SayItUITests */,
+				6010154271823344F95623D2 /* SayItXPC */,
 				932443B985F40D816A0FD3B7 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		888FD776B908645E4D96827F /* SayItCLI */ = {
+			isa = PBXGroup;
+			children = (
+				C75E2E573611488A4C502C26 /* ClearCommand.swift */,
+				CB9828AEDF7F2EE0C7277DB4 /* CLICommandSupport.swift */,
+				4721772B92A83D55E5373290 /* CLIExitCode.swift */,
+				1A39863383170BD4A8E9A68C /* CLIOutput.swift */,
+				75F4790CC40B333B29FB16A3 /* CLIQueuePolicy.swift */,
+				3E887931831C3AE85FF36919 /* CLIService.swift */,
+				382FC0930FEB1526D9B8C8ED /* HistoryCommand.swift */,
+				E4A114503EEA29B96D47D643 /* InterruptMonitor.swift */,
+				357DA3D4FC416C8C10ACAD26 /* InterruptState.swift */,
+				2DE20722F67E395754CEB06B /* JobsCommand.swift */,
+				3BA4BDA03C479DA055875A9F /* ModelsCommand.swift */,
+				4527699AF5875AD4FC468DF5 /* PauseCommand.swift */,
+				C159E47E305909312F3675A5 /* ResumeCommand.swift */,
+				ECC95C922639DA5E240A1C7A /* SayItCommand.swift */,
+				DAB3E6A2673BBD7147C1B8F1 /* SayItRootCommand.swift */,
+				4ED5A1F0B187E695CA0512A6 /* SeekCommand.swift */,
+				33B872F10E4B1D9A5C988561 /* SkipCommand.swift */,
+				3EEBAE1424977EEAAB66E2B6 /* StatusCommand.swift */,
+				3143D35E528697F33A92BD89 /* StopCommand.swift */,
+			);
+			name = SayItCLI;
+			path = Sources/SayItCLI;
+			sourceTree = "<group>";
+		};
+		8EE0D6189A4911CEA9D2F756 /* SayItAgent */ = {
+			isa = PBXGroup;
+			children = (
+				22AF325892B4DA31F4DF982E /* HTTPServerSupervisor.swift */,
+				CEDE2008B198AA58D2CCB9D1 /* SayItAgentListenerDelegate.swift */,
+				435BC42F39716B2AF01C14DE /* SayItAgentMain.swift */,
+				591762C5B5BB3C128A89AE66 /* SayItClientValidator.swift */,
+				03B452881D666854D351A6EF /* SayItXPCExportedService.swift */,
+			);
+			name = SayItAgent;
+			path = Sources/SayItAgent;
 			sourceTree = "<group>";
 		};
 		932443B985F40D816A0FD3B7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A89BAB57F71A7F5E2FBB982E /* SayIt.app */,
+				ED8FA9418526551FA54A3047 /* SayItAgent */,
+				7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */,
+				7E69CC9DD867211672C68925 /* SayItBackendTests.xctest */,
+				A34B5CCE5898CC0D0B34624D /* SayItCLI */,
 				3E5B162BA286FB4707D990A4 /* SayItCore.framework */,
 				6BB69A7620D3CE582DB267B3 /* SayItCoreTests.xctest */,
+				7E0D0C006406346A39E5C37E /* SayItHTTP.framework */,
+				9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */,
+				EA062DB47D6A9A2BF47B4B11 /* SayItProtocolTests.xctest */,
 				B4CFE223B3C0E813CCD15803 /* SayItUITests.xctest */,
+				00445B56A690FA19B85A8F34 /* SayItXPC.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -652,11 +1323,25 @@
 			path = Tests/SayItUITests;
 			sourceTree = "<group>";
 		};
+		9D691964438E5C687089858B /* SayItBackend */ = {
+			isa = PBXGroup;
+			children = (
+				52BF1BEF2AACEFA006369AAC /* Authentication */,
+				C8A783000259E0A5C5DE22DE /* History */,
+				FE8DE68C6650DEEEBB4132D1 /* Models */,
+				4BE29EA20E92E9754640F284 /* Playback */,
+				5BDED558E315484E146E9EE5 /* Service */,
+				85E88D277ED8871B3BF41317 /* Settings */,
+				37558F4A8A7FE53F777E3F58 /* Synthesis */,
+				A7E44C1B5F3585A3F6B83577 /* Utilities */,
+			);
+			name = SayItBackend;
+			path = Sources/SayItBackend;
+			sourceTree = "<group>";
+		};
 		9F4805DABF447CD18F7FC3FF /* Synthesis */ = {
 			isa = PBXGroup;
 			children = (
-				E376F1786EA4376F080B15A1 /* SynthesisActor.swift */,
-				3DC636BB65E51FA1C527129C /* SynthesisError.swift */,
 			);
 			path = Synthesis;
 			sourceTree = "<group>";
@@ -676,6 +1361,14 @@
 			path = Sources/SayItCore;
 			sourceTree = "<group>";
 		};
+		A7E44C1B5F3585A3F6B83577 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				22127AF959BA0AC76DF43D20 /* String+Padding.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 		AC660638F3A0ADB17B279DD8 /* Updates */ = {
 			isa = PBXGroup;
 			children = (
@@ -689,17 +1382,8 @@
 		AF60EDD8FDECB0310D3B524B /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				47F82E250E5DDE4747AF9FFA /* CommunityModelResolver.swift */,
 				64688820F285E6E664A7F21C /* DownloadStatusView.swift */,
-				9853DA38445F3A95C3D8CC3F /* HuggingFaceCardData.swift */,
-				F9D36C82439E0D76A31C16D0 /* HuggingFaceLFSInfo.swift */,
-				B30411F0503DEC3542D2B952 /* HuggingFaceModelResponse.swift */,
-				B30B714E90D675DA2282DD4E /* HuggingFaceSibling.swift */,
-				69093FDD3CAF3054F47E0669 /* KeychainTokenStore.swift */,
-				4EF0DD7C05A13BA9B5FC669D /* ModelFileDownloadDelegate.swift */,
-				31C4AC5009A935780C7B009B /* ModelManager.swift */,
-				C7FD527A36C41A4553D41088 /* ModelManagerError.swift */,
-				719F2DD16D460533010B3A4E /* SupportedModelTypes.swift */,
+				CEB589732A789AF6BE59CA74 /* ModelSnapshot+Descriptor.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -720,6 +1404,16 @@
 			path = TextIngestion;
 			sourceTree = "<group>";
 		};
+		C8A783000259E0A5C5DE22DE /* History */ = {
+			isa = PBXGroup;
+			children = (
+				90333F6EA2A7FFDB276CCF77 /* HistoryItemSnapshot.swift */,
+				E6CD55E927CF113AB7D91466 /* HistoryStore.swift */,
+				C9C3EEF657685D177B47895A /* SpeechItem.swift */,
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
 		D5368688F97DCA95208246D6 /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
@@ -733,13 +1427,150 @@
 			isa = PBXGroup;
 			children = (
 				C1F03C694936914BB34739D7 /* DiagnosticExport.swift */,
+				98358E5044F1911C15A82B63 /* DiagnosticSnapshot+Event.swift */,
 			);
 			path = Diagnostics;
+			sourceTree = "<group>";
+		};
+		EF875F90BE82D9FC4425C99C /* SayItHTTP */ = {
+			isa = PBXGroup;
+			children = (
+				38E3DF056A02DF0552D8EE5E /* APIProblem.swift */,
+				356A58229DE0CCCFD9915867 /* APIRateLimiter.swift */,
+				2EA8150FAAAA5955808EBE01 /* HealthResponse.swift */,
+				803A1EDA343EA0D66099E704 /* HTTPAPIError.swift */,
+				46A2C77FAF415C25A265B262 /* HTTPSubmission.swift */,
+				068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */,
+				CC719FAC8BB29024BACE25E2 /* IdempotencyStore.swift */,
+				33C679C3BD54B83C5BCE6E2E /* ModelArchiveImporter.swift */,
+				2996022F566B1CA2CFAB59AD /* openapi-generator-config.yaml */,
+				4D514FBB81728B5F7E53FCCE /* openapi.yaml */,
+				5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */,
+				01D5840F137CD49046F6AD9C /* RateLimitWindow.swift */,
+				575B1BE275B2F840E61C8252 /* SayItHTTPServer.swift */,
+				91BDFCA93C53799BE00F9B86 /* SayItHTTPServer+CommandHelpers.swift */,
+				4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */,
+				D9B46ED4E3593D6AD4A329B7 /* SayItHTTPServer+JobRoutes.swift */,
+				3EE5C86653DE1BC1C89CBCA9 /* SayItHTTPServer+ModelRoutes.swift */,
+				5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */,
+				2263B37D07FDBD6AAD94452F /* SayItHTTPServer+Responses.swift */,
+				5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */,
+				EFBF73237570E80D42747421 /* SayItHTTPServer+SystemRoutes.swift */,
+				6C5C8FD44D6CA11CEA0B6212 /* SayItHTTPServer+Upload.swift */,
+				B59C1431DC3F3B4E084DCB7C /* SecondsRequest.swift */,
+			);
+			name = SayItHTTP;
+			path = Sources/SayItHTTP;
+			sourceTree = "<group>";
+		};
+		FBD0603A94F9B8D839DBC472 /* Service */ = {
+			isa = PBXGroup;
+			children = (
+				94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */,
+				6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */,
+				E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */,
+				B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */,
+				73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */,
+			);
+			path = Service;
+			sourceTree = "<group>";
+		};
+		FD0D9D2B3FB2800A402244E1 /* SayItBackendTests */ = {
+			isa = PBXGroup;
+			children = (
+				D8697FFA4EB481A4A7FB1A3A /* APITokenDigestTests.swift */,
+				C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */,
+			);
+			name = SayItBackendTests;
+			path = Tests/SayItBackendTests;
+			sourceTree = "<group>";
+		};
+		FE8DE68C6650DEEEBB4132D1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				3F82CDFD943568E864550065 /* CommunityModelResolver.swift */,
+				6DB8C131295E9BCA8721ABA0 /* HuggingFaceCardData.swift */,
+				1AAAB79ECE86C6928C43363F /* HuggingFaceLFSInfo.swift */,
+				93C653B2059CA0C0A44D0172 /* HuggingFaceModelResponse.swift */,
+				DF1AFC6EE2B82BB5175239C0 /* HuggingFaceSibling.swift */,
+				0C7947A1B766A97606F2097C /* KeychainTokenStore.swift */,
+				3DDABCE697A7EEB2ABFE94DF /* ModelFileDownloadDelegate.swift */,
+				077D725F6B2841CB8D718F24 /* ModelManager.swift */,
+				F70E0C325CC84370C425EF07 /* ModelManagerError.swift */,
+				E7300175D3859BFBAAE93CFD /* SupportedModelTypes.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		06B8B306387E5860F2C96821 /* SayItAgent */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D3F6A5C279689CC31AB435B9 /* Build configuration list for PBXNativeTarget "SayItAgent" */;
+			buildPhases = (
+				EEF708522C037F1C84E4D938 /* Sources */,
+				694B96306AEE986493C6187D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				59366005C5CD5785FE5FB471 /* PBXTargetDependency */,
+				4F900529FFB1AF0907BD454F /* PBXTargetDependency */,
+				0CD72DB7FF9B3A333CE5C2AA /* PBXTargetDependency */,
+				64CC9C5C1A2BA7637DF65687 /* PBXTargetDependency */,
+				129154E6C75FB179F0C363E9 /* PBXTargetDependency */,
+			);
+			name = SayItAgent;
+			packageProductDependencies = (
+			);
+			productName = SayItAgent;
+			productReference = ED8FA9418526551FA54A3047 /* SayItAgent */;
+			productType = "com.apple.product-type.tool";
+		};
+		08A937CF27D492EAD096D59D /* SayItBackend */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8FABD9E7AB00574FF1927E0E /* Build configuration list for PBXNativeTarget "SayItBackend" */;
+			buildPhases = (
+				08A1158AFA777C05629BDE42 /* Sources */,
+				34D057331FAABBAF23C2C1B1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				938F35BFBDE32E2E4487DD2F /* PBXTargetDependency */,
+				C3BD4103B564840FECB08D15 /* PBXTargetDependency */,
+			);
+			name = SayItBackend;
+			packageProductDependencies = (
+				71DDF93755CA3F43B4C3D31B /* MLXAudioCore */,
+				A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */,
+			);
+			productName = SayItBackend;
+			productReference = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		0E6A4DF449BCF8EC396A9A2F /* SayItCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9B0C1CB5AC2BCC55C43934CD /* Build configuration list for PBXNativeTarget "SayItCLI" */;
+			buildPhases = (
+				627BC4B9E6BC05EB624FB5D9 /* Sources */,
+				70D1C07CB639FDE79DA76FD6 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F71C6417AB167C1AE02C1BC7 /* PBXTargetDependency */,
+				8944AB83FF1099DD6DA668D2 /* PBXTargetDependency */,
+			);
+			name = SayItCLI;
+			packageProductDependencies = (
+				5998E2DDB565ABE0CAAD3F16 /* ArgumentParser */,
+			);
+			productName = SayItCLI;
+			productReference = A34B5CCE5898CC0D0B34624D /* SayItCLI */;
+			productType = "com.apple.product-type.tool";
+		};
 		106925F20E0CA1189E7A5FB7 /* SayItUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8B9420409490AAB9D8EEB41C /* Build configuration list for PBXNativeTarget "SayItUITests" */;
@@ -779,6 +1610,71 @@
 			productReference = 6BB69A7620D3CE582DB267B3 /* SayItCoreTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		6A4303A3D2D6CF1067B59EC0 /* SayItXPC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E3E38B244F83D983C013D4B6 /* Build configuration list for PBXNativeTarget "SayItXPC" */;
+			buildPhases = (
+				13489084992C624F67E81061 /* Sources */,
+				FA4C161C5932BB9067930908 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				347A27BF2027222C2B958A0C /* PBXTargetDependency */,
+			);
+			name = SayItXPC;
+			packageProductDependencies = (
+			);
+			productName = SayItXPC;
+			productReference = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		76FCBBBD58375040CFAEC740 /* SayItBackendTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B03ABDCB12CB63CA1CBC9A91 /* Build configuration list for PBXNativeTarget "SayItBackendTests" */;
+			buildPhases = (
+				E0647F7D5866E7DF53EA0915 /* Sources */,
+				87736D3CBCC000AE3E94B8A9 /* Frameworks */,
+				FE5F2A8F9EFDB0AA60D7555D /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FB459B9090F3D9D23DCCB801 /* PBXTargetDependency */,
+				8D625F1AAFDA110A33DB48D4 /* PBXTargetDependency */,
+			);
+			name = SayItBackendTests;
+			packageProductDependencies = (
+			);
+			productName = SayItBackendTests;
+			productReference = 7E69CC9DD867211672C68925 /* SayItBackendTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		805D294C1B998FB17D83063C /* SayItHTTP */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B90EB6F2ABE269DA4F80846 /* Build configuration list for PBXNativeTarget "SayItHTTP" */;
+			buildPhases = (
+				E24BB7B9A63C461C7FBAFCDE /* Sources */,
+				9CB10E3BEAB46F4358C47451 /* Resources */,
+				12722A47E6878920783450B0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				89541381418410CE121BEB18 /* PBXTargetDependency */,
+				5DA5F17B98C2E77436AA5CE4 /* PBXTargetDependency */,
+			);
+			name = SayItHTTP;
+			packageProductDependencies = (
+				A39050CFC31E1CAFAD4CAFB6 /* Hummingbird */,
+				FD20A7112C89EF1EA775887A /* OpenAPIRuntime */,
+				31863F3224A3AC66E6B10238 /* OpenAPIHummingbird */,
+				B085212FC4B8B933B6D6E28B /* Yams */,
+			);
+			productName = SayItHTTP;
+			productReference = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 		8F86AD8C9F6B4A4C4524329A /* SayIt */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 76E435C3A55525CAF1B56369 /* Build configuration list for PBXNativeTarget "SayIt" */;
@@ -787,20 +1683,48 @@
 				6157E05CD609748F7BB2FB19 /* Resources */,
 				9F238D5F14F06815D6DA2741 /* Frameworks */,
 				EEFFFCAE31E15325C45E3FA0 /* Embed Frameworks */,
+				75F0987D10DC0817340148AF /* Embed Background Service and CLI */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				965A726E5D57411A1769AE50 /* PBXTargetDependency */,
 				E90BD671C29202C9F169783B /* PBXTargetDependency */,
+				B3ED80D7E17459C561261E8D /* PBXTargetDependency */,
+				6A7DDE750A3392396AF2C2B8 /* PBXTargetDependency */,
+				303EFC37664F9E6C1F32CEE9 /* PBXTargetDependency */,
+				F614977EAEC81544F1FF06FD /* PBXTargetDependency */,
+				C8C7527B9E9029D750C97BE7 /* PBXTargetDependency */,
 			);
 			name = SayIt;
 			packageProductDependencies = (
 				D32C1E8AC5B0B86155A50698 /* MLXAudioCore */,
 				5EE1786A722735766F45829F /* MLXAudioTTS */,
+				E452F8ABB24767BF7794A92D /* ArgumentParser */,
 			);
 			productName = SayIt;
 			productReference = A89BAB57F71A7F5E2FBB982E /* SayIt.app */;
 			productType = "com.apple.product-type.application";
+		};
+		95793290520BEA9ABABE8DA0 /* SayItProtocolTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 15393834937B9759BF1AE0BC /* Build configuration list for PBXNativeTarget "SayItProtocolTests" */;
+			buildPhases = (
+				BEFC86530FCF2251014E44FE /* Sources */,
+				A98875AA3997B37790FE20E6 /* Frameworks */,
+				B641224137319169B5DA22AE /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				157A91D32ECBA51466E252DB /* PBXTargetDependency */,
+			);
+			name = SayItProtocolTests;
+			packageProductDependencies = (
+			);
+			productName = SayItProtocolTests;
+			productReference = EA062DB47D6A9A2BF47B4B11 /* SayItProtocolTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		A4CD6DF3FF16CD2ACEF30207 /* SayItCore */ = {
 			isa = PBXNativeTarget;
@@ -818,6 +1742,23 @@
 			);
 			productName = SayItCore;
 			productReference = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		B4824402F65B5745F1B19F74 /* SayItProtocol */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 719DCBC6D8AF860463B312FB /* Build configuration list for PBXNativeTarget "SayItProtocol" */;
+			buildPhases = (
+				8A2A57EDF265B9FAB1D43D5E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SayItProtocol;
+			packageProductDependencies = (
+			);
+			productName = SayItProtocol;
+			productReference = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
@@ -844,7 +1785,12 @@
 			mainGroup = 87E25D5B80E0D6D94DD25735;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				DE2AC70706798290F46011A7 /* XCRemoteSwiftPackageReference "hummingbird" */,
 				EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
+				DA53DAD9A435295BFDF0116F /* XCRemoteSwiftPackageReference "swift-openapi-hummingbird" */,
+				8B218DEFA2D4D5EF7E32680E /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */,
+				8FA3A87EEEF8E0DC0F7CA93B /* XCRemoteSwiftPackageReference "Yams" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 932443B985F40D816A0FD3B7 /* Products */;
@@ -852,9 +1798,17 @@
 			projectRoot = "";
 			targets = (
 				8F86AD8C9F6B4A4C4524329A /* SayIt */,
+				06B8B306387E5860F2C96821 /* SayItAgent */,
+				08A937CF27D492EAD096D59D /* SayItBackend */,
+				76FCBBBD58375040CFAEC740 /* SayItBackendTests */,
+				0E6A4DF449BCF8EC396A9A2F /* SayItCLI */,
 				A4CD6DF3FF16CD2ACEF30207 /* SayItCore */,
 				29BF54346ADCD47588183FAA /* SayItCoreTests */,
+				805D294C1B998FB17D83063C /* SayItHTTP */,
+				B4824402F65B5745F1B19F74 /* SayItProtocol */,
+				95793290520BEA9ABABE8DA0 /* SayItProtocolTests */,
 				106925F20E0CA1189E7A5FB7 /* SayItUITests */,
+				6A4303A3D2D6CF1067B59EC0 /* SayItXPC */,
 			);
 		};
 /* End PBXProject section */
@@ -886,14 +1840,121 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9CB10E3BEAB46F4358C47451 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52502DAC4AEAFB4BD4596A9D /* openapi-generator-config.yaml in Resources */,
+				49FDF14558C27BFE52DEA9F3 /* openapi.yaml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		75F0987D10DC0817340148AF /* Embed Background Service and CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Background Service and CLI";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/com.sayit.mac.agent.plist\" \"${agent_dir}/com.sayit.mac.agent.plist\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
+		08A1158AFA777C05629BDE42 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				906F6FEB715C41544642F1CF /* APITokenDigest.swift in Sources */,
+				14C2C345DED4A876DEB5AABB /* APITokenRecord.swift in Sources */,
+				DF1A7B327CD86174A5E88962 /* APITokenStore.swift in Sources */,
+				819369E4BE67473156C2F517 /* AudioArchive.swift in Sources */,
+				773D97FBBC1137FED7BFF3F9 /* AudioArchiveResult.swift in Sources */,
+				7856CCAA37B79FD97834762B /* BackendPlaybackControlling.swift in Sources */,
+				4C7C91395A2A7B358CB8BA6C /* BackendSettingsStore.swift in Sources */,
+				9A468EF5A94031E08CFEE119 /* CommunityModelResolver.swift in Sources */,
+				945A39481BECA04AEDA50C1F /* DiagnosticEvent+Snapshot.swift in Sources */,
+				0933C3DB1F15CB642A263B79 /* HistoryItemSnapshot+ServiceSnapshot.swift in Sources */,
+				F1C9759FFD7F42B474603F0F /* HistoryItemSnapshot.swift in Sources */,
+				87E78A91A66292F711C87D5D /* HistoryStore.swift in Sources */,
+				B078626A4589356599B6609F /* HuggingFaceCardData.swift in Sources */,
+				5335E77D09F3E4133ACBB024 /* HuggingFaceLFSInfo.swift in Sources */,
+				9F3A06ACFC59D72F85ABCF59 /* HuggingFaceModelResponse.swift in Sources */,
+				CC09F1D03D3EDE29C62AA352 /* HuggingFaceSibling.swift in Sources */,
+				EB9A60DB0D9FC7A16FB2B097 /* JobJournalStore.swift in Sources */,
+				EC9841D91F602C9A42D56702 /* KeychainTokenStore.swift in Sources */,
+				C6CA386BB11586E35FBF163A /* ModelDescriptor+Snapshot.swift in Sources */,
+				2132BD3904587DAA3F093A71 /* ModelDownloadProgress+Snapshot.swift in Sources */,
+				CB4BCFDF950ABA3F028C97BB /* ModelFileDownloadDelegate.swift in Sources */,
+				A38649ACD452781EC3169E5D /* ModelManager.swift in Sources */,
+				51A0401365D51889E07375E6 /* ModelManagerError.swift in Sources */,
+				7CFF37CCAEC02ABD34865DC9 /* PendingSpeechJob.swift in Sources */,
+				E0D9FF0CFEFFF92FA76A2283 /* PlaybackController.swift in Sources */,
+				8C37C42D200745BF0203A5AD /* PlaybackError.swift in Sources */,
+				7AE751EA7DE12B38E00969F8 /* SayItBackendService.swift in Sources */,
+				05F4361DDBD00ADEC9FA4D25 /* SpeechItem.swift in Sources */,
+				BF93DE1D2B25E06EC0FA2815 /* SpeechJobSource+TriggerSource.swift in Sources */,
+				4F4C80F9B704A34D4DE00AEB /* String+Padding.swift in Sources */,
+				E70CB86990DB91139F05A377 /* SupportedModelTypes.swift in Sources */,
+				AC7F2812FD464707EE4D6006 /* SynthesisActor.swift in Sources */,
+				35C5858DED5258F9813091A5 /* SynthesisError.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0B874E958B102D1773A5CEC7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				39C253ED1EC6C988E4E8FDEC /* SayItUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		13489084992C624F67E81061 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */,
+				4E3AC9A759280B1F3A00E23F /* SayItXPCClientError.swift in Sources */,
+				A7412271ED12DDEA24E130CB /* SayItXPCProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		627BC4B9E6BC05EB624FB5D9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FDDB9383D9EDE9D3692A36B3 /* CLICommandSupport.swift in Sources */,
+				BC777898E233D8551231A00C /* CLIExitCode.swift in Sources */,
+				26837F03C8591D15D7A5C6EA /* CLIOutput.swift in Sources */,
+				C7258BC34FD32FA78F2560B8 /* CLIQueuePolicy.swift in Sources */,
+				9D66CEC06590EB81EE8C74DA /* CLIService.swift in Sources */,
+				80BFAE22448B0EAB7E67A249 /* ClearCommand.swift in Sources */,
+				7A8C3D617826E8577AA252BC /* HistoryCommand.swift in Sources */,
+				6FAD03578FF45B9F0DD51DA5 /* InterruptMonitor.swift in Sources */,
+				C972B0684EB1C95B0F6F013E /* InterruptState.swift in Sources */,
+				C8FCEB8C93FE777FE1F6C463 /* JobsCommand.swift in Sources */,
+				87D72908294EA29CE78FE004 /* ModelsCommand.swift in Sources */,
+				6D7BC63EED554722AFF0B04F /* PauseCommand.swift in Sources */,
+				660B9287719F72B11783D3C1 /* ResumeCommand.swift in Sources */,
+				B2EDB1786D33F2043CCC9956 /* SayItCommand.swift in Sources */,
+				2353CC07E206CC47B438E4EA /* SayItRootCommand.swift in Sources */,
+				1ACA6FA960940632C8EE1B46 /* SeekCommand.swift in Sources */,
+				053CFBBC5981CE9F80D50B43 /* SkipCommand.swift in Sources */,
+				81C66B4F2522D000131B2B9A /* StatusCommand.swift in Sources */,
+				5E4F195C99A8660397FBB6A6 /* StopCommand.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -953,6 +2014,40 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8A2A57EDF265B9FAB1D43D5E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				30F806119784A3EA06D08732 /* APITokenCreation.swift in Sources */,
+				16A5F34E0F821CFCC1C608D0 /* APITokenMetadata.swift in Sources */,
+				C3A7E7DC7E33CEE9B8165B17 /* APITokenPreset.swift in Sources */,
+				500B2120BC57AC30D4324BD5 /* APITokenScope.swift in Sources */,
+				2002F93C6ECAEBEEE465DB9E /* BackendSettingsSnapshot.swift in Sources */,
+				969D61B2F282C219FF951296 /* DiagnosticSnapshot.swift in Sources */,
+				5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */,
+				741209B74AB521E4341DE52B /* ExportedFile.swift in Sources */,
+				EECE7B3F7BACB09CA84DA1D6 /* HistorySnapshot.swift in Sources */,
+				60080A0011D69A2FFB07DFCD /* InputFormat.swift in Sources */,
+				9BB4F1D68B609492CD7B3737 /* ModelSnapshot.swift in Sources */,
+				D22CB839B0E58587F414A88E /* PlaybackSnapshot.swift in Sources */,
+				19488C0CF76ABE8972AE4980 /* QueuePolicy.swift in Sources */,
+				3A8223BA39074C1F96EBA1E7 /* SayItProtocolVersion.swift in Sources */,
+				6031661FBE161FAAE146395D /* SayItService.swift in Sources */,
+				DFB7C6CFF86DE53C733F2CDE /* SayItServiceIdentifiers.swift in Sources */,
+				A599889B95C6B4AF68C31EDA /* SayItWireCodec.swift in Sources */,
+				82741D859B1FF46D9898F67E /* ServiceCommand.swift in Sources */,
+				0168663A8EC2A4FEDBC79848 /* ServiceEvent.swift in Sources */,
+				CF9A01A54BE9B5BF2AC55EC6 /* ServiceFailure.swift in Sources */,
+				9E527BB986FDD54C6DEC79F1 /* ServiceRequest.swift in Sources */,
+				4FB1429455F5301CFCB98EB9 /* ServiceResponse.swift in Sources */,
+				3C2740D6D5CDFA7E43AA354D /* ServiceSnapshot.swift in Sources */,
+				080F4D50872D29D3C1590F8D /* SpeechJob.swift in Sources */,
+				3D42A15E1FDD41183493A7F7 /* SpeechJobSource.swift in Sources */,
+				FA5D14317857B5754D28667E /* SpeechJobState.swift in Sources */,
+				0ED42576C853998CBE6BE8A9 /* SpeechSubmission.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A115E9470F5BA2DD7C3BA798 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -969,10 +2064,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BEFC86530FCF2251014E44FE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4E78F203D84F8C3ED47C16C5 /* ProtocolRoundTripTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C1677C6EF28168D8AC39C93E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A75DB9B824D2FF3AC9285396 /* APITokenRow.swift in Sources */,
+				A3FB45BF87BFC016D4935383 /* APITokenScope+Presentation.swift in Sources */,
 				1B7DE382603E96F6DCFE8250 /* AboutSettingsView.swift in Sources */,
 				1499573C719AFE565957C8DE /* AnywhereOnboardingView.swift in Sources */,
 				45E5E96E262A16E29BC0B1C3 /* AppDelegate.swift in Sources */,
@@ -980,12 +2085,12 @@
 				FFDA6AAAF51DAC39E8D32853 /* AppState.swift in Sources */,
 				B5677AD3CAE8F0FB0A6430A0 /* AppWindowCoordinator.swift in Sources */,
 				CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */,
-				9CFB4BC0AAB9F4B89E2D8EF3 /* AudioArchive.swift in Sources */,
-				F8749377DCF9DCF7ECD60D75 /* AudioArchiveResult.swift in Sources */,
-				0EA887F215E78307EF628AF0 /* CommunityModelResolver.swift in Sources */,
+				8031E3C162346A93D6DC988C /* BackendMigrationCoordinator.swift in Sources */,
+				C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */,
 				80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */,
 				4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */,
 				237FCE4FBE1E65624CCBEF35 /* DiagnosticExport.swift in Sources */,
+				2E66646AAA47CC18D80E876B /* DiagnosticSnapshot+Event.swift in Sources */,
 				AB5E37AC8EDF9B95E2DCB1E7 /* DiagnosticsSettingsView.swift in Sources */,
 				7926E925ACC463D96004B5DC /* DownloadStatusView.swift in Sources */,
 				9CC2E3B1434FA175E8BF6443 /* ErrorStatusView.swift in Sources */,
@@ -1000,48 +2105,40 @@
 				1AB6750260BF70B395B0F9E5 /* HistorySettingsView.swift in Sources */,
 				1E6BFAC949F1B9472E9A8D07 /* HistoryStore.swift in Sources */,
 				48D749D47ED1BD0895F0A364 /* HistoryView.swift in Sources */,
-				78320379F180A31FE8BFA81B /* HuggingFaceCardData.swift in Sources */,
-				52A017285F107BA8530870DC /* HuggingFaceLFSInfo.swift in Sources */,
-				E2EDE56E1790874AFB5A3B6F /* HuggingFaceModelResponse.swift in Sources */,
-				07FAC4E112A4D89D7F813428 /* HuggingFaceSibling.swift in Sources */,
-				EC2F62E8B8B5F60A521B5ABF /* KeychainTokenStore.swift in Sources */,
 				04A486FFB00918D6EA2CEF6A /* LaunchAtLoginController.swift in Sources */,
 				DC09BC8CD78C2EA737B30CB4 /* LongTextConfirmationView.swift in Sources */,
 				58F83E662C322E4BC40E6F4B /* MenuBarLabel.swift in Sources */,
 				51C0584024264406E5670233 /* MenuBarRootView.swift in Sources */,
 				560D74E1A13F3E50F535D55F /* MenuFooterView.swift in Sources */,
-				014246F80C8D3B170437E965 /* ModelFileDownloadDelegate.swift in Sources */,
-				A281FD09EB0ADC747E7FC4D6 /* ModelManager.swift in Sources */,
-				C2F4D9E7CDB5C6281D797919 /* ModelManagerError.swift in Sources */,
 				EFB987AC996D3190C88081AF /* ModelRowView.swift in Sources */,
+				7E512A306F97FFFAC8E597BE /* ModelSnapshot+Descriptor.swift in Sources */,
 				E246A995B180E51036FFD2C7 /* ModelsSettingsView.swift in Sources */,
 				3C99E640EDA4D3175B6A2DB4 /* OnboardingProgressView.swift in Sources */,
 				F4DEB3192F7FFA8A44F37867 /* OnboardingStep.swift in Sources */,
 				3E69D945BB53BFBF82FCAA9D /* OnboardingView.swift in Sources */,
+				B95A804F262234D3231DD46F /* OneTimeTokenSecretView.swift in Sources */,
 				25C973535C87B9998DBFE308 /* PasteboardPayloadReader.swift in Sources */,
 				245C2FAE01D5A6E480FDE344 /* PlaybackController.swift in Sources */,
 				22B295F9AD2362B159941CB4 /* PlaybackControlsView.swift in Sources */,
-				C5DDCD8C2ADA3EC97F5DCF80 /* PlaybackError.swift in Sources */,
 				9F2F336F030A559A0653D0CF /* PlaybackRateMenu.swift in Sources */,
 				D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */,
 				AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */,
 				1066672AD8F1CD5C55522FFE /* ReadClipboardButton.swift in Sources */,
 				BE86A8D46C752BA2CA27C7EC /* RecentHistoryView.swift in Sources */,
 				435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */,
+				65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */,
 				E900FFE2EA7D7743A097327C /* ServiceProvider.swift in Sources */,
+				7B74C3E06CFE1D1CC86C1B4B /* ServiceSettingsView.swift in Sources */,
 				8D145BFDAAA4427BDA29F932 /* SettingsPage.swift in Sources */,
 				53280083429EC40EB5447394 /* SettingsPane.swift in Sources */,
 				2BC6435590DB25F699123475 /* SettingsRootView.swift in Sources */,
 				B24786ECB0895EA3225C363A /* ShortcutRecorderView.swift in Sources */,
-				AA0EFEA0010CCAA0CC68782C /* SpeechItem.swift in Sources */,
 				9F5FA1C7694F5EDE270C51D7 /* SpeechPreviewView.swift in Sources */,
 				D6412CDA4CB9297F9C24C1DA /* SpeechSettingsView.swift in Sources */,
 				603C870494872101D543D1DC /* StatusHeaderView.swift in Sources */,
-				0A6957B0F2BBFE76A0D32E86 /* String+Padding.swift in Sources */,
-				08C3669F0AE099B6AB0EF7B6 /* SupportedModelTypes.swift in Sources */,
-				DBA2119FF927F27A7AC579F0 /* SynthesisActor.swift in Sources */,
-				4777D3D93A31DCAA81FFBA6A /* SynthesisError.swift in Sources */,
 				560E27275E9D1815E261F41E /* TimeInterval+Formatting.swift in Sources */,
+				360339154AB4814D00BBCB3B /* TokenCreationSheet.swift in Sources */,
+				99144A0E1446A1EC04D2EA22 /* TriggerSource+SpeechJobSource.swift in Sources */,
 				D9439B3E92690CBD90209315 /* UpdateChecker.swift in Sources */,
 				74104E6B15D75A7822590DD1 /* UpdateResult.swift in Sources */,
 				C8AC9D0FE1CE408BF436056D /* VoiceOnboardingView.swift in Sources */,
@@ -1049,23 +2146,177 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E0647F7D5866E7DF53EA0915 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				40F3797F2C6B54BD494E8C74 /* APITokenDigestTests.swift in Sources */,
+				F88A3CF15CA4053F7D587898 /* SpeechQueuePolicyTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E24BB7B9A63C461C7FBAFCDE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D99CE5A7A1F008A1B317B1E8 /* APIProblem.swift in Sources */,
+				8D4EBDD04C3B06E93203E143 /* APIRateLimiter.swift in Sources */,
+				24FCB6E59B79022AB028FB48 /* HTTPAPIError.swift in Sources */,
+				B936622D4C0ADF9D079FB168 /* HTTPSubmission.swift in Sources */,
+				E2EC3F4FDF5F57D59B375F62 /* HealthResponse.swift in Sources */,
+				466EF460CC2E6FADDF770B9E /* IdempotencyEntry.swift in Sources */,
+				364005AD51699126DC66000A /* IdempotencyStore.swift in Sources */,
+				DDE91548092439266D6EDF7D /* ModelArchiveImporter.swift in Sources */,
+				C805C1B80DD09A84D5ABFBFC /* PlaybackRateRequest.swift in Sources */,
+				DC3537F1F093936D660CC7DB /* RateLimitWindow.swift in Sources */,
+				60B48AD0995F27BC9235EF4A /* SayItHTTPServer+CommandHelpers.swift in Sources */,
+				0B5B5BCD24A338EB27529A01 /* SayItHTTPServer+HistoryRoutes.swift in Sources */,
+				C31C3C75AE072D1F3F55DB80 /* SayItHTTPServer+JobRoutes.swift in Sources */,
+				DAD0B8CD692D8177F3F3D345 /* SayItHTTPServer+ModelRoutes.swift in Sources */,
+				6B2A2003079910D0A146A378 /* SayItHTTPServer+PlaybackRoutes.swift in Sources */,
+				8C75E37B81E956CB8F3ADC37 /* SayItHTTPServer+Responses.swift in Sources */,
+				A4FFF134C8CCF5D4A4673FEE /* SayItHTTPServer+SettingsRoutes.swift in Sources */,
+				880FA583B8A21CB73DAF01DB /* SayItHTTPServer+SystemRoutes.swift in Sources */,
+				65660AA297D0C8DC90D9D553 /* SayItHTTPServer+Upload.swift in Sources */,
+				F639B38795383E43347A9A95 /* SayItHTTPServer.swift in Sources */,
+				9BE94003FF79DC47D54D4E5A /* SecondsRequest.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEF708522C037F1C84E4D938 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0FB0EDD489F54EC19171E70 /* HTTPServerSupervisor.swift in Sources */,
+				89FB85395B38ED936E9041C6 /* SayItAgentListenerDelegate.swift in Sources */,
+				1E86814254355D2846A4EC64 /* SayItAgentMain.swift in Sources */,
+				14F63953685D0CD2DD646FA8 /* SayItClientValidator.swift in Sources */,
+				47F2189FF5531A33CA2B00DE /* SayItXPCExportedService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		0CD72DB7FF9B3A333CE5C2AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 805D294C1B998FB17D83063C /* SayItHTTP */;
+			targetProxy = D637764A95361951569F0EF7 /* PBXContainerItemProxy */;
+		};
+		129154E6C75FB179F0C363E9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6A4303A3D2D6CF1067B59EC0 /* SayItXPC */;
+			targetProxy = E2DEA465019FBA8B61D67DD3 /* PBXContainerItemProxy */;
+		};
+		157A91D32ECBA51466E252DB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 2D4CD6DC879B21651CBB79DD /* PBXContainerItemProxy */;
+		};
+		303EFC37664F9E6C1F32CEE9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 805D294C1B998FB17D83063C /* SayItHTTP */;
+			targetProxy = A6A9618335832C32F8452DB0 /* PBXContainerItemProxy */;
+		};
+		347A27BF2027222C2B958A0C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 90DB7FE87B8B34CC7B8890BA /* PBXContainerItemProxy */;
+		};
+		4F900529FFB1AF0907BD454F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4CD6DF3FF16CD2ACEF30207 /* SayItCore */;
+			targetProxy = 38461510A29B9655F3E71FA4 /* PBXContainerItemProxy */;
+		};
+		59366005C5CD5785FE5FB471 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08A937CF27D492EAD096D59D /* SayItBackend */;
+			targetProxy = 48601C1C50E3A508EDF5E9C1 /* PBXContainerItemProxy */;
+		};
+		5DA5F17B98C2E77436AA5CE4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 0259104F39DFA715CF04FE48 /* PBXContainerItemProxy */;
+		};
+		64CC9C5C1A2BA7637DF65687 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 91DC36769485AF290905B924 /* PBXContainerItemProxy */;
+		};
+		6A7DDE750A3392396AF2C2B8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6A4303A3D2D6CF1067B59EC0 /* SayItXPC */;
+			targetProxy = 14BDA408B8C9B3D44B2F1D2F /* PBXContainerItemProxy */;
+		};
 		73CC498B588BA011B93330C3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A4CD6DF3FF16CD2ACEF30207 /* SayItCore */;
 			targetProxy = 56D7D3D146117616A2971B94 /* PBXContainerItemProxy */;
+		};
+		8944AB83FF1099DD6DA668D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6A4303A3D2D6CF1067B59EC0 /* SayItXPC */;
+			targetProxy = 420AFE277A4DE7206FFE9EA9 /* PBXContainerItemProxy */;
+		};
+		89541381418410CE121BEB18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08A937CF27D492EAD096D59D /* SayItBackend */;
+			targetProxy = CBF3C043E00C2AD2B1D43833 /* PBXContainerItemProxy */;
+		};
+		8D625F1AAFDA110A33DB48D4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 95F49AB20F6B33BF847F51CF /* PBXContainerItemProxy */;
+		};
+		938F35BFBDE32E2E4487DD2F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4CD6DF3FF16CD2ACEF30207 /* SayItCore */;
+			targetProxy = 0392070E44122DF92CD0A746 /* PBXContainerItemProxy */;
+		};
+		965A726E5D57411A1769AE50 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08A937CF27D492EAD096D59D /* SayItBackend */;
+			targetProxy = 1F063F274CBD4638AC6004BA /* PBXContainerItemProxy */;
+		};
+		B3ED80D7E17459C561261E8D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = C5FC8F9C682468831A8365F3 /* PBXContainerItemProxy */;
 		};
 		C2ECCB8903AC2549DEFAFAF8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 8F86AD8C9F6B4A4C4524329A /* SayIt */;
 			targetProxy = 70E12F49BDB4BA59464DEFBC /* PBXContainerItemProxy */;
 		};
+		C3BD4103B564840FECB08D15 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 7C5259373F52D5353383162F /* PBXContainerItemProxy */;
+		};
+		C8C7527B9E9029D750C97BE7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E6A4DF449BCF8EC396A9A2F /* SayItCLI */;
+			targetProxy = D3E42D271BFC553BDD9F6458 /* PBXContainerItemProxy */;
+		};
 		E90BD671C29202C9F169783B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A4CD6DF3FF16CD2ACEF30207 /* SayItCore */;
 			targetProxy = 94A06DA8C175FF2FEB7383DD /* PBXContainerItemProxy */;
+		};
+		F614977EAEC81544F1FF06FD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 06B8B306387E5860F2C96821 /* SayItAgent */;
+			targetProxy = 938520AE0B3D569D415B67F4 /* PBXContainerItemProxy */;
+		};
+		F71C6417AB167C1AE02C1BC7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 958FE8B59461CA365C1B5A64 /* PBXContainerItemProxy */;
+		};
+		FB459B9090F3D9D23DCCB801 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 08A937CF27D492EAD096D59D /* SayItBackend */;
+			targetProxy = CCACBF1EDF552E62F279FD67 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1088,6 +2339,72 @@
 			};
 			name = Release;
 		};
+		1A251DED8DBC14751D6486E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/SayItCLI.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/SayItCLIProducts";
+				FRAMEWORKS_FOLDER_PATH = SayItCLIFrameworks;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/PackageFrameworks";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.cli;
+				PRODUCT_NAME = sayit;
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+			};
+			name = Release;
+		};
+		1D15026A613D5A2FE1BFF6B2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.http;
+				PRODUCT_NAME = SayItHTTP;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		2345844D6F680A91AA776C62 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.protocol;
+				PRODUCT_NAME = SayItProtocol;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
 		24A66389FF92E88F06234B32 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1104,6 +2421,30 @@
 				TEST_TARGET_NAME = SayIt;
 			};
 			name = Release;
+		};
+		301248E0F0F001E101D9A6EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.backend;
+				PRODUCT_NAME = SayItBackend;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
 		};
 		3D8B4EEF4C42B1B22DF6B7B9 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1209,6 +2550,139 @@
 			};
 			name = Release;
 		};
+		4E2E67901E172BC8E2D866DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.http;
+				PRODUCT_NAME = SayItHTTP;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		62AD935173946379D4DF890E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.protocol-tests";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		6C544BF1674989E12577E03C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.backend-tests";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		71E9733000354EAF034EFE7A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.xpc;
+				PRODUCT_NAME = SayItXPC;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		72C9F3F734B57B12F9981DA6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.backend-tests";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		771A4CADC592DC7B4CA7C507 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/SayItAgent.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.agent;
+				PRODUCT_NAME = SayItAgent;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		7B3E24698D76D434E6B54C69 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.protocol;
+				PRODUCT_NAME = SayItProtocol;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
 		8474BE9CCEC865FF0D59DB2D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1226,6 +2700,43 @@
 				SDKROOT = macosx;
 			};
 			name = Debug;
+		};
+		86DDB5480CD09FD05000EF67 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/SayItAgent.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.agent;
+				PRODUCT_NAME = SayItAgent;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		87DB04D87B0D709BD2E0C963 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.backend;
+				PRODUCT_NAME = SayItBackend;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
 		};
 		8E9E58F39C9F99ACD26BCA63 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -1353,14 +2864,99 @@
 			};
 			name = Debug;
 		};
+		D0B4E46D54708E3E7388B4BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.protocol-tests";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DFFEA8C8CB16CAEDA2577456 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.xpc;
+				PRODUCT_NAME = SayItXPC;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		EB094859BD1CAC3420276E31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/SayItCLI.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/SayItCLIProducts";
+				FRAMEWORKS_FOLDER_PATH = SayItCLIFrameworks;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/PackageFrameworks";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.cli;
+				PRODUCT_NAME = sayit;
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		15393834937B9759BF1AE0BC /* Build configuration list for PBXNativeTarget "SayItProtocolTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				62AD935173946379D4DF890E /* Debug */,
+				D0B4E46D54708E3E7388B4BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		719DCBC6D8AF860463B312FB /* Build configuration list for PBXNativeTarget "SayItProtocol" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B3E24698D76D434E6B54C69 /* Debug */,
+				2345844D6F680A91AA776C62 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		76E435C3A55525CAF1B56369 /* Build configuration list for PBXNativeTarget "SayIt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8474BE9CCEC865FF0D59DB2D /* Debug */,
 				0D5D8A568CFB88CF88D1C12E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7B90EB6F2ABE269DA4F80846 /* Build configuration list for PBXNativeTarget "SayItHTTP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D15026A613D5A2FE1BFF6B2 /* Debug */,
+				4E2E67901E172BC8E2D866DD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -1374,11 +2970,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		8FABD9E7AB00574FF1927E0E /* Build configuration list for PBXNativeTarget "SayItBackend" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				301248E0F0F001E101D9A6EF /* Debug */,
+				87DB04D87B0D709BD2E0C963 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		993EE40C7104E5B656EA5F53 /* Build configuration list for PBXNativeTarget "SayItCore" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				43B33D32A6EBB5924285C25C /* Debug */,
 				8E9E58F39C9F99ACD26BCA63 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9B0C1CB5AC2BCC55C43934CD /* Build configuration list for PBXNativeTarget "SayItCLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EB094859BD1CAC3420276E31 /* Debug */,
+				1A251DED8DBC14751D6486E8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -1392,6 +3006,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		B03ABDCB12CB63CA1CBC9A91 /* Build configuration list for PBXNativeTarget "SayItBackendTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C544BF1674989E12577E03C /* Debug */,
+				72C9F3F734B57B12F9981DA6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		BA05955DA682B8CC33D14B8E /* Build configuration list for PBXProject "SayIt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1401,9 +3024,67 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		D3F6A5C279689CC31AB435B9 /* Build configuration list for PBXNativeTarget "SayItAgent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				86DDB5480CD09FD05000EF67 /* Debug */,
+				771A4CADC592DC7B4CA7C507 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E3E38B244F83D983C013D4B6 /* Build configuration list for PBXNativeTarget "SayItXPC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DFFEA8C8CB16CAEDA2577456 /* Debug */,
+				71E9733000354EAF034EFE7A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser";
+			requirement = {
+				kind = exactVersion;
+				version = 1.8.2;
+			};
+		};
+		8B218DEFA2D4D5EF7E32680E /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-openapi-runtime";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.8.2;
+			};
+		};
+		8FA3A87EEEF8E0DC0F7CA93B /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams";
+			requirement = {
+				kind = exactVersion;
+				version = 6.2.2;
+			};
+		};
+		DA53DAD9A435295BFDF0116F /* XCRemoteSwiftPackageReference "swift-openapi-hummingbird" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swift-server/swift-openapi-hummingbird";
+			requirement = {
+				kind = exactVersion;
+				version = 2.0.1;
+			};
+		};
+		DE2AC70706798290F46011A7 /* XCRemoteSwiftPackageReference "hummingbird" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hummingbird-project/hummingbird.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.22.0;
+			};
+		};
 		EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Blaizzy/mlx-audio-swift.git";
@@ -1415,15 +3096,55 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		31863F3224A3AC66E6B10238 /* OpenAPIHummingbird */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA53DAD9A435295BFDF0116F /* XCRemoteSwiftPackageReference "swift-openapi-hummingbird" */;
+			productName = OpenAPIHummingbird;
+		};
+		5998E2DDB565ABE0CAAD3F16 /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
 		5EE1786A722735766F45829F /* MLXAudioTTS */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
 			productName = MLXAudioTTS;
 		};
+		71DDF93755CA3F43B4C3D31B /* MLXAudioCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
+			productName = MLXAudioCore;
+		};
+		A39050CFC31E1CAFAD4CAFB6 /* Hummingbird */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE2AC70706798290F46011A7 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = Hummingbird;
+		};
+		A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
+			productName = MLXAudioTTS;
+		};
+		B085212FC4B8B933B6D6E28B /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8FA3A87EEEF8E0DC0F7CA93B /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
 		D32C1E8AC5B0B86155A50698 /* MLXAudioCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
 			productName = MLXAudioCore;
+		};
+		E452F8ABB24767BF7794A92D /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
+		FD20A7112C89EF1EA775887A /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B218DEFA2D4D5EF7E32680E /* XCRemoteSwiftPackageReference "swift-openapi-runtime" */;
+			productName = OpenAPIRuntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

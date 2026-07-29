@@ -1,5 +1,6 @@
 import Foundation
 import SayItCore
+import SayItProtocol
 
 struct HistoryItemSnapshot: Identifiable, Sendable {
     let id: UUID
@@ -9,7 +10,20 @@ struct HistoryItemSnapshot: Identifiable, Sendable {
     let modelID: ModelID
     let voice: String?
     let duration: TimeInterval
-    let audioRelativePath: String?
     let state: SpeechItemState
     let isPinned: Bool
+    let hasAudio: Bool
+
+    init(_ snapshot: HistorySnapshot) {
+        id = snapshot.id
+        title = snapshot.title
+        cleanedText = snapshot.cleanedText
+        createdAt = snapshot.createdAt
+        modelID = ModelID(snapshot.modelID)
+        voice = snapshot.voice
+        duration = snapshot.duration
+        state = SpeechItemState(rawValue: snapshot.state) ?? .failed
+        isPinned = snapshot.isPinned
+        hasAudio = snapshot.hasAudio
+    }
 }

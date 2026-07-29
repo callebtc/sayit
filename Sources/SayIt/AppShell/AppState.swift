@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 import Observation
-import OSLog
 import SayItCore
+import SayItProtocol
+import SayItXPC
 import UniformTypeIdentifiers
 
 @MainActor
@@ -11,115 +12,71 @@ final class AppState {
     static let shared = AppState()
 
     let settings: AppSettings
-    let playback: PlaybackController
-    let history: HistoryStore
-    let launchAtLogin: LaunchAtLoginController
+    let playback = PlaybackController()
+    let history = HistoryStore()
+    let launchAtLogin = LaunchAtLoginController()
+    let backgroundService = BackgroundServiceController()
 
-    private let directories: AppDirectories
-    private let catalog: ModelCatalog
-    private let modelManager: ModelManager
-    private let synthesizer: SynthesisActor
-    private let textCleaner = TextCleaner()
-    private let audioArchive: AudioArchive
-    private let diagnostics: DiagnosticRecorder
-    private let tokenStore: KeychainTokenStore
+    private let client = SayItXPCClient()
+    private let migration = BackendMigrationCoordinator()
     private let updateChecker = UpdateChecker()
-    private let communityModelResolver = CommunityModelResolver()
-    private let logger = Logger(
-        subsystem: "com.sayit.mac",
-        category: "application"
-    )
-    private var requestTask: Task<Void, Never>?
-    private var downloadTask: Task<Void, Never>?
-    private var activeRequest: SpeechRequest?
-    private var pendingCleanedText: CleanedText?
-    private var pendingSource: TriggerSource?
+    private var pollingTask: Task<Void, Never>?
+    private var settingsPushTask: Task<Void, Never>?
+    private var lastModelsRevision: UInt64?
+    private var lastHistoryRevision: UInt64?
+    private var lastDiagnosticsRevision: UInt64?
+    private var lastServiceRevision: UInt64?
+    private var downloadByteCounts: [ModelID: Int64] = [:]
 
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
     private(set) var downloadProgress: ModelDownloadProgress?
-    private(set) var statusText = "Ready to speak"
+    private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
     private(set) var needsLongTextConfirmation = false
-    var isShowingOnboarding: Bool
     private(set) var diagnosticEvents: [DiagnosticEvent] = []
+    private(set) var serviceSnapshot: ServiceSnapshot?
+    private(set) var serviceConnection: ServiceConnectionState = .connecting
+    private(set) var backendSettings = BackendSettingsSnapshot()
+    private(set) var apiTokens: [APITokenMetadata] = []
+    private(set) var oneTimeTokenSecret: String?
     private(set) var updateStatus = "Up to date"
     private(set) var availableUpdateURL: URL?
+    var isShowingOnboarding: Bool
 
     private init() {
-        do {
-            let directories = try AppDirectories.live()
-            setenv("HF_HUB_CACHE", directories.hubCache.path, 1)
-            let catalog = try ModelCatalogLoader().bundledCatalog()
-            let settings = AppSettings()
-            let history = try HistoryStore(directories: directories)
-            let tokenStore = KeychainTokenStore()
-            let manager = ModelManager(
-                catalog: catalog,
-                directories: directories,
-                activeModelID: settings.activeModelID,
-                tokenProvider: {
-                    try await tokenStore.token()
-                }
-            )
-
-            self.directories = directories
-            self.catalog = catalog
-            self.settings = settings
-            self.history = history
-            models = catalog.models
-            playback = PlaybackController()
-            launchAtLogin = LaunchAtLoginController()
-            modelManager = manager
-            self.tokenStore = tokenStore
-            synthesizer = SynthesisActor { id in
-                await manager.installedURL(for: id)
-            }
-            audioArchive = AudioArchive(directory: directories.historyAudio)
-            diagnostics = DiagnosticRecorder(
-                fileURL: directories.diagnostics.appending(path: "events.jsonl")
-            )
-            isShowingOnboarding = !settings.onboardingComplete
-            playback.onFailure = { [weak self] message in
-                self?.presentError(message)
-            }
-        } catch {
-            fatalError("Say It could not initialize its local storage.")
+        settings = AppSettings()
+        models = (try? ModelCatalogLoader().bundledCatalog().models) ?? []
+        isShowingOnboarding = !settings.onboardingComplete
+        settings.onBackendChange = { [weak self] in
+            self?.scheduleBackendSettingsPush()
+        }
+        playback.commandHandler = { [weak self] command in
+            self?.perform(command)
         }
     }
 
     func startup() async {
-        installedModelIDs = await modelManager.installedModelIDs()
-        if !installedModelIDs.contains(settings.activeModelID),
-           let first = models.first(where: {
-               installedModelIDs.contains($0.id) && $0.isSelectable
-           }) {
-            settings.activeModelID = first.id
-            settings.activeVoice = first.defaultVoice ?? ""
-            settings.activeLanguage = first.defaultLanguage ?? ""
-            try? await modelManager.select(first.id)
-        }
-        isShowingOnboarding = installedModelIDs.isEmpty
-            || !settings.onboardingComplete
         do {
-            try history.enforceRetention(
-                period: settings.retentionPeriod,
-                quotaBytes: settings.historyQuotaBytes
+            try await migration.migrate(
+                settings: settings.backendSnapshot()
             )
         } catch {
-            logger.error("History retention failed, code: history.retention_failed")
-        }
-        await diagnostics.record(
-            DiagnosticEvent(
-                severity: .info,
-                category: .lifecycle,
-                code: "application.started"
+            presentError(
+                "Existing Say It data could not be migrated. The original data was left unchanged."
             )
-        )
-        playback.showTitleInNowPlaying = settings.showNowPlayingTitles
-        playback.rate = settings.playbackRate
-        playback.backwardSkipInterval = settings.rewindInterval
-        playback.forwardSkipInterval = settings.forwardInterval
+            serviceConnection = .offline
+            return
+        }
+
+        backgroundService.refresh()
+        if !UserDefaults.standard.bool(
+            forKey: BackgroundServiceController.userDisabledDefaultsKey
+        ), !backgroundService.isEnabled {
+            backgroundService.enable()
+        }
+
+        startPolling()
         if settings.checkForUpdates,
            settings.lastUpdateCheck.map({
                Date.now.timeIntervalSince($0) > 24 * 60 * 60
@@ -129,11 +86,12 @@ final class AppState {
     }
 
     func readClipboard() {
-        let payload = PasteboardPayloadReader.payload(
-            from: .general,
-            source: .clipboard
+        receive(
+            PasteboardPayloadReader.payload(
+                from: .general,
+                source: .clipboard
+            )
         )
-        receive(payload)
     }
 
     func speakSample() {
@@ -143,118 +101,81 @@ final class AppState {
     }
 
     func speakSample(_ text: String) {
-        receive(
-            TextSourcePayload(
+        submit(
+            SpeechSubmission(
+                text: text,
                 source: .preview,
-                plainText: text
+                modelID: settings.activeModelID.rawValue,
+                voice: settings.activeVoice,
+                language: settings.activeLanguage,
+                voiceDescription: settings.voiceDescription,
+                speakingPace: settings.speakingPace.rawValue,
+                playbackRate: settings.playbackRate,
+                queuePolicy: .interruptCurrent,
+                permitsLongText: true
             )
         )
     }
 
     func receive(_ payload: TextSourcePayload) {
-        cancelCurrentRequest(preserveHistory: true)
-        requestTask = Task { [weak self] in
-            guard let self else { return }
-            await self.process(payload)
+        let submission: SpeechSubmission
+        if let html = payload.html {
+            submission = makeSubmission(
+                text: payload.plainText ?? String(decoding: html, as: UTF8.self),
+                format: .html,
+                representationData: html,
+                source: payload.source
+            )
+        } else if let richText = payload.richText {
+            submission = makeSubmission(
+                text: payload.plainText ?? "",
+                format: .richText,
+                representationData: richText,
+                source: payload.source
+            )
+        } else {
+            submission = makeSubmission(
+                text: payload.plainText ?? "",
+                format: .plainText,
+                source: payload.source
+            )
         }
+        submit(submission)
     }
 
     func confirmLongText() {
-        guard let pendingCleanedText, let pendingSource else { return }
-        needsLongTextConfirmation = false
-        self.pendingCleanedText = nil
-        self.pendingSource = nil
-        requestTask = Task { [weak self] in
-            await self?.beginSpeech(pendingCleanedText, source: pendingSource)
-        }
+        guard let id = serviceSnapshot?.activeJob?.id else { return }
+        perform(.confirmJob(id))
     }
 
     func cancelLongText() {
-        pendingCleanedText = nil
-        pendingSource = nil
-        needsLongTextConfirmation = false
-        statusText = "Ready to speak"
+        guard let id = serviceSnapshot?.activeJob?.id else { return }
+        perform(.cancelJob(id))
     }
 
     func cancelCurrentRequest(preserveHistory: Bool = true) {
-        requestTask?.cancel()
-        requestTask = nil
-        Task {
-            await synthesizer.cancelCurrentRequest()
-        }
-        playback.stop()
-        if preserveHistory,
-           let activeRequest,
-           activeRequest.source != .preview {
-            try? history.markIncomplete(id: activeRequest.id, state: .canceled)
-        }
-        activeRequest = nil
-        statusText = "Ready to speak"
+        _ = preserveHistory
+        perform(.clear)
     }
 
     func clearCurrentSpeech() {
-        cancelCurrentRequest()
+        perform(.clear)
     }
 
     func installModel(_ id: ModelID) {
-        guard downloadTask == nil else { return }
-        errorMessage = nil
-        downloadTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await self.modelManager.install(id) { progress in
-                    await self.updateDownloadProgress(progress)
-                }
-                await self.finishInstall(id)
-            } catch is CancellationError {
-                self.finishCancelledInstall()
-            } catch {
-                self.finishFailedInstall(error)
-            }
-        }
+        perform(.installModel(id.rawValue))
     }
 
     func downloadByteCount(for model: ModelDescriptor) -> Int64 {
-        let modelType = model.modelType.lowercased()
-        let dependencyBytes = catalog.dependencies
-            .filter { $0.modelTypes.contains(modelType) }
-            .reduce(Int64(0)) { total, dependency in
-                total + dependency.files.reduce(Int64(0)) {
-                    $0 + $1.byteCount
-                }
-            }
-        return model.downloadByteCount + dependencyBytes
+        downloadByteCounts[model.id] ?? model.downloadByteCount
     }
 
     func cancelModelInstall() {
-        guard let current = downloadProgress else { return }
-        let id = current.modelID
-        downloadProgress = ModelDownloadProgress(
-            modelID: id,
-            state: .paused,
-            completedBytes: current.completedBytes,
-            totalBytes: current.totalBytes,
-            bytesPerSecond: 0
-        )
-        statusText = "Download paused"
-        downloadTask?.cancel()
-        Task {
-            await modelManager.cancelInstall(id)
-        }
+        perform(.cancelModelInstall)
     }
 
     func selectModel(_ model: ModelDescriptor) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                await self.synthesizer.cancelCurrentRequest()
-                await self.synthesizer.unloadModel()
-                try await self.modelManager.select(model.id)
-                self.applyModelSelection(model)
-            } catch {
-                self.presentError(error.localizedDescription)
-            }
-        }
+        perform(.selectModel(model.id.rawValue))
     }
 
     func updateLanguageForVoice(
@@ -284,32 +205,7 @@ final class AppState {
     }
 
     func removeModel(_ model: ModelDescriptor) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                if self.settings.activeModelID == model.id {
-                    guard let replacement = self.models.first(where: {
-                        $0.id != model.id
-                            && self.installedModelIDs.contains($0.id)
-                            && $0.isSelectable
-                    }) else {
-                        self.presentError(
-                            "Install another compatible model before deleting the active model."
-                        )
-                        return
-                    }
-                    await self.synthesizer.cancelCurrentRequest()
-                    await self.synthesizer.unloadModel()
-                    try await self.modelManager.select(replacement.id)
-                    self.applyModelSelection(replacement)
-                }
-                try await self.modelManager.remove(model.id)
-                self.models = await self.modelManager.models()
-                await self.refreshInstalledModels()
-            } catch {
-                self.presentError(error.localizedDescription)
-            }
-        }
+        perform(.removeModel(model.id.rawValue))
     }
 
     func addCommunityModel(
@@ -318,20 +214,19 @@ final class AppState {
         token: String
     ) async -> Bool {
         do {
-            let normalizedToken = token.trimmingCharacters(
-                in: .whitespacesAndNewlines
+            let response = try await send(
+                .addCommunityModel(
+                    repository: repository,
+                    revision: revision?.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).nilIfEmpty,
+                    accessToken: token.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).nilIfEmpty
+                )
             )
-            if !normalizedToken.isEmpty {
-                try await tokenStore.save(normalizedToken)
-            }
-            let savedToken = try await tokenStore.token()
-            let model = try await communityModelResolver.resolve(
-                repository: repository,
-                revision: revision,
-                token: savedToken
-            )
-            try await modelManager.addCommunityModel(model)
-            models = await modelManager.models()
+            try requireSuccess(response)
+            await refreshModels()
             return true
         } catch {
             presentError(error.localizedDescription)
@@ -347,29 +242,15 @@ final class AppState {
         panel.prompt = "Import"
         panel.message = "Choose an MLX Audio Swift model folder containing config.json."
         guard panel.runModal() == .OK, let source = panel.url else { return }
-        let hasAccess = source.startAccessingSecurityScopedResource()
-        Task { [weak self] in
-            guard let self else { return }
-            defer {
-                if hasAccess {
-                    source.stopAccessingSecurityScopedResource()
-                }
-            }
-            do {
-                let model = try await self.communityModelResolver.resolveLocal(
-                    directory: source
-                )
-                try await self.modelManager.importLocalModel(
-                    model,
-                    from: source
-                )
-                try await self.synthesizer.prepareDependencies(for: model)
-                try await self.modelManager.markDependenciesVerified(model.id)
-                self.models = await self.modelManager.models()
-                await self.refreshInstalledModels()
-            } catch {
-                self.presentError(error.localizedDescription)
-            }
+        do {
+            let bookmark = try source.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            perform(.importLocalModel(bookmark: bookmark))
+        } catch {
+            presentError(error.localizedDescription)
         }
     }
 
@@ -380,9 +261,7 @@ final class AppState {
 
     func clearError() {
         errorMessage = nil
-        if playback.state == .idle {
-            statusText = "Ready to speak"
-        }
+        perform(.clearError)
     }
 
     func finishOnboarding() {
@@ -417,164 +296,155 @@ final class AppState {
     }
 
     func replay(_ item: HistoryItemSnapshot) {
-        guard let url = history.audioURL(for: item) else {
-            presentError("This item has no completed audio.")
-            return
-        }
-        do {
-            cancelCurrentRequest(preserveHistory: true)
-            try playback.playFile(at: url, title: item.title)
-            statusText = "Playing"
-        } catch {
-            presentError(error.localizedDescription)
-        }
+        perform(.replayHistory(item.id))
     }
 
     func regenerate(_ item: HistoryItemSnapshot) {
-        receive(
-            TextSourcePayload(
-                source: .history,
-                plainText: item.cleanedText
-            )
-        )
+        perform(.regenerateHistory(item.id))
     }
 
     func togglePinned(_ item: HistoryItemSnapshot) {
-        do {
-            try history.togglePinned(id: item.id)
-        } catch {
-            presentError(error.localizedDescription)
-        }
+        perform(.toggleHistoryPinned(item.id))
     }
 
     func export(_ item: HistoryItemSnapshot, kind: ExportKind) {
-        let panel = NSSavePanel()
-        let sanitizedTitle = item.title
-            .replacing("/", with: "–")
-            .replacing(":", with: "–")
-        let date = item.createdAt.formatted(
-            .dateTime.year().month().day()
-        )
-        panel.nameFieldStringValue = "Say It – \(sanitizedTitle) – \(date).\(kind.rawValue)"
-        panel.allowedContentTypes = switch kind {
-        case .m4a: [.mpeg4Audio]
-        case .wav: [.wav]
-        case .text: [.plainText]
+        if kind == .text {
+            save(
+                ExportedFile(
+                    filename: "\(safeFilename(item.title)).txt",
+                    contentType: "text/plain; charset=utf-8",
+                    data: Data(item.cleanedText.utf8)
+                )
+            )
+            return
         }
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             do {
-                switch kind {
-                case .text:
-                    try item.cleanedText.write(
-                        to: destination,
-                        atomically: true,
-                        encoding: .utf8
-                    )
-                case .m4a:
-                    guard let source = self.history.audioURL(for: item) else {
-                        throw CocoaError(.fileNoSuchFile)
-                    }
-                    try FileManager.default.copyItem(
-                        at: source,
-                        to: destination
-                    )
-                case .wav:
-                    guard let source = self.history.audioURL(for: item) else {
-                        throw CocoaError(.fileNoSuchFile)
-                    }
-                    try await self.audioArchive.convertToWAV(
-                        source: source,
-                        destination: destination
-                    )
+                let response = try await send(
+                    .exportHistory(item.id, format: kind.rawValue)
+                )
+                guard case .file(let file) = response else {
+                    try requireSuccess(response)
+                    return
                 }
+                save(file)
             } catch {
-                self.presentError(error.localizedDescription)
+                presentError(error.localizedDescription)
             }
         }
     }
 
+    func deleteHistoryItem(_ item: HistoryItemSnapshot) {
+        perform(.deleteHistory(item.id))
+    }
+
+    func clearHistory() {
+        perform(.clearHistory)
+    }
+
     func refreshDiagnostics() {
-        Task { [weak self] in
-            guard let self else { return }
-            let events = await self.diagnostics.events()
-            self.applyDiagnosticEvents(events)
+        Task {
+            await loadDiagnostics()
         }
     }
 
     func clearDiagnostics() {
-        Task { [weak self] in
-            guard let self else { return }
+        perform(.clearDiagnostics)
+    }
+
+    func exportDiagnostics() {
+        Task {
             do {
-                try await self.diagnostics.clear()
-                self.applyDiagnosticEvents([])
+                let response = try await send(.exportDiagnostics)
+                guard case .file(let file) = response else {
+                    try requireSuccess(response)
+                    return
+                }
+                save(file)
             } catch {
-                self.presentError(error.localizedDescription)
+                presentError(error.localizedDescription)
             }
         }
     }
 
-    func exportDiagnostics() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Say It Diagnostics.json"
-        panel.allowedContentTypes = [.json]
-        guard panel.runModal() == .OK, let destination = panel.url else {
-            return
-        }
-
-        Task { [weak self] in
-            guard let self else { return }
+    func refreshTokens() {
+        Task {
             do {
-                let events = await self.diagnostics.events()
-                let payload = DiagnosticExport(
-                    generatedAt: .now,
-                    applicationVersion: self.applicationVersion,
-                    macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
-                    architecture: "Apple silicon",
-                    physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory,
-                    installedModelIDs: self.installedModelIDs.sorted {
-                        $0.rawValue < $1.rawValue
-                    },
-                    settings: DiagnosticExport.SettingsSnapshot(
-                        historyRetention: self.settings.retentionPeriod.rawValue,
-                        historyQuotaBytes: self.settings.historyQuotaBytes,
-                        showTitlesInNowPlaying: self.settings.showNowPlayingTitles,
-                        updateChecksEnabled: self.settings.checkForUpdates
-                    ),
-                    events: events
-                )
-                let data = try JSONEncoder.sayIt.encode(payload)
-                try data.write(to: destination, options: .atomic)
+                let response = try await send(.tokens)
+                guard case .tokens(let tokens) = response else {
+                    try requireSuccess(response)
+                    return
+                }
+                apiTokens = tokens
             } catch {
-                self.presentError(error.localizedDescription)
+                presentError(error.localizedDescription)
             }
+        }
+    }
+
+    func createToken(name: String, scopes: Set<APITokenScope>) async -> Bool {
+        do {
+            let response = try await send(
+                .createToken(name: name, scopes: scopes)
+            )
+            guard case .createdToken(let creation) = response else {
+                try requireSuccess(response)
+                return false
+            }
+            oneTimeTokenSecret = creation.secret
+            await loadTokens()
+            return true
+        } catch {
+            presentError(error.localizedDescription)
+            return false
+        }
+    }
+
+    func dismissOneTimeToken() {
+        oneTimeTokenSecret = nil
+    }
+
+    func revokeToken(_ token: APITokenMetadata) {
+        perform(.revokeToken(token.id))
+    }
+
+    func updateHTTP(enabled: Bool, port: Int) {
+        var snapshot = backendSettings
+        snapshot.httpEnabled = enabled
+        snapshot.httpPort = port
+        backendSettings = snapshot
+        perform(.updateSettings(snapshot))
+    }
+
+    func restartBackgroundService() {
+        Task {
+            await backgroundService.restart()
+            await client.invalidate()
+            serviceConnection = .connecting
         }
     }
 
     func checkForUpdates() {
         updateStatus = "Checking…"
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             do {
-                let result = try await self.updateChecker.check(
-                    currentVersion: self.applicationVersion
+                let result = try await updateChecker.check(
+                    currentVersion: applicationVersion
                 )
-                self.settings.lastUpdateCheck = .now
+                settings.lastUpdateCheck = .now
                 switch result {
                 case .unconfigured:
-                    self.updateStatus = "Update feed not configured"
-                    self.availableUpdateURL = nil
+                    updateStatus = "Update feed not configured"
+                    availableUpdateURL = nil
                 case .current:
-                    self.updateStatus = "Up to date"
-                    self.availableUpdateURL = nil
+                    updateStatus = "Up to date"
+                    availableUpdateURL = nil
                 case .available(let version, let url):
-                    self.updateStatus = "Version \(version) is available"
-                    self.availableUpdateURL = url
+                    updateStatus = "Version \(version) is available"
+                    availableUpdateURL = url
                 }
             } catch {
-                self.updateStatus = "Couldn’t check for updates"
+                updateStatus = "Couldn’t check for updates"
             }
         }
     }
@@ -584,320 +454,326 @@ final class AppState {
         NSWorkspace.shared.open(availableUpdateURL)
     }
 
-    func deleteHistoryItem(_ item: HistoryItemSnapshot) {
-        do {
-            try history.remove(id: item.id)
-        } catch {
-            presentError(error.localizedDescription)
-        }
-    }
-
-    func clearHistory() {
-        do {
-            try history.removeAll()
-        } catch {
-            presentError(error.localizedDescription)
-        }
-    }
-
-    private func process(_ payload: TextSourcePayload) async {
-        do {
-            statusText = "Cleaning text"
-            let cleaned = try await textCleaner.ingest(payload)
-            if cleaned.requiresLongTextConfirmation {
-                pendingCleanedText = cleaned
-                pendingSource = payload.source
-                needsLongTextConfirmation = true
-                statusText = "Long text"
-                return
-            }
-            await beginSpeech(cleaned, source: payload.source)
-        } catch is CancellationError {
-            return
-        } catch {
-            presentError(error.localizedDescription)
-            await diagnostics.record(
-                DiagnosticEvent(
-                    severity: .warning,
-                    category: .ingestion,
-                    code: "ingestion.failed"
-                )
-            )
-        }
-    }
-
-    private func beginSpeech(
-        _ cleaned: CleanedText,
-        source: TriggerSource
-    ) async {
-        guard let model = models.first(where: {
-            $0.id == settings.activeModelID
-        }) else {
-            presentError("Choose a speech model in Settings.")
-            return
-        }
-        guard installedModelIDs.contains(model.id) else {
-            pendingCleanedText = cleaned
-            pendingSource = source
-            isShowingOnboarding = true
-            presentError("Download \(model.displayName) before speaking.")
-            return
-        }
-
-        let request = SpeechRequest(
-            cleanedText: cleaned,
-            model: model,
-            voice: settings.activeVoice.isEmpty ? model.defaultVoice : settings.activeVoice,
-            language: settings.activeLanguage.isEmpty
-                ? model.defaultLanguage
-                : settings.activeLanguage,
-            voiceDescription: settings.voiceDescription,
-            speakingPace: model.supportsNativeSpeakingPace
-                ? settings.speakingPace
-                : .natural,
-            source: source
-        )
-        activeRequest = request
-        if request.source != .preview {
-            do {
-                try history.begin(request)
-            } catch {
-                logger.error("History begin failed, code: history.begin_failed")
-            }
-        }
-
-        playback.rate = settings.playbackRate
-        playback.prepare(
-            requestID: request.id,
-            title: request.cleanedText.title,
-            estimatedDuration: Double(request.cleanedText.characterCount)
-                / 14
-                / request.speakingPace.rawValue
-        )
-        statusText = "Preparing speech"
-        errorMessage = nil
-
-        let stream = await synthesizer.synthesize(request)
-        do {
-            for try await event in stream {
-                try Task.checkCancellation()
-                try await handle(event, request: request)
-            }
-        } catch is CancellationError {
-            if request.source != .preview {
-                try? history.markIncomplete(id: request.id, state: .canceled)
-            }
-        } catch {
-            playback.stop()
-            if request.source != .preview {
-                try? history.markIncomplete(
-                    id: request.id,
-                    state: .failed,
-                    code: "synthesis.failed"
-                )
-            }
-            presentError(error.localizedDescription)
-            await diagnostics.record(
-                DiagnosticEvent(
-                    severity: .error,
-                    category: .synthesis,
-                    code: "synthesis.failed",
-                    modelID: request.model.id
-                )
-            )
-        }
-    }
-
-    private func handle(
-        _ event: SynthesisEvent,
-        request: SpeechRequest
-    ) async throws {
-        switch event {
-        case .loadingModel:
-            statusText = "Loading \(request.model.displayName)"
-        case .modelLoaded:
-            statusText = "Preparing speech"
-        case .audio(let chunk):
-            try playback.enqueue(chunk)
-            if playback.shouldStartWhenBuffered {
-                playback.play()
-                statusText = "Playing"
-            } else if playback.state == .buffering {
-                statusText = "Buffering"
-            }
-        case .metrics(let metrics):
-            await diagnostics.record(
-                DiagnosticEvent(
-                    severity: .info,
-                    category: .synthesis,
-                    code: "synthesis.chunk_completed",
-                    modelID: request.model.id,
-                    durationMilliseconds: Int(
-                        metrics.generationDuration * 1_000
-                    ),
-                    numericValue: metrics.realTimeFactor
-                )
-            )
-        case .completed:
-            playback.finishBuffering()
-            statusText = "Playing"
-            if request.source != .preview {
-                do {
-                    let archive = try await playback.archive(using: audioArchive)
-                    do {
-                        try history.complete(
-                            id: request.id,
-                            duration: archive.duration,
-                            audioRelativePath: archive.relativePath,
-                            audioByteCount: archive.byteCount
-                        )
-                    } catch {
-                        await audioArchive.remove(
-                            relativePath: archive.relativePath
-                        )
-                        throw error
-                    }
-                } catch {
-                    statusText = "Playing · History unavailable"
-                    try? history.markIncomplete(
-                        id: request.id,
-                        state: .failed,
-                        code: "history.audio_archive_failed"
-                    )
-                    await diagnostics.record(
-                        DiagnosticEvent(
-                            severity: .error,
-                            category: .history,
-                            code: "history.audio_archive_failed",
-                            modelID: request.model.id
-                        )
-                    )
-                }
-            }
-            activeRequest = nil
-        case .cancelled:
-            if request.source != .preview {
-                try? history.markIncomplete(id: request.id, state: .canceled)
-            }
-        }
-    }
-
-    private func updateDownloadProgress(_ progress: ModelDownloadProgress) {
-        downloadProgress = progress
-        statusText = progress.state == .verifying
-            ? "Verifying model"
-            : "Downloading model"
-    }
-
-    private func finishInstall(_ id: ModelID) async {
-        if let model = models.first(where: { $0.id == id }) {
-            let current = downloadProgress
-            let totalBytes = current?.totalBytes ?? downloadByteCount(for: model)
-            downloadProgress = ModelDownloadProgress(
-                modelID: id,
-                state: .verifying,
-                completedBytes: totalBytes,
-                totalBytes: totalBytes,
-                bytesPerSecond: 0
-            )
-            statusText = "Preparing offline speech resources"
-            do {
-                try await synthesizer.prepareDependencies(for: model)
-                try await modelManager.markDependenciesVerified(id)
-            } catch is CancellationError {
-                finishCancelledInstall()
-                return
-            } catch {
-                downloadTask = nil
-                downloadProgress = ModelDownloadProgress(
-                    modelID: id,
-                    state: .failed,
-                    completedBytes: totalBytes,
-                    totalBytes: totalBytes,
-                    bytesPerSecond: 0
-                )
-                presentError(
-                    "Offline speech setup failed: \(error.localizedDescription)"
-                )
-                return
-            }
-        }
-        await refreshInstalledModels()
-        let activeModelIsInstalled = installedModelIDs.contains(
-            settings.activeModelID
-        )
-        if !activeModelIsInstalled,
-           let model = models.first(where: { $0.id == id }) {
-            do {
-                try await modelManager.select(id)
-                applyModelSelection(model)
-            } catch {
-                downloadTask = nil
-                presentError(error.localizedDescription)
-                return
-            }
-        }
-        downloadTask = nil
-        downloadProgress = nil
-        settings.onboardingComplete = true
-        statusText = "Ready to speak"
-        if let pendingCleanedText, let pendingSource {
-            self.pendingCleanedText = nil
-            self.pendingSource = nil
-            await beginSpeech(pendingCleanedText, source: pendingSource)
-        }
-    }
-
-    private func finishCancelledInstall() {
-        downloadTask = nil
-        if let current = downloadProgress {
-            downloadProgress = ModelDownloadProgress(
-                modelID: current.modelID,
-                state: .paused,
-                completedBytes: current.completedBytes,
-                totalBytes: current.totalBytes,
-                bytesPerSecond: 0
-            )
-        }
-        statusText = "Download paused"
-    }
-
-    private func finishFailedInstall(_ error: Error) {
-        downloadTask = nil
-        if let current = downloadProgress {
-            downloadProgress = ModelDownloadProgress(
-                modelID: current.modelID,
-                state: .failed,
-                completedBytes: current.completedBytes,
-                totalBytes: current.totalBytes,
-                bytesPerSecond: 0
-            )
-        }
-        presentError(error.localizedDescription)
-    }
-
-    private func refreshInstalledModels() async {
-        installedModelIDs = await modelManager.installedModelIDs()
-    }
-
-    private func applyModelSelection(_ model: ModelDescriptor) {
-        settings.activeModelID = model.id
-        settings.activeVoice = model.defaultVoice ?? ""
-        settings.activeLanguage = model.defaultLanguage ?? ""
-        statusText = "Ready to speak"
-    }
-
-    private func applyDiagnosticEvents(_ events: [DiagnosticEvent]) {
-        diagnosticEvents = events
-    }
-
     var applicationDisplayVersion: String {
         applicationVersion
+    }
+
+    var isServiceOnline: Bool {
+        if case .online = serviceConnection {
+            true
+        } else {
+            false
+        }
+    }
+
+    var commandLineToolURL: URL? {
+        let url = Bundle.main.bundleURL
+            .appending(path: "Contents/Helpers/sayit")
+        return FileManager.default.isExecutableFile(atPath: url.path)
+            ? url
+            : nil
+    }
+
+    private func startPolling() {
+        guard pollingTask == nil else { return }
+        pollingTask = Task { [weak self] in
+            var retryDelay = Duration.milliseconds(250)
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.backgroundService.refresh()
+                guard self.backgroundService.isEnabled else {
+                    self.serviceConnection = .disabled
+                    try? await Task.sleep(for: .seconds(1))
+                    continue
+                }
+                do {
+                    try await self.synchronizeServiceState()
+                    retryDelay = .milliseconds(250)
+                    try await Task.sleep(for: .milliseconds(100))
+                } catch let failure as ServiceFailure
+                    where failure.code == "protocol.version_mismatch" {
+                    self.serviceConnection = .updateRequired
+                    self.statusText = "Service update required"
+                    try? await Task.sleep(for: .seconds(2))
+                } catch {
+                    self.serviceConnection = .offline
+                    self.statusText = "Background service unavailable"
+                    await self.client.invalidate()
+                    try? await Task.sleep(for: retryDelay)
+                    retryDelay = min(retryDelay * 2, .seconds(8))
+                }
+            }
+        }
+    }
+
+    private func synchronizeServiceState() async throws {
+        guard let lastServiceRevision else {
+            try await reloadServiceSnapshot()
+            return
+        }
+        let response = try await send(.events(after: lastServiceRevision))
+        guard case .events(let events) = response else {
+            try requireSuccess(response)
+            throw ServiceFailure(
+                code: "service.invalid_events",
+                message: "The service returned an invalid event response."
+            )
+        }
+        guard let event = events.last else { return }
+        guard event.id == lastServiceRevision + 1 else {
+            try await reloadServiceSnapshot()
+            return
+        }
+        apply(event.snapshot)
+    }
+
+    private func reloadServiceSnapshot() async throws {
+        let response = try await send(.snapshot)
+        guard case .snapshot(let snapshot) = response else {
+            try requireSuccess(response)
+            throw ServiceFailure(
+                code: "service.invalid_snapshot",
+                message: "The service returned an invalid state snapshot."
+            )
+        }
+        apply(snapshot)
+    }
+
+    private func apply(_ snapshot: ServiceSnapshot) {
+        lastServiceRevision = snapshot.revision
+        serviceSnapshot = snapshot
+        serviceConnection = .online(version: snapshot.serviceVersion)
+        statusText = snapshot.statusText
+        errorMessage = snapshot.lastError
+        needsLongTextConfirmation =
+            snapshot.activeJob?.state == .awaitingConfirmation
+        installedModelIDs = Set(
+            snapshot.installedModelIDs.map { ModelID($0) }
+        )
+        playback.apply(snapshot.playback)
+        applyDownload(snapshot.download)
+
+        if backendSettings != snapshot.settings {
+            backendSettings = snapshot.settings
+            settings.apply(snapshot.settings)
+            playback.backwardSkipInterval = snapshot.settings.rewindInterval
+            playback.forwardSkipInterval = snapshot.settings.forwardInterval
+            playback.showTitleInNowPlaying =
+                snapshot.settings.showNowPlayingTitles
+        }
+
+        isShowingOnboarding = installedModelIDs.isEmpty
+            || !settings.onboardingComplete
+
+        if lastModelsRevision != snapshot.modelsRevision {
+            lastModelsRevision = snapshot.modelsRevision
+            Task { await refreshModels() }
+        }
+        if lastHistoryRevision != snapshot.historyRevision {
+            lastHistoryRevision = snapshot.historyRevision
+            Task { await refreshHistory() }
+        }
+        if lastDiagnosticsRevision != snapshot.diagnosticsRevision {
+            lastDiagnosticsRevision = snapshot.diagnosticsRevision
+            Task { await loadDiagnostics() }
+        }
+    }
+
+    private func applyDownload(_ snapshot: DownloadSnapshot?) {
+        guard let snapshot,
+              let state = ModelInstallationState(
+                rawValue: snapshot.state
+              ) else {
+            downloadProgress = nil
+            return
+        }
+        downloadProgress = ModelDownloadProgress(
+            modelID: ModelID(snapshot.modelID),
+            state: state,
+            completedBytes: snapshot.completedBytes,
+            totalBytes: snapshot.totalBytes,
+            bytesPerSecond: Int64(snapshot.bytesPerSecond)
+        )
+    }
+
+    private func refreshModels() async {
+        do {
+            let response = try await send(.models)
+            guard case .models(let snapshots) = response else {
+                try requireSuccess(response)
+                return
+            }
+            models = snapshots.map(\.descriptor)
+            downloadByteCounts = Dictionary(
+                uniqueKeysWithValues: snapshots.map {
+                    (ModelID($0.id), $0.downloadByteCount)
+                }
+            )
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func refreshHistory() async {
+        do {
+            let response = try await send(.history)
+            guard case .history(let snapshots) = response else {
+                try requireSuccess(response)
+                return
+            }
+            history.apply(snapshots)
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func loadDiagnostics() async {
+        do {
+            let response = try await send(.diagnostics)
+            guard case .diagnostics(let snapshots) = response else {
+                try requireSuccess(response)
+                return
+            }
+            diagnosticEvents = snapshots.map(\.event)
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func loadTokens() async {
+        do {
+            let response = try await send(.tokens)
+            guard case .tokens(let tokens) = response else {
+                try requireSuccess(response)
+                return
+            }
+            apiTokens = tokens
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func scheduleBackendSettingsPush() {
+        settingsPushTask?.cancel()
+        settingsPushTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard let self, !Task.isCancelled else { return }
+            let snapshot = self.settings.backendSnapshot(
+                httpEnabled: self.backendSettings.httpEnabled,
+                httpPort: self.backendSettings.httpPort
+            )
+            self.backendSettings = snapshot
+            do {
+                let response = try await self.send(.updateSettings(snapshot))
+                try self.requireSuccess(response)
+            } catch {
+                self.presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func submit(_ submission: SpeechSubmission) {
+        Task {
+            do {
+                let response = try await send(.submit(submission))
+                try requireSuccess(response)
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func perform(_ command: ServiceCommand) {
+        Task {
+            do {
+                let response = try await send(command)
+                try requireSuccess(response)
+                if case .revokeToken = command {
+                    await loadTokens()
+                }
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func send(
+        _ command: ServiceCommand
+    ) async throws -> ServiceResponse {
+        try await client.send(command)
+    }
+
+    private func requireSuccess(_ response: ServiceResponse) throws {
+        if case .failure(let failure) = response {
+            throw failure
+        }
+    }
+
+    private func makeSubmission(
+        text: String,
+        format: InputFormat,
+        representationData: Data? = nil,
+        source: TriggerSource
+    ) -> SpeechSubmission {
+        SpeechSubmission(
+            text: text,
+            inputFormat: format,
+            representationData: representationData,
+            source: source.speechJobSource,
+            modelID: settings.activeModelID.rawValue,
+            voice: settings.activeVoice,
+            language: settings.activeLanguage,
+            voiceDescription: settings.voiceDescription,
+            speakingPace: settings.speakingPace.rawValue,
+            playbackRate: settings.playbackRate,
+            queuePolicy: .interruptCurrent
+        )
+    }
+
+    private func save(_ file: ExportedFile) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = file.filename
+        panel.allowedContentTypes = allowedContentTypes(for: file)
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            return
+        }
+        do {
+            try file.data.write(to: destination, options: .atomic)
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func allowedContentTypes(
+        for file: ExportedFile
+    ) -> [UTType] {
+        switch file.filename.split(separator: ".").last?.lowercased() {
+        case "m4a":
+            [.mpeg4Audio]
+        case "wav":
+            [.wav]
+        case "txt":
+            [.plainText]
+        default:
+            [.json]
+        }
+    }
+
+    private func safeFilename(_ title: String) -> String {
+        title
+            .replacing("/", with: "–")
+            .replacing(":", with: "–")
     }
 
     private var applicationVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "0.1.0"
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

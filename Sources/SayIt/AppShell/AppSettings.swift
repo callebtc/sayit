@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SayItCore
+import SayItProtocol
 
 @MainActor
 @Observable
@@ -27,44 +28,79 @@ final class AppSettings {
     }
 
     private let defaults: UserDefaults
+    @ObservationIgnored
+    private var isApplyingBackendSnapshot = false
+    @ObservationIgnored
+    var onBackendChange: (() -> Void)?
 
     var onboardingComplete: Bool {
         didSet { defaults.set(onboardingComplete, forKey: Key.onboardingComplete) }
     }
     var activeModelID: ModelID {
-        didSet { defaults.set(activeModelID.rawValue, forKey: Key.activeModelID) }
+        didSet {
+            defaults.set(activeModelID.rawValue, forKey: Key.activeModelID)
+            notifyBackendChange()
+        }
     }
     var activeVoice: String {
-        didSet { defaults.set(activeVoice, forKey: Key.activeVoice) }
+        didSet {
+            defaults.set(activeVoice, forKey: Key.activeVoice)
+            notifyBackendChange()
+        }
     }
     var activeLanguage: String {
-        didSet { defaults.set(activeLanguage, forKey: Key.activeLanguage) }
+        didSet {
+            defaults.set(activeLanguage, forKey: Key.activeLanguage)
+            notifyBackendChange()
+        }
     }
     var voiceDescription: String {
-        didSet { defaults.set(voiceDescription, forKey: Key.voiceDescription) }
+        didSet {
+            defaults.set(voiceDescription, forKey: Key.voiceDescription)
+            notifyBackendChange()
+        }
     }
     var speakingPace: SpeakingPace {
-        didSet { defaults.set(speakingPace.rawValue, forKey: Key.speakingPace) }
+        didSet {
+            defaults.set(speakingPace.rawValue, forKey: Key.speakingPace)
+            notifyBackendChange()
+        }
     }
     var playbackRate: Double {
-        didSet { defaults.set(playbackRate, forKey: Key.playbackRate) }
+        didSet {
+            defaults.set(playbackRate, forKey: Key.playbackRate)
+            notifyBackendChange()
+        }
     }
     var rewindInterval: Double {
-        didSet { defaults.set(rewindInterval, forKey: Key.rewindInterval) }
+        didSet {
+            defaults.set(rewindInterval, forKey: Key.rewindInterval)
+            notifyBackendChange()
+        }
     }
     var forwardInterval: Double {
-        didSet { defaults.set(forwardInterval, forKey: Key.forwardInterval) }
+        didSet {
+            defaults.set(forwardInterval, forKey: Key.forwardInterval)
+            notifyBackendChange()
+        }
     }
     var showNowPlayingTitles: Bool {
         didSet {
             defaults.set(showNowPlayingTitles, forKey: Key.showNowPlayingTitles)
+            notifyBackendChange()
         }
     }
     var retentionPeriod: RetentionPeriod {
-        didSet { defaults.set(retentionPeriod.rawValue, forKey: Key.retentionPeriod) }
+        didSet {
+            defaults.set(retentionPeriod.rawValue, forKey: Key.retentionPeriod)
+            notifyBackendChange()
+        }
     }
     var historyQuotaBytes: Int64 {
-        didSet { defaults.set(historyQuotaBytes, forKey: Key.historyQuota) }
+        didSet {
+            defaults.set(historyQuotaBytes, forKey: Key.historyQuota)
+            notifyBackendChange()
+        }
     }
     var checkForUpdates: Bool {
         didSet { defaults.set(checkForUpdates, forKey: Key.checkForUpdates) }
@@ -137,5 +173,50 @@ final class AppSettings {
             carbonModifiers: shortcutModifiers,
             keyLabel: shortcutKeyLabel
         )
+    }
+
+    func backendSnapshot(
+        httpEnabled: Bool = false,
+        httpPort: Int = 59_125
+    ) -> BackendSettingsSnapshot {
+        BackendSettingsSnapshot(
+            activeModelID: activeModelID.rawValue,
+            activeVoice: activeVoice,
+            activeLanguage: activeLanguage,
+            voiceDescription: voiceDescription,
+            speakingPace: speakingPace.rawValue,
+            playbackRate: playbackRate,
+            rewindInterval: rewindInterval,
+            forwardInterval: forwardInterval,
+            showNowPlayingTitles: showNowPlayingTitles,
+            retentionPeriod: retentionPeriod.rawValue,
+            historyQuotaBytes: historyQuotaBytes,
+            httpEnabled: httpEnabled,
+            httpPort: httpPort
+        )
+    }
+
+    func apply(_ snapshot: BackendSettingsSnapshot) {
+        isApplyingBackendSnapshot = true
+        activeModelID = ModelID(snapshot.activeModelID)
+        activeVoice = snapshot.activeVoice
+        activeLanguage = snapshot.activeLanguage
+        voiceDescription = snapshot.voiceDescription
+        speakingPace = SpeakingPace(rawValue: snapshot.speakingPace)
+            ?? .natural
+        playbackRate = snapshot.playbackRate
+        rewindInterval = snapshot.rewindInterval
+        forwardInterval = snapshot.forwardInterval
+        showNowPlayingTitles = snapshot.showNowPlayingTitles
+        retentionPeriod = RetentionPeriod(
+            rawValue: snapshot.retentionPeriod
+        ) ?? .thirtyDays
+        historyQuotaBytes = snapshot.historyQuotaBytes
+        isApplyingBackendSnapshot = false
+    }
+
+    private func notifyBackendChange() {
+        guard !isApplyingBackendSnapshot else { return }
+        onBackendChange?()
     }
 }

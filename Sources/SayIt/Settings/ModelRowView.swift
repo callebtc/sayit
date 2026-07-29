@@ -94,6 +94,7 @@ struct ModelRowView: View {
             }
         }
         .padding(.vertical, DesignTokens.compactSpacing)
+        .disabled(!state.isServiceOnline)
         .accessibilityElement(children: .contain)
     }
 

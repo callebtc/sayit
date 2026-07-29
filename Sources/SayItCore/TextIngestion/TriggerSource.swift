@@ -5,4 +5,7 @@ public enum TriggerSource: String, Codable, Sendable {
     case clipboard
     case history
     case preview
+    case frontend
+    case commandLine
+    case http
 }

@@ -44,6 +44,7 @@ struct SpeechPreviewView: View {
     private var canTestVoice: Bool {
         !sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && state.installedModelIDs.contains(state.settings.activeModelID)
+            && state.isServiceOnline
     }
 
     private func testVoice() {

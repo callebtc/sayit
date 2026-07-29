@@ -2,6 +2,7 @@ import Foundation
 
 enum SettingsPane: String, CaseIterable, Identifiable {
     case general
+    case service
     case speech
     case models
     case history
@@ -13,6 +14,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "General"
+        case .service: "Service"
         case .speech: "Speech"
         case .models: "Models"
         case .history: "History"
@@ -24,6 +26,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .service: "server.rack"
         case .speech: "waveform"
         case .models: "internaldrive"
         case .history: "clock.arrow.circlepath"

@@ -15,6 +15,13 @@ struct SettingsRootView: View {
                 GeneralSettingsView()
             }
             Tab(
+                SettingsPane.service.title,
+                systemImage: SettingsPane.service.symbol,
+                value: SettingsPane.service
+            ) {
+                ServiceSettingsView()
+            }
+            Tab(
                 SettingsPane.speech.title,
                 systemImage: SettingsPane.speech.symbol,
                 value: SettingsPane.speech

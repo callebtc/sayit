@@ -15,7 +15,12 @@ struct ReadClipboardButton: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .disabled(!state.isServiceOnline)
         .frame(minHeight: DesignTokens.minimumControlSize)
-        .accessibilityHint("Reads the clipboard once and speaks its text locally")
+        .accessibilityHint(
+            state.isServiceOnline
+                ? "Reads the clipboard once and speaks its text locally"
+                : "Unavailable until the background service connects"
+        )
     }
 }

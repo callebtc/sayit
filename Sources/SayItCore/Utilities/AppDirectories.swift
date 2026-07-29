@@ -32,6 +32,55 @@ public struct AppDirectories: Sendable {
             .appending(path: "Say It", directoryHint: .isDirectory)
         let caches = URL.cachesDirectory
             .appending(path: "Say It", directoryHint: .isDirectory)
+        return try create(applicationSupport: support, caches: caches)
+    }
+
+    public static func shared(
+        appGroupIdentifier: String
+    ) throws -> AppDirectories {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+        ) else {
+#if DEBUG
+            let support = URL.applicationSupportDirectory.appending(
+                path: "Say It Service (Debug)",
+                directoryHint: .isDirectory
+            )
+            let caches = URL.cachesDirectory.appending(
+                path: "Say It Service (Debug)",
+                directoryHint: .isDirectory
+            )
+            return try create(applicationSupport: support, caches: caches)
+#else
+            throw CocoaError(.fileNoSuchFile)
+#endif
+        }
+        return try create(
+            applicationSupport: container.appending(
+                path: "Library/Application Support/Say It",
+                directoryHint: .isDirectory
+            ),
+            caches: container.appending(
+                path: "Library/Caches/Say It",
+                directoryHint: .isDirectory
+            )
+        )
+    }
+
+    public static func testing(root: URL) throws -> AppDirectories {
+        try create(
+            applicationSupport: root.appending(
+                path: "Application Support",
+                directoryHint: .isDirectory
+            ),
+            caches: root.appending(path: "Caches", directoryHint: .isDirectory)
+        )
+    }
+
+    private static func create(
+        applicationSupport support: URL,
+        caches: URL
+    ) throws -> AppDirectories {
         let directories = AppDirectories(
             applicationSupport: support,
             models: support.appending(path: "Models", directoryHint: .isDirectory),

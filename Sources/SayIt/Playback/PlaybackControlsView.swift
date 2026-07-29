@@ -47,6 +47,12 @@ struct PlaybackControlsView: View {
             )
             .buttonStyle(.plain)
         }
+        .disabled(!state.isServiceOnline)
+        .accessibilityHint(
+            state.isServiceOnline
+                ? ""
+                : "Playback is unavailable until the background service connects"
+        )
     }
 
     private func skipBackward() {
