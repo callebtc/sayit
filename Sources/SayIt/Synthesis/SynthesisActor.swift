@@ -103,6 +103,11 @@ actor SynthesisActor: SpeechSynthesizing {
         guard let loadedModel else {
             throw SynthesisError.modelNotInstalled
         }
+        try applySpeakingPace(
+            request.speakingPace,
+            to: loadedModel,
+            model: request.model
+        )
 
         let chunks = chunker.chunks(for: request.cleanedText.text)
         var generatedSamples = 0
@@ -180,6 +185,23 @@ actor SynthesisActor: SpeechSynthesizing {
         continuation.finish()
         currentTask = nil
         scheduleIdleUnload()
+    }
+
+    private func applySpeakingPace(
+        _ pace: SpeakingPace,
+        to loadedModel: SpeechGenerationModel,
+        model: ModelDescriptor
+    ) throws {
+        guard model.supportsNativeSpeakingPace else { return }
+        switch model.modelType.lowercased() {
+        case "kokoro", "kokoro_tts":
+            guard let kokoro = loadedModel as? KokoroModel else {
+                throw SynthesisError.speakingPaceUnavailable
+            }
+            kokoro.speed = Float(pace.rawValue)
+        default:
+            break
+        }
     }
 
     private func scheduleIdleUnload() {

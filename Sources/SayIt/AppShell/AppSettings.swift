@@ -11,6 +11,7 @@ final class AppSettings {
         static let activeVoice = "activeVoice"
         static let activeLanguage = "activeLanguage"
         static let voiceDescription = "voiceDescription"
+        static let speakingPace = "speakingPace"
         static let playbackRate = "playbackRate"
         static let rewindInterval = "rewindInterval"
         static let forwardInterval = "forwardInterval"
@@ -41,6 +42,9 @@ final class AppSettings {
     }
     var voiceDescription: String {
         didSet { defaults.set(voiceDescription, forKey: Key.voiceDescription) }
+    }
+    var speakingPace: SpeakingPace {
+        didSet { defaults.set(speakingPace.rawValue, forKey: Key.speakingPace) }
     }
     var playbackRate: Double {
         didSet { defaults.set(playbackRate, forKey: Key.playbackRate) }
@@ -92,6 +96,9 @@ final class AppSettings {
         activeVoice = defaults.string(forKey: Key.activeVoice) ?? "af_heart"
         activeLanguage = defaults.string(forKey: Key.activeLanguage) ?? "en-US"
         voiceDescription = defaults.string(forKey: Key.voiceDescription) ?? ""
+        speakingPace = SpeakingPace(
+            rawValue: defaults.double(forKey: Key.speakingPace)
+        ) ?? .natural
         let storedRate = defaults.double(forKey: Key.playbackRate)
         playbackRate = storedRate == 0 ? 1 : storedRate
         let storedRewind = defaults.double(forKey: Key.rewindInterval)

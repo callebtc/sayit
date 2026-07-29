@@ -120,6 +120,7 @@ final class AppState {
             )
         )
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+        playback.rate = settings.playbackRate
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         if settings.checkForUpdates,
@@ -655,6 +656,9 @@ final class AppState {
                 ? model.defaultLanguage
                 : settings.activeLanguage,
             voiceDescription: settings.voiceDescription,
+            speakingPace: model.supportsNativeSpeakingPace
+                ? settings.speakingPace
+                : .natural,
             source: source
         )
         activeRequest = request
@@ -670,7 +674,9 @@ final class AppState {
         playback.prepare(
             requestID: request.id,
             title: request.cleanedText.title,
-            estimatedDuration: Double(request.cleanedText.characterCount) / 14
+            estimatedDuration: Double(request.cleanedText.characterCount)
+                / 14
+                / request.speakingPace.rawValue
         )
         statusText = "Preparing speech"
         errorMessage = nil

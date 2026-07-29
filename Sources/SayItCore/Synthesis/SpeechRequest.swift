@@ -7,6 +7,7 @@ public struct SpeechRequest: Identifiable, Sendable {
     public let voice: String?
     public let language: String?
     public let voiceDescription: String?
+    public let speakingPace: SpeakingPace
     public let source: TriggerSource
     public let createdAt: Date
 
@@ -17,6 +18,7 @@ public struct SpeechRequest: Identifiable, Sendable {
         voice: String?,
         language: String?,
         voiceDescription: String? = nil,
+        speakingPace: SpeakingPace = .natural,
         source: TriggerSource,
         createdAt: Date = .now
     ) {
@@ -26,6 +28,7 @@ public struct SpeechRequest: Identifiable, Sendable {
         self.voice = voice
         self.language = language
         self.voiceDescription = voiceDescription
+        self.speakingPace = speakingPace
         self.source = source
         self.createdAt = createdAt
     }
