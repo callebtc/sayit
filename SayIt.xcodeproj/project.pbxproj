@@ -132,6 +132,7 @@
 		6E52A0435904D6D6FDB609BF /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = FD20A7112C89EF1EA775887A /* OpenAPIRuntime */; };
 		6F00A9E66B1543D0A1FA4014 /* ModelDependencyDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE2146938E2B5731D39082E5 /* ModelDependencyDescriptor.swift */; };
 		6FAD03578FF45B9F0DD51DA5 /* InterruptMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A114503EEA29B96D47D643 /* InterruptMonitor.swift */; };
+		72474B2BF09C76E00F3ED617 /* RecentHistoryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E134E4C59A27E9192DF8D2 /* RecentHistoryRowView.swift */; };
 		74104E6B15D75A7822590DD1 /* UpdateResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C640391D6C6DECE4012194E /* UpdateResult.swift */; };
 		741209B74AB521E4341DE52B /* ExportedFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB3A6AAC6675A003A0ACE47C /* ExportedFile.swift */; };
 		76903DE1E3B650737C2E4C40 /* TextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6779E36EE1B11B74EFC4C4 /* TextParser.swift */; };
@@ -554,6 +555,7 @@
 		266607DF46390FDCA1CDA0BE /* SpeechJobSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechJobSource.swift; sourceTree = "<group>"; };
 		2837701977770F5911182C7A /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		2996022F566B1CA2CFAB59AD /* openapi-generator-config.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = "openapi-generator-config.yaml"; sourceTree = "<group>"; };
+		29E134E4C59A27E9192DF8D2 /* RecentHistoryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentHistoryRowView.swift; sourceTree = "<group>"; };
 		2CE9FEAEE8B390CA9BE7F2E8 /* TextSourcePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSourcePayload.swift; sourceTree = "<group>"; };
 		2DCDEEA486A4B8840D1463C5 /* LongTextConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LongTextConfirmationView.swift; sourceTree = "<group>"; };
 		2DE20722F67E395754CEB06B /* JobsCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsCommand.swift; sourceTree = "<group>"; };
@@ -901,6 +903,7 @@
 				56631767F22E065003A55DA8 /* HistoryRowView.swift */,
 				2837701977770F5911182C7A /* HistoryStore.swift */,
 				029B4E9368A75CA1F818245E /* HistoryView.swift */,
+				29E134E4C59A27E9192DF8D2 /* RecentHistoryRowView.swift */,
 				4FA2774E4BA33E2F3264E324 /* RecentHistoryView.swift */,
 			);
 			path = History;
@@ -2139,6 +2142,7 @@
 				D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */,
 				AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */,
 				1066672AD8F1CD5C55522FFE /* ReadClipboardButton.swift in Sources */,
+				72474B2BF09C76E00F3ED617 /* RecentHistoryRowView.swift in Sources */,
 				BE86A8D46C752BA2CA27C7EC /* RecentHistoryView.swift in Sources */,
 				2BEF190D834CDA9DE81A8AF9 /* RecommendedOnboardingModelView.swift in Sources */,
 				435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */,

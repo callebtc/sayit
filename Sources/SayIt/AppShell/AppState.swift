@@ -320,11 +320,11 @@ final class AppState {
     }
 
     func replay(_ item: HistoryItemSnapshot) {
-        perform(.replayHistory(item.id))
+        performAndReload(.replayHistory(item.id))
     }
 
     func regenerate(_ item: HistoryItemSnapshot) {
-        perform(.regenerateHistory(item.id))
+        performAndReload(.regenerateHistory(item.id))
     }
 
     func togglePinned(_ item: HistoryItemSnapshot) {
@@ -727,6 +727,18 @@ final class AppState {
                 if case .revokeToken = command {
                     await loadTokens()
                 }
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performAndReload(_ command: ServiceCommand) {
+        Task {
+            do {
+                let response = try await send(command)
+                try requireSuccess(response)
+                try await reloadServiceSnapshot()
             } catch {
                 presentError(error.localizedDescription)
             }

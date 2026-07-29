@@ -19,28 +19,7 @@ struct RecentHistoryView: View {
                     .frame(minHeight: DesignTokens.minimumControlSize)
             } else {
                 ForEach(state.history.items.prefix(3)) { item in
-                    HStack {
-                        Image(
-                            systemName: item.state == .completed
-                                ? "waveform"
-                                : "arrow.clockwise"
-                        )
-                        .accessibilityHidden(true)
-                        VStack(alignment: .leading) {
-                            Text(item.title)
-                                .lineLimit(1)
-                            Text(item.createdAt, format: .relative(presentation: .named))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if item.duration > 0 {
-                            Text(item.duration.formattedDuration)
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(minHeight: DesignTokens.minimumControlSize)
+                    RecentHistoryRowView(item: item)
                 }
             }
 

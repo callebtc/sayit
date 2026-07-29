@@ -1045,6 +1045,7 @@ public final class SayItBackendService: SayItService {
         }
         cancelActiveJob(startNext: false)
         try playback.playFile(at: url, title: item.title)
+        errorMessage = nil
         statusText = "Playing"
         revision &+= 1
     }
