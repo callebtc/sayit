@@ -62,6 +62,11 @@ actor ModelManager: ModelManaging {
             throw ModelManagerError.modelUnavailable
         }
         if rawInstallation(for: model) != nil {
+            let staleStaging = directories.downloads.appending(
+                path: "\(model.id.rawValue)-\(model.revision).partial",
+                directoryHint: .isDirectory
+            )
+            try? FileManager.default.removeItem(at: staleStaging)
             return
         }
 
@@ -280,29 +285,16 @@ actor ModelManager: ModelManaging {
                     totalModelBytes: totalBytes,
                     progress: progress
                 )
-                let temporaryURL: URL
-                let response: URLResponse
-                do {
-                    if let resumeData = try? Data(contentsOf: resumeURL) {
-                        (temporaryURL, response) = try await session.download(
-                            resumeFrom: resumeData,
-                            delegate: delegate
-                        )
-                    } else {
-                        (temporaryURL, response) = try await session.download(
-                            for: try await authorizedRequest(url: remoteURL),
-                            delegate: delegate
-                        )
-                    }
-                } catch {
-                    let resumeData = (error as NSError).userInfo[
-                        NSURLSessionDownloadTaskResumeData
-                    ] as? Data
-                    if let resumeData {
-                        try? resumeData.write(to: resumeURL, options: .atomic)
-                    }
-                    throw error
-                }
+                let downloadedFile = destination.appendingPathExtension(
+                    "download"
+                )
+                let response = try await delegate.download(
+                    using: session,
+                    request: try await authorizedRequest(url: remoteURL),
+                    resumeData: try? Data(contentsOf: resumeURL),
+                    to: downloadedFile,
+                    resumeDataURL: resumeURL
+                )
                 guard let http = response as? HTTPURLResponse,
                       (200..<300).contains(http.statusCode) else {
                     throw ModelManagerError.invalidResponse
@@ -312,7 +304,7 @@ actor ModelManager: ModelManaging {
                     try FileManager.default.removeItem(at: destination)
                 }
                 try FileManager.default.moveItem(
-                    at: temporaryURL,
+                    at: downloadedFile,
                     to: destination
                 )
                 try? FileManager.default.removeItem(at: resumeURL)
@@ -374,32 +366,16 @@ actor ModelManager: ModelManaging {
                         totalModelBytes: totalBytes,
                         progress: progress
                     )
-                    let temporaryURL: URL
-                    let response: URLResponse
-                    do {
-                        if let resumeData = try? Data(contentsOf: resumeURL) {
-                            (temporaryURL, response) = try await session.download(
-                                resumeFrom: resumeData,
-                                delegate: delegate
-                            )
-                        } else {
-                            (temporaryURL, response) = try await session.download(
-                                for: try await authorizedRequest(url: remoteURL),
-                                delegate: delegate
-                            )
-                        }
-                    } catch {
-                        let resumeData = (error as NSError).userInfo[
-                            NSURLSessionDownloadTaskResumeData
-                        ] as? Data
-                        if let resumeData {
-                            try? resumeData.write(
-                                to: resumeURL,
-                                options: .atomic
-                            )
-                        }
-                        throw error
-                    }
+                    let downloadedFile = destination.appendingPathExtension(
+                        "download"
+                    )
+                    let response = try await delegate.download(
+                        using: session,
+                        request: try await authorizedRequest(url: remoteURL),
+                        resumeData: try? Data(contentsOf: resumeURL),
+                        to: downloadedFile,
+                        resumeDataURL: resumeURL
+                    )
                     guard let http = response as? HTTPURLResponse,
                           (200..<300).contains(http.statusCode) else {
                         throw ModelManagerError.invalidResponse
@@ -410,7 +386,7 @@ actor ModelManager: ModelManaging {
                         try FileManager.default.removeItem(at: destination)
                     }
                     try FileManager.default.moveItem(
-                        at: temporaryURL,
+                        at: downloadedFile,
                         to: destination
                     )
                     try? FileManager.default.removeItem(at: resumeURL)
@@ -515,15 +491,6 @@ actor ModelManager: ModelManaging {
                 )
             )
         } catch is CancellationError {
-            await progress(
-                ModelDownloadProgress(
-                    modelID: model.id,
-                    state: .paused,
-                    completedBytes: completedBytes,
-                    totalBytes: totalBytes,
-                    bytesPerSecond: 0
-                )
-            )
             throw CancellationError()
         }
     }
@@ -667,12 +634,7 @@ actor ModelManager: ModelManaging {
               let configJSON = try? JSONSerialization.jsonObject(
                   with: configData
               ) as? [String: Any],
-              let rawType = (
-                  configJSON["model_type"] as? String
-                    ?? configJSON["architecture"] as? String
-                    ?? configJSON["model_version"] as? String
-              )?.lowercased(),
-              SupportedModelTypes.all.contains(rawType),
+              SupportedModelTypes.all.contains(model.modelType.lowercased()),
               files.contains(where: {
                   $0.path.hasSuffix(".safetensors") && $0.byteCount > 0
               }) else {
@@ -681,9 +643,19 @@ actor ModelManager: ModelManaging {
         for file in files {
             try verify(url.appending(path: file.path), descriptor: file)
         }
-        guard rawType == model.modelType.lowercased()
-                || model.modelType.lowercased().contains(rawType)
-                || rawType.contains(model.modelType.lowercased()) else {
+
+        let declaredType = (
+            configJSON["model_type"] as? String
+                ?? configJSON["architecture"] as? String
+                ?? configJSON["model_version"] as? String
+        )?.lowercased()
+        guard let declaredType else {
+            return
+        }
+        guard SupportedModelTypes.all.contains(declaredType),
+              declaredType == model.modelType.lowercased()
+                || model.modelType.lowercased().contains(declaredType)
+                || declaredType.contains(model.modelType.lowercased()) else {
             throw ModelManagerError.modelUnavailable
         }
     }
@@ -707,7 +679,7 @@ actor ModelManager: ModelManaging {
             .appending(path: relativePath)
             .appending(path: "installation.json")
         guard let data = try? Data(contentsOf: url),
-              let installation = try? JSONDecoder().decode(
+              let installation = try? JSONDecoder.sayIt.decode(
                   ModelInstallation.self,
                   from: data
               ),

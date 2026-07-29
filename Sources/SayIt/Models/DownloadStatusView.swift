@@ -9,12 +9,8 @@ struct DownloadStatusView: View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
             HStack {
                 Label(
-                    progress.state == .verifying
-                        ? "Verifying model"
-                        : "Downloading model",
-                    systemImage: progress.state == .verifying
-                        ? "checkmark.shield"
-                        : "arrow.down.circle"
+                    statusTitle,
+                    systemImage: statusSymbol
                 )
                 .bold()
                 Spacer()
@@ -38,12 +34,59 @@ struct DownloadStatusView: View {
             }
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
-            Button(
-                progress.state == .paused ? "Resume" : "Cancel",
-                action: progress.state == .paused
-                    ? { state.installModel(progress.modelID) }
-                    : state.cancelModelInstall
-            )
+            if progress.state == .failed, let message = state.errorMessage {
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(actionTitle, action: performAction)
+        }
+    }
+
+    private var statusTitle: String {
+        switch progress.state {
+        case .paused:
+            "Download paused"
+        case .failed:
+            "Download failed"
+        case .verifying:
+            "Verifying model"
+        default:
+            "Downloading model"
+        }
+    }
+
+    private var statusSymbol: String {
+        switch progress.state {
+        case .paused:
+            "pause.circle"
+        case .failed:
+            "exclamationmark.triangle"
+        case .verifying:
+            "checkmark.shield"
+        default:
+            "arrow.down.circle"
+        }
+    }
+
+    private var actionTitle: String {
+        switch progress.state {
+        case .paused:
+            "Resume"
+        case .failed:
+            "Retry"
+        default:
+            "Cancel"
+        }
+    }
+
+    private func performAction() {
+        switch progress.state {
+        case .paused, .failed:
+            state.installModel(progress.modelID)
+        default:
+            state.cancelModelInstall()
         }
     }
 }

@@ -1,7 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct MenuFooterView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack {
@@ -17,9 +19,7 @@ struct MenuFooterView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            SettingsLink {
-                Text("Settings…")
-            }
+            Button("Settings…", action: openSettings)
             .buttonStyle(.plain)
             Divider()
                 .frame(height: 16)
@@ -27,5 +27,10 @@ struct MenuFooterView: View {
                 .buttonStyle(.plain)
         }
         .font(.callout)
+    }
+
+    private func openSettings() {
+        openWindow(id: AppWindowID.settings)
+        NSApp.activate()
     }
 }

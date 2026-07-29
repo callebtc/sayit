@@ -1,7 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct ErrorStatusView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.openWindow) private var openWindow
     let message: String
 
     var body: some View {
@@ -16,10 +18,16 @@ struct ErrorStatusView: View {
                 Button("Dismiss", action: state.clearError)
                 Spacer()
                 if state.installedModelIDs.isEmpty {
-                    Button("Choose a model", action: state.showOnboarding)
+                    Button("Choose a model", action: openOnboarding)
                         .buttonStyle(.borderedProminent)
                 }
             }
         }
+    }
+
+    private func openOnboarding() {
+        state.showOnboarding()
+        openWindow(id: AppWindowID.onboarding)
+        NSApp.activate()
     }
 }

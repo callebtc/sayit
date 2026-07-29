@@ -40,11 +40,8 @@ struct VoiceOnboardingView: View {
                         Button("Play sample", action: state.speakSample)
                     }
                 } else if let progress = state.downloadProgress {
-                    ProgressView(value: progress.fractionCompleted) {
-                        Text(progress.state == .verifying ? "Verifying" : "Downloading")
-                    }
-                    .frame(maxWidth: 380)
-                    Button("Cancel", action: state.cancelModelInstall)
+                    DownloadStatusView(progress: progress)
+                        .frame(maxWidth: 380)
                 } else {
                     Button("Download Kokoro", action: { state.installModel(model.id) })
                         .buttonStyle(.borderedProminent)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RecentHistoryView: View {
@@ -41,10 +42,13 @@ struct RecentHistoryView: View {
                 }
             }
 
-            Button("View All History…") {
-                openWindow(id: "history")
-            }
+            Button("View All History…", action: openHistory)
             .buttonStyle(.link)
         }
+    }
+
+    private func openHistory() {
+        openWindow(id: AppWindowID.history)
+        NSApp.activate()
     }
 }

@@ -1,3 +1,4 @@
+import AppKit
 import SayItCore
 import SwiftUI
 
@@ -23,7 +24,8 @@ struct HistorySettingsView: View {
                     Text(settings.historyQuotaBytes, format: .byteCount(style: .file))
                 }
                 Button("Open History") {
-                    openWindow(id: "history")
+                    openWindow(id: AppWindowID.history)
+                    NSApp.activate()
                 }
                 Button("Clear History…", role: .destructive) {
                     isConfirmingClear = true

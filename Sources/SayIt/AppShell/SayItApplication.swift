@@ -16,17 +16,29 @@ struct SayItApplication: App {
         }
         .menuBarExtraStyle(.window)
 
-        Settings {
+        Window("Say It Settings", id: AppWindowID.settings) {
             SettingsRootView()
                 .environment(state)
                 .frame(minWidth: 720, minHeight: 500)
         }
+        .defaultSize(width: 760, height: 560)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
 
-        WindowGroup("History", id: "history") {
+        Window("History", id: AppWindowID.history) {
             HistoryView()
                 .environment(state)
                 .frame(minWidth: 700, minHeight: 480)
         }
         .defaultSize(width: 820, height: 560)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
+
+        Window("Welcome to Say It", id: AppWindowID.onboarding) {
+            OnboardingView()
+                .environment(state)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
     }
 }

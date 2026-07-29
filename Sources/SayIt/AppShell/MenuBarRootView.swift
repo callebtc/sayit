@@ -4,8 +4,6 @@ struct MenuBarRootView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        @Bindable var state = state
-
         VStack(alignment: .leading, spacing: 0) {
             StatusHeaderView()
                 .padding(DesignTokens.generousSpacing)
@@ -43,9 +41,5 @@ struct MenuBarRootView: View {
                 .padding(.vertical, DesignTokens.compactSpacing)
         }
         .frame(width: DesignTokens.popoverWidth)
-        .sheet(isPresented: $state.isShowingOnboarding) {
-            OnboardingView()
-                .environment(state)
-        }
     }
 }

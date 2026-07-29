@@ -30,5 +30,8 @@ struct MenuBarLabel: View {
         }
         .accessibilityLabel("Say It")
         .accessibilityValue(state.statusText)
+        .background {
+            AppWindowCoordinator()
+        }
     }
 }

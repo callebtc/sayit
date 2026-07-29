@@ -215,7 +215,16 @@ final class AppState {
     }
 
     func cancelModelInstall() {
-        guard let id = downloadProgress?.modelID else { return }
+        guard let current = downloadProgress else { return }
+        let id = current.modelID
+        downloadProgress = ModelDownloadProgress(
+            modelID: id,
+            state: .paused,
+            completedBytes: current.completedBytes,
+            totalBytes: current.totalBytes,
+            bytesPerSecond: 0
+        )
+        statusText = "Download paused"
         downloadTask?.cancel()
         Task {
             await modelManager.cancelInstall(id)
@@ -372,6 +381,10 @@ final class AppState {
 
     func showOnboarding() {
         isShowingOnboarding = true
+    }
+
+    func onboardingWindowDidClose() {
+        isShowingOnboarding = false
     }
 
     func updateGlobalShortcut(_ shortcut: GlobalShortcut) {
@@ -730,16 +743,34 @@ final class AppState {
     }
 
     private func finishInstall(_ id: ModelID) async {
-        downloadTask = nil
-        downloadProgress = nil
         if let model = models.first(where: { $0.id == id }) {
+            let current = downloadProgress
+            let totalBytes = current?.totalBytes ?? downloadByteCount(for: model)
+            downloadProgress = ModelDownloadProgress(
+                modelID: id,
+                state: .verifying,
+                completedBytes: totalBytes,
+                totalBytes: totalBytes,
+                bytesPerSecond: 0
+            )
             statusText = "Preparing offline speech resources"
             do {
                 try await synthesizer.prepareDependencies(for: model)
                 try await modelManager.markDependenciesVerified(id)
+            } catch is CancellationError {
+                finishCancelledInstall()
+                return
             } catch {
+                downloadTask = nil
+                downloadProgress = ModelDownloadProgress(
+                    modelID: id,
+                    state: .failed,
+                    completedBytes: totalBytes,
+                    totalBytes: totalBytes,
+                    bytesPerSecond: 0
+                )
                 presentError(
-                    "The model was downloaded, but its offline speech resources are incomplete."
+                    "Offline speech setup failed: \(error.localizedDescription)"
                 )
                 return
             }
@@ -754,10 +785,13 @@ final class AppState {
                 try await modelManager.select(id)
                 applyModelSelection(model)
             } catch {
+                downloadTask = nil
                 presentError(error.localizedDescription)
                 return
             }
         }
+        downloadTask = nil
+        downloadProgress = nil
         settings.onboardingComplete = true
         statusText = "Ready to speak"
         if let pendingCleanedText, let pendingSource {
@@ -783,6 +817,15 @@ final class AppState {
 
     private func finishFailedInstall(_ error: Error) {
         downloadTask = nil
+        if let current = downloadProgress {
+            downloadProgress = ModelDownloadProgress(
+                modelID: current.modelID,
+                state: .failed,
+                completedBytes: current.completedBytes,
+                totalBytes: current.totalBytes,
+                bytesPerSecond: 0
+            )
+        }
         presentError(error.localizedDescription)
     }
 

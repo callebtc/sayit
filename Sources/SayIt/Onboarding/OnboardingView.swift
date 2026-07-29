@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(AppState.self) private var state
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var step = OnboardingStep.privacy
 
     var body: some View {
@@ -34,7 +34,7 @@ struct OnboardingView: View {
             .padding(DesignTokens.generousSpacing)
         }
         .frame(width: 540, height: 430)
-        .interactiveDismissDisabled(state.installedModelIDs.isEmpty)
+        .onDisappear(perform: state.onboardingWindowDidClose)
     }
 
     private var progressDots: some View {
@@ -65,7 +65,7 @@ struct OnboardingView: View {
     private func goForward() {
         if step == .anywhere {
             state.finishOnboarding()
-            dismiss()
+            dismissWindow(id: AppWindowID.onboarding)
         } else if let next = OnboardingStep(rawValue: step.rawValue + 1) {
             step = next
         }
