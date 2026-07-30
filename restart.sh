@@ -7,7 +7,10 @@ cli="$app_root/Contents/Helpers/sayit"
 bundle_identifier="com.sayit.mac"
 launch_services="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
-"$project_root/Scripts/build-app.sh"
+if [ ! -x "$app_root/Contents/MacOS/SayIt" ] || [ ! -x "$cli" ]; then
+    echo "No runnable Release build was found. Run ./rebuild.sh first." >&2
+    exit 1
+fi
 
 if pgrep -x SayIt >/dev/null 2>&1; then
     echo "Stopping Say It…"

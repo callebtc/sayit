@@ -87,7 +87,13 @@ The build script generates `SayIt.xcodeproj`, resolves the declared Swift
 packages, builds and signs the app, background agent, and CLI, then creates an
 arm64 app in `Build/DerivedData/Build/Products/Release`.
 
-To build the latest Release app and cleanly start or restart it in one command:
+To build the latest Release app and restart it:
+
+```sh
+./rebuild.sh
+```
+
+To restart the existing Release build without compiling:
 
 ```sh
 ./restart.sh
