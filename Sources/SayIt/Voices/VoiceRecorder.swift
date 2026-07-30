@@ -75,10 +75,13 @@ final class VoiceRecorder {
         }
         stop()
         errorMessage = nil
+        recordingURL = nil
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
-        guard format.channelCount > 0, format.sampleRate > 0 else {
+        guard (1...8).contains(format.channelCount),
+              format.sampleRate.isFinite,
+              (8_000...384_000).contains(format.sampleRate) else {
             access = .noDevice
             throw VoiceRecordingError.noAudioDevice
         }
@@ -86,25 +89,20 @@ final class VoiceRecorder {
             at: destination.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let file = try AVAudioFile(
-            forWriting: destination,
-            settings: format.settings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
-        let sink = VoiceRecordingSink(file: file, sampleRate: format.sampleRate)
+        let sink = VoiceRecordingSink(destination: destination)
         input.installTap(
             onBus: 0,
             bufferSize: 1_024,
-            format: format
-        ) { buffer, _ in
-            sink.consume(buffer)
-        }
+            format: nil,
+            block: Self.tapHandler(for: sink)
+        )
         engine.prepare()
         do {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
+            sink.finish()
+            try? FileManager.default.removeItem(at: destination)
             throw error
         }
         self.engine = engine
@@ -140,76 +138,32 @@ final class VoiceRecorder {
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()
         }
-        if let reading = sink?.reading {
+        let finalReading = sink?.finish()
+        if let reading = finalReading {
             level = reading.level
             peak = reading.peak
             duration = reading.duration
             errorMessage = reading.errorMessage
         }
+        let completedURL: URL? = if let finalReading,
+                                    finalReading.frameCount > 0,
+                                    finalReading.errorMessage == nil {
+            recordingURL
+        } else {
+            nil
+        }
         engine = nil
         sink = nil
         isRecording = false
-        return recordingURL
-    }
-}
-
-private final class VoiceRecordingSink: @unchecked Sendable {
-    struct Reading {
-        let level: Float
-        let peak: Float
-        let duration: TimeInterval
-        let errorMessage: String?
+        recordingURL = completedURL
+        return completedURL
     }
 
-    private let file: AVAudioFile
-    private let sampleRate: Double
-    private let lock = NSLock()
-    private var frames: AVAudioFramePosition = 0
-    private var currentLevel: Float = 0
-    private var currentPeak: Float = 0
-    private var writeError: String?
-
-    init(file: AVAudioFile, sampleRate: Double) {
-        self.file = file
-        self.sampleRate = sampleRate
-    }
-
-    var reading: Reading {
-        lock.lock()
-        defer { lock.unlock() }
-        return Reading(
-            level: currentLevel,
-            peak: currentPeak,
-            duration: Double(frames) / sampleRate,
-            errorMessage: writeError
-        )
-    }
-
-    func consume(_ buffer: AVAudioPCMBuffer) {
-        var sum: Double = 0
-        var peak: Float = 0
-        let frameCount = Int(buffer.frameLength)
-        let channelCount = Int(buffer.format.channelCount)
-        if let channels = buffer.floatChannelData, frameCount > 0 {
-            for channelIndex in 0..<channelCount {
-                for index in 0..<frameCount {
-                    let value = channels[channelIndex][index]
-                    sum += Double(value) * Double(value)
-                    peak = max(peak, abs(value))
-                }
-            }
-        }
-        let divisor = max(frameCount * channelCount, 1)
-        let rms = Float(sqrt(sum / Double(divisor)))
-        lock.lock()
-        defer { lock.unlock() }
-        do {
-            try file.write(from: buffer)
-            frames += AVAudioFramePosition(buffer.frameLength)
-            currentLevel = rms
-            currentPeak = max(currentPeak, peak)
-        } catch {
-            writeError = "The microphone recording could not be saved. Check available disk space and try again."
+    nonisolated static func tapHandler(
+        for sink: VoiceRecordingSink
+    ) -> @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void {
+        { buffer, _ in
+            sink.consume(buffer)
         }
     }
 }

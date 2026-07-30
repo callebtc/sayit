@@ -74,6 +74,40 @@ struct VoiceRecordingProcessorTests {
         }
     }
 
+    @Test("Bluetooth microphone audio is accepted and normalized")
+    func bluetoothMicrophoneAudio() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItRecordingTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        let source = root.appending(path: "airpods-style.wav")
+        let destination = root.appending(path: "reference.wav")
+        try writeFixture(
+            to: source,
+            sampleRate: 16_000,
+            signalDuration: 4,
+            amplitude: 0.2,
+            channelCount: 1
+        )
+
+        let analysis = try VoiceRecordingProcessor().process(
+            source: source,
+            destination: destination,
+            targetSampleRate: 24_000,
+            minimumDuration: 3,
+            maximumDuration: 10
+        )
+
+        #expect((3.9...4.3).contains(analysis.duration))
+        #expect(analysis.sampleRate == 24_000)
+        let output = try AVAudioFile(forReading: destination)
+        #expect(output.processingFormat.channelCount == 1)
+        #expect(output.processingFormat.sampleRate == 24_000)
+    }
+
     @Test("Out-of-range processing parameters are rejected")
     func outOfRangeParameters() throws {
         let root = FileManager.default.temporaryDirectory
@@ -106,7 +140,8 @@ struct VoiceRecordingProcessorTests {
         to url: URL,
         sampleRate: Double,
         signalDuration: TimeInterval,
-        amplitude: Float
+        amplitude: Float,
+        channelCount: AVAudioChannelCount = 2
     ) throws {
         let silenceFrames = Int(sampleRate * 0.25)
         let signalFrames = Int(sampleRate * signalDuration)
@@ -121,7 +156,7 @@ struct VoiceRecordingProcessorTests {
             AVAudioFormat(
                 commonFormat: .pcmFormatFloat32,
                 sampleRate: sampleRate,
-                channels: 2,
+                channels: channelCount,
                 interleaved: false
             )
         )
@@ -132,7 +167,7 @@ struct VoiceRecordingProcessorTests {
             )
         )
         buffer.frameLength = AVAudioFrameCount(samples.count)
-        for channelIndex in 0..<2 {
+        for channelIndex in 0..<Int(channelCount) {
             let channel = try #require(
                 buffer.floatChannelData?[channelIndex]
             )

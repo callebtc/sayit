@@ -500,9 +500,20 @@ struct VoiceCloneWizard: View {
     }
 
     private func stopRecording() {
-        guard let rawURL = recorder.stop(),
+        let rawURL = recorder.stop()
+        if let message = recorder.errorMessage {
+            analysis = nil
+            referenceURL = nil
+            recordingError = message
+            return
+        }
+        guard let rawURL,
               let recordingID,
               let requirements else {
+            analysis = nil
+            referenceURL = nil
+            recordingError =
+                "No microphone audio was captured. Check the selected input device and record again."
             return
         }
         do {
