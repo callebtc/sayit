@@ -1,117 +1,106 @@
 # Say It
 
-Say It is a private, local text-to-speech service for Apple silicon Macs. Its
-menu-bar app, command-line tool, and opt-in loopback API all use the same
-per-user background service and MLX Audio engine without sending source text
-to a cloud service.
+Private, local text-to-speech for Apple silicon Macs. Say It turns selected or
+copied text into speech with open models running through
+[MLX Audio](https://github.com/Blaizzy/mlx-audio)—your text and generated audio
+stay on your Mac.
 
-You can read selected text through macOS Services, read the clipboard with a
-keyboard shortcut, replay previous items, and export generated audio.
+<table>
+  <tr>
+    <td width="46%"><img src="public/resources/player.png" alt="Say It menu-bar player"></td>
+    <td width="54%"><img src="public/resources/models.png" alt="Say It model library"></td>
+  </tr>
+</table>
 
-## Requirements
+## Highlights
 
-- Apple-silicon Mac
-- macOS 15 or later
+- **Speak from anywhere.** Select text in any app and choose
+  **Services → Say It**, or copy text and press the configurable global hotkey.
+- **A native menu-bar player.** Read the clipboard, pause, seek, change playback
+  speed, follow the spoken text, and revisit history without leaving your
+  current app.
+- **Open models from Hugging Face.** Download supported MLX models in the app,
+  including [Qwen3 TTS](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit),
+  [Kokoro](https://huggingface.co/mlx-community/Kokoro-82M-bf16),
+  [Chatterbox](https://huggingface.co/mlx-community/Chatterbox-TTS-fp16), and
+  [OmniVoice](https://huggingface.co/mlx-community/OmniVoice). Compatible
+  community models can be added by Hugging Face repository ID.
+- **Create voices.** Models expose the features they support, from built-in
+  voices and voice descriptions to random voice discovery and voice cloning.
+- **Efficient model loading.** Only one model is kept in memory, and it is
+  automatically unloaded after a configurable period of inactivity (ten
+  minutes by default).
+- **Local by design.** Synthesis works offline after model download. There is no
+  analytics, cloud inference, or passive clipboard monitoring.
 
-## Install
+## Clone your voice
 
-1. Download the latest DMG from the project's Releases page.
-2. Open the DMG and drag Say It into Applications.
-3. Launch Say It and complete the initial model download.
-4. Leave the background service enabled in **Settings → Service**.
+For models with voice-cloning support, Voice Studio guides you through recording
+or importing a clean reference sample, checks its quality, and saves it as a
+reusable voice profile. You stay in control of the recording: voice samples and
+profiles remain on your Mac, and cloning runs locally.
 
-Model weights are not bundled with the app. After a model is installed, speech
-generation works offline.
+Only clone a voice when you have the speaker's permission.
 
-## Use
+## Getting started
 
-- Select text in another app and choose **Services → Say It**.
-- Copy text and press **Control–Option–S**.
-- Choose **Read Clipboard** from the Say It menu.
+Say It requires macOS 15 or later on an Apple silicon Mac.
 
-The shortcut can be changed in Settings. Say It only reads the clipboard after
-an explicit command.
+1. Install and launch Say It.
+2. Choose and download a model during onboarding.
+3. Select text in another app and choose **Services → Say It**, or copy text and
+   press **Control–Option–S**.
 
-### Command line
+The shortcut can be changed in Settings. Say It reads clipboard text only when
+you explicitly ask it to.
 
-The signed `sayit` executable is bundled inside the app. Settings shows its
-location and a command for linking it into `~/.local/bin`.
+### Terminal
+
+The app includes a `sayit` CLI for speech, playback, models, voices, and
+automation:
 
 ```sh
 sayit "Read this aloud"
 printf 'Read standard input' | sayit
-sayit --interrupt --detach "Read this now"
 sayit status
 sayit pause
 sayit resume
-sayit clear
 ```
 
-Run `sayit --help` for model, voice, language, rate, pace, queue, JSON, and
-long-text options.
+Run `sayit --help` to see all commands and options.
 
-### Local HTTP API
+## Architecture
 
-The versioned REST API is disabled by default. Enable it in
-**Settings → Service**, create a scoped token, then send it only in the
-`Authorization` header:
+The native SwiftUI frontend is separate from a per-user backend service that
+owns model downloads, synthesis, playback, and history. The app and CLI talk to
+that service over XPC. An optional, token-protected HTTP server exposes the same
+synthesis engine to other local apps through a versioned REST API bound to
+`127.0.0.1`.
 
-```sh
-curl \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"Hello from local automation"}' \
-  http://127.0.0.1:59125/v1/jobs
-```
-
-The API binds only to `127.0.0.1`. Its OpenAPI 3.1 document is available at
-`/v1/openapi.json`; state changes can be followed at `/v1/events` with
-Server-Sent Events.
+The synthesis layer is built primarily on
+[MLX Audio](https://github.com/Blaizzy/mlx-audio), with the native Swift
+integration provided by
+[mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift).
 
 ## Build from source
 
-Install:
-
-- Xcode with Swift 6.2 or later
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-
-Then run:
+Install Xcode with Swift 6.2 or later and
+[XcodeGen](https://github.com/yonaskolb/XcodeGen), then run:
 
 ```sh
 brew install xcodegen
 ./Scripts/build-app.sh
-open Build/DerivedData/Build/Products/Release/SayIt.app
 ```
 
-The build script generates `SayIt.xcodeproj`, resolves the declared Swift
-packages, builds and signs the app, background agent, and CLI, then creates an
-arm64 app in `Build/DerivedData/Build/Products/Release`.
+Tests run with `swift test --disable-sandbox`.
 
-To build the latest Release app and restart it:
+## More screenshots
 
-```sh
-./rebuild.sh
-```
+[Voice cloning](public/resources/cloning.png) ·
+[Menu-bar controls](public/resources/menu.png) ·
+[Service and local API](public/resources/service.png)
 
-To restart the existing Release build without compiling:
+## License
 
-```sh
-./restart.sh
-```
-
-## Tests
-
-```sh
-swift test --disable-sandbox
-```
-
-Core tests do not download model weights.
-
-## Privacy
-
-Source text, generated audio, models, history, settings, and diagnostics remain
-on the Mac. Network access is used only for model downloads and update checks;
-the optional automation API is loopback-only. Say It does not use analytics, a
-microphone, or passive clipboard monitoring.
-
-See [SECURITY.md](SECURITY.md) for security and privacy details.
+Say It is available under the [MIT License](LICENSE). Models are distributed
+under their own licenses; review the model card before downloading or using one.
