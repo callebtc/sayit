@@ -144,7 +144,7 @@ struct SpeechQueuePolicyTests {
     }
 
     @Test
-    func unfinishedJobsResumeInOrderAfterServiceRestart() async throws {
+    func unfinishedJobsDoNotStartAfterServiceRestart() async throws {
         let root = FileManager.default.temporaryDirectory.appending(
             path: UUID().uuidString,
             directoryHint: .isDirectory
@@ -167,7 +167,7 @@ struct SpeechQueuePolicyTests {
                                 repeating: "Persistent speech. ",
                                 count: 5_000
                             ),
-                            source: .frontend
+                            source: .service
                         )
                     )
                 )
@@ -196,16 +196,49 @@ struct SpeechQueuePolicyTests {
             playback: MockPlaybackController()
         )
         await restored.start()
-        try await waitForState(
-            .awaitingConfirmation,
-            jobID: active.id,
-            service: restored
-        )
         let restoredSnapshot = try snapshot(
             await restored.handle(ServiceRequest(command: .snapshot))
         )
-        #expect(restoredSnapshot.activeJob?.id == active.id)
-        #expect(restoredSnapshot.queuedJobs.map(\.id) == [queued.id])
+        #expect(restoredSnapshot.activeJob == nil)
+        #expect(restoredSnapshot.queuedJobs.isEmpty)
+        #expect(restoredSnapshot.playback.state == PlaybackState.idle.rawValue)
+
+        let restoredJobs = try jobList(
+            await restored.handle(ServiceRequest(command: .jobs))
+        )
+        #expect(
+            restoredJobs.first(where: { $0.id == active.id })?.state
+                == .canceled
+        )
+        #expect(
+            restoredJobs.first(where: { $0.id == queued.id })?.state
+                == .canceled
+        )
+
+        let freshServiceJob = try submittedJob(
+            await restored.handle(
+                ServiceRequest(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: String(
+                                repeating: "Fresh service speech. ",
+                                count: 5_000
+                            ),
+                            source: .service
+                        )
+                    )
+                )
+            )
+        )
+        try await waitForState(
+            .awaitingConfirmation,
+            jobID: freshServiceJob.id,
+            service: restored
+        )
+        let serviceSnapshot = try snapshot(
+            await restored.handle(ServiceRequest(command: .snapshot))
+        )
+        #expect(serviceSnapshot.activeJob?.id == freshServiceJob.id)
     }
 
     private func waitForState(

@@ -1289,24 +1289,21 @@ public final class SayItBackendService: SayItService {
             uniqueKeysWithValues: journal.jobs.map { ($0.id, $0) }
         )
         jobOrder = journal.jobs.map(\.id)
-        pendingJobs = journal.pendingJobs
-        queuedJobIDs = journal.queuedJobIDs.filter {
-            pendingJobs[$0] != nil && jobsByID[$0]?.state.isTerminal == false
+
+        // A process launch must stay silent. Jobs interrupted by termination are
+        // retained for status/history, but only a fresh user action may start
+        // new speech after the service comes back.
+        for (id, var job) in jobsByID where !job.state.isTerminal {
+            job.state = .canceled
+            job.finishedAt = .now
+            jobsByID[id] = job
+            if job.source != .preview {
+                try? history.markIncomplete(id: id, state: .canceled)
+            }
         }
-        if let activeID = journal.activeJobID,
-           pendingJobs[activeID] != nil,
-           var activeJob = jobsByID[activeID],
-           !activeJob.state.isTerminal {
-            activeJob.state = .queued
-            activeJob.progress = 0
-            activeJob.startedAt = nil
-            activeJob.finishedAt = nil
-            activeJob.errorCode = nil
-            activeJob.errorMessage = nil
-            jobsByID[activeID] = activeJob
-            queuedJobIDs.removeAll { $0 == activeID }
-            queuedJobIDs.insert(activeID, at: 0)
-        }
+
+        pendingJobs.removeAll(keepingCapacity: false)
+        queuedJobIDs.removeAll(keepingCapacity: false)
         activeJobID = nil
         trimJobHistory()
         persistJobJournal()
