@@ -4,22 +4,25 @@ struct MenuBarLabel: View {
     @Environment(AppState.self) private var state
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var isActive: Bool {
+        state.playback.state == .playing
+            || state.playback.state == .preparing
+            || state.playback.state == .buffering
+    }
+
     var body: some View {
-        Image(
-            systemName: state.errorMessage == nil
-                ? "speaker.wave.2"
-                : "speaker.wave.2.fill"
-        )
-        .symbolEffect(
-            .variableColor.iterative,
-            options: .repeating,
-            isActive: !reduceMotion
-                && (
-                    state.playback.state == .playing
-                        || state.playback.state == .preparing
-                        || state.playback.state == .buffering
-                )
-        )
+        Group {
+            if isActive, !reduceMotion {
+                icon
+                    .phaseAnimator([1.0, 0.4]) { view, phase in
+                        view.opacity(phase)
+                    } animation: { _ in
+                        .easeInOut(duration: 0.8)
+                    }
+            } else {
+                icon
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if state.errorMessage != nil {
                 Circle()
@@ -33,5 +36,12 @@ struct MenuBarLabel: View {
         .background {
             AppWindowCoordinator()
         }
+    }
+
+    private var icon: some View {
+        Image("MenuBarIcon")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 19, height: 19)
     }
 }
