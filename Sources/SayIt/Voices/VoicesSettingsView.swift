@@ -45,13 +45,21 @@ struct VoicesSettingsView: View {
 
             Section {
                 if profiles.isEmpty {
-                    ContentUnavailableView(
-                        "No Saved Voices",
-                        systemImage: "person.wave.2",
-                        description: Text(
-                            "Discover a voice you like, then save it here."
-                        )
-                    )
+                    VStack(spacing: DesignTokens.compactSpacing) {
+                        Image(systemName: "person.wave.2")
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        Text("No Saved Voices")
+                            .font(.callout.weight(.medium))
+                        Text("Discover a voice you like, then save it here.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DesignTokens.generousSpacing)
                 } else {
                     ForEach(profiles) { profile in
                         VoiceProfileRow(

@@ -295,7 +295,7 @@ struct VoiceCloneWizard: View {
                 }
                 .sayItCard()
 
-                VStack(spacing: DesignTokens.generousSpacing) {
+                VStack(spacing: DesignTokens.standardSpacing) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(
                             recorder.duration.formatted(
@@ -318,35 +318,37 @@ struct VoiceCloneWizard: View {
 
                     VoiceLevelMeter(level: recorder.level, peak: recorder.peak)
 
-                    HStack(spacing: DesignTokens.generousSpacing) {
-                        Spacer()
+                    ZStack {
                         recordButton
-                        if let referenceURL, analysis != nil, !recorder.isRecording {
-                            Button {
-                                play(url: referenceURL)
-                            } label: {
-                                Image(
-                                    systemName: state.voicePreview.isPlaying
-                                        ? "stop.fill"
-                                        : "play.fill"
+                        HStack {
+                            Spacer()
+                            if showsRecordingPlayback, let referenceURL {
+                                Button {
+                                    play(url: referenceURL)
+                                } label: {
+                                    Image(
+                                        systemName: state.voicePreview.isPlaying
+                                            ? "stop.fill"
+                                            : "play.fill"
+                                    )
+                                    .contentTransition(.symbolEffect(.replace.offUp))
+                                }
+                                .buttonStyle(CircularIconButtonStyle(size: 32))
+                                .accessibilityLabel(
+                                    state.voicePreview.isPlaying
+                                        ? "Stop recording playback"
+                                        : "Play recording"
                                 )
-                                .contentTransition(.symbolEffect(.replace.offUp))
+                                .transition(
+                                    .opacity.combined(with: .scale(scale: 0.6))
+                                )
                             }
-                            .buttonStyle(CircularIconButtonStyle(size: 32))
-                            .accessibilityLabel(
-                                state.voicePreview.isPlaying
-                                    ? "Stop recording playback"
-                                    : "Play recording"
-                            )
-                            .transition(
-                                .opacity.combined(with: .scale(scale: 0.6))
-                            )
                         }
-                        Spacer()
                     }
+                    .frame(height: 54)
                     .animation(
                         DesignTokens.springAnimation,
-                        value: analysis != nil && !recorder.isRecording
+                        value: showsRecordingPlayback
                     )
                 }
                 .sayItCard()
@@ -721,6 +723,10 @@ struct VoiceCloneWizard: View {
     private var targetDurationText: String {
         guard let requirements else { return "" }
         return "Aim for \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) seconds"
+    }
+
+    private var showsRecordingPlayback: Bool {
+        referenceURL != nil && analysis != nil && !recorder.isRecording
     }
 
     private var currentStudioID: UUID? {
