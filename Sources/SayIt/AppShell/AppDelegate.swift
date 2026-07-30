@@ -27,10 +27,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        center.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                guard AppState.shared.selectionService
+                    .accessibilityIsTrusted != nil else {
+                    return
+                }
+                await AppState.shared.refreshSelectionAccessibilityAccess()
+            }
+        }
 
         do {
             try GlobalHotKeyManager.shared.register(
-                AppState.shared.settings.globalShortcut
+                AppState.shared.settings.globalShortcut,
+                for: .readClipboard
+            )
+        } catch {
+            AppState.shared.presentError(
+                "The Control–Option–V shortcut is already in use."
+            )
+        }
+        do {
+            try GlobalHotKeyManager.shared.register(
+                AppState.shared.settings.selectionShortcut,
+                for: .speakSelection
             )
         } catch {
             AppState.shared.presentError(
@@ -54,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        GlobalHotKeyManager.shared.unregister()
+        GlobalHotKeyManager.shared.unregisterAll()
         _ = notification
     }
 

@@ -18,8 +18,9 @@ stay on your Mac.
 
 ## Highlights
 
-- **Speak from anywhere.** Select text in any app and choose
-  **Services → Say It**, or copy text and press the configurable global hotkey.
+- **Speak from anywhere.** Select text in another app and press the configurable
+  selection hotkey, choose **Services → Say It**, or use the separate clipboard
+  hotkey.
 - **A native menu-bar player.** Read the clipboard, pause, seek, change playback
   speed, follow the spoken text, and revisit history without leaving your
   current app.
@@ -52,11 +53,12 @@ Say It requires macOS 15 or later on an Apple silicon Mac.
 
 1. Install and launch Say It.
 2. Choose and download a model during onboarding.
-3. Select text in another app and choose **Services → Say It**, or copy text and
-   press **Control–Option–S**.
+3. Optionally allow Accessibility access, select text in another app, and press
+   **Control–Option–S**. You can also copy text and press
+   **Control–Option–V**, or choose **Services → Say It**.
 
-The shortcut can be changed in Settings. Say It reads clipboard text only when
-you explicitly ask it to.
+Both shortcuts can be changed in Settings. Say It queries the current selection
+or reads clipboard text only when you explicitly invoke the matching action.
 
 ### Terminal
 
@@ -77,9 +79,10 @@ Run `sayit --help` to see all commands and options.
 
 The native SwiftUI frontend is separate from a per-user backend service that
 owns model downloads, synthesis, playback, and history. The app and CLI talk to
-that service over XPC. An optional, token-protected HTTP server exposes the same
-synthesis engine to other local apps through a versioned REST API bound to
-`127.0.0.1`.
+that service over XPC. A narrowly scoped accessibility helper retrieves the
+frontmost app's selection only when requested. An optional, token-protected HTTP
+server exposes the same synthesis engine to other local apps through a
+versioned REST API bound to `127.0.0.1`.
 
 The synthesis layer is built primarily on
 [MLX Audio](https://github.com/Blaizzy/mlx-audio), with the native Swift
@@ -101,6 +104,11 @@ using all available logical CPUs by default. Set `SAYIT_BUILD_JOBS` to cap the
 number of concurrent build operations. Signed release builds keep whole-module
 optimization; set `SAYIT_SWIFT_COMPILATION_MODE=wholemodule` to reproduce that
 behavior in an ad-hoc local build.
+
+For a stable Accessibility grant across Debug rebuilds, set
+`SAYIT_SELECTION_SIGN_IDENTITY` to the same Apple Development signing identity
+used for the app. The build does not select a certificate from your keychain
+automatically.
 
 Tests run with `swift test --disable-sandbox`.
 

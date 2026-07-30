@@ -9,19 +9,28 @@ struct AnywhereOnboardingView: View {
         OnboardingPage(
             symbol: "cursorarrow.click.2",
             title: "Use Say It anywhere",
-            subtitle: "Select text and choose Services → Say It, or copy text and use your global shortcut."
+            subtitle: "Select text and use its shortcut, read the clipboard, or choose Services → Say It."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
                 VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
-                    LabeledContent("Selected text") {
-                        Text("Services → Say It")
-                            .foregroundStyle(.secondary)
+                    LabeledContent("Speak selected text") {
+                        ShortcutRecorderView(
+                            shortcut: state.settings.selectionShortcut,
+                            accessibilityLabel: "Speak selected text shortcut",
+                            onRecord: state.updateSelectionShortcut
+                        )
                     }
-                    LabeledContent("Clipboard") {
+                    SelectionAccessSettingsView()
+                    LabeledContent("Read clipboard") {
                         ShortcutRecorderView(
                             shortcut: state.settings.globalShortcut,
+                            accessibilityLabel: "Read clipboard shortcut",
                             onRecord: state.updateGlobalShortcut
                         )
+                    }
+                    LabeledContent("Services fallback") {
+                        Text("Services → Say It")
+                            .foregroundStyle(.secondary)
                     }
                     Divider()
                     Toggle("Launch Say It at login", isOn: $launchAtLogin)
@@ -45,7 +54,7 @@ struct AnywhereOnboardingView: View {
                 )
 
                 Text(
-                    "Some applications place Say It in a Services submenu. Clipboard text is read only when you invoke it."
+                    "Accessibility is used only when you invoke the selection shortcut. Clipboard text is read only when you invoke its shortcut."
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)

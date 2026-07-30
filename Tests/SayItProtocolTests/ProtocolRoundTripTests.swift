@@ -4,6 +4,34 @@ import Testing
 
 struct ProtocolRoundTripTests {
     @Test
+    func selectionServiceMessagesRoundTripThroughJSON() throws {
+        let responses: [SelectionServiceResponse] = [
+            .authorizationStatus(isTrusted: true),
+            .selectedText("Selected text"),
+            .authorizationRequired,
+            .noSelection,
+            .selectionTooLong(maximumCharacters: 1_000_000),
+            .unavailable
+        ]
+
+        for response in responses {
+            let decoded = try SayItWireCodec.decode(
+                SelectionServiceResponse.self,
+                from: SayItWireCodec.encode(response)
+            )
+            #expect(decoded == response)
+        }
+
+        let request = SelectionServiceRequest.selectedText
+        let decodedRequest = try SayItWireCodec.decode(
+            SelectionServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        #expect(decodedRequest == request)
+        #expect(SayItProtocolVersion.current == 5)
+    }
+
+    @Test
     func serviceRequestRoundTripsThroughJSON() throws {
         let request = ServiceRequest(
             command: .submit(

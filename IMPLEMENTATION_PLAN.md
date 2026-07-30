@@ -22,17 +22,21 @@ or clipboard monitoring.
 
 ### Core interaction contract
 
-1. Selected text is received from a native `NSServices` service named “Say It.”
-2. Copied text is read once through an explicit action or configurable native
-   global shortcut. The app never polls the clipboard.
+1. Selected text is read on demand through a configurable native global
+   shortcut and optional Accessibility access, or received from a native
+   `NSServices` service named “Say It.”
+2. Copied text is read once through an explicit action or its own configurable
+   native global shortcut. The app never polls the clipboard or selection.
 3. Completed speech can be replayed, exported, searched, and deleted.
 4. Playback exposes play/pause, scrub, 15-second rewind, 30-second forward,
    rate, stop, export, and system Now Playing controls.
 5. A new request cancels current inference, keeps its cleaned text as an
    incomplete history item, removes partial audio, and starts the new request.
 
-The default shortcut is Control–Option–S and uses the Carbon hot-key API, which
-does not require Accessibility or Input Monitoring permission.
+The default clipboard shortcut is Control–Option–V and the default selection
+shortcut is Control–Option–S. Both use the Carbon hot-key API, which does not
+require Input Monitoring permission; only reading another app's selection
+requires optional Accessibility access.
 
 ### Day-one boundaries
 
@@ -55,7 +59,8 @@ does not require Accessibility or Input Monitoring permission.
 - Installed models synthesize without network access.
 - Model loading, inference, conversion, persistence, and downloads never block
   the main actor.
-- No Accessibility, microphone, Contacts, Calendar, or Automation permission.
+- Accessibility is optional and used only for explicit selection reads; no
+  Contacts, Calendar, or Automation permission.
 
 ## 2. Experience and visual design
 
@@ -80,7 +85,7 @@ playing, and error states.
 │      ↶ 15      ◀︎/❚❚      30 ↷       │
 │          1.0×        Stop            │
 ├──────────────────────────────────────┤
-│ Read Clipboard                 ⌃⌥S  │
+│ Read Clipboard                 ⌃⌥V  │
 ├──────────────────────────────────────┤
 │ Recent                               │
 │ Article title                 12 min │
@@ -140,8 +145,9 @@ through Now Playing and hardware controls.
 
 ## 3. Architecture and data flow
 
-Create one app plus core-library and unit-test targets. The main app provides
-the native Service; there is no helper or extension. Organize source by feature:
+Create one app, a sandboxed speech agent, a narrowly scoped unsandboxed
+selection helper, plus core-library and unit-test targets. The main app provides
+the native Service. Organize source by feature:
 
 - `AppShell`
 - `TextIngestion`
@@ -321,9 +327,12 @@ pasteboard payload and enqueues it immediately without waiting for inference.
 Launch at Login uses `SMAppService.mainApp`. The app stays resident when the
 popover closes and quits only explicitly or at system termination.
 
-Enable App Sandbox, outgoing network, user-selected read/write, and Hardened
-Runtime. Do not enable Accessibility, microphone/audio input, Apple Events,
-broad filesystem, or temporary exceptions.
+Keep the main app and speech agent sandboxed and enable Hardened Runtime. The
+separately signed selection helper remains unsandboxed because macOS blocks
+assistive Accessibility clients in App Sandbox. It accepts only authenticated
+on-demand selection requests from the Say It app and never observes selection
+changes. Do not enable Apple Events, broad filesystem access, or temporary
+exceptions.
 
 Daily native update checks query GitHub Releases and open a signed download
 page; v1 does not self-replace. Release validation covers tests, catalog,
@@ -342,8 +351,9 @@ diagnostics.
    String Catalog.
 3. **Models/onboarding:** catalog validation, suitability, download lifecycle,
    custom models, Keychain, model UI, onboarding, offline-load verification.
-4. **Text ingestion:** Services, shortcut, clipboard precedence, cleanup,
-   language/title/limits, fixtures, compatibility matrix.
+4. **Text ingestion:** Services, separate selection and clipboard shortcuts,
+   on-demand Accessibility helper, cleanup, language/title/limits, fixtures,
+   compatibility matrix.
 5. **Synthesis/playback:** chunking, lifecycle/events, strategies, cancellation,
    pressure handling, engine/rate/seek/ribbon/writer/conversion/Now Playing,
    long-form/device/sleep tests.

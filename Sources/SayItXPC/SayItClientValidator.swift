@@ -2,18 +2,27 @@ import Foundation
 import Security
 import SayItProtocol
 
-struct SayItClientValidator {
-    func accepts(_ connection: NSXPCConnection) -> Bool {
+public struct SayItClientValidator {
+    private let trustedBundleIdentifiers: Set<String>
+
+    public init(
+        trustedBundleIdentifiers: Set<String> = Set(
+            SayItServiceIdentifiers.trustedClientBundleIdentifiers
+        )
+    ) {
+        self.trustedBundleIdentifiers = trustedBundleIdentifiers
+    }
+
+    public func accepts(_ connection: NSXPCConnection) -> Bool {
 #if DEBUG || SAYIT_LOCAL_BUILD
-        return connection.effectiveUserIdentifier == geteuid()
+        connection.effectiveUserIdentifier == geteuid()
 #else
         guard connection.effectiveUserIdentifier == geteuid(),
               let client = signingInformation(
                 processIdentifier: connection.processIdentifier
               ),
-              isAuthorizedClient(client),
-              SayItServiceIdentifiers.trustedClientBundleIdentifiers
-                .contains(client.identifier),
+              client.hasClientEntitlement,
+              trustedBundleIdentifiers.contains(client.identifier),
               let own = signingInformation(processIdentifier: getpid()) else {
             return false
         }
@@ -26,10 +35,6 @@ struct SayItClientValidator {
     }
 
 #if !DEBUG && !SAYIT_LOCAL_BUILD
-    private func isAuthorizedClient(_ client: SigningInformation) -> Bool {
-        client.hasClientEntitlement
-    }
-
     private func signingInformation(
         processIdentifier: pid_t
     ) -> SigningInformation? {

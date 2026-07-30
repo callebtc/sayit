@@ -6,6 +6,7 @@ public enum SpeechJobSource: String, Codable, Sendable {
     case http
     case service
     case clipboard
+    case selection
     case history
     case preview
 }

@@ -4,6 +4,12 @@ import Foundation
 
 struct GlobalShortcut: Equatable, Sendable {
     static let defaultShortcut = GlobalShortcut(
+        keyCode: UInt32(kVK_ANSI_V),
+        carbonModifiers: UInt32(controlKey | optionKey),
+        keyLabel: "V"
+    )
+
+    static let defaultSelectionShortcut = GlobalShortcut(
         keyCode: UInt32(kVK_ANSI_S),
         carbonModifiers: UInt32(controlKey | optionKey),
         keyLabel: "S"

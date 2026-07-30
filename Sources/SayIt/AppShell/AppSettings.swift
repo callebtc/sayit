@@ -27,6 +27,9 @@ final class AppSettings {
         static let shortcutKeyCode = "shortcutKeyCode"
         static let shortcutModifiers = "shortcutModifiers"
         static let shortcutKeyLabel = "shortcutKeyLabel"
+        static let selectionShortcutKeyCode = "selectionShortcutKeyCode"
+        static let selectionShortcutModifiers = "selectionShortcutModifiers"
+        static let selectionShortcutKeyLabel = "selectionShortcutKeyLabel"
         static let chunkCharacterTarget = "chunkCharacterTarget"
         static let chunkDelaySeconds = "chunkDelaySeconds"
         static let paragraphPauseSeconds = "paragraphPauseSeconds"
@@ -153,6 +156,30 @@ final class AppSettings {
     }
     var shortcutKeyLabel: String {
         didSet { defaults.set(shortcutKeyLabel, forKey: Key.shortcutKeyLabel) }
+    }
+    var selectionShortcutKeyCode: UInt32 {
+        didSet {
+            defaults.set(
+                Int(selectionShortcutKeyCode),
+                forKey: Key.selectionShortcutKeyCode
+            )
+        }
+    }
+    var selectionShortcutModifiers: UInt32 {
+        didSet {
+            defaults.set(
+                Int(selectionShortcutModifiers),
+                forKey: Key.selectionShortcutModifiers
+            )
+        }
+    }
+    var selectionShortcutKeyLabel: String {
+        didSet {
+            defaults.set(
+                selectionShortcutKeyLabel,
+                forKey: Key.selectionShortcutKeyLabel
+            )
+        }
     }
     var chunkCharacterTarget: Int {
         didSet {
@@ -296,6 +323,18 @@ final class AppSettings {
         )
         shortcutKeyLabel = defaults.string(forKey: Key.shortcutKeyLabel)
             ?? defaultShortcut.keyLabel
+        let defaultSelectionShortcut = GlobalShortcut.defaultSelectionShortcut
+        selectionShortcutKeyCode = UInt32(
+            defaults.object(forKey: Key.selectionShortcutKeyCode) as? Int
+                ?? Int(defaultSelectionShortcut.keyCode)
+        )
+        selectionShortcutModifiers = UInt32(
+            defaults.object(forKey: Key.selectionShortcutModifiers) as? Int
+                ?? Int(defaultSelectionShortcut.carbonModifiers)
+        )
+        selectionShortcutKeyLabel = defaults.string(
+            forKey: Key.selectionShortcutKeyLabel
+        ) ?? defaultSelectionShortcut.keyLabel
         let storedChunkTarget = defaults.object(
             forKey: Key.chunkCharacterTarget
         ) as? Int
@@ -337,6 +376,14 @@ final class AppSettings {
             keyCode: shortcutKeyCode,
             carbonModifiers: shortcutModifiers,
             keyLabel: shortcutKeyLabel
+        )
+    }
+
+    var selectionShortcut: GlobalShortcut {
+        GlobalShortcut(
+            keyCode: selectionShortcutKeyCode,
+            carbonModifiers: selectionShortcutModifiers,
+            keyLabel: selectionShortcutKeyLabel
         )
     }
 

@@ -98,6 +98,7 @@ targets:
       - path: Sources/SayItXPC
     dependencies:
       - target: SayItProtocol
+      - sdk: Security.framework
     settings:
       base:
         DEFINES_MODULE: true
@@ -156,6 +157,24 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../Frameworks"
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.agent
         PRODUCT_NAME: SayItAgent
+
+  SayItSelectionAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/SayItSelectionAgent
+    dependencies:
+      - target: SayItProtocol
+      - target: SayItXPC
+      - sdk: ApplicationServices.framework
+      - sdk: AppKit.framework
+    settings:
+      base:
+        ENABLE_APP_SANDBOX: false
+        GENERATE_INFOPLIST_FILE: true
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../Frameworks"
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.selection
+        PRODUCT_NAME: SayItSelectionAgent
 
   SayItCLI:
     type: tool
@@ -245,6 +264,9 @@ targets:
       - target: SayItAgent
         link: false
         embed: false
+      - target: SayItSelectionAgent
+        link: false
+        embed: false
       - target: SayItCLI
         link: false
         embed: false
@@ -273,11 +295,22 @@ targets:
           platform_suffix="${EFFECTIVE_PLATFORM_NAME:-}"
           cli_products="${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts"
           mkdir -p "${service_dir}" "${agent_dir}" "${cli_dir}"
-          rm -f "${agent_dir}/com.sayit.mac.agent.plist"
+          rm -f \
+            "${agent_dir}/com.sayit.mac.agent.plist" \
+            "${agent_dir}/com.sayit.mac.selection.plist"
           ditto "${BUILT_PRODUCTS_DIR}/SayItAgent" "${service_dir}/SayItAgent"
+          ditto "${BUILT_PRODUCTS_DIR}/SayItSelectionAgent" "${service_dir}/SayItSelectionAgent"
+          if [[ -n "${SAYIT_SELECTION_SIGN_IDENTITY:-}" ]]; then
+            /usr/bin/codesign \
+              --force \
+              --sign "${SAYIT_SELECTION_SIGN_IDENTITY}" \
+              --identifier sh.sayit.mac.selection \
+              "${service_dir}/SayItSelectionAgent"
+          fi
           ditto "${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle" "${service_dir}/mlx-swift_Cmlx.bundle"
           ditto "${cli_products}/sayit" "${cli_dir}/sayit"
           ditto "${SRCROOT}/Config/sh.sayit.mac.agent.plist" "${agent_dir}/sh.sayit.mac.agent.plist"
+          ditto "${SRCROOT}/Config/sh.sayit.mac.selection.plist" "${agent_dir}/sh.sayit.mac.selection.plist"
 
   SayItCoreTests:
     type: bundle.unit-test

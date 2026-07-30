@@ -14,6 +14,8 @@ extension SpeechJobSource {
             .service
         case .clipboard:
             .clipboard
+        case .selection:
+            .selection
         case .history:
             .history
         case .preview:

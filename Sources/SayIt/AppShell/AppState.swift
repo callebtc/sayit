@@ -16,6 +16,7 @@ final class AppState {
     let history = HistoryStore()
     let launchAtLogin = LaunchAtLoginController()
     let backgroundService = BackgroundServiceController()
+    let selectionService = SelectionServiceController()
     let voicePreview = VoicePreviewPlayer()
 
     private let client = SayItXPCClient()
@@ -121,6 +122,34 @@ final class AppState {
                 source: .clipboard
             )
         )
+    }
+
+    func speakSelectedText() {
+        Task {
+            do {
+                let text = try await selectionService.selectedText(
+                    promptIfNeeded: true
+                )
+                receive(
+                    TextSourcePayload(
+                        source: .selection,
+                        plainText: text
+                    )
+                )
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    func refreshSelectionAccessibilityAccess() async {
+        await selectionService.refreshAuthorization()
+    }
+
+    func requestSelectionAccessibilityAccess() {
+        Task {
+            await selectionService.requestAuthorization()
+        }
     }
 
     func refreshClipboardState() {
@@ -461,12 +490,37 @@ final class AppState {
     func updateGlobalShortcut(_ shortcut: GlobalShortcut) {
         let previous = settings.globalShortcut
         do {
-            try GlobalHotKeyManager.shared.register(shortcut)
+            try GlobalHotKeyManager.shared.register(
+                shortcut,
+                for: .readClipboard
+            )
             settings.shortcutKeyCode = shortcut.keyCode
             settings.shortcutModifiers = shortcut.carbonModifiers
             settings.shortcutKeyLabel = shortcut.keyLabel
         } catch {
-            try? GlobalHotKeyManager.shared.register(previous)
+            try? GlobalHotKeyManager.shared.register(
+                previous,
+                for: .readClipboard
+            )
+            presentError("That shortcut is already in use.")
+        }
+    }
+
+    func updateSelectionShortcut(_ shortcut: GlobalShortcut) {
+        let previous = settings.selectionShortcut
+        do {
+            try GlobalHotKeyManager.shared.register(
+                shortcut,
+                for: .speakSelection
+            )
+            settings.selectionShortcutKeyCode = shortcut.keyCode
+            settings.selectionShortcutModifiers = shortcut.carbonModifiers
+            settings.selectionShortcutKeyLabel = shortcut.keyLabel
+        } catch {
+            try? GlobalHotKeyManager.shared.register(
+                previous,
+                for: .speakSelection
+            )
             presentError("That shortcut is already in use.")
         }
     }
@@ -626,6 +680,7 @@ final class AppState {
     }
 
     func terminateBackgroundServiceForQuit() async {
+        await selectionService.terminateForQuit()
         await backgroundService.terminateForQuit()
     }
 

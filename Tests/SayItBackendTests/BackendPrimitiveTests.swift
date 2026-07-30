@@ -122,6 +122,7 @@ struct BackendPrimitiveTests {
             (.http, .http),
             (.service, .service),
             (.clipboard, .clipboard),
+            (.selection, .selection),
             (.history, .history),
             (.preview, .preview)
         ]

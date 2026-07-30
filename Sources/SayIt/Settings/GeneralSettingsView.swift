@@ -23,19 +23,30 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                LabeledContent("Global shortcut") {
+                LabeledContent("Read clipboard") {
                     ShortcutRecorderView(
                         shortcut: settings.globalShortcut,
+                        accessibilityLabel: "Read clipboard shortcut",
                         onRecord: state.updateGlobalShortcut
                     )
                 }
-                LabeledContent("Selected text") {
+                LabeledContent("Speak selected text") {
+                    ShortcutRecorderView(
+                        shortcut: settings.selectionShortcut,
+                        accessibilityLabel: "Speak selected text shortcut",
+                        onRecord: state.updateSelectionShortcut
+                    )
+                }
+                SelectionAccessSettingsView()
+                LabeledContent("Services fallback") {
                     Text("Services → Say It")
                         .foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("Shortcuts")
             } footer: {
                 Text(
-                    "macOS controls where Services appear. Say It does not need Accessibility permission."
+                    "The selection shortcut reads the frontmost app only when pressed and requires Accessibility access. Clipboard and Services remain available without it."
                 )
             }
 
@@ -157,7 +168,7 @@ struct GeneralSettingsView: View {
                 Text("Text cleanup")
             } footer: {
                 Text(
-                    "Rules applied to clipboard and shared text before it reaches the model."
+                    "Rules applied to selected, clipboard, and shared text before it reaches the model."
                 )
             }
         }

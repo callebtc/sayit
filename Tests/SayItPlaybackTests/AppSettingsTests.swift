@@ -6,6 +6,43 @@ import Testing
 
 @Suite("App settings")
 struct AppSettingsTests {
+    @Test("Clipboard and selection shortcuts have distinct defaults")
+    @MainActor
+    func shortcutDefaultsAreDistinct() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.globalShortcut != settings.selectionShortcut)
+        #expect(settings.globalShortcut.displayName == "⌃⌥V")
+        #expect(settings.selectionShortcut.displayName == "⌃⌥S")
+    }
+
+    @Test("Selection shortcut persists independently")
+    @MainActor
+    func selectionShortcutPersists() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: defaults)
+
+        settings.selectionShortcutKeyCode = 17
+        settings.selectionShortcutModifiers = 3_840
+        settings.selectionShortcutKeyLabel = "T"
+
+        let restored = AppSettings(defaults: defaults)
+        #expect(restored.selectionShortcut.keyCode == 17)
+        #expect(restored.selectionShortcut.carbonModifiers == 3_840)
+        #expect(restored.selectionShortcut.keyLabel == "T")
+        #expect(restored.globalShortcut == GlobalShortcut.defaultShortcut)
+    }
+
     @Test("Speaking pace persists as a typed setting")
     @MainActor
     func speakingPacePersists() throws {

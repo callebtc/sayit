@@ -1,8 +1,10 @@
 # Security and Privacy
 
 Say It processes selected and copied text locally. It does not use analytics,
-telemetry, cloud inference, passive clipboard monitoring, microphone access,
-Accessibility access, Apple Events, or broad filesystem access.
+telemetry, cloud inference, passive clipboard or microphone monitoring, Apple
+Events, or broad filesystem access. Its optional selection shortcut uses a
+dedicated Accessibility helper only when the user explicitly configures access
+or invokes that shortcut.
 
 The app stores only cleaned plain text in history. Diagnostic events use stable
 codes and allowlisted numeric or categorical metadata; source text, access
@@ -13,10 +15,14 @@ Hugging Face tokens for gated models are stored in the macOS Keychain. Model
 snapshots are pinned to an immutable revision and installed inside the
 sandboxed App Group container.
 
-The menu-bar app and bundled CLI communicate with the per-user agent over XPC.
-The agent accepts only same-user clients signed with the app or CLI bundle
-identifier, the private Say It client entitlement, and the same signing team.
-Service lifecycle and API-token administration are never exposed over HTTP.
+The menu-bar app and bundled CLI communicate with the per-user speech agent over
+XPC. The speech agent accepts only same-user clients signed with the app or CLI
+bundle identifier, the private Say It client entitlement, and the same signing
+team. The unsandboxed selection helper accepts only the same-user, same-team
+Say It app with that client entitlement. It exposes only authorization status,
+an authorization prompt, and an on-demand selected-text read; it does not
+monitor selection changes. Service lifecycle and API-token administration are
+never exposed over HTTP.
 
 The optional HTTP API is disabled by default and binds only to `127.0.0.1`.
 It validates the loopback Host header, has no permissive CORS policy, limits
