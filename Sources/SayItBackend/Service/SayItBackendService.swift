@@ -1514,11 +1514,13 @@ public final class SayItBackendService: SayItService {
 
     private func recordJobFailure(id: UUID, error: Error) async {
         playback.stop()
+        let errorCode = (error as? ServiceFailure)?.code
+            ?? "synthesis.failed"
         if let request = activeRequest, request.source != .preview {
             try? history.markIncomplete(
                 id: request.id,
                 state: .failed,
-                code: "synthesis.failed"
+                code: errorCode
             )
             historyRevision &+= 1
         }
@@ -1527,7 +1529,7 @@ public final class SayItBackendService: SayItService {
             DiagnosticEvent(
                 severity: .error,
                 category: .synthesis,
-                code: "synthesis.failed",
+                code: errorCode,
                 modelID: activeRequest?.model.id
             )
         )
@@ -1535,7 +1537,7 @@ public final class SayItBackendService: SayItService {
         finishJob(
             id,
             state: .failed,
-            errorCode: "synthesis.failed",
+            errorCode: errorCode,
             errorMessage: error.localizedDescription
         )
     }

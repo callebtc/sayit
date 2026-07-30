@@ -27,8 +27,8 @@ final class BackendSettingsStore {
                 message: "The HTTP port must be between 1024 and 65535."
             )
         }
-        value = settings
         let data = try JSONEncoder.sayIt.encode(settings)
         try data.write(to: fileURL, options: .atomic)
+        value = settings
     }
 }
