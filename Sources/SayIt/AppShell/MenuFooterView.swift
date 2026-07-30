@@ -1,4 +1,5 @@
 import AppKit
+import SayItCore
 import SwiftUI
 
 struct MenuFooterView: View {
@@ -8,18 +9,7 @@ struct MenuFooterView: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.compactSpacing) {
-            if let model = state.models.first(where: {
-                $0.id == state.settings.activeModelID
-            }) {
-                Text(
-                    state.settings.activeVoice.isEmpty
-                        ? model.displayName
-                        : "\(model.displayName) · \(state.settings.activeVoice)"
-                )
-                .lineLimit(1)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
+            modelMenu
             Spacer()
             Button("Settings…", action: openSettingsWindow)
                 .buttonStyle(.sayItInline)
@@ -27,6 +17,61 @@ struct MenuFooterView: View {
                 .buttonStyle(.sayItInline)
         }
         .font(.callout)
+    }
+
+    private var modelMenu: some View {
+        Menu {
+            ForEach(installedModels) { model in
+                Button {
+                    state.switchPlaybackModel(model)
+                } label: {
+                    if model.id == displayedModelID {
+                        Label(model.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(model.displayName)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "shippingbox")
+                Text(modelLabel)
+                    .lineLimit(1)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .disabled(installedModels.isEmpty)
+        .help(
+            displayedModelID == state.settings.activeModelID
+                ? "Switch the speech model"
+                : "Model used for this audio. Pick another model to re-synthesize."
+        )
+    }
+
+    private var displayedModelID: ModelID {
+        if state.playback.state != .idle,
+           let playbackModelID = state.playback.modelID {
+            return playbackModelID
+        }
+        return state.settings.activeModelID
+    }
+
+    private var modelLabel: String {
+        let name = state.models.first(where: {
+            $0.id == displayedModelID
+        })?.displayName ?? displayedModelID.rawValue
+        guard displayedModelID == state.settings.activeModelID,
+              !state.settings.activeVoice.isEmpty else {
+            return name
+        }
+        return "\(name) · \(state.settings.activeVoice)"
+    }
+
+    private var installedModels: [ModelDescriptor] {
+        state.models.filter { state.installedModelIDs.contains($0.id) }
     }
 
     private func openSettingsWindow() {

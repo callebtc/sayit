@@ -70,8 +70,8 @@ struct GeneralSettingsView: View {
                 advancedSlider(
                     title: "Text block size",
                     value: chunkTargetBinding,
-                    range: 200...2_000,
-                    step: 50,
+                    range: 1...2_000,
+                    step: 1,
                     label: "\(settings.chunkCharacterTarget) characters"
                 )
                 advancedSlider(
@@ -104,6 +104,12 @@ struct GeneralSettingsView: View {
                     Text("After 30 minutes").tag(1_800.0)
                     Text("After 1 hour").tag(3_600.0)
                 }
+
+                Button(
+                    "Reset to Defaults",
+                    systemImage: "arrow.counterclockwise",
+                    action: settings.resetAdvancedSettings
+                )
             } header: {
                 Text("Advanced")
             } footer: {

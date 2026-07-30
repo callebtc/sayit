@@ -12,6 +12,7 @@ final class PlaybackController {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var modelID: ModelID?
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     var rate: Double = 1 {
@@ -34,6 +35,7 @@ final class PlaybackController {
         estimatedDuration = snapshot.estimatedDuration
         amplitudes = snapshot.amplitudes
         currentTitle = snapshot.currentTitle
+        modelID = snapshot.modelID.map { ModelID($0) }
         spokenText = snapshot.spokenText
         spokenChunks = snapshot.spokenChunks
         if rate != snapshot.rate {

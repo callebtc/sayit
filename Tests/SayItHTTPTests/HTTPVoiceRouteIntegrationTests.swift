@@ -289,6 +289,7 @@ private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var currentModelID: String?
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     var shouldStartWhenBuffered = false
@@ -300,9 +301,11 @@ private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
     func prepare(
         requestID _: UUID,
         title: String,
-        estimatedDuration: TimeInterval
+        estimatedDuration: TimeInterval,
+        modelID: String?
     ) {
         currentTitle = title
+        currentModelID = modelID
         self.estimatedDuration = estimatedDuration
         state = .preparing
     }
@@ -330,6 +333,7 @@ private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
         generatedDuration = 0
         estimatedDuration = 0
         currentTitle = ""
+        currentModelID = nil
     }
 
     func stopForModelSwitch() async {
@@ -346,8 +350,9 @@ private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
         throw CocoaError(.featureUnsupported)
     }
 
-    func playFile(at _: URL, title: String) throws {
+    func playFile(at _: URL, title: String, modelID: String?) throws {
         currentTitle = title
+        currentModelID = modelID
         state = .playing
     }
 }

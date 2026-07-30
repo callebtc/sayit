@@ -131,7 +131,7 @@ struct BackendServiceCommandTests {
         value.playbackRate = 0.4
         invalidCases.append((value, "settings.invalid_playback_rate"))
         value = original
-        value.chunkCharacterTarget = 99
+        value.chunkCharacterTarget = 0
         invalidCases.append((value, "settings.invalid_chunk_size"))
         value = original
         value.chunkDelaySeconds = 11
@@ -160,7 +160,7 @@ struct BackendServiceCommandTests {
         updated.showNowPlayingTitles = true
         updated.httpEnabled = true
         updated.httpPort = 49_999
-        updated.chunkCharacterTarget = 1_000
+        updated.chunkCharacterTarget = 1
         updated.chunkDelaySeconds = 0.2
         updated.paragraphPauseSeconds = 0.5
         updated.modelUnloadDelaySeconds = 0
@@ -531,6 +531,124 @@ struct BackendServiceCommandTests {
             isAccepted(
                 await fixture.service.handle(.init(command: .clearHistory))
             )
+        )
+    }
+
+    @Test("Playback snapshot reports the model that generated the audio")
+    func playbackSnapshotReportsHistoryModel() async throws {
+        let fixture = try ServiceFixture(seedVoiceAndHistory: true)
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let historyID = try #require(fixture.historyID)
+        let itemModelID = try #require(
+            try history(
+                await fixture.service.handle(.init(command: .history))
+            ).first?.modelID
+        )
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .replayHistory(historyID))
+                )
+            )
+        )
+        #expect(fixture.playback.currentModelID == itemModelID)
+        let playing = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(playing.playback.modelID == itemModelID)
+
+        #expect(
+            isAccepted(await fixture.service.handle(.init(command: .clear)))
+        )
+        let cleared = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(cleared.playback.modelID == nil)
+    }
+
+    @Test("Switching the playback model re-synthesizes the current audio")
+    func switchPlaybackModelResynthesizesCurrentAudio() async throws {
+        let fixture = try ServiceFixture(seedVoiceAndHistory: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        try fixture.seedInstallation(modelID: "kitten-mini-08")
+        await fixture.service.start()
+        let historyID = try #require(fixture.historyID)
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .replayHistory(historyID))
+                )
+            )
+        )
+        #expect(fixture.playback.currentModelID == "kokoro-bf16")
+
+        let job = try submittedJob(
+            await fixture.service.handle(
+                .init(command: .switchPlaybackModel("kitten-mini-08"))
+            )
+        )
+        #expect(job.source == .history)
+        let switched = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(switched.settings.activeModelID == "kitten-mini-08")
+
+        try await waitForTerminalJob(job.id, service: fixture.service)
+        let requestedModelIDs = await fixture.synthesizer.requestedModelIDs
+        #expect(requestedModelIDs == ["kitten-mini-08"])
+        let unloadCount = await fixture.synthesizer.unloadCount
+        #expect(unloadCount >= 1)
+    }
+
+    @Test("Switching the playback model without audio only selects the model")
+    func switchPlaybackModelWithoutPlayback() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        try fixture.seedInstallation(modelID: "kitten-mini-08")
+        await fixture.service.start()
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .switchPlaybackModel("kitten-mini-08"))
+                )
+            )
+        )
+        let switched = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(switched.settings.activeModelID == "kitten-mini-08")
+        #expect(switched.activeJob == nil)
+        #expect(switched.queuedJobs.isEmpty)
+        let requestedModelIDs = await fixture.synthesizer.requestedModelIDs
+        #expect(requestedModelIDs.isEmpty)
+    }
+
+    @Test("Switching the playback model validates the target model")
+    func switchPlaybackModelValidatesModel() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        await fixture.service.start()
+
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(command: .switchPlaybackModel("missing"))
+                )
+            ).code == "model.not_found"
+        )
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(command: .switchPlaybackModel("kitten-mini-08"))
+                )
+            ).code == "model.not_installed"
         )
     }
 
@@ -1049,10 +1167,14 @@ private final class ServiceFixture {
 }
 
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
+    private(set) var requestedModelIDs: [String] = []
+    private(set) var unloadCount = 0
+
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
-        AsyncThrowingStream { continuation in
+        requestedModelIDs.append(request.model.id.rawValue)
+        return AsyncThrowingStream { continuation in
             continuation.yield(.loadingModel(request.model.id))
             continuation.finish(throwing: SynthesisError.modelNotInstalled)
         }
@@ -1060,7 +1182,9 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
 
     func cancelCurrentRequest() async {}
 
-    func unloadModel() async {}
+    func unloadModel() async {
+        unloadCount += 1
+    }
 
     func updateConfiguration(
         chunkTarget _: Int,
@@ -1099,6 +1223,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var currentModelID: String?
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var playCount = 0
@@ -1114,9 +1239,11 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     func prepare(
         requestID _: UUID,
         title: String,
-        estimatedDuration: TimeInterval
+        estimatedDuration: TimeInterval,
+        modelID: String?
     ) {
         currentTitle = title
+        currentModelID = modelID
         self.estimatedDuration = estimatedDuration
         state = .preparing
     }
@@ -1152,6 +1279,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         generatedDuration = 0
         estimatedDuration = 0
         currentTitle = ""
+        currentModelID = nil
     }
 
     func stopForModelSwitch() async {
@@ -1179,9 +1307,10 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         )
     }
 
-    func playFile(at _: URL, title: String) throws {
+    func playFile(at _: URL, title: String, modelID: String?) throws {
         playedFileTitle = title
         currentTitle = title
+        currentModelID = modelID
         state = .playing
     }
 }

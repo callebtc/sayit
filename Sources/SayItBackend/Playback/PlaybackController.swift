@@ -50,6 +50,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var currentModelID: String?
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
@@ -103,11 +104,13 @@ final class PlaybackController: BackendPlaybackControlling {
     func prepare(
         requestID: UUID,
         title: String,
-        estimatedDuration: TimeInterval
+        estimatedDuration: TimeInterval,
+        modelID: String?
     ) {
         stop()
         self.requestID = requestID
         currentTitle = title
+        currentModelID = modelID
         self.estimatedDuration = estimatedDuration
         state = .preparing
         updateNowPlaying()
@@ -222,6 +225,7 @@ final class PlaybackController: BackendPlaybackControlling {
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil
         currentTitle = ""
+        currentModelID = nil
         spokenText = ""
         spokenChunks = []
         failureMessage = nil
@@ -281,7 +285,7 @@ final class PlaybackController: BackendPlaybackControlling {
         )
     }
 
-    func playFile(at url: URL, title: String) throws {
+    func playFile(at url: URL, title: String, modelID: String?) throws {
         let file = try AVAudioFile(
             forReading: url,
             commonFormat: .pcmFormatFloat32,
@@ -305,6 +309,7 @@ final class PlaybackController: BackendPlaybackControlling {
         stop()
         requestID = UUID()
         currentTitle = title
+        currentModelID = modelID
         sampleRate = file.processingFormat.sampleRate
         accumulatedSamples = samples
         generatedDuration = Double(samples.count) / sampleRate

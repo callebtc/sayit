@@ -39,6 +39,7 @@ public enum ServiceCommand: Codable, Sendable {
     case exportHistory(UUID, format: String)
     case replayHistory(UUID)
     case regenerateHistory(UUID)
+    case switchPlaybackModel(String)
     case toggleHistoryPinned(UUID)
     case deleteHistory(UUID)
     case clearHistory

@@ -11,6 +11,7 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     var estimatedDuration: TimeInterval { get }
     var amplitudes: [Float] { get }
     var currentTitle: String { get }
+    var currentModelID: String? { get }
     var spokenText: String { get }
     var spokenChunks: [PlaybackTextChunk] { get }
     var shouldStartWhenBuffered: Bool { get }
@@ -22,12 +23,13 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     func prepare(
         requestID: UUID,
         title: String,
-        estimatedDuration: TimeInterval
+        estimatedDuration: TimeInterval,
+        modelID: String?
     )
     func setSpokenText(_ text: String)
     func appendSpokenChunk(_ chunk: PlaybackTextChunk)
     func stopForModelSwitch() async
     func finishBuffering()
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult
-    func playFile(at url: URL, title: String) throws
+    func playFile(at url: URL, title: String, modelID: String?) throws
 }

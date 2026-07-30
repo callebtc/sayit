@@ -393,6 +393,14 @@ final class AppSettings {
         isApplyingBackendSnapshot = false
     }
 
+    func resetAdvancedSettings() {
+        let defaultSettings = BackendSettingsSnapshot()
+        chunkCharacterTarget = defaultSettings.chunkCharacterTarget
+        chunkDelaySeconds = defaultSettings.chunkDelaySeconds
+        paragraphPauseSeconds = defaultSettings.paragraphPauseSeconds
+        modelUnloadDelaySeconds = defaultSettings.modelUnloadDelaySeconds
+    }
+
     var activeVoiceSelection: VoiceSelection {
         get {
             voiceSelections[activeModelID.rawValue]

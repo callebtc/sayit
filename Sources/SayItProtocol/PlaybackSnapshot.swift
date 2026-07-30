@@ -7,6 +7,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
     public let estimatedDuration: TimeInterval
     public let rate: Double
     public let currentTitle: String
+    public let modelID: String?
     public let amplitudes: [Float]
     public let spokenText: String
     public let spokenChunks: [PlaybackTextChunk]
@@ -18,6 +19,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         estimatedDuration: TimeInterval = 0,
         rate: Double = 1,
         currentTitle: String = "",
+        modelID: String? = nil,
         amplitudes: [Float] = [],
         spokenText: String = "",
         spokenChunks: [PlaybackTextChunk] = []
@@ -28,6 +30,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         self.estimatedDuration = estimatedDuration
         self.rate = rate
         self.currentTitle = currentTitle
+        self.modelID = modelID
         self.amplitudes = amplitudes
         self.spokenText = spokenText
         self.spokenChunks = spokenChunks

@@ -74,4 +74,34 @@ struct AppSettingsTests {
         settings.speakingPace = .fast
         #expect(backendChangeCount == 1)
     }
+
+    @Test("Advanced settings can be reset to defaults")
+    @MainActor
+    func advancedSettingsResetToDefaults() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: defaults)
+        let expected = BackendSettingsSnapshot()
+
+        settings.chunkCharacterTarget = 1
+        settings.chunkDelaySeconds = 1
+        settings.paragraphPauseSeconds = 1
+        settings.modelUnloadDelaySeconds = 60
+        settings.resetAdvancedSettings()
+
+        #expect(
+            settings.chunkCharacterTarget == expected.chunkCharacterTarget
+        )
+        #expect(settings.chunkDelaySeconds == expected.chunkDelaySeconds)
+        #expect(
+            settings.paragraphPauseSeconds == expected.paragraphPauseSeconds
+        )
+        #expect(
+            settings.modelUnloadDelaySeconds
+                == expected.modelUnloadDelaySeconds
+        )
+    }
 }

@@ -408,6 +408,11 @@ public final class SayItBackendService: SayItService {
             return .accepted
         case .regenerateHistory(let id):
             return .job(try await regenerateHistory(id))
+        case .switchPlaybackModel(let id):
+            if let job = try await switchPlaybackModel(ModelID(id)) {
+                return .job(job)
+            }
+            return .accepted
         case .toggleHistoryPinned(let id):
             try history.togglePinned(id: id)
             historyRevision &+= 1
@@ -1364,10 +1369,17 @@ public final class SayItBackendService: SayItService {
             title: cleaned.title,
             estimatedDuration: Double(cleaned.characterCount)
                 / 14
-                / request.speakingPace.rawValue
+                / request.speakingPace.rawValue,
+            modelID: request.model.id.rawValue
         )
         playback.setSpokenText(cleaned.text)
         activeSpokenText = cleaned.text
+        if submission.source != .preview {
+            playbackContext = PlaybackContext(
+                text: cleaned.text,
+                language: request.language
+            )
+        }
         spokenTextCursor = cleaned.text.startIndex
         pendingSpokenChunkRange = nil
         spokenAudioCursor = 0
@@ -1645,6 +1657,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private var activeSpokenText: String?
+    private var playbackContext: PlaybackContext?
     private var spokenTextCursor: String.Index?
     private var pendingSpokenChunkRange: Range<String.Index>?
     private var spokenAudioCursor: TimeInterval = 0
@@ -1713,6 +1726,7 @@ public final class SayItBackendService: SayItService {
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
                 currentTitle: playback.currentTitle,
+                modelID: playback.currentModelID,
                 amplitudes: playback.amplitudes,
                 spokenText: playback.spokenText,
                 spokenChunks: playback.spokenChunks
@@ -2163,9 +2177,17 @@ public final class SayItBackendService: SayItService {
             )
         }
         await cancelActiveJob(startNext: false)
-        try playback.playFile(at: url, title: item.title)
+        try playback.playFile(
+            at: url,
+            title: item.title,
+            modelID: item.modelID.rawValue
+        )
         playback.setSpokenText(item.cleanedText)
         activeSpokenText = item.cleanedText
+        playbackContext = PlaybackContext(
+            text: item.cleanedText,
+            language: item.language
+        )
         spokenTextCursor = item.cleanedText.startIndex
         pendingSpokenChunkRange = nil
         spokenAudioCursor = 0
@@ -2188,6 +2210,36 @@ public final class SayItBackendService: SayItService {
                 modelID: item.modelID.rawValue,
                 voiceSelection: item.serviceSnapshot.voiceSelection,
                 language: item.language,
+                queuePolicy: .replaceAll,
+                permitsLongText: true
+            )
+        )
+    }
+
+    private func switchPlaybackModel(_ id: ModelID) async throws -> SpeechJob? {
+        guard models.contains(where: { $0.id == id }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested model was not found."
+            )
+        }
+        guard installedModelIDs.contains(id) else {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install the model before selecting it."
+            )
+        }
+        let context = playback.state == .idle ? nil : playbackContext
+        if id != ModelID(settingsStore.value.activeModelID) {
+            try await selectModel(id)
+        }
+        guard let context else { return nil }
+        return try await submit(
+            SpeechSubmission(
+                text: context.text,
+                source: .history,
+                modelID: id.rawValue,
+                language: context.language,
                 queuePolicy: .replaceAll,
                 permitsLongText: true
             )
@@ -2308,10 +2360,10 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
-        guard (100...5_000).contains(settings.chunkCharacterTarget) else {
+        guard (1...5_000).contains(settings.chunkCharacterTarget) else {
             throw ServiceFailure(
                 code: "settings.invalid_chunk_size",
-                message: "Text block size must be between 100 and 5,000 characters."
+                message: "Text block size must be between 1 and 5,000 characters."
             )
         }
         guard (0...10).contains(settings.chunkDelaySeconds),

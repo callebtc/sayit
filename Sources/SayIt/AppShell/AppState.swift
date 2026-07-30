@@ -260,6 +260,14 @@ final class AppState {
         requestModelSelection(model.id)
     }
 
+    func switchPlaybackModel(_ model: ModelDescriptor) {
+        settingsPushTask?.cancel()
+        modelSelectionTask?.cancel()
+        modelSelectionGeneration &+= 1
+        statusText = "Switching model"
+        performAndReload(.switchPlaybackModel(model.id.rawValue))
+    }
+
     func updateLanguageForVoice(
         _ voice: String,
         model: ModelDescriptor

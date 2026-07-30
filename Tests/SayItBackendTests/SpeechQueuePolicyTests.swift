@@ -625,6 +625,7 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     private(set) var estimatedDuration: TimeInterval = 0
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
+    private(set) var currentModelID: String?
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     var shouldStartWhenBuffered = false
@@ -638,9 +639,11 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     func prepare(
         requestID: UUID,
         title: String,
-        estimatedDuration: TimeInterval
+        estimatedDuration: TimeInterval,
+        modelID: String?
     ) {
         currentTitle = title
+        currentModelID = modelID
         self.estimatedDuration = estimatedDuration
         state = .preparing
     }
@@ -673,6 +676,7 @@ private final class MockPlaybackController: BackendPlaybackControlling {
         generatedDuration = 0
         estimatedDuration = 0
         currentTitle = ""
+        currentModelID = nil
     }
 
     func stopForModelSwitch() async {
@@ -704,8 +708,9 @@ private final class MockPlaybackController: BackendPlaybackControlling {
         )
     }
 
-    func playFile(at url: URL, title: String) throws {
+    func playFile(at url: URL, title: String, modelID: String?) throws {
         currentTitle = title
+        currentModelID = modelID
         state = .playing
     }
 }
