@@ -7,6 +7,7 @@ struct SpeechLyricsView: View {
     let chunks: [PlaybackTextChunk]
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
+    var showsBlockSeparators = false
     var onSeek: ((TimeInterval) -> Void)?
 
     @State private var tokenization = Tokenization()
@@ -128,7 +129,7 @@ struct SpeechLyricsView: View {
                     wordView(for: token)
                 }
             }
-            if block.id != blocks.last?.id {
+            if showsBlockSeparators, block.id != blocks.last?.id {
                 ChunkMarkerView()
             }
         }

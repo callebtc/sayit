@@ -31,6 +31,7 @@ final class AppSettings {
         static let chunkDelaySeconds = "chunkDelaySeconds"
         static let paragraphPauseSeconds = "paragraphPauseSeconds"
         static let modelUnloadDelaySeconds = "modelUnloadDelaySeconds"
+        static let showLyricsBlockSeparators = "showLyricsBlockSeparators"
         static let textCleaningEnabled = "textCleaningEnabled"
         static let textCleaningStripMarkdown = "textCleaningStripMarkdown"
         static let textCleaningStripHTML = "textCleaningStripHTML"
@@ -180,6 +181,14 @@ final class AppSettings {
             notifyBackendChange()
         }
     }
+    var showLyricsBlockSeparators: Bool {
+        didSet {
+            defaults.set(
+                showLyricsBlockSeparators,
+                forKey: Key.showLyricsBlockSeparators
+            )
+        }
+    }
     var textCleaningEnabled: Bool {
         didSet {
             defaults.set(textCleaningEnabled, forKey: Key.textCleaningEnabled)
@@ -300,6 +309,9 @@ final class AppSettings {
             forKey: Key.modelUnloadDelaySeconds
         ) as? Double
         modelUnloadDelaySeconds = storedUnloadDelay ?? 600
+        showLyricsBlockSeparators = defaults.bool(
+            forKey: Key.showLyricsBlockSeparators
+        )
         textCleaningEnabled = defaults.object(
             forKey: Key.textCleaningEnabled
         ) as? Bool ?? true
@@ -399,6 +411,7 @@ final class AppSettings {
         chunkDelaySeconds = defaultSettings.chunkDelaySeconds
         paragraphPauseSeconds = defaultSettings.paragraphPauseSeconds
         modelUnloadDelaySeconds = defaultSettings.modelUnloadDelaySeconds
+        showLyricsBlockSeparators = false
     }
 
     var activeVoiceSelection: VoiceSelection {

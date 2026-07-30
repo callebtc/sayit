@@ -90,6 +90,7 @@ struct AppSettingsTests {
         settings.chunkDelaySeconds = 1
         settings.paragraphPauseSeconds = 1
         settings.modelUnloadDelaySeconds = 60
+        settings.showLyricsBlockSeparators = true
         settings.resetAdvancedSettings()
 
         #expect(
@@ -103,5 +104,24 @@ struct AppSettingsTests {
             settings.modelUnloadDelaySeconds
                 == expected.modelUnloadDelaySeconds
         )
+        #expect(settings.showLyricsBlockSeparators == false)
+    }
+
+    @Test("Lyrics block separators are off by default and persist")
+    @MainActor
+    func lyricsBlockSeparatorPreferencePersists() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.showLyricsBlockSeparators == false)
+
+        settings.showLyricsBlockSeparators = true
+
+        let restored = AppSettings(defaults: defaults)
+        #expect(restored.showLyricsBlockSeparators == true)
     }
 }

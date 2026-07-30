@@ -9,8 +9,10 @@ struct VoiceSelectionPicker: View {
 
     var body: some View {
         Picker("Voice", selection: $selection) {
-            Text(automaticLabel)
-                .tag(VoiceSelection.automaticStable)
+            if !model.capabilities.supportsRandomVoiceSampling {
+                Text("Automatic")
+                    .tag(VoiceSelection.automaticStable)
+            }
 
             ForEach(model.voices, id: \.self) { voice in
                 Text(voice)
@@ -24,15 +26,11 @@ struct VoiceSelectionPicker: View {
 
             if model.capabilities.supportsRandomVoiceSampling {
                 Divider()
+                Text("Random voice")
+                    .tag(VoiceSelection.automaticStable)
                 Text("Random voice every paragraph")
                     .tag(VoiceSelection.randomPerParagraph)
             }
         }
-    }
-
-    private var automaticLabel: String {
-        model.capabilities.supportsRandomVoiceSampling
-            ? "Automatic — stable for this article"
-            : "Automatic"
     }
 }

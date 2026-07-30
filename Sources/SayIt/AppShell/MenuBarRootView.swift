@@ -43,6 +43,8 @@ struct MenuBarRootView: View {
                     chunks: state.playback.spokenChunks,
                     elapsed: state.playback.elapsed,
                     generatedDuration: state.playback.generatedDuration,
+                    showsBlockSeparators:
+                        state.settings.showLyricsBlockSeparators,
                     onSeek: state.playback.seek
                 )
                 .frame(height: 150)

@@ -71,7 +71,7 @@ struct GeneralSettingsView: View {
                     title: "Text block size",
                     value: chunkTargetBinding,
                     range: 1...2_000,
-                    step: 1,
+                    step: nil,
                     label: "\(settings.chunkCharacterTarget) characters"
                 )
                 advancedSlider(
@@ -105,6 +105,11 @@ struct GeneralSettingsView: View {
                     Text("After 1 hour").tag(3_600.0)
                 }
 
+                Toggle(
+                    "Show block separators in lyrics (debug)",
+                    isOn: $settings.showLyricsBlockSeparators
+                )
+
                 Button(
                     "Reset to Defaults",
                     systemImage: "arrow.counterclockwise",
@@ -114,7 +119,7 @@ struct GeneralSettingsView: View {
                 Text("Advanced")
             } footer: {
                 Text(
-                    "Applied to newly spoken text. Keeping the model in memory avoids reload delays."
+                    "Applied to newly spoken text. Keeping the model in memory avoids reload delays. Block separators are a visual debugging aid."
                 )
             }
 
@@ -169,7 +174,7 @@ struct GeneralSettingsView: View {
     private var chunkTargetBinding: Binding<Double> {
         Binding(
             get: { Double(state.settings.chunkCharacterTarget) },
-            set: { state.settings.chunkCharacterTarget = Int($0) }
+            set: { state.settings.chunkCharacterTarget = Int($0.rounded()) }
         )
     }
 
@@ -177,7 +182,7 @@ struct GeneralSettingsView: View {
         title: String,
         value: Binding<Double>,
         range: ClosedRange<Double>,
-        step: Double,
+        step: Double?,
         label: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -187,10 +192,14 @@ struct GeneralSettingsView: View {
                 Text(label)
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .contentTransition(.numericText(value: value.wrappedValue))
             }
-            Slider(value: value, in: range, step: step)
-                .accessibilityLabel(title)
+            if let step {
+                Slider(value: value, in: range, step: step)
+                    .accessibilityLabel(title)
+            } else {
+                Slider(value: value, in: range)
+                    .accessibilityLabel(title)
+            }
         }
     }
 
