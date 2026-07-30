@@ -39,6 +39,9 @@ final class HistoryStore {
             modelIDRawValue: request.model.id.rawValue,
             modelRevision: request.model.revision,
             voice: request.voice,
+            voiceModeRawValue: request.voiceMode.rawValue,
+            voiceProfileID: request.voiceProfileID,
+            voiceProfileName: request.voiceProfileName,
             language: request.language,
             characterCount: request.cleanedText.characterCount
         )
@@ -177,6 +180,12 @@ final class HistoryStore {
                 createdAt: $0.createdAt,
                 modelID: ModelID($0.modelIDRawValue),
                 voice: $0.voice,
+                voiceMode: VoiceSynthesisMode(
+                    rawValue: $0.voiceModeRawValue ?? ""
+                ) ?? .standard,
+                voiceProfileID: $0.voiceProfileID,
+                voiceProfileName: $0.voiceProfileName,
+                language: $0.language,
                 duration: $0.duration,
                 audioRelativePath: $0.audioRelativePath,
                 state: SpeechItemState(rawValue: $0.stateRawValue) ?? .failed,

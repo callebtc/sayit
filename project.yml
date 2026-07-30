@@ -204,6 +204,7 @@ targets:
         CFBundleVersion: "1"
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSUIElement: true
+        NSMicrophoneUsageDescription: Say It uses the microphone only when you choose to record a local voice reference.
         NSServices:
           - NSMenuItem:
               default: Say It
@@ -227,6 +228,7 @@ targets:
         com.apple.security.application-groups:
           - group.com.sayit.mac
         com.apple.security.files.user-selected.read-write: true
+        com.apple.security.device.audio-input: true
         com.apple.security.network.client: true
         com.sayit.client: true
     dependencies:
@@ -317,6 +319,23 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.backend-tests
 
+  SayItHTTPTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItHTTPTests
+    dependencies:
+      - target: SayItCore
+      - target: SayItBackend
+      - target: SayItHTTP
+      - target: SayItProtocol
+      - package: Hummingbird
+        product: HummingbirdTesting
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.http-tests
+
   SayItUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -338,6 +357,7 @@ schemes:
         SayItCoreTests: [test]
         SayItProtocolTests: [test]
         SayItBackendTests: [test]
+        SayItHTTPTests: [test]
     run:
       config: Debug
     test:
@@ -346,6 +366,7 @@ schemes:
         - SayItCoreTests
         - SayItProtocolTests
         - SayItBackendTests
+        - SayItHTTPTests
         - SayItUITests
     archive:
       config: Release

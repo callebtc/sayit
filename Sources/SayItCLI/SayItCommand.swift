@@ -14,6 +14,18 @@ struct SpeakCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Voice identifier.")
     var voice: String?
 
+    @Option(
+        name: .long,
+        help: "Saved voice profile UUID or exact name."
+    )
+    var voiceProfile: String?
+
+    @Flag(
+        name: .long,
+        help: "Generate a fresh random voice for every paragraph."
+    )
+    var randomVoicePerParagraph = false
+
     @Option(name: .long, help: "Model identifier.")
     var model: String?
 
@@ -56,16 +68,28 @@ struct SpeakCommand: AsyncParsableCommand {
         ).isEmpty else {
             throw ValidationError("Provide text as arguments or on stdin.")
         }
+        let selectionCount = [
+            voice != nil,
+            voiceProfile != nil,
+            randomVoicePerParagraph
+        ].count(where: { $0 })
+        guard selectionCount <= 1 else {
+            throw ValidationError(
+                "Use only one of --voice, --voice-profile, or --random-voice-per-paragraph."
+            )
+        }
 
         let service = CLIService()
         do {
+            let resolved = try await resolvedVoice(using: service)
             let response = try await service.call(
                 .submit(
                     SpeechSubmission(
                         text: input,
                         source: .commandLine,
-                        modelID: model,
+                        modelID: resolved.modelID ?? model,
                         voice: voice,
+                        voiceSelection: resolved.selection,
                         language: language,
                         speakingPace: pace,
                         playbackRate: rate,
@@ -104,6 +128,38 @@ struct SpeakCommand: AsyncParsableCommand {
             CLIOutput.status("Say It background service is unavailable.")
             throw CLIExitCode.unavailable
         }
+    }
+
+    private func resolvedVoice(
+        using service: CLIService
+    ) async throws -> (selection: VoiceSelection?, modelID: String?) {
+        if randomVoicePerParagraph {
+            return (.randomPerParagraph, nil)
+        }
+        guard let voiceProfile else {
+            return (nil, nil)
+        }
+        let response = try await service.call(.voices(modelID: nil))
+        guard case .voices(let profiles) = response else {
+            throw ServiceFailure(
+                code: "voice.invalid_response",
+                message: "The service did not return saved voices."
+            )
+        }
+        let snapshotResponse = try await service.call(.snapshot)
+        guard case .snapshot(let snapshot) = snapshotResponse else {
+            throw ServiceFailure(
+                code: "voice.invalid_response",
+                message: "The service did not return its active model."
+            )
+        }
+        let profile = try VoiceProfileResolver().resolve(
+            identifier: voiceProfile,
+            requestedModelID: model,
+            currentModelID: snapshot.settings.activeModelID,
+            profiles: profiles
+        )
+        return (.profile(profile.id), profile.modelID)
     }
 
     private func wait(

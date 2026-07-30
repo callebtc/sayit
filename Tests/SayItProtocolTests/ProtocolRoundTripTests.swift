@@ -55,7 +55,160 @@ struct ProtocolRoundTripTests {
     func tokenPresetsNeverGrantWritesToReadOnlyClients() {
         #expect(!APITokenPreset.readOnly.scopes.contains(.speechSubmit))
         #expect(!APITokenPreset.readOnly.scopes.contains(.settingsWrite))
+        #expect(APITokenPreset.readOnly.scopes.contains(.voicesRead))
+        #expect(!APITokenPreset.readOnly.scopes.contains(.voicesWrite))
         #expect(APITokenPreset.fullAccess.scopes == Set(APITokenScope.allCases))
+    }
+
+    @Test
+    func voiceSelectionsRoundTripThroughJSON() throws {
+        let profileID = UUID()
+        let selections: [VoiceSelection] = [
+            .automaticStable,
+            .preset("af_heart"),
+            .profile(profileID),
+            .randomPerParagraph
+        ]
+
+        for selection in selections {
+            let encoded = try SayItWireCodec.encode(selection)
+            let decoded = try SayItWireCodec.decode(
+                VoiceSelection.self,
+                from: encoded
+            )
+            #expect(decoded == selection)
+        }
+    }
+
+    @Test
+    func legacyVoiceMigratesToCurrentModelPreset() throws {
+        let legacyJSON = """
+        {
+          "activeModelID": "kokoro-bf16",
+          "activeVoice": "af_sky",
+          "activeLanguage": "en-US",
+          "voiceDescription": "",
+          "speakingPace": 1,
+          "playbackRate": 1,
+          "rewindInterval": 15,
+          "forwardInterval": 30,
+          "showNowPlayingTitles": false,
+          "retentionPeriod": "thirtyDays",
+          "historyQuotaBytes": 2147483648,
+          "httpEnabled": false,
+          "httpPort": 59125
+        }
+        """
+
+        let settings = try SayItWireCodec.decode(
+            BackendSettingsSnapshot.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        #expect(settings.voiceSelections["kokoro-bf16"] == .preset("af_sky"))
+    }
+
+    @Test
+    func speechSubmissionRetainsLegacyVoiceCompatibility() throws {
+        let legacyJSON = """
+        {
+          "text": "Legacy request",
+          "inputFormat": "plainText",
+          "source": "commandLine",
+          "voice": "af_heart",
+          "queuePolicy": "enqueue",
+          "permitsLongText": false
+        }
+        """
+
+        let submission = try SayItWireCodec.decode(
+            SpeechSubmission.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        #expect(submission.voice == "af_heart")
+        #expect(submission.voiceSelection == nil)
+    }
+
+    @Test
+    func voiceCloneCommandsRoundTripThroughProtocolV3() throws {
+        let recordingID = UUID()
+        let request = ServiceRequest(
+            command: .startVoiceClone(
+                VoiceCloneRequest(
+                    recordingID: recordingID,
+                    modelID: "omnivoice",
+                    language: "en-US",
+                    transcript: "A clear reference passage.",
+                    tuning: VoiceTuning(
+                        preset: .faithful,
+                        parameters: ["guidance": 2.5]
+                    )
+                )
+            )
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            ServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        guard case .startVoiceClone(let clone) = decoded.command else {
+            Issue.record("Expected a clone command")
+            return
+        }
+        #expect(clone.recordingID == recordingID)
+        #expect(clone.modelID == "omnivoice")
+        #expect(clone.tuning.preset == .faithful)
+        #expect(clone.tuning.parameters["guidance"] == 2.5)
+    }
+
+    @Test
+    func cliVoiceProfileResolutionSupportsUUIDAndModelScopedNames() throws {
+        let qwen = voiceProfile(name: "Silver Lark", modelID: "qwen")
+        let omni = voiceProfile(name: "Silver Lark", modelID: "omni")
+        let resolver = VoiceProfileResolver()
+
+        #expect(
+            try resolver.resolve(
+                identifier: qwen.id.uuidString,
+                requestedModelID: nil,
+                currentModelID: "omni",
+                profiles: [qwen, omni]
+            ).id == qwen.id
+        )
+        #expect(
+            try resolver.resolve(
+                identifier: "silver lark",
+                requestedModelID: "omni",
+                currentModelID: "qwen",
+                profiles: [qwen, omni]
+            ).id == omni.id
+        )
+        #expect(throws: ServiceFailure.self) {
+            _ = try resolver.resolve(
+                identifier: qwen.id.uuidString,
+                requestedModelID: "omni",
+                currentModelID: "omni",
+                profiles: [qwen, omni]
+            )
+        }
+    }
+
+    private func voiceProfile(
+        name: String,
+        modelID: String
+    ) -> VoiceProfileSnapshot {
+        VoiceProfileSnapshot(
+            id: UUID(),
+            modelID: modelID,
+            displayName: name,
+            origin: .generated,
+            language: "en-US",
+            duration: 7,
+            createdAt: .now,
+            updatedAt: .now,
+            tuning: VoiceTuning()
+        )
     }
 
     @Test
@@ -109,6 +262,8 @@ struct ProtocolRoundTripTests {
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
         legacyJSON["httpServiceError"] = nil
+        legacyJSON["voicesRevision"] = nil
+        legacyJSON["voiceStudio"] = nil
         let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
 
         let decoded = try SayItWireCodec.decode(
@@ -117,5 +272,7 @@ struct ProtocolRoundTripTests {
         )
 
         #expect(decoded.httpServiceError == nil)
+        #expect(decoded.voicesRevision == 0)
+        #expect(decoded.voiceStudio == nil)
     }
 }

@@ -29,6 +29,13 @@ struct SettingsRootView: View {
                 SpeechSettingsView(settings: settings)
             }
             Tab(
+                SettingsPane.voices.title,
+                systemImage: SettingsPane.voices.symbol,
+                value: SettingsPane.voices
+            ) {
+                VoicesSettingsView(settings: settings)
+            }
+            Tab(
                 SettingsPane.models.title,
                 systemImage: SettingsPane.models.symbol,
                 value: SettingsPane.models

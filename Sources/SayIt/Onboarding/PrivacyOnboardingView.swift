@@ -14,8 +14,8 @@ struct PrivacyOnboardingView: View {
                     systemImage: "doc.on.clipboard"
                 )
                 Label(
-                    "No analytics or microphone access",
-                    systemImage: "waveform.slash"
+                    "No analytics or passive microphone listening",
+                    systemImage: "mic.slash"
                 )
             }
             .labelStyle(.onboardingFeature)

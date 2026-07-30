@@ -29,6 +29,9 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
     public let supportsLongForm: Bool
     public let supportsLanguageSelection: Bool
     public let requiresReferenceAudio: Bool
+    public let supportsVoiceDiscovery: Bool
+    public let supportsRandomVoiceSampling: Bool
+    public let voiceCloneRequirements: VoiceCloneRequirementsSnapshot?
     public let testedMLXAudioVersion: String
     public let testedDate: String
     public let isSelectable: Bool
@@ -63,6 +66,9 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
         supportsLongForm: Bool,
         supportsLanguageSelection: Bool,
         requiresReferenceAudio: Bool,
+        supportsVoiceDiscovery: Bool = false,
+        supportsRandomVoiceSampling: Bool = false,
+        voiceCloneRequirements: VoiceCloneRequirementsSnapshot? = nil,
         testedMLXAudioVersion: String,
         testedDate: String,
         isSelectable: Bool,
@@ -96,6 +102,9 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
         self.supportsLongForm = supportsLongForm
         self.supportsLanguageSelection = supportsLanguageSelection
         self.requiresReferenceAudio = requiresReferenceAudio
+        self.supportsVoiceDiscovery = supportsVoiceDiscovery
+        self.supportsRandomVoiceSampling = supportsRandomVoiceSampling
+        self.voiceCloneRequirements = voiceCloneRequirements
         self.testedMLXAudioVersion = testedMLXAudioVersion
         self.testedDate = testedDate
         self.isSelectable = isSelectable

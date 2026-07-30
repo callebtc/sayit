@@ -10,6 +10,7 @@ final class AppSettings {
         static let onboardingComplete = "onboardingComplete"
         static let activeModelID = "activeModelID"
         static let activeVoice = "activeVoice"
+        static let voiceSelections = "voiceSelections"
         static let activeLanguage = "activeLanguage"
         static let voiceDescription = "voiceDescription"
         static let speakingPace = "speakingPace"
@@ -39,12 +40,22 @@ final class AppSettings {
     var activeModelID: ModelID {
         didSet {
             defaults.set(activeModelID.rawValue, forKey: Key.activeModelID)
+            synchronizeLegacyVoice()
             notifyBackendChange()
         }
     }
     var activeVoice: String {
         didSet {
             defaults.set(activeVoice, forKey: Key.activeVoice)
+            notifyBackendChange()
+        }
+    }
+    var voiceSelections: [String: VoiceSelection] {
+        didSet {
+            if let data = try? JSONEncoder.sayIt.encode(voiceSelections) {
+                defaults.set(data, forKey: Key.voiceSelections)
+            }
+            synchronizeLegacyVoice()
             notifyBackendChange()
         }
     }
@@ -126,10 +137,24 @@ final class AppSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
-        activeModelID = ModelID(
+        let storedModelID = ModelID(
             defaults.string(forKey: Key.activeModelID) ?? "kokoro-bf16"
         )
-        activeVoice = defaults.string(forKey: Key.activeVoice) ?? "af_heart"
+        let storedVoice = defaults.string(forKey: Key.activeVoice)
+            ?? "af_heart"
+        activeModelID = storedModelID
+        activeVoice = storedVoice
+        if let data = defaults.data(forKey: Key.voiceSelections),
+           let selections = try? JSONDecoder.sayIt.decode(
+               [String: VoiceSelection].self,
+               from: data
+           ) {
+            voiceSelections = selections
+        } else {
+            voiceSelections = [
+                storedModelID.rawValue: .preset(storedVoice)
+            ]
+        }
         activeLanguage = defaults.string(forKey: Key.activeLanguage) ?? "en-US"
         voiceDescription = defaults.string(forKey: Key.voiceDescription) ?? ""
         speakingPace = SpeakingPace(
@@ -182,6 +207,7 @@ final class AppSettings {
         BackendSettingsSnapshot(
             activeModelID: activeModelID.rawValue,
             activeVoice: activeVoice,
+            voiceSelections: voiceSelections,
             activeLanguage: activeLanguage,
             voiceDescription: voiceDescription,
             speakingPace: speakingPace.rawValue,
@@ -200,6 +226,7 @@ final class AppSettings {
         isApplyingBackendSnapshot = true
         activeModelID = ModelID(snapshot.activeModelID)
         activeVoice = snapshot.activeVoice
+        voiceSelections = snapshot.voiceSelections
         activeLanguage = snapshot.activeLanguage
         voiceDescription = snapshot.voiceDescription
         speakingPace = SpeakingPace(rawValue: snapshot.speakingPace)
@@ -215,8 +242,36 @@ final class AppSettings {
         isApplyingBackendSnapshot = false
     }
 
+    var activeVoiceSelection: VoiceSelection {
+        get {
+            voiceSelections[activeModelID.rawValue]
+                ?? fallbackVoiceSelection
+        }
+        set {
+            voiceSelections[activeModelID.rawValue] = newValue
+        }
+    }
+
+    func voiceSelection(for modelID: ModelID) -> VoiceSelection? {
+        voiceSelections[modelID.rawValue]
+    }
+
     private func notifyBackendChange() {
         guard !isApplyingBackendSnapshot else { return }
         onBackendChange?()
+    }
+
+    private var fallbackVoiceSelection: VoiceSelection {
+        activeVoice.isEmpty ? .automaticStable : .preset(activeVoice)
+    }
+
+    private func synchronizeLegacyVoice() {
+        guard case .preset(let voice) =
+            voiceSelections[activeModelID.rawValue] else {
+            return
+        }
+        if activeVoice != voice {
+            activeVoice = voice
+        }
     }
 }

@@ -27,7 +27,14 @@ extension SayItHTTPServer {
         let token = String(authorization.dropFirst("Bearer ".count))
         let metadata: APITokenMetadata
         do {
-            metadata = try await backend.authorize(token: token, for: scope)
+            if let tokenAuthorizer {
+                metadata = try await tokenAuthorizer(token, scope)
+            } else {
+                metadata = try await backend.authorize(
+                    token: token,
+                    for: scope
+                )
+            }
         } catch let failure as ServiceFailure {
             throw HTTPAPIError(
                 status: failure.code == "authentication.insufficient_scope"
@@ -65,6 +72,10 @@ extension SayItHTTPServer {
         case .jobs(let value):
             jsonResponse(value, status: successStatus)
         case .models(let value):
+            jsonResponse(value, status: successStatus)
+        case .voices(let value):
+            jsonResponse(value, status: successStatus)
+        case .voiceStudio(let value):
             jsonResponse(value, status: successStatus)
         case .history(let value):
             jsonResponse(value, status: successStatus)

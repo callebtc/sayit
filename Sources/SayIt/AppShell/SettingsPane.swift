@@ -4,6 +4,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case general
     case service
     case speech
+    case voices
     case models
     case history
     case diagnostics
@@ -16,6 +17,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: "General"
         case .service: "Service"
         case .speech: "Speech"
+        case .voices: "Voices"
         case .models: "Models"
         case .history: "History"
         case .diagnostics: "Diagnostics"
@@ -28,6 +30,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .general: "gearshape"
         case .service: "server.rack"
         case .speech: "waveform"
+        case .voices: "person.wave.2"
         case .models: "internaldrive"
         case .history: "clock.arrow.circlepath"
         case .diagnostics: "stethoscope"

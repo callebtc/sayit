@@ -13,6 +13,8 @@ public final class SayItBackendService: SayItService {
     private let playback: any BackendPlaybackControlling
     private let history: HistoryStore
     private let audioArchive: AudioArchive
+    private let voiceAudioArchive: AudioArchive
+    private let voiceProfiles: VoiceProfileStore
     private let diagnostics: DiagnosticRecorder
     private let huggingFaceTokenStore: KeychainTokenStore
     private let apiTokenStore = APITokenStore()
@@ -42,6 +44,11 @@ public final class SayItBackendService: SayItService {
     private var modelsRevision: UInt64 = 0
     private var historyRevision: UInt64 = 0
     private var diagnosticsRevision: UInt64 = 0
+    private var voicesRevision: UInt64 = 0
+    private var voiceStudioTask: Task<Void, Never>?
+    private var voiceStudioSnapshot: VoiceStudioSnapshot?
+    private var voiceDraftsByID: [UUID: VoiceDraftCandidate] = [:]
+    private var voiceCloneDraft: VoiceCloneDraft?
     private var lastProgressRevisionDate = Date.distantPast
     private var lastReplayProgressTick: Int?
     private let serviceVersion: String
@@ -75,6 +82,7 @@ public final class SayItBackendService: SayItService {
             directory: directories.applicationSupport
         )
         let history = try HistoryStore(directories: directories)
+        let voiceProfiles = VoiceProfileStore(directories: directories)
         let tokenStore = KeychainTokenStore()
         let manager = ModelManager(
             catalog: catalog,
@@ -89,6 +97,7 @@ public final class SayItBackendService: SayItService {
         self.settingsStore = settingsStore
         self.jobJournalStore = jobJournalStore
         self.history = history
+        self.voiceProfiles = voiceProfiles
         huggingFaceTokenStore = tokenStore
         modelManager = manager
         models = catalog.models
@@ -96,6 +105,7 @@ public final class SayItBackendService: SayItService {
             await manager.installedURL(for: id)
         }
         audioArchive = AudioArchive(directory: directories.historyAudio)
+        voiceAudioArchive = AudioArchive(directory: directories.voiceDrafts)
         diagnostics = DiagnosticRecorder(
             fileURL: directories.diagnostics.appending(path: "events.jsonl")
         )
@@ -118,7 +128,10 @@ public final class SayItBackendService: SayItService {
                 try await modelManager.select(first.id)
                 var settings = settingsStore.value
                 settings.activeModelID = first.id.rawValue
-                settings.activeVoice = first.defaultVoice ?? ""
+                settings.activeVoice = legacyVoice(
+                    for: settings.voiceSelections[first.id.rawValue],
+                    fallback: first.defaultVoice
+                )
                 settings.activeLanguage = first.defaultLanguage ?? ""
                 try settingsStore.update(settings)
             } catch {
@@ -274,6 +287,37 @@ public final class SayItBackendService: SayItService {
         case .removeModel(let id):
             try await removeModel(ModelID(id))
             return .accepted
+        case .voices(let modelID):
+            let voices = voiceProfiles.snapshots.filter {
+                modelID == nil || $0.modelID == modelID
+            }
+            return .voices(voices)
+        case .startVoiceDiscovery(let request):
+            return .voiceStudio(try startVoiceDiscovery(request))
+        case .startVoiceClone(let request):
+            return .voiceStudio(try startVoiceClone(request))
+        case .cancelVoiceStudio:
+            cancelVoiceStudio()
+            return .accepted
+        case .voicePreview(let id):
+            return .file(try voicePreview(id: id))
+        case .saveVoiceCandidate(let id, let name):
+            _ = try saveVoiceCandidate(id: id, name: name)
+            return .accepted
+        case .saveVoiceClone(let id, let name):
+            _ = try saveVoiceClone(sessionID: id, name: name)
+            return .accepted
+        case .selectVoice(let id):
+            try selectVoice(id: id)
+            return .accepted
+        case .renameVoice(let id, let name):
+            _ = try voiceProfiles.rename(id: id, name: name)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
+        case .deleteVoice(let id):
+            try deleteVoice(id: id)
+            return .accepted
         case .addCommunityModel(
             let repository,
             let revision,
@@ -333,7 +377,608 @@ public final class SayItBackendService: SayItService {
         }
     }
 
+    private func startVoiceDiscovery(
+        _ request: VoiceDiscoveryRequest
+    ) throws -> VoiceStudioSnapshot {
+        guard activeJobID == nil, voiceStudioTask == nil else {
+            throw ServiceFailure(
+                code: "voice.studio_busy",
+                message: "Finish or stop the current speech before creating voices."
+            )
+        }
+        guard let model = models.first(where: {
+            $0.id.rawValue == request.modelID
+        }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested speech model was not found."
+            )
+        }
+        guard installedModelIDs.contains(model.id) else {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install \(model.displayName) before creating voices."
+            )
+        }
+        guard model.capabilities.supportsVoiceDiscovery else {
+            throw ServiceFailure(
+                code: "voice.discovery_unsupported",
+                message: "\(model.displayName) cannot discover generated voices."
+            )
+        }
+        let sampleText = request.sampleText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !sampleText.isEmpty, sampleText.count <= 500 else {
+            throw ServiceFailure(
+                code: "voice.invalid_sample_text",
+                message: "Use a sample containing 1 to 500 characters."
+            )
+        }
+        guard (1...8).contains(request.candidateCount) else {
+            throw ServiceFailure(
+                code: "voice.invalid_candidate_count",
+                message: "Generate between 1 and 8 voices at a time."
+            )
+        }
+
+        discardVoiceStudio(removeCloneRecording: true)
+        let session = VoiceStudioSnapshot(
+            id: UUID(),
+            modelID: model.id.rawValue,
+            state: .generating,
+            completedCount: 0,
+            totalCount: request.candidateCount,
+            candidates: []
+        )
+        voiceStudioSnapshot = session
+        revision &+= 1
+        voiceStudioTask = Task { [weak self] in
+            await self?.runVoiceDiscovery(
+                sessionID: session.id,
+                model: model,
+                request: VoiceDiscoveryRequest(
+                    modelID: request.modelID,
+                    language: request.language,
+                    sampleText: sampleText,
+                    candidateCount: request.candidateCount,
+                    tuning: request.tuning
+                )
+            )
+        }
+        return session
+    }
+
+    private func runVoiceDiscovery(
+        sessionID: UUID,
+        model: ModelDescriptor,
+        request: VoiceDiscoveryRequest
+    ) async {
+        var candidateIDs: [UUID] = []
+        do {
+            let directory = try voiceProfiles.prepareDraftDirectory(
+                id: sessionID
+            )
+            var candidates: [VoiceCandidateSnapshot] = []
+            var existingNames = Set(
+                voiceProfiles.records(modelID: model.id.rawValue)
+                    .map(\.displayName)
+            )
+            let tuning = try validatedTuning(
+                request.tuning,
+                model: model
+            )
+            for index in 0..<request.candidateCount {
+                try Task.checkCancellation()
+                let id = UUID()
+                let seed = UInt64.random(in: UInt64.min...UInt64.max)
+                let generated = try await synthesizer.generateVoiceSample(
+                    model: model,
+                    text: request.sampleText,
+                    language: request.language,
+                    tuning: VoiceSynthesisTuning(
+                        preset: tuning.preset.rawValue,
+                        parameters: tuning.parameters
+                    ),
+                    seed: seed
+                )
+                try Task.checkCancellation()
+                let audioURL = directory.appending(
+                    path: "\(id.uuidString).wav"
+                )
+                try await voiceAudioArchive.writeWAV(
+                    samples: generated.samples,
+                    sampleRate: generated.sampleRate,
+                    destination: audioURL
+                )
+                let name = VoiceNameGenerator().name(
+                    excluding: existingNames
+                )
+                existingNames.insert(name)
+                let candidate = VoiceCandidateSnapshot(
+                    id: id,
+                    suggestedName: name,
+                    duration: Double(generated.samples.count)
+                        / generated.sampleRate,
+                    fingerprint: VoiceFingerprint.make(
+                        samples: generated.samples
+                    )
+                )
+                candidates.append(candidate)
+                candidateIDs.append(id)
+                voiceDraftsByID[id] = VoiceDraftCandidate(
+                    snapshot: candidate,
+                    modelID: model.id.rawValue,
+                    language: request.language,
+                    transcript: request.sampleText,
+                    tuning: tuning,
+                    generationSeed: seed,
+                    audioURL: audioURL
+                )
+                guard voiceStudioSnapshot?.id == sessionID else {
+                    throw CancellationError()
+                }
+                voiceStudioSnapshot = VoiceStudioSnapshot(
+                    id: sessionID,
+                    modelID: model.id.rawValue,
+                    state: index + 1 == request.candidateCount
+                        ? .ready
+                        : .generating,
+                    completedCount: index + 1,
+                    totalCount: request.candidateCount,
+                    candidates: candidates
+                )
+                revision &+= 1
+            }
+        } catch is CancellationError {
+            voiceProfiles.removeDraft(id: sessionID)
+            for id in candidateIDs {
+                voiceDraftsByID[id] = nil
+            }
+            if voiceStudioSnapshot?.id == sessionID {
+                voiceStudioSnapshot = nil
+                revision &+= 1
+            }
+        } catch {
+            if voiceStudioSnapshot?.id == sessionID {
+                let current = voiceStudioSnapshot
+                voiceStudioSnapshot = VoiceStudioSnapshot(
+                    id: sessionID,
+                    modelID: model.id.rawValue,
+                    state: .failed,
+                    completedCount: current?.completedCount ?? 0,
+                    totalCount: request.candidateCount,
+                    candidates: current?.candidates ?? [],
+                    errorMessage: error.localizedDescription
+                )
+                revision &+= 1
+            }
+        }
+        if voiceStudioSnapshot?.id == sessionID {
+            voiceStudioTask = nil
+        }
+    }
+
+    private func startVoiceClone(
+        _ request: VoiceCloneRequest
+    ) throws -> VoiceStudioSnapshot {
+        guard activeJobID == nil, voiceStudioTask == nil else {
+            throw ServiceFailure(
+                code: "voice.studio_busy",
+                message: "Finish or stop the current speech before cloning a voice."
+            )
+        }
+        guard let model = models.first(where: {
+            $0.id.rawValue == request.modelID
+        }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested speech model was not found."
+            )
+        }
+        guard installedModelIDs.contains(model.id) else {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install \(model.displayName) before cloning a voice."
+            )
+        }
+        guard model.capabilities.voiceCloning,
+              let requirements = model.capabilities.voiceCloneRequirements else {
+            throw ServiceFailure(
+                code: "voice.cloning_unsupported",
+                message: "\(model.displayName) does not support voice cloning."
+            )
+        }
+        let transcript = request.transcript.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !requirements.transcriptRequired || !transcript.isEmpty else {
+            throw ServiceFailure(
+                code: "voice.transcript_required",
+                message: "Read the displayed passage so its transcript can condition this model."
+            )
+        }
+        guard transcript.count <= 1_000 else {
+            throw ServiceFailure(
+                code: "voice.invalid_transcript",
+                message: "The recording transcript is too long."
+            )
+        }
+        let source = try voiceProfiles.draftURL(id: request.recordingID)
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            throw ServiceFailure(
+                code: "voice.recording_not_found",
+                message: "The recording is no longer available. Record it again."
+            )
+        }
+        let tuning = try validatedTuning(request.tuning, model: model)
+        let previousRecordingID = voiceCloneDraft?.recordingID
+        discardVoiceStudio(removeCloneRecording: false)
+        if let previousRecordingID,
+           previousRecordingID != request.recordingID {
+            voiceProfiles.removeDraft(id: previousRecordingID)
+        }
+
+        let sessionID = UUID()
+        let directory = try voiceProfiles.prepareDraftDirectory(id: sessionID)
+        let referenceURL = directory.appending(path: "clone-reference.wav")
+        let analysis: VoiceRecordingAnalysis
+        do {
+            analysis = try VoiceRecordingProcessor().process(
+                source: source,
+                destination: referenceURL,
+                targetSampleRate: targetReferenceSampleRate(for: model),
+                minimumDuration: requirements.minimumDuration,
+                maximumDuration: requirements.maximumDuration
+            )
+        } catch let error as VoiceRecordingError {
+            voiceProfiles.removeDraft(id: sessionID)
+            throw ServiceFailure(
+                code: "voice.invalid_recording",
+                message: error.localizedDescription
+            )
+        }
+        let conditioningTranscript = model.modelType.lowercased() == "chatterbox"
+            ? nil
+            : transcript
+        voiceCloneDraft = VoiceCloneDraft(
+            sessionID: sessionID,
+            recordingID: request.recordingID,
+            modelID: model.id.rawValue,
+            language: request.language,
+            transcript: transcript.nilIfEmpty,
+            duration: analysis.duration,
+            tuning: tuning,
+            referenceURL: referenceURL
+        )
+        let session = VoiceStudioSnapshot(
+            id: sessionID,
+            modelID: model.id.rawValue,
+            state: .generating,
+            completedCount: 0,
+            totalCount: 3,
+            candidates: []
+        )
+        voiceStudioSnapshot = session
+        revision &+= 1
+        voiceStudioTask = Task { [weak self] in
+            await self?.runVoiceClone(
+                sessionID: sessionID,
+                model: model,
+                language: request.language,
+                transcript: conditioningTranscript,
+                tuning: tuning,
+                referenceURL: referenceURL
+            )
+        }
+        return session
+    }
+
+    private func runVoiceClone(
+        sessionID: UUID,
+        model: ModelDescriptor,
+        language: String?,
+        transcript: String?,
+        tuning: VoiceTuning,
+        referenceURL: URL
+    ) async {
+        var candidateIDs: [UUID] = []
+        do {
+            let previewTexts = clonePreviewTexts(language: language)
+            var candidates: [VoiceCandidateSnapshot] = []
+            for (index, text) in previewTexts.enumerated() {
+                try Task.checkCancellation()
+                let id = UUID()
+                let seed = UInt64.random(in: UInt64.min...UInt64.max)
+                let generated = try await synthesizer.generateVoiceSample(
+                    model: model,
+                    text: text,
+                    language: language,
+                    tuning: VoiceSynthesisTuning(
+                        preset: tuning.preset.rawValue,
+                        parameters: tuning.parameters
+                    ),
+                    seed: seed,
+                    reference: VoiceReference(
+                        audioURL: referenceURL,
+                        transcript: transcript
+                    )
+                )
+                let audioURL = referenceURL.deletingLastPathComponent()
+                    .appending(path: "\(id.uuidString).wav")
+                try await voiceAudioArchive.writeWAV(
+                    samples: generated.samples,
+                    sampleRate: generated.sampleRate,
+                    destination: audioURL
+                )
+                let candidate = VoiceCandidateSnapshot(
+                    id: id,
+                    suggestedName: "Preview \(index + 1)",
+                    duration: Double(generated.samples.count)
+                        / generated.sampleRate,
+                    fingerprint: VoiceFingerprint.make(
+                        samples: generated.samples
+                    )
+                )
+                candidates.append(candidate)
+                candidateIDs.append(id)
+                voiceDraftsByID[id] = VoiceDraftCandidate(
+                    snapshot: candidate,
+                    modelID: model.id.rawValue,
+                    language: language,
+                    transcript: text,
+                    tuning: tuning,
+                    generationSeed: seed,
+                    audioURL: audioURL
+                )
+                guard voiceStudioSnapshot?.id == sessionID else {
+                    throw CancellationError()
+                }
+                voiceStudioSnapshot = VoiceStudioSnapshot(
+                    id: sessionID,
+                    modelID: model.id.rawValue,
+                    state: index + 1 == previewTexts.count
+                        ? .ready
+                        : .generating,
+                    completedCount: index + 1,
+                    totalCount: previewTexts.count,
+                    candidates: candidates
+                )
+                revision &+= 1
+            }
+        } catch is CancellationError {
+            voiceProfiles.removeDraft(id: sessionID)
+            for id in candidateIDs {
+                voiceDraftsByID[id] = nil
+            }
+            if voiceStudioSnapshot?.id == sessionID {
+                voiceStudioSnapshot = nil
+                voiceCloneDraft = nil
+                revision &+= 1
+            }
+        } catch {
+            if voiceStudioSnapshot?.id == sessionID {
+                let current = voiceStudioSnapshot
+                voiceStudioSnapshot = VoiceStudioSnapshot(
+                    id: sessionID,
+                    modelID: model.id.rawValue,
+                    state: .failed,
+                    completedCount: current?.completedCount ?? 0,
+                    totalCount: 3,
+                    candidates: current?.candidates ?? [],
+                    errorMessage: error.localizedDescription
+                )
+                revision &+= 1
+            }
+        }
+        if voiceStudioSnapshot?.id == sessionID {
+            voiceStudioTask = nil
+        }
+    }
+
+    private func cancelVoiceStudio() {
+        voiceStudioTask?.cancel()
+        voiceStudioTask = nil
+        discardVoiceStudio(removeCloneRecording: true)
+        revision &+= 1
+    }
+
+    private func discardVoiceStudio(removeCloneRecording: Bool) {
+        if let snapshot = voiceStudioSnapshot {
+            voiceProfiles.removeDraft(id: snapshot.id)
+            for candidate in snapshot.candidates {
+                voiceDraftsByID[candidate.id] = nil
+            }
+        }
+        if removeCloneRecording, let draft = voiceCloneDraft {
+            voiceProfiles.removeDraft(id: draft.recordingID)
+        }
+        voiceCloneDraft = nil
+        voiceStudioSnapshot = nil
+    }
+
+    private func voicePreview(id: UUID) throws -> ExportedFile {
+        guard let draft = voiceDraftsByID[id],
+              FileManager.default.fileExists(atPath: draft.audioURL.path) else {
+            throw ServiceFailure(
+                code: "voice.preview_not_found",
+                message: "That voice preview is no longer available."
+            )
+        }
+        return ExportedFile(
+            filename: "\(id.uuidString).wav",
+            contentType: "audio/wav",
+            data: try Data(contentsOf: draft.audioURL)
+        )
+    }
+
+    @discardableResult
+    private func saveVoiceCandidate(
+        id: UUID,
+        name: String
+    ) throws -> VoiceProfileSnapshot {
+        guard let draft = voiceDraftsByID[id] else {
+            throw ServiceFailure(
+                code: "voice.preview_not_found",
+                message: "That voice preview is no longer available."
+            )
+        }
+        let profile = try voiceProfiles.saveGenerated(draft, name: name)
+        try selectVoice(id: profile.id)
+        voicesRevision &+= 1
+        revision &+= 1
+        return profile
+    }
+
+    @discardableResult
+    private func saveVoiceClone(
+        sessionID: UUID,
+        name: String
+    ) throws -> VoiceProfileSnapshot {
+        guard let draft = voiceCloneDraft,
+              draft.sessionID == sessionID,
+              voiceStudioSnapshot?.id == sessionID,
+              voiceStudioSnapshot?.state == .ready else {
+            throw ServiceFailure(
+                code: "voice.clone_not_ready",
+                message: "Finish generating all voice previews before saving."
+            )
+        }
+        let profile = try voiceProfiles.saveRecorded(draft, name: name)
+        try selectVoice(id: profile.id)
+        voicesRevision &+= 1
+        discardVoiceStudio(removeCloneRecording: true)
+        revision &+= 1
+        return profile
+    }
+
+    private func targetReferenceSampleRate(
+        for model: ModelDescriptor
+    ) -> Double {
+        model.modelType.lowercased() == "fish_speech" ? 44_100 : 24_000
+    }
+
+    private func clonePreviewTexts(language: String?) -> [String] {
+        let code = language?.lowercased().split(separator: "-").first
+        return switch code {
+        case "de":
+            [
+                "Heute klingt selbst ein vertrauter Satz ein wenig neu.",
+                "Eine ruhige Stimme macht lange Texte angenehm und klar.",
+                "Kleine Pausen geben jedem Gedanken seinen eigenen Raum."
+            ]
+        case "fr":
+            [
+                "Aujourd’hui, une phrase familière semble presque nouvelle.",
+                "Une voix calme rend les longs textes clairs et agréables.",
+                "De petites pauses donnent à chaque idée son propre espace."
+            ]
+        case "es":
+            [
+                "Hoy, incluso una frase conocida suena un poco diferente.",
+                "Una voz tranquila vuelve claros y agradables los textos largos.",
+                "Las pequeñas pausas dan a cada idea su propio espacio."
+            ]
+        case "zh":
+            [
+                "今天，即使熟悉的句子也能听起来焕然一新。",
+                "平静的声音让长篇文字清楚而自然。",
+                "短暂的停顿为每个想法留出空间。"
+            ]
+        case "ja":
+            [
+                "今日は、聞き慣れた文章も少し新鮮に響きます。",
+                "落ち着いた声なら、長い文章も明瞭で自然に聞こえます。",
+                "短い間が、それぞれの考えに余白を与えます。"
+            ]
+        case "ko":
+            [
+                "오늘은 익숙한 문장도 조금 새롭게 들릴 수 있습니다.",
+                "차분한 목소리는 긴 글도 또렷하고 자연스럽게 만듭니다.",
+                "짧은 쉼은 각각의 생각에 여유를 줍니다."
+            ]
+        case "ru":
+            [
+                "Сегодня даже знакомая фраза может прозвучать совсем по-новому.",
+                "Спокойный голос делает длинные тексты ясными и естественными.",
+                "Короткие паузы дают каждой мысли немного пространства."
+            ]
+        case "pt":
+            [
+                "Hoje, até uma frase conhecida pode soar inteiramente nova.",
+                "Uma voz calma torna textos longos claros e naturais.",
+                "Pequenas pausas dão espaço a cada pensamento."
+            ]
+        case "it":
+            [
+                "Oggi anche una frase familiare può sembrare del tutto nuova.",
+                "Una voce calma rende i testi lunghi chiari e naturali.",
+                "Piccole pause danno a ogni pensiero un po’ di spazio."
+            ]
+        default:
+            [
+                "Today, even a familiar sentence can sound entirely new.",
+                "A calm voice makes long passages feel clear and effortless.",
+                "Small pauses give every thought a little room to breathe."
+            ]
+        }
+    }
+
+    private func selectVoice(id: UUID) throws {
+        guard let record = voiceProfiles.record(id: id) else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        var settings = settingsStore.value
+        settings.voiceSelections[record.modelID] = .profile(id)
+        if settings.activeModelID == record.modelID {
+            settings.activeVoice = ""
+        }
+        try settingsStore.update(settings)
+        revision &+= 1
+    }
+
+    private func deleteVoice(id: UUID) throws {
+        guard let record = voiceProfiles.record(id: id) else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        try voiceProfiles.delete(id: id)
+        var settings = settingsStore.value
+        if case .profile(let selectedID)? =
+            settings.voiceSelections[record.modelID],
+           selectedID == id {
+            settings.voiceSelections[record.modelID] = .automaticStable
+            if settings.activeModelID == record.modelID {
+                settings.activeVoice = ""
+            }
+            try settingsStore.update(settings)
+        }
+        voicesRevision &+= 1
+        revision &+= 1
+    }
+
+    private func validatedTuning(
+        _ tuning: VoiceTuning,
+        model: ModelDescriptor
+    ) throws -> VoiceTuning {
+        try VoiceTuningPolicy().validate(
+            tuning,
+            modelType: model.modelType
+        )
+    }
+
     private func submit(_ submission: SpeechSubmission) throws -> SpeechJob {
+        guard voiceStudioTask == nil else {
+            throw ServiceFailure(
+                code: "voice.studio_busy",
+                message: "Wait for voice creation to finish before starting speech."
+            )
+        }
         guard submission.inputFormat != .ssml else {
             throw ServiceFailure(
                 code: "speech.unsupported_input_format",
@@ -450,6 +1095,109 @@ public final class SayItBackendService: SayItService {
         }
     }
 
+    private func resolveVoice(
+        submission: SpeechSubmission,
+        settings: BackendSettingsSnapshot,
+        model: ModelDescriptor
+    ) throws -> ResolvedVoice {
+        guard submission.voice == nil || submission.voiceSelection == nil else {
+            throw ServiceFailure(
+                code: "voice.conflicting_selection",
+                message: "Choose either voice or voiceSelection, not both."
+            )
+        }
+        let selection = submission.voiceSelection
+            ?? submission.voice.map(VoiceSelection.preset)
+            ?? settings.voiceSelections[model.id.rawValue]
+            ?? fallbackSelection(settings: settings, model: model)
+
+        switch selection {
+        case .automaticStable:
+            return ResolvedVoice(
+                preset: model.defaultVoice,
+                mode: model.capabilities.supportsRandomVoiceSampling
+                    ? .automaticStable
+                    : .standard,
+                reference: nil,
+                profileID: nil,
+                profileName: nil,
+                tuning: nil
+            )
+        case .preset(let voice):
+            if !model.voices.isEmpty, !model.voices.contains(voice) {
+                throw ServiceFailure(
+                    code: "voice.preset_not_found",
+                    message: "The selected preset voice is unavailable for this model."
+                )
+            }
+            return ResolvedVoice(
+                preset: voice,
+                mode: .standard,
+                reference: nil,
+                profileID: nil,
+                profileName: voice,
+                tuning: nil
+            )
+        case .profile(let id):
+            guard let record = voiceProfiles.record(id: id) else {
+                throw ServiceFailure(
+                    code: "voice.not_found",
+                    message: "The saved voice was not found."
+                )
+            }
+            guard record.modelID == model.id.rawValue else {
+                throw ServiceFailure(
+                    code: "voice.model_mismatch",
+                    message: "That voice belongs to a different speech model."
+                )
+            }
+            let referenceURL = try voiceProfiles.referenceURL(for: record)
+            return ResolvedVoice(
+                preset: nil,
+                mode: .savedProfile,
+                reference: VoiceReference(
+                    audioURL: referenceURL,
+                    transcript: record.transcript
+                ),
+                profileID: record.id,
+                profileName: record.displayName,
+                tuning: VoiceSynthesisTuning(
+                    preset: record.tuning.preset.rawValue,
+                    parameters: record.tuning.parameters
+                )
+            )
+        case .randomPerParagraph:
+            guard model.capabilities.supportsRandomVoiceSampling else {
+                throw ServiceFailure(
+                    code: "voice.random_mode_unsupported",
+                    message: "\(model.displayName) cannot randomize each paragraph."
+                )
+            }
+            return ResolvedVoice(
+                preset: nil,
+                mode: .randomPerParagraph,
+                reference: nil,
+                profileID: nil,
+                profileName: nil,
+                tuning: nil
+            )
+        }
+    }
+
+    private func fallbackSelection(
+        settings: BackendSettingsSnapshot,
+        model: ModelDescriptor
+    ) -> VoiceSelection {
+        if settings.activeModelID == model.id.rawValue,
+           let voice = nonEmpty(settings.activeVoice) {
+            return .preset(voice)
+        }
+        if let voice = model.defaultVoice {
+            return .preset(voice)
+        }
+        return .automaticStable
+    }
+
     private func speak(
         id: UUID,
         cleaned: CleanedText,
@@ -473,16 +1221,25 @@ public final class SayItBackendService: SayItService {
         let pace = closestSpeakingPace(
             to: submission.speakingPace ?? settings.speakingPace
         )
+        let resolvedVoice = try resolveVoice(
+            submission: submission,
+            settings: settings,
+            model: model
+        )
         let request = SpeechRequest(
             id: id,
             cleanedText: cleaned,
             model: model,
-            voice: submission.voice ?? nonEmpty(settings.activeVoice)
-                ?? model.defaultVoice,
+            voice: resolvedVoice.preset,
             language: submission.language ?? nonEmpty(settings.activeLanguage)
                 ?? model.defaultLanguage,
             voiceDescription: submission.voiceDescription
                 ?? nonEmpty(settings.voiceDescription),
+            voiceMode: resolvedVoice.mode,
+            voiceReference: resolvedVoice.reference,
+            voiceProfileID: resolvedVoice.profileID,
+            voiceProfileName: resolvedVoice.profileName,
+            voiceTuning: resolvedVoice.tuning,
             speakingPace: model.supportsNativeSpeakingPace ? pace : .natural,
             source: submission.source.triggerSource
         )
@@ -543,6 +1300,9 @@ public final class SayItBackendService: SayItService {
         case .modelLoaded:
             statusText = "Preparing speech"
             updateJob(request.id, state: .synthesizing, progress: 0.15)
+        case .creatingArticleVoice:
+            statusText = "Creating an article voice"
+            updateJob(request.id, state: .synthesizing, progress: 0.12)
         case .chunkStarted(_, let text):
             registerSpokenChunk(text)
         case .audio(let chunk):
@@ -842,7 +1602,9 @@ public final class SayItBackendService: SayItService {
             settings: settingsStore.value,
             modelsRevision: modelsRevision,
             historyRevision: historyRevision,
-            diagnosticsRevision: diagnosticsRevision
+            diagnosticsRevision: diagnosticsRevision,
+            voicesRevision: voicesRevision,
+            voiceStudio: voiceStudioSnapshot
         )
     }
 
@@ -920,7 +1682,10 @@ public final class SayItBackendService: SayItService {
         try await modelManager.select(id)
         var settings = settingsStore.value
         settings.activeModelID = id.rawValue
-        settings.activeVoice = model.defaultVoice ?? ""
+        settings.activeVoice = legacyVoice(
+            for: settings.voiceSelections[id.rawValue],
+            fallback: model.defaultVoice
+        )
         settings.activeLanguage = model.defaultLanguage ?? ""
         try settingsStore.update(settings)
         revision &+= 1
@@ -1043,7 +1808,10 @@ public final class SayItBackendService: SayItService {
             try await modelManager.select(replacement.id)
             var settings = settingsStore.value
             settings.activeModelID = replacement.id.rawValue
-            settings.activeVoice = replacement.defaultVoice ?? ""
+            settings.activeVoice = legacyVoice(
+                for: settings.voiceSelections[replacement.id.rawValue],
+                fallback: replacement.defaultVoice
+            )
             settings.activeLanguage = replacement.defaultLanguage ?? ""
             try settingsStore.update(settings)
         }
@@ -1132,6 +1900,9 @@ public final class SayItBackendService: SayItService {
             SpeechSubmission(
                 text: item.cleanedText,
                 source: .history,
+                modelID: item.modelID.rawValue,
+                voiceSelection: item.serviceSnapshot.voiceSelection,
+                language: item.language,
                 queuePolicy: .replaceAll,
                 permitsLongText: true
             )
@@ -1250,6 +2021,16 @@ public final class SayItBackendService: SayItService {
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+    }
+
+    private func legacyVoice(
+        for selection: VoiceSelection?,
+        fallback: String?
+    ) -> String {
+        if case .preset(let voice)? = selection {
+            return voice
+        }
+        return fallback ?? ""
     }
 
     private func enforceRetention() {

@@ -17,14 +17,19 @@ struct SpeechSettingsView: View {
                     selectModel(id)
                 }
 
-                if let model = activeModel, !model.voices.isEmpty {
-                    Picker("Voice", selection: $settings.activeVoice) {
-                        ForEach(model.voices, id: \.self) { voice in
-                            Text(voice).tag(voice)
+                if let model = activeModel {
+                    VoiceSelectionPicker(
+                        selection: $settings.activeVoiceSelection,
+                        model: model,
+                        profiles: state.voiceProfiles.filter {
+                            $0.modelID == model.id.rawValue
                         }
-                    }
-                    .onChange(of: settings.activeVoice) { _, voice in
-                        updateLanguage(for: voice, model: model)
+                    )
+                    .onChange(of: settings.activeVoiceSelection) {
+                        if case .preset(let voice) =
+                            settings.activeVoiceSelection {
+                            updateLanguage(for: voice, model: model)
+                        }
                     }
                 }
 

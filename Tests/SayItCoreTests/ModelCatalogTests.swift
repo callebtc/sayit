@@ -57,4 +57,37 @@ struct ModelCatalogTests {
 
         #expect(supportedIDs == [ModelID("kokoro-bf16")])
     }
+
+    @Test("Generated and cloned voice capabilities are explicitly routed")
+    func voiceCapabilities() throws {
+        let models = Dictionary(
+            uniqueKeysWithValues: try ModelCatalogLoader()
+                .bundledCatalog()
+                .models
+                .map { ($0.id.rawValue, $0) }
+        )
+        for id in [
+            "qwen3-06b-base-8bit",
+            "omnivoice",
+            "fish-s2-pro-8bit"
+        ] {
+            let model = try #require(models[id])
+            #expect(model.capabilities.supportsVoiceDiscovery)
+            #expect(model.capabilities.supportsRandomVoiceSampling)
+            #expect(model.capabilities.voiceCloning)
+            #expect(model.capabilities.voiceCloneRequirements != nil)
+        }
+
+        let chatterbox = try #require(models["chatterbox-fp16"])
+        #expect(!chatterbox.capabilities.supportsVoiceDiscovery)
+        #expect(!chatterbox.capabilities.supportsRandomVoiceSampling)
+        #expect(chatterbox.capabilities.voiceCloning)
+        #expect(chatterbox.capabilities.voiceCloneRequirements != nil)
+
+        let kokoro = try #require(models["kokoro-bf16"])
+        #expect(!kokoro.capabilities.supportsVoiceDiscovery)
+        #expect(!kokoro.capabilities.supportsRandomVoiceSampling)
+        #expect(!kokoro.capabilities.voiceCloning)
+        #expect(kokoro.capabilities.voiceCloneRequirements == nil)
+    }
 }

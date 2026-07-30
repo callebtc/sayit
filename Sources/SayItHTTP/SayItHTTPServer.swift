@@ -5,18 +5,37 @@ import SayItProtocol
 import Yams
 
 public final class SayItHTTPServer: Sendable {
+    typealias TokenAuthorizer = @Sendable (
+        String,
+        APITokenScope
+    ) async throws -> APITokenMetadata
+
     let backend: SayItBackendService
     let rateLimiter = APIRateLimiter()
     let idempotencyStore = IdempotencyStore()
     let openAPIJSON: Data
     let port: Int
+    let tokenAuthorizer: TokenAuthorizer?
 
-    public init(
+    public convenience init(
         backend: SayItBackendService,
         port: Int
     ) throws {
+        try self.init(
+            backend: backend,
+            port: port,
+            tokenAuthorizer: nil
+        )
+    }
+
+    init(
+        backend: SayItBackendService,
+        port: Int,
+        tokenAuthorizer: TokenAuthorizer?
+    ) throws {
         self.backend = backend
         self.port = port
+        self.tokenAuthorizer = tokenAuthorizer
         guard (1_024...65_535).contains(port) else {
             throw HTTPAPIError(
                 status: 400,
@@ -33,6 +52,7 @@ public final class SayItHTTPServer: Sendable {
         registerJobRoutes(on: router)
         registerPlaybackRoutes(on: router)
         registerModelRoutes(on: router)
+        registerVoiceRoutes(on: router)
         registerHistoryRoutes(on: router)
         registerSettingsRoutes(on: router)
         let app = Application(

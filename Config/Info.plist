@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Say It</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Say It uses the microphone only when you choose to record a local voice reference.</string>
 	<key>NSServices</key>
 	<array>
 		<dict>

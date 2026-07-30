@@ -8,6 +8,8 @@ public enum APITokenScope: String, Codable, CaseIterable, Sendable {
     case historyWrite = "history:write"
     case modelsRead = "models:read"
     case modelsWrite = "models:write"
+    case voicesRead = "voices:read"
+    case voicesWrite = "voices:write"
     case settingsRead = "settings:read"
     case settingsWrite = "settings:write"
     case diagnosticsRead = "diagnostics:read"

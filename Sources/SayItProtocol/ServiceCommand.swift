@@ -19,6 +19,16 @@ public enum ServiceCommand: Codable, Sendable {
     case installModel(String)
     case cancelModelInstall
     case removeModel(String)
+    case voices(modelID: String?)
+    case startVoiceDiscovery(VoiceDiscoveryRequest)
+    case startVoiceClone(VoiceCloneRequest)
+    case cancelVoiceStudio
+    case voicePreview(UUID)
+    case saveVoiceCandidate(UUID, name: String)
+    case saveVoiceClone(UUID, name: String)
+    case selectVoice(UUID)
+    case renameVoice(UUID, name: String)
+    case deleteVoice(UUID)
     case addCommunityModel(
         repository: String,
         revision: String?,
