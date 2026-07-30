@@ -57,6 +57,20 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "32A7DAF7678EFA659391EF80"
+               BuildableName = "SayItHTTPTests.xctest"
+               BlueprintName = "SayItHTTPTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "95793290520BEA9ABABE8DA0"
                BuildableName = "SayItProtocolTests.xctest"
                BlueprintName = "SayItProtocolTests"
@@ -111,6 +125,17 @@
                BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
                BuildableName = "SayItBackendTests.xctest"
                BlueprintName = "SayItBackendTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "32A7DAF7678EFA659391EF80"
+               BuildableName = "SayItHTTPTests.xctest"
+               BlueprintName = "SayItHTTPTests"
                ReferencedContainer = "container:SayIt.xcodeproj">
             </BuildableReference>
          </TestableReference>

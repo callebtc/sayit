@@ -66,6 +66,10 @@ extension SayItHTTPServer {
             jsonResponse(value, status: successStatus)
         case .models(let value):
             jsonResponse(value, status: successStatus)
+        case .voices(let value):
+            jsonResponse(value, status: successStatus)
+        case .voiceStudio(let value):
+            jsonResponse(value, status: successStatus)
         case .history(let value):
             jsonResponse(value, status: successStatus)
         case .diagnostics(let value):

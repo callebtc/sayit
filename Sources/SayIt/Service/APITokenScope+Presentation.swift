@@ -10,6 +10,8 @@ extension APITokenScope {
         case .historyWrite: "Change history"
         case .modelsRead: "Read models"
         case .modelsWrite: "Change models"
+        case .voicesRead: "Read voices"
+        case .voicesWrite: "Change voices"
         case .settingsRead: "Read settings"
         case .settingsWrite: "Change settings"
         case .diagnosticsRead: "Read diagnostics"

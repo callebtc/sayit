@@ -16,6 +16,8 @@ public struct ServiceSnapshot: Codable, Sendable {
     public let modelsRevision: UInt64
     public let historyRevision: UInt64
     public let diagnosticsRevision: UInt64
+    public let voicesRevision: UInt64
+    public let voiceStudio: VoiceStudioSnapshot?
 
     public init(
         protocolVersion: Int = SayItProtocolVersion.current,
@@ -32,7 +34,9 @@ public struct ServiceSnapshot: Codable, Sendable {
         settings: BackendSettingsSnapshot,
         modelsRevision: UInt64,
         historyRevision: UInt64,
-        diagnosticsRevision: UInt64
+        diagnosticsRevision: UInt64,
+        voicesRevision: UInt64 = 0,
+        voiceStudio: VoiceStudioSnapshot? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serviceVersion = serviceVersion
@@ -49,5 +53,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         self.modelsRevision = modelsRevision
         self.historyRevision = historyRevision
         self.diagnosticsRevision = diagnosticsRevision
+        self.voicesRevision = voicesRevision
+        self.voiceStudio = voiceStudio
     }
 }

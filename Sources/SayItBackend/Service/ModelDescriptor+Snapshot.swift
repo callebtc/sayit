@@ -32,6 +32,20 @@ extension ModelDescriptor {
             supportsLongForm: capabilities.longForm,
             supportsLanguageSelection: capabilities.languageSelection,
             requiresReferenceAudio: capabilities.requiresReferenceAudio,
+            supportsVoiceDiscovery: capabilities.supportsVoiceDiscovery,
+            supportsRandomVoiceSampling:
+                capabilities.supportsRandomVoiceSampling,
+            voiceCloneRequirements: capabilities.voiceCloneRequirements.map {
+                VoiceCloneRequirementsSnapshot(
+                    minimumDuration: $0.minimumDuration,
+                    recommendedMinimumDuration:
+                        $0.recommendedMinimumDuration,
+                    recommendedMaximumDuration:
+                        $0.recommendedMaximumDuration,
+                    maximumDuration: $0.maximumDuration,
+                    transcriptRequired: $0.transcriptRequired
+                )
+            },
             testedMLXAudioVersion: testedMLXAudioVersion,
             testedDate: testedDate,
             isSelectable: isSelectable,

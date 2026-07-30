@@ -191,6 +191,13 @@ let package = Package(
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
+        ),
+        .testTarget(
+            name: "SayItHTTPTests",
+            dependencies: ["SayItHTTP", "SayItProtocol"],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
+            ]
         )
     ]
 )

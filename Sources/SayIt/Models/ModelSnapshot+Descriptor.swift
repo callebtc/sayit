@@ -23,7 +23,20 @@ extension ModelSnapshot {
                 streaming: supportsStreaming,
                 longForm: supportsLongForm,
                 languageSelection: supportsLanguageSelection,
-                requiresReferenceAudio: requiresReferenceAudio
+                requiresReferenceAudio: requiresReferenceAudio,
+                voiceDiscovery: supportsVoiceDiscovery,
+                randomVoiceSampling: supportsRandomVoiceSampling,
+                voiceCloneRequirements: voiceCloneRequirements.map {
+                    VoiceCloneRequirements(
+                        minimumDuration: $0.minimumDuration,
+                        recommendedMinimumDuration:
+                            $0.recommendedMinimumDuration,
+                        recommendedMaximumDuration:
+                            $0.recommendedMaximumDuration,
+                        maximumDuration: $0.maximumDuration,
+                        transcriptRequired: $0.transcriptRequired
+                    )
+                }
             ),
             playbackMode: PlaybackMode(rawValue: playbackMode)
                 ?? .progressive,

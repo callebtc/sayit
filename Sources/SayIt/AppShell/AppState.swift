@@ -16,6 +16,7 @@ final class AppState {
     let history = HistoryStore()
     let launchAtLogin = LaunchAtLoginController()
     let backgroundService = BackgroundServiceController()
+    let voicePreview = VoicePreviewPlayer()
 
     private let client = SayItXPCClient()
     private let migration = BackendMigrationCoordinator()
@@ -27,6 +28,7 @@ final class AppState {
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
+    private var lastVoicesRevision: UInt64?
     private var lastServiceRevision: UInt64?
     private var downloadByteCounts: [ModelID: Int64] = [:]
     private var modelIDToSelectAfterInstallation: ModelID?
@@ -43,6 +45,8 @@ final class AppState {
     private(set) var serviceConnection: ServiceConnectionState = .connecting
     private(set) var backendSettings = BackendSettingsSnapshot()
     private(set) var apiTokens: [APITokenMetadata] = []
+    private(set) var voiceProfiles: [VoiceProfileSnapshot] = []
+    private(set) var voiceStudio: VoiceStudioSnapshot?
     private(set) var httpAPIErrorMessage: String?
     private(set) var apiTokenErrorMessage: String?
     private(set) var oneTimeTokenSecret: String?
@@ -124,7 +128,7 @@ final class AppState {
                 text: text,
                 source: .preview,
                 modelID: settings.activeModelID.rawValue,
-                voice: settings.activeVoice,
+                voiceSelection: settings.activeVoiceSelection,
                 language: settings.activeLanguage,
                 voiceDescription: settings.voiceDescription,
                 speakingPace: settings.speakingPace.rawValue,
@@ -249,6 +253,65 @@ final class AppState {
 
     func removeModel(_ model: ModelDescriptor) {
         perform(.removeModel(model.id.rawValue))
+    }
+
+    func startVoiceDiscovery(
+        model: ModelDescriptor,
+        language: String?,
+        text: String,
+        tuning: VoiceTuning
+    ) {
+        perform(
+            .startVoiceDiscovery(
+                VoiceDiscoveryRequest(
+                    modelID: model.id.rawValue,
+                    language: language,
+                    sampleText: text,
+                    tuning: tuning
+                )
+            )
+        )
+    }
+
+    func cancelVoiceStudio() {
+        voicePreview.stop()
+        perform(.cancelVoiceStudio)
+    }
+
+    func playVoicePreview(_ candidate: VoiceCandidateSnapshot) {
+        Task {
+            do {
+                let response = try await send(.voicePreview(candidate.id))
+                guard case .file(let file) = response else {
+                    try requireSuccess(response)
+                    return
+                }
+                try voicePreview.play(data: file.data)
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    func saveVoiceCandidate(
+        _ candidate: VoiceCandidateSnapshot,
+        name: String
+    ) {
+        perform(.saveVoiceCandidate(candidate.id, name: name))
+    }
+
+    func selectVoice(_ profile: VoiceProfileSnapshot) {
+        settings.voiceSelections[profile.modelID] = .profile(profile.id)
+        perform(.selectVoice(profile.id))
+    }
+
+    func renameVoice(_ profile: VoiceProfileSnapshot, name: String) {
+        perform(.renameVoice(profile.id, name: name))
+    }
+
+    func deleteVoice(_ profile: VoiceProfileSnapshot) {
+        voicePreview.stop()
+        perform(.deleteVoice(profile.id))
     }
 
     func addCommunityModel(
@@ -671,6 +734,11 @@ final class AppState {
             lastDiagnosticsRevision = snapshot.diagnosticsRevision
             Task { await loadDiagnostics() }
         }
+        voiceStudio = snapshot.voiceStudio
+        if lastVoicesRevision != snapshot.voicesRevision {
+            lastVoicesRevision = snapshot.voicesRevision
+            Task { await refreshVoices() }
+        }
     }
 
     private func applyDownload(_ snapshot: DownloadSnapshot?) {
@@ -732,6 +800,19 @@ final class AppState {
                 return
             }
             diagnosticEvents = snapshots.map(\.event)
+        } catch {
+            presentError(error.localizedDescription)
+        }
+    }
+
+    private func refreshVoices() async {
+        do {
+            let response = try await send(.voices(modelID: nil))
+            guard case .voices(let profiles) = response else {
+                try requireSuccess(response)
+                return
+            }
+            voiceProfiles = profiles
         } catch {
             presentError(error.localizedDescription)
         }
@@ -842,7 +923,7 @@ final class AppState {
             representationData: representationData,
             source: source.speechJobSource,
             modelID: settings.activeModelID.rawValue,
-            voice: settings.activeVoice,
+            voiceSelection: settings.activeVoiceSelection,
             language: settings.activeLanguage,
             voiceDescription: settings.voiceDescription,
             speakingPace: settings.speakingPace.rawValue,

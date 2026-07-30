@@ -218,6 +218,76 @@ paths:
       responses:
         "202":
           description: Import accepted
+  /voices:
+    get:
+      operationId: listVoices
+      description: Requires the voices:read token scope.
+      parameters:
+        - in: query
+          name: modelID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Saved profiles and per-model selection modes, without reference audio, transcripts, or local paths.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCatalog"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /voices/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    get:
+      operationId: getVoice
+      description: Requires the voices:read token scope.
+      responses:
+        "200":
+          description: Safe saved-voice metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceProfile"
+        "404":
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: renameVoice
+      description: Requires the voices:write token scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameVoice"
+      responses:
+        "202":
+          description: Rename accepted
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteVoice
+      description: Requires the voices:write token scope.
+      responses:
+        "202":
+          description: Deletion accepted
+        "404":
+          $ref: "#/components/responses/Problem"
+  /voices/{id}/select:
+    parameters:
+      - $ref: "#/components/parameters/Identifier"
+    post:
+      operationId: selectVoice
+      description: Requires the voices:write token scope.
+      responses:
+        "202":
+          description: Selection accepted
+        "404":
+          $ref: "#/components/responses/Problem"
   /history:
     get:
       operationId: listHistory
@@ -391,6 +461,9 @@ components:
           type: string
         voice:
           type: string
+          description: Legacy preset identifier. Mutually exclusive with voiceSelection.
+        voiceSelection:
+          $ref: "#/components/schemas/VoiceSelection"
         language:
           type: string
         voiceDescription:
@@ -406,6 +479,120 @@ components:
         permitsLongText:
           type: boolean
           default: false
+    VoiceSelection:
+      oneOf:
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              const: automaticStable
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              const: randomPerParagraph
+        - type: object
+          required: [kind, id]
+          properties:
+            kind:
+              type: string
+              const: preset
+            id:
+              type: string
+        - type: object
+          required: [kind, id]
+          properties:
+            kind:
+              type: string
+              const: profile
+            id:
+              type: string
+              format: uuid
+      discriminator:
+        propertyName: kind
+    VoiceProfile:
+      type: object
+      required:
+        [id, modelID, displayName, origin, duration, createdAt, updatedAt, tuning]
+      properties:
+        id:
+          type: string
+          format: uuid
+        modelID:
+          type: string
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 50
+        origin:
+          type: string
+          enum: [generated, recordedClone]
+        language:
+          type: [string, "null"]
+        duration:
+          type: number
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        tuning:
+          $ref: "#/components/schemas/VoiceTuning"
+    VoiceCatalog:
+      type: object
+      required: [profiles, models]
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceProfile"
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceModelModes"
+    VoiceModelModes:
+      type: object
+      required:
+        [modelID, available, supportedSelectionModes, presets]
+      properties:
+        modelID:
+          type: string
+        available:
+          type: boolean
+        supportedSelectionModes:
+          type: array
+          items:
+            type: string
+            enum: [automaticStable, preset, profile, randomPerParagraph]
+        presets:
+          type: array
+          items:
+            type: string
+        currentSelection:
+          $ref: "#/components/schemas/VoiceSelection"
+    VoiceTuning:
+      type: object
+      required: [preset, parameters]
+      properties:
+        preset:
+          type: string
+          enum: [faithful, natural, expressive]
+        parameters:
+          type: object
+          additionalProperties:
+            type: number
+    RenameVoice:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
     Seconds:
       type: object
       required: [seconds]

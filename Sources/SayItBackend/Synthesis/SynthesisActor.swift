@@ -1,5 +1,7 @@
+@preconcurrency import AVFoundation
 import Foundation
 
+@preconcurrency import MLX
 import MLXAudioCore
 import MLXAudioTTS
 import SayItCore
@@ -84,29 +86,69 @@ actor SynthesisActor: SpeechSynthesizing {
         }
     }
 
+    func generateVoiceSample(
+        model: ModelDescriptor,
+        text: String,
+        language: String?,
+        tuning: VoiceSynthesisTuning,
+        seed: UInt64,
+        reference: VoiceReference? = nil
+    ) async throws -> GeneratedVoiceSample {
+        idleUnloadTask?.cancel()
+        try await ensureModelLoaded(model)
+        guard let loadedModel else {
+            throw SynthesisError.modelNotInstalled
+        }
+        let referenceAudio = try reference.map {
+            try loadReferenceAudio(
+                from: $0.audioURL,
+                targetSampleRate: Double(loadedModel.sampleRate)
+            )
+        }
+        var parameters = loadedModel.defaultGenerationParameters
+        if let value = tuning.parameters["temperature"] {
+            parameters.temperature = Float(value)
+        }
+        if let value = tuning.parameters["topP"] {
+            parameters.topP = Float(value)
+        }
+        if let value = tuning.parameters["topK"] {
+            parameters.topK = Int(value.rounded())
+        }
+        if let value = tuning.parameters["repetitionPenalty"] {
+            parameters.repetitionPenalty = Float(value)
+        }
+        parameters.seed = seed
+        let stream = loadedModel.generateSamplesStream(
+            text: text,
+            voice: nil,
+            refAudio: referenceAudio,
+            refText: reference?.transcript,
+            language: language,
+            generationParameters: parameters
+        )
+        var samples: [Float] = []
+        for try await chunk in stream {
+            try Task.checkCancellation()
+            samples.append(contentsOf: chunk)
+        }
+        guard !samples.isEmpty else {
+            throw SynthesisError.generatedNoAudio
+        }
+        scheduleIdleUnload()
+        return GeneratedVoiceSample(
+            samples: samples,
+            sampleRate: Double(loadedModel.sampleRate)
+        )
+    }
+
     private func run(
         _ request: SpeechRequest,
         continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation
     ) async throws {
-        if loadedModelID != request.model.id {
-            loadedModel = nil
-            loadedModelID = nil
-            loadedTextProcessor = nil
-        }
-
-        if loadedModel == nil {
+        if loadedModelID != request.model.id || loadedModel == nil {
             continuation.yield(.loadingModel(request.model.id))
-            guard let modelURL = await modelURLProvider(request.model.id) else {
-                throw SynthesisError.modelNotInstalled
-            }
-            let textProcessor = makeTextProcessor(for: request.model)
-            loadedModel = try await TTS.loadModel(
-                modelRepo: modelURL.path,
-                modelType: request.model.modelType,
-                textProcessor: textProcessor
-            )
-            loadedModelID = request.model.id
-            loadedTextProcessor = textProcessor
+            try await ensureModelLoaded(request.model)
             continuation.yield(.modelLoaded(request.model.id))
         }
 
@@ -118,6 +160,58 @@ actor SynthesisActor: SpeechSynthesizing {
             to: loadedModel,
             model: request.model
         )
+
+        var referenceAudio = try request.voiceReference.map {
+            try loadReferenceAudio(
+                from: $0.audioURL,
+                targetSampleRate: Double(loadedModel.sampleRate)
+            )
+        }
+        var referenceText = request.voiceReference?.transcript
+        if request.voiceMode == .automaticStable,
+           request.model.capabilities.supportsRandomVoiceSampling {
+            continuation.yield(.creatingArticleVoice)
+            let anchorText = articleVoiceAnchor(
+                language: request.language,
+                modelType: request.model.modelType
+            )
+            var parameters = loadedModel.defaultGenerationParameters
+            if let tuning = request.voiceTuning {
+                if let value = tuning.parameters["temperature"] {
+                    parameters.temperature = Float(value)
+                }
+                if let value = tuning.parameters["topP"] {
+                    parameters.topP = Float(value)
+                }
+                if let value = tuning.parameters["topK"] {
+                    parameters.topK = Int(value.rounded())
+                }
+                if let value = tuning.parameters["repetitionPenalty"] {
+                    parameters.repetitionPenalty = Float(value)
+                }
+            }
+            let anchorVoice = request.model.capabilities.voiceDescription
+                ? request.voiceDescription
+                : nil
+            let anchorStream = loadedModel.generateSamplesStream(
+                text: anchorText,
+                voice: anchorVoice,
+                refAudio: nil,
+                refText: nil,
+                language: request.language,
+                generationParameters: parameters
+            )
+            var anchorSamples: [Float] = []
+            for try await samples in anchorStream {
+                try Task.checkCancellation()
+                anchorSamples.append(contentsOf: samples)
+            }
+            guard !anchorSamples.isEmpty else {
+                throw SynthesisError.generatedNoAudio
+            }
+            referenceAudio = MLXArray(anchorSamples)
+            referenceText = anchorText
+        }
 
         var chunks = try await chunks(for: request, model: loadedModel)
         var chunkCursor = 0
@@ -135,15 +229,35 @@ actor SynthesisActor: SpeechSynthesizing {
 
             let start = ContinuousClock.now
             var chunkSamples = 0
-            let voiceArgument = request.model.capabilities.voiceDescription
-                ? request.voiceDescription
-                : request.voice
+            let usesReference = referenceAudio != nil
+                && request.voiceMode != .randomPerParagraph
+            let voiceArgument = usesReference
+                ? nil
+                : request.model.capabilities.voiceDescription
+                    ? request.voiceDescription
+                    : request.voice
+            var parameters = loadedModel.defaultGenerationParameters
+            if let tuning = request.voiceTuning {
+                if let value = tuning.parameters["temperature"] {
+                    parameters.temperature = Float(value)
+                }
+                if let value = tuning.parameters["topP"] {
+                    parameters.topP = Float(value)
+                }
+                if let value = tuning.parameters["topK"] {
+                    parameters.topK = Int(value.rounded())
+                }
+                if let value = tuning.parameters["repetitionPenalty"] {
+                    parameters.repetitionPenalty = Float(value)
+                }
+            }
             let stream = loadedModel.generateSamplesStream(
                 text: chunk.text,
                 voice: voiceArgument,
-                refAudio: nil,
-                refText: nil,
+                refAudio: usesReference ? referenceAudio : nil,
+                refText: usesReference ? referenceText : nil,
                 language: request.language,
+                generationParameters: parameters,
                 streamingInterval: request.model.playbackMode == .progressive ? 0.32 : 2
             )
 
@@ -231,6 +345,107 @@ actor SynthesisActor: SpeechSynthesizing {
         default:
             nil
         }
+    }
+
+    private func ensureModelLoaded(_ model: ModelDescriptor) async throws {
+        if loadedModelID != model.id {
+            loadedModel = nil
+            loadedModelID = nil
+            loadedTextProcessor = nil
+        }
+        guard loadedModel == nil else { return }
+        guard let modelURL = await modelURLProvider(model.id) else {
+            throw SynthesisError.modelNotInstalled
+        }
+        let textProcessor = makeTextProcessor(for: model)
+        loadedModel = try await TTS.loadModel(
+            modelRepo: modelURL.path,
+            modelType: model.modelType,
+            textProcessor: textProcessor
+        )
+        loadedModelID = model.id
+        loadedTextProcessor = textProcessor
+    }
+
+    private func articleVoiceAnchor(
+        language: String?,
+        modelType: String
+    ) -> String {
+        let normalized = language?.lowercased() ?? "en"
+        let shortText: String
+        switch normalized.split(separator: "-").first {
+        case "zh":
+            shortText = "清晨的阳光轻轻落在安静的房间里，远处传来鸟儿清脆的歌声。"
+        case "ja":
+            shortText = "朝の光が静かな部屋にやさしく差し込み、遠くで鳥の声が聞こえました。"
+        case "ko":
+            shortText = "아침 햇살이 조용한 방 안으로 부드럽게 스며들고 멀리서 새소리가 들렸습니다."
+        case "de":
+            shortText = "Das Morgenlicht fiel sanft in den stillen Raum, während draußen die ersten Vögel sangen."
+        case "fr":
+            shortText = "La lumière du matin entrait doucement dans la pièce calme, tandis que les oiseaux chantaient au loin."
+        case "es":
+            shortText = "La luz de la mañana entraba suavemente en la habitación tranquila mientras cantaban los pájaros."
+        case "it":
+            shortText = "La luce del mattino entrava dolcemente nella stanza tranquilla mentre gli uccelli cantavano."
+        case "pt":
+            shortText = "A luz da manhã entrava suavemente na sala tranquila enquanto os pássaros cantavam ao longe."
+        case "ru":
+            shortText = "Утренний свет мягко наполнял тихую комнату, а вдали уже пели первые птицы."
+        default:
+            shortText = "Morning light settled softly across the quiet room while the first birds began to sing outside."
+        }
+        if modelType.lowercased() == "fish_speech" {
+            return "\(shortText) The day felt unhurried, clear, and full of small possibilities."
+        }
+        return shortText
+    }
+
+    private func loadReferenceAudio(
+        from url: URL,
+        targetSampleRate: Double
+    ) throws -> MLXArray {
+        let file = try AVAudioFile(forReading: url)
+        let frameCount = AVAudioFrameCount(file.length)
+        guard frameCount > 0,
+              let buffer = AVAudioPCMBuffer(
+                  pcmFormat: file.processingFormat,
+                  frameCapacity: frameCount
+              ) else {
+            throw SynthesisError.invalidReferenceAudio
+        }
+        try file.read(into: buffer)
+        guard let channels = buffer.floatChannelData else {
+            throw SynthesisError.invalidReferenceAudio
+        }
+        let count = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        var mono = [Float](repeating: 0, count: count)
+        for channelIndex in 0..<channelCount {
+            for sampleIndex in 0..<count {
+                mono[sampleIndex] += channels[channelIndex][sampleIndex]
+                    / Float(channelCount)
+            }
+        }
+        let sourceRate = buffer.format.sampleRate
+        if abs(sourceRate - targetSampleRate) < 1 {
+            return MLXArray(mono)
+        }
+        let outputCount = max(
+            Int(Double(mono.count) * targetSampleRate / sourceRate),
+            1
+        )
+        var resampled = [Float](repeating: 0, count: outputCount)
+        for outputIndex in 0..<outputCount {
+            let sourcePosition = Double(outputIndex) * sourceRate
+                / targetSampleRate
+            let lower = min(Int(sourcePosition), mono.count - 1)
+            let upper = min(lower + 1, mono.count - 1)
+            let fraction = Float(sourcePosition - Double(lower))
+            resampled[outputIndex] =
+                mono[lower] * (1 - fraction) + mono[upper] * fraction
+        }
+        return MLXArray(resampled)
     }
 
     private func chunks(

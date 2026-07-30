@@ -8,6 +8,9 @@ public struct ModelCapabilities: Codable, Equatable, Sendable {
     public let longForm: Bool
     public let languageSelection: Bool
     public let requiresReferenceAudio: Bool
+    public let voiceDiscovery: Bool?
+    public let randomVoiceSampling: Bool?
+    public let voiceCloneRequirements: VoiceCloneRequirements?
 
     public init(
         presetVoices: Bool,
@@ -16,7 +19,10 @@ public struct ModelCapabilities: Codable, Equatable, Sendable {
         streaming: Bool,
         longForm: Bool,
         languageSelection: Bool,
-        requiresReferenceAudio: Bool
+        requiresReferenceAudio: Bool,
+        voiceDiscovery: Bool? = nil,
+        randomVoiceSampling: Bool? = nil,
+        voiceCloneRequirements: VoiceCloneRequirements? = nil
     ) {
         self.presetVoices = presetVoices
         self.voiceDescription = voiceDescription
@@ -25,9 +31,20 @@ public struct ModelCapabilities: Codable, Equatable, Sendable {
         self.longForm = longForm
         self.languageSelection = languageSelection
         self.requiresReferenceAudio = requiresReferenceAudio
+        self.voiceDiscovery = voiceDiscovery
+        self.randomVoiceSampling = randomVoiceSampling
+        self.voiceCloneRequirements = voiceCloneRequirements
     }
 
     public var canReadAloudInVersionOne: Bool {
         !requiresReferenceAudio
+    }
+
+    public var supportsVoiceDiscovery: Bool {
+        voiceDiscovery == true
+    }
+
+    public var supportsRandomVoiceSampling: Bool {
+        randomVoiceSampling == true
     }
 }

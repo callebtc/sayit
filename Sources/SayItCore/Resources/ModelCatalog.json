@@ -228,7 +228,16 @@
         "streaming": true,
         "longForm": true,
         "languageSelection": true,
-        "requiresReferenceAudio": false
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": true,
+        "randomVoiceSampling": true,
+        "voiceCloneRequirements": {
+          "minimumDuration": 3,
+          "recommendedMinimumDuration": 6,
+          "recommendedMaximumDuration": 10,
+          "maximumDuration": 15,
+          "transcriptRequired": true
+        }
       },
       "playbackMode": "buffered",
       "files": [],
@@ -265,7 +274,16 @@
         "streaming": true,
         "longForm": true,
         "languageSelection": false,
-        "requiresReferenceAudio": false
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 5,
+          "recommendedMinimumDuration": 8,
+          "recommendedMaximumDuration": 12,
+          "maximumDuration": 15,
+          "transcriptRequired": false
+        }
       },
       "playbackMode": "buffered",
       "files": [],
@@ -302,7 +320,16 @@
         "streaming": false,
         "longForm": true,
         "languageSelection": false,
-        "requiresReferenceAudio": false
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": true,
+        "randomVoiceSampling": true,
+        "voiceCloneRequirements": {
+          "minimumDuration": 3,
+          "recommendedMinimumDuration": 5,
+          "recommendedMaximumDuration": 10,
+          "maximumDuration": 10,
+          "transcriptRequired": true
+        }
       },
       "playbackMode": "buffered",
       "files": [],
@@ -339,7 +366,16 @@
         "streaming": true,
         "longForm": true,
         "languageSelection": true,
-        "requiresReferenceAudio": false
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": true,
+        "randomVoiceSampling": true,
+        "voiceCloneRequirements": {
+          "minimumDuration": 10,
+          "recommendedMinimumDuration": 12,
+          "recommendedMaximumDuration": 20,
+          "maximumDuration": 30,
+          "transcriptRequired": true
+        }
       },
       "playbackMode": "buffered",
       "files": [],

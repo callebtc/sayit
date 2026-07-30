@@ -14,6 +14,9 @@ final class SpeechItem {
     var modelIDRawValue: String
     var modelRevision: String
     var voice: String?
+    var voiceModeRawValue: String?
+    var voiceProfileID: UUID?
+    var voiceProfileName: String?
     var language: String?
     var duration: Double
     var characterCount: Int
@@ -32,6 +35,9 @@ final class SpeechItem {
         modelIDRawValue: String,
         modelRevision: String,
         voice: String?,
+        voiceModeRawValue: String?,
+        voiceProfileID: UUID?,
+        voiceProfileName: String?,
         language: String?,
         characterCount: Int
     ) {
@@ -45,6 +51,9 @@ final class SpeechItem {
         self.modelIDRawValue = modelIDRawValue
         self.modelRevision = modelRevision
         self.voice = voice
+        self.voiceModeRawValue = voiceModeRawValue
+        self.voiceProfileID = voiceProfileID
+        self.voiceProfileName = voiceProfileName
         self.language = language
         duration = 0
         self.characterCount = characterCount

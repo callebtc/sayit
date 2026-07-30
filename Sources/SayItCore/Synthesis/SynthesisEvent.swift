@@ -3,6 +3,7 @@ import Foundation
 public enum SynthesisEvent: Sendable {
     case loadingModel(ModelID)
     case modelLoaded(ModelID)
+    case creatingArticleVoice
     case chunkStarted(index: Int, text: String)
     case audio(AudioChunk)
     case metrics(SynthesisMetrics)

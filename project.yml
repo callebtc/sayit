@@ -316,6 +316,19 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.backend-tests
 
+  SayItHTTPTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItHTTPTests
+    dependencies:
+      - target: SayItHTTP
+      - target: SayItProtocol
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.sayit.mac.http-tests
+
   SayItUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -337,6 +350,7 @@ schemes:
         SayItCoreTests: [test]
         SayItProtocolTests: [test]
         SayItBackendTests: [test]
+        SayItHTTPTests: [test]
     run:
       config: Debug
     test:
@@ -345,6 +359,7 @@ schemes:
         - SayItCoreTests
         - SayItProtocolTests
         - SayItBackendTests
+        - SayItHTTPTests
         - SayItUITests
     archive:
       config: Release

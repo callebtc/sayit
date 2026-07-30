@@ -45,8 +45,9 @@ extension SayItHTTPServer {
                     HTTPSubmission.self,
                     request: request
                 )
+                let submission = try body.serviceSubmission()
                 let result = await self.backend.handle(
-                    ServiceRequest(command: .submit(body.serviceSubmission))
+                    ServiceRequest(command: .submit(submission))
                 )
                 if case .job(let job) = result, let idempotencyKey {
                     await self.idempotencyStore.store(

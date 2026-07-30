@@ -16,6 +16,7 @@ struct SayItCommand: AsyncParsableCommand {
             SeekCommand.self,
             SkipCommand.self,
             ModelsCommand.self,
+            VoicesCommand.self,
             HistoryCommand.self,
             ServiceControlCommand.self
         ],

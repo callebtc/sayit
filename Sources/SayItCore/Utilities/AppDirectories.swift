@@ -8,6 +8,8 @@ public struct AppDirectories: Sendable {
     public let hubCache: URL
     public let temporary: URL
     public let downloads: URL
+    public let voiceProfiles: URL
+    public let voiceDrafts: URL
 
     public init(
         applicationSupport: URL,
@@ -16,7 +18,9 @@ public struct AppDirectories: Sendable {
         diagnostics: URL,
         hubCache: URL,
         temporary: URL,
-        downloads: URL
+        downloads: URL,
+        voiceProfiles: URL,
+        voiceDrafts: URL
     ) {
         self.applicationSupport = applicationSupport
         self.models = models
@@ -25,6 +29,8 @@ public struct AppDirectories: Sendable {
         self.hubCache = hubCache
         self.temporary = temporary
         self.downloads = downloads
+        self.voiceProfiles = voiceProfiles
+        self.voiceDrafts = voiceDrafts
     }
 
     public static func live() throws -> AppDirectories {
@@ -110,7 +116,15 @@ public struct AppDirectories: Sendable {
                 directoryHint: .isDirectory
             ),
             temporary: caches.appending(path: "Generation", directoryHint: .isDirectory),
-            downloads: caches.appending(path: "Downloads", directoryHint: .isDirectory)
+            downloads: caches.appending(path: "Downloads", directoryHint: .isDirectory),
+            voiceProfiles: support.appending(
+                path: "Voice Profiles",
+                directoryHint: .isDirectory
+            ),
+            voiceDrafts: caches.appending(
+                path: "Voice Studio",
+                directoryHint: .isDirectory
+            )
         )
         for url in [
             directories.applicationSupport,
@@ -119,7 +133,9 @@ public struct AppDirectories: Sendable {
             directories.diagnostics,
             directories.hubCache,
             directories.temporary,
-            directories.downloads
+            directories.downloads,
+            directories.voiceProfiles,
+            directories.voiceDrafts
         ] {
             try FileManager.default.createDirectory(
                 at: url,

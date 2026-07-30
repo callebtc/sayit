@@ -55,7 +55,79 @@ struct ProtocolRoundTripTests {
     func tokenPresetsNeverGrantWritesToReadOnlyClients() {
         #expect(!APITokenPreset.readOnly.scopes.contains(.speechSubmit))
         #expect(!APITokenPreset.readOnly.scopes.contains(.settingsWrite))
+        #expect(APITokenPreset.readOnly.scopes.contains(.voicesRead))
+        #expect(!APITokenPreset.readOnly.scopes.contains(.voicesWrite))
         #expect(APITokenPreset.fullAccess.scopes == Set(APITokenScope.allCases))
+    }
+
+    @Test
+    func voiceSelectionsRoundTripThroughJSON() throws {
+        let profileID = UUID()
+        let selections: [VoiceSelection] = [
+            .automaticStable,
+            .preset("af_heart"),
+            .profile(profileID),
+            .randomPerParagraph
+        ]
+
+        for selection in selections {
+            let encoded = try SayItWireCodec.encode(selection)
+            let decoded = try SayItWireCodec.decode(
+                VoiceSelection.self,
+                from: encoded
+            )
+            #expect(decoded == selection)
+        }
+    }
+
+    @Test
+    func legacyVoiceMigratesToCurrentModelPreset() throws {
+        let legacyJSON = """
+        {
+          "activeModelID": "kokoro-bf16",
+          "activeVoice": "af_sky",
+          "activeLanguage": "en-US",
+          "voiceDescription": "",
+          "speakingPace": 1,
+          "playbackRate": 1,
+          "rewindInterval": 15,
+          "forwardInterval": 30,
+          "showNowPlayingTitles": false,
+          "retentionPeriod": "thirtyDays",
+          "historyQuotaBytes": 2147483648,
+          "httpEnabled": false,
+          "httpPort": 59125
+        }
+        """
+
+        let settings = try SayItWireCodec.decode(
+            BackendSettingsSnapshot.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        #expect(settings.voiceSelections["kokoro-bf16"] == .preset("af_sky"))
+    }
+
+    @Test
+    func speechSubmissionRetainsLegacyVoiceCompatibility() throws {
+        let legacyJSON = """
+        {
+          "text": "Legacy request",
+          "inputFormat": "plainText",
+          "source": "commandLine",
+          "voice": "af_heart",
+          "queuePolicy": "enqueue",
+          "permitsLongText": false
+        }
+        """
+
+        let submission = try SayItWireCodec.decode(
+            SpeechSubmission.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        #expect(submission.voice == "af_heart")
+        #expect(submission.voiceSelection == nil)
     }
 
     @Test

@@ -6,6 +6,8 @@ public enum ServiceResponse: Codable, Sendable {
     case job(SpeechJob)
     case jobs([SpeechJob])
     case models([ModelSnapshot])
+    case voices([VoiceProfileSnapshot])
+    case voiceStudio(VoiceStudioSnapshot)
     case history([HistorySnapshot])
     case diagnostics([DiagnosticSnapshot])
     case tokens([APITokenMetadata])

@@ -33,6 +33,7 @@ public final class SayItHTTPServer: Sendable {
         registerJobRoutes(on: router)
         registerPlaybackRoutes(on: router)
         registerModelRoutes(on: router)
+        registerVoiceRoutes(on: router)
         registerHistoryRoutes(on: router)
         registerSettingsRoutes(on: router)
         let app = Application(

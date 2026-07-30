@@ -7,6 +7,7 @@ public struct SpeechSubmission: Codable, Sendable {
     public let source: SpeechJobSource
     public let modelID: String?
     public let voice: String?
+    public let voiceSelection: VoiceSelection?
     public let language: String?
     public let voiceDescription: String?
     public let speakingPace: Double?
@@ -21,6 +22,7 @@ public struct SpeechSubmission: Codable, Sendable {
         source: SpeechJobSource,
         modelID: String? = nil,
         voice: String? = nil,
+        voiceSelection: VoiceSelection? = nil,
         language: String? = nil,
         voiceDescription: String? = nil,
         speakingPace: Double? = nil,
@@ -34,6 +36,7 @@ public struct SpeechSubmission: Codable, Sendable {
         self.source = source
         self.modelID = modelID
         self.voice = voice
+        self.voiceSelection = voiceSelection
         self.language = language
         self.voiceDescription = voiceDescription
         self.speakingPace = speakingPace
