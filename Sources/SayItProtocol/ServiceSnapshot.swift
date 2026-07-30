@@ -6,6 +6,7 @@ public struct ServiceSnapshot: Codable, Sendable {
     public let revision: UInt64
     public let statusText: String
     public let lastError: String?
+    public let httpServiceError: String?
     public let activeJob: SpeechJob?
     public let queuedJobs: [SpeechJob]
     public let playback: PlaybackSnapshot
@@ -22,6 +23,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         revision: UInt64,
         statusText: String,
         lastError: String?,
+        httpServiceError: String? = nil,
         activeJob: SpeechJob?,
         queuedJobs: [SpeechJob],
         playback: PlaybackSnapshot,
@@ -37,6 +39,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         self.revision = revision
         self.statusText = statusText
         self.lastError = lastError
+        self.httpServiceError = httpServiceError
         self.activeJob = activeJob
         self.queuedJobs = queuedJobs
         self.playback = playback

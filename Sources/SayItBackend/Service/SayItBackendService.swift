@@ -37,6 +37,7 @@ public final class SayItBackendService: SayItService {
     private var activeRequest: SpeechRequest?
     private var statusText = "Starting service"
     private var errorMessage: String?
+    private var httpServiceError: String?
     private var revision: UInt64 = 0
     private var modelsRevision: UInt64 = 0
     private var historyRevision: UInt64 = 0
@@ -196,7 +197,16 @@ public final class SayItBackendService: SayItService {
         var settings = settingsStore.value
         settings.httpEnabled = false
         try? settingsStore.update(settings)
-        await reportServiceError(message)
+        httpServiceError = message
+        revision &+= 1
+        await diagnostics.record(
+            DiagnosticEvent(
+                severity: .error,
+                category: .lifecycle,
+                code: "http.server_failed"
+            )
+        )
+        diagnosticsRevision &+= 1
     }
 
     public func importUploadedModel(from directory: URL) async throws {
@@ -811,6 +821,7 @@ public final class SayItBackendService: SayItService {
             revision: revision,
             statusText: statusText,
             lastError: errorMessage,
+            httpServiceError: httpServiceError,
             activeJob: activeJob,
             queuedJobs: queuedJobIDs.compactMap { jobsByID[$0] },
             playback: PlaybackSnapshot(
@@ -1196,7 +1207,8 @@ public final class SayItBackendService: SayItService {
     private func updateSettings(
         _ settings: BackendSettingsSnapshot
     ) async throws {
-        let previousModelID = settingsStore.value.activeModelID
+        let previousSettings = settingsStore.value
+        let previousModelID = previousSettings.activeModelID
         guard models.contains(where: {
             $0.id.rawValue == settings.activeModelID
         }) else {
@@ -1218,6 +1230,10 @@ public final class SayItBackendService: SayItService {
             )
         }
         try settingsStore.update(settings)
+        if settings.httpEnabled != previousSettings.httpEnabled
+            || settings.httpPort != previousSettings.httpPort {
+            httpServiceError = nil
+        }
         applyPlaybackSettings(settings)
         if settings.activeModelID != previousModelID,
            installedModelIDs.contains(ModelID(settings.activeModelID)) {
