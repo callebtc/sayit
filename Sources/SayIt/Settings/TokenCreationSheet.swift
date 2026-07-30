@@ -12,7 +12,7 @@ struct TokenCreationSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Create API Token")
+            Text("Create Access Token")
                 .font(.title2)
                 .bold()
                 .accessibilityAddTraits(.isHeader)
@@ -46,6 +46,12 @@ struct TokenCreationSheet: View {
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
+
+                if let message = state.apiTokenErrorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
             }
 
             HStack {
@@ -58,7 +64,7 @@ struct TokenCreationSheet: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Button("Create Token") {
+                Button("Create Access Token") {
                     create()
                 }
                 .buttonStyle(.borderedProminent)

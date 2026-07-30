@@ -7,6 +7,41 @@ import Testing
 @MainActor
 struct SpeechQueuePolicyTests {
     @Test
+    func httpServiceFailuresDoNotReplacePlayerWithAGlobalError() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString,
+            directoryHint: .isDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let service = try SayItBackendService(
+            directories: AppDirectories.testing(root: root),
+            playback: MockPlaybackController()
+        )
+        await service.start()
+
+        var settings = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        ).settings
+        settings.httpEnabled = true
+        _ = await service.handle(
+            ServiceRequest(command: .updateSettings(settings))
+        )
+
+        let message = "HTTP API could not start because the port is in use."
+        await service.reportHTTPServiceError(message)
+
+        let failedSnapshot = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        )
+        #expect(failedSnapshot.lastError == nil)
+        #expect(failedSnapshot.statusText == "Ready to speak")
+        #expect(failedSnapshot.httpServiceError == message)
+        #expect(!failedSnapshot.settings.httpEnabled)
+    }
+
+    @Test
     func queuePoliciesPreserveFIFOAndCancelReplacedWork() async throws {
         let root = FileManager.default.temporaryDirectory.appending(
             path: UUID().uuidString,

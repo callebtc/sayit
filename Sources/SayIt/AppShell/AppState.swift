@@ -43,6 +43,8 @@ final class AppState {
     private(set) var serviceConnection: ServiceConnectionState = .connecting
     private(set) var backendSettings = BackendSettingsSnapshot()
     private(set) var apiTokens: [APITokenMetadata] = []
+    private(set) var httpAPIErrorMessage: String?
+    private(set) var apiTokenErrorMessage: String?
     private(set) var oneTimeTokenSecret: String?
     private(set) var updateStatus = "Up to date"
     private(set) var availableUpdateURL: URL?
@@ -410,16 +412,7 @@ final class AppState {
 
     func refreshTokens() {
         Task {
-            do {
-                let response = try await send(.tokens)
-                guard case .tokens(let tokens) = response else {
-                    try requireSuccess(response)
-                    return
-                }
-                apiTokens = tokens
-            } catch {
-                presentError(error.localizedDescription)
-            }
+            await loadTokens()
         }
     }
 
@@ -432,11 +425,12 @@ final class AppState {
                 try requireSuccess(response)
                 return false
             }
+            apiTokenErrorMessage = nil
             oneTimeTokenSecret = creation.secret
             await loadTokens()
             return true
         } catch {
-            presentError(error.localizedDescription)
+            apiTokenErrorMessage = error.localizedDescription
             return false
         }
     }
@@ -445,8 +439,21 @@ final class AppState {
         oneTimeTokenSecret = nil
     }
 
+    func clearAPITokenError() {
+        apiTokenErrorMessage = nil
+    }
+
     func revokeToken(_ token: APITokenMetadata) {
-        perform(.revokeToken(token.id))
+        Task {
+            do {
+                let response = try await send(.revokeToken(token.id))
+                try requireSuccess(response)
+                apiTokenErrorMessage = nil
+                await loadTokens()
+            } catch {
+                apiTokenErrorMessage = error.localizedDescription
+            }
+        }
     }
 
     func updateHTTP(enabled: Bool, port: Int) {
@@ -454,7 +461,15 @@ final class AppState {
         snapshot.httpEnabled = enabled
         snapshot.httpPort = port
         backendSettings = snapshot
-        perform(.updateSettings(snapshot))
+        httpAPIErrorMessage = nil
+        Task {
+            do {
+                let response = try await send(.updateSettings(snapshot))
+                try requireSuccess(response)
+            } catch {
+                httpAPIErrorMessage = error.localizedDescription
+            }
+        }
     }
 
     func restartBackgroundService() {
@@ -614,6 +629,7 @@ final class AppState {
         serviceConnection = .online(version: snapshot.serviceVersion)
         statusText = snapshot.statusText
         errorMessage = snapshot.lastError
+        httpAPIErrorMessage = snapshot.httpServiceError
         needsLongTextConfirmation =
             snapshot.activeJob?.state == .awaitingConfirmation
         installedModelIDs = Set(
@@ -729,8 +745,9 @@ final class AppState {
                 return
             }
             apiTokens = tokens
+            apiTokenErrorMessage = nil
         } catch {
-            presentError(error.localizedDescription)
+            apiTokenErrorMessage = error.localizedDescription
         }
     }
 
@@ -772,9 +789,6 @@ final class AppState {
             do {
                 let response = try await send(command)
                 try requireSuccess(response)
-                if case .revokeToken = command {
-                    await loadTokens()
-                }
             } catch {
                 presentError(error.localizedDescription)
             }

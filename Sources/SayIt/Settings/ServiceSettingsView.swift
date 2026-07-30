@@ -66,7 +66,7 @@ struct ServiceSettingsView: View {
             }
 
             Section {
-                Toggle("Enable HTTP API", isOn: $httpEnabled)
+                Toggle("Enable local automation API", isOn: $httpEnabled)
                     .onChange(of: httpEnabled) { _, _ in
                         updateHTTP()
                     }
@@ -76,7 +76,6 @@ struct ServiceSettingsView: View {
                     format: .number.grouping(.never)
                 )
                 .frame(width: 110)
-                .disabled(!httpEnabled)
                 .onSubmit(updateHTTP)
 
                 LabeledContent("Base URL") {
@@ -92,17 +91,26 @@ struct ServiceSettingsView: View {
                         .buttonStyle(CircularIconButtonStyle(size: 22))
                     }
                 }
+
+                if let message = state.httpAPIErrorMessage {
+                    Label(
+                        "The local API was turned off. \(message)",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                }
             } header: {
-                Text("Local HTTP API")
+                Text("Local automation API")
             } footer: {
                 Text(
-                    "The API listens only on this Mac’s loopback interface. Requests require a scoped bearer token."
+                    "Optional. The Say It player and command-line tool do not use this API. It accepts requests only from this Mac and requires an access token."
                 )
             }
 
-            Section("API tokens") {
+            Section {
                 if state.apiTokens.isEmpty {
-                    Text("No API tokens")
+                    Text("No access tokens")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(state.apiTokens) { token in
@@ -114,9 +122,20 @@ struct ServiceSettingsView: View {
                     )
                 }
                 Button(
-                    "Create Token…",
+                    "Create Access Token…",
                     systemImage: "plus",
                     action: showTokenCreation
+                )
+                if let message = state.apiTokenErrorMessage {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Automation access tokens")
+            } footer: {
+                Text(
+                    "Only apps or scripts using the optional local automation API need a token."
                 )
             }
 
@@ -149,6 +168,9 @@ struct ServiceSettingsView: View {
             synchronize()
             state.refreshTokens()
         }
+        .onChange(of: state.backendSettings) {
+            synchronizeHTTPSettings()
+        }
         .sheet(isPresented: $isCreatingToken) {
             TokenCreationSheet()
                 .environment(state)
@@ -158,7 +180,7 @@ struct ServiceSettingsView: View {
                 .environment(state)
         }
         .confirmationDialog(
-            "Revoke this API token?",
+            "Revoke this access token?",
             isPresented: revokeConfirmationPresented,
             presenting: tokenToRevoke
         ) { token in
@@ -199,6 +221,10 @@ struct ServiceSettingsView: View {
 
     private func synchronize() {
         state.backgroundService.refresh()
+        synchronizeHTTPSettings()
+    }
+
+    private func synchronizeHTTPSettings() {
         httpEnabled = state.backendSettings.httpEnabled
         httpPort = state.backendSettings.httpPort
     }
@@ -229,6 +255,7 @@ struct ServiceSettingsView: View {
     }
 
     private func showTokenCreation() {
+        state.clearAPITokenError()
         isCreatingToken = true
     }
 

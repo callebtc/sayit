@@ -6,7 +6,10 @@ struct OneTimeTokenSecretView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Label("Token created", systemImage: "checkmark.circle.fill")
+            Label(
+                "Access token created",
+                systemImage: "checkmark.circle.fill"
+            )
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundStyle(.green)
