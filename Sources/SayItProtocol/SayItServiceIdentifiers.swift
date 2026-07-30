@@ -2,7 +2,7 @@ import Foundation
 
 public enum SayItServiceIdentifiers {
     public static let appGroup = "group.com.sayit.mac"
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
     public static let machService = "com.sayit.mac.agent.debug"
 #else
     public static let machService = "group.com.sayit.mac.agent"

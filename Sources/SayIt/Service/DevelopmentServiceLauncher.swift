@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
 import Foundation
 import SayItProtocol
 import SayItXPC

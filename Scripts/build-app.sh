@@ -16,11 +16,13 @@ xcodegen generate --spec "$project_root/project.yml" \
     --project "$project_root"
 
 build() {
+    echo "Building Say It (Release)…"
     DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
     CLANG_MODULE_CACHE_PATH="$module_cache" \
     SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
     XDG_CACHE_HOME="$swiftpm_cache" \
         xcodebuild \
+        -quiet \
         -project "$project_root/SayIt.xcodeproj" \
         -scheme SayIt \
         -configuration Release \
@@ -40,18 +42,10 @@ if [ "$sign_identity" = "-" ]; then
     build \
         CODE_SIGNING_ALLOWED=NO \
         CODE_SIGNING_REQUIRED=NO \
-        ENABLE_HARDENED_RUNTIME=NO
+        ENABLE_HARDENED_RUNTIME=NO \
+        SAYIT_LOCAL_SWIFT_FLAG=-DSAYIT_LOCAL_BUILD
 
     codesign --force --deep --sign - "$app_root"
-    codesign --force --sign - \
-        --entitlements "$project_root/Config/SayItAgent.entitlements" \
-        "$app_root/Contents/Library/LaunchServices/SayItAgent"
-    codesign --force --sign - \
-        --entitlements "$project_root/Config/SayItCLI.entitlements" \
-        "$app_root/Contents/Helpers/sayit"
-    codesign --force --sign - \
-        --entitlements "$project_root/Config/SayIt.entitlements" \
-        "$app_root"
 else
     build \
         CODE_SIGN_IDENTITY="$sign_identity" \
@@ -59,5 +53,5 @@ else
         ENABLE_HARDENED_RUNTIME=YES
 fi
 
-codesign --verify --deep --strict --verbose=2 "$app_root"
+codesign --verify --deep --strict "$app_root"
 echo "$app_root"

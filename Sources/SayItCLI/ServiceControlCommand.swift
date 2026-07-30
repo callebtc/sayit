@@ -116,7 +116,7 @@ enum CLIServiceJob {
     }
 
     private static var label: String {
-        #if DEBUG
+        #if DEBUG || SAYIT_LOCAL_BUILD
         "com.sayit.mac.agent.debug"
         #else
         "com.sayit.mac.agent"

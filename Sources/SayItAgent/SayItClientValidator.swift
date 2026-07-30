@@ -4,7 +4,7 @@ import SayItProtocol
 
 struct SayItClientValidator {
     func accepts(_ connection: NSXPCConnection) -> Bool {
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
         return connection.effectiveUserIdentifier == geteuid()
 #else
         guard connection.effectiveUserIdentifier == geteuid(),
@@ -25,7 +25,11 @@ struct SayItClientValidator {
 #endif
     }
 
-#if !DEBUG
+#if !DEBUG && !SAYIT_LOCAL_BUILD
+    private func isAuthorizedClient(_ client: SigningInformation) -> Bool {
+        client.hasClientEntitlement
+    }
+
     private func signingInformation(
         processIdentifier: pid_t
     ) -> SigningInformation? {
@@ -77,7 +81,7 @@ struct SayItClientValidator {
 #endif
 }
 
-#if !DEBUG
+#if !DEBUG && !SAYIT_LOCAL_BUILD
 private struct SigningInformation {
     let identifier: String
     let teamIdentifier: String?

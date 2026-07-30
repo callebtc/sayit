@@ -38,7 +38,7 @@ public struct AppDirectories: Sendable {
     public static func shared(
         appGroupIdentifier: String
     ) throws -> AppDirectories {
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
         if ProcessInfo.processInfo.environment[
             "SAYIT_USE_APP_GROUP_CONTAINER"
         ] != "1" {
@@ -48,7 +48,7 @@ public struct AppDirectories: Sendable {
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else {
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
             return try debugServiceDirectories()
 #else
             throw CocoaError(.fileNoSuchFile)
@@ -66,7 +66,7 @@ public struct AppDirectories: Sendable {
         )
     }
 
-#if DEBUG
+#if DEBUG || SAYIT_LOCAL_BUILD
     private static func debugServiceDirectories() throws -> AppDirectories {
         let support = URL.applicationSupportDirectory.appending(
             path: "Say It Service (Debug)",

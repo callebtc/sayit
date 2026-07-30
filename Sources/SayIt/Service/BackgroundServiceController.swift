@@ -18,7 +18,7 @@ final class BackgroundServiceController {
     private(set) var status: SMAppService.Status
     private(set) var errorMessage: String?
     private(set) var isWorking = false
-    #if DEBUG
+    #if DEBUG || SAYIT_LOCAL_BUILD
     private(set) var isDevelopmentServiceRunning = false
     #endif
 
@@ -27,7 +27,7 @@ final class BackgroundServiceController {
     }
 
     var isEnabled: Bool {
-        #if DEBUG
+        #if DEBUG || SAYIT_LOCAL_BUILD
         isDevelopmentServiceRunning
         #else
         status == .enabled || status == .requiresApproval
@@ -44,7 +44,7 @@ final class BackgroundServiceController {
         if isWorking {
             return "Working…"
         }
-        #if DEBUG
+        #if DEBUG || SAYIT_LOCAL_BUILD
         return isDevelopmentServiceRunning ? "Running" : "Off"
         #else
         return switch status {
@@ -71,7 +71,7 @@ final class BackgroundServiceController {
         await perform {
             await legacyCleanupIfNeeded()
             writeParentProcessFile()
-            #if DEBUG
+            #if DEBUG || SAYIT_LOCAL_BUILD
             try await ensureDevelopmentServiceRunning()
             #else
             if status == .enabled, parentProcessFileMatches {
@@ -92,7 +92,7 @@ final class BackgroundServiceController {
 
     func disable() async {
         await perform {
-            #if DEBUG
+            #if DEBUG || SAYIT_LOCAL_BUILD
             if DevelopmentServiceLauncher.isLoaded {
                 try DevelopmentServiceLauncher.unregister()
             }
@@ -111,7 +111,7 @@ final class BackgroundServiceController {
     func restart() async {
         await perform {
             writeParentProcessFile()
-            #if DEBUG
+            #if DEBUG || SAYIT_LOCAL_BUILD
             try await ensureDevelopmentServiceRunning()
             #else
             try await restartRegisteredService()
@@ -120,7 +120,7 @@ final class BackgroundServiceController {
     }
 
     func terminateForQuit() async {
-        #if DEBUG
+        #if DEBUG || SAYIT_LOCAL_BUILD
         if DevelopmentServiceLauncher.isLoaded {
             try? DevelopmentServiceLauncher.unregister()
         }
@@ -151,7 +151,7 @@ final class BackgroundServiceController {
     }
 
     private func legacyCleanupIfNeeded() async {
-        #if DEBUG
+        #if DEBUG || SAYIT_LOCAL_BUILD
         guard !UserDefaults.standard.bool(
             forKey: Self.legacyCleanupDefaultsKey
         ) else {
@@ -259,7 +259,7 @@ final class BackgroundServiceController {
         }
     }
 
-    #if DEBUG
+    #if DEBUG || SAYIT_LOCAL_BUILD
     private func ensureDevelopmentServiceRunning() async throws {
         try await DevelopmentServiceLauncher.ensureRunning(
             agentURL: agentURL
