@@ -20,6 +20,7 @@ final class AppState {
     private let client = SayItXPCClient()
     private let migration = BackendMigrationCoordinator()
     private let updateChecker = UpdateChecker()
+    private var startupTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
     private var serviceRepairTask: Task<Void, Never>?
@@ -60,6 +61,21 @@ final class AppState {
     }
 
     func startup() async {
+        if let startupTask {
+            await startupTask.value
+            return
+        }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performStartup()
+        }
+        startupTask = task
+        await task.value
+        startupTask = nil
+    }
+
+    private func performStartup() async {
         do {
             try await migration.migrate(
                 settings: settings.backendSnapshot()
@@ -739,6 +755,9 @@ final class AppState {
 
     private func submit(_ submission: SpeechSubmission) {
         Task {
+            if !isServiceOnline {
+                await startup()
+            }
             do {
                 let response = try await send(.submit(submission))
                 try requireSuccess(response)
