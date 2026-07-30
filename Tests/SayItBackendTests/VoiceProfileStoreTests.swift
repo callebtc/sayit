@@ -66,6 +66,74 @@ struct VoiceProfileStoreTests {
         }
     }
 
+    @Test("Recorded clones retain local metadata and reference audio")
+    @MainActor
+    func recordedClonePersistence() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let sessionID = UUID()
+        let recordingID = UUID()
+        let directory = try store.prepareDraftDirectory(id: sessionID)
+        let referenceURL = directory.appending(path: "clone-reference.wav")
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: referenceURL)
+        let tuning = VoiceTuning(
+            preset: .expressive,
+            parameters: ["temperature": 0.9]
+        )
+        let draft = VoiceCloneDraft(
+            sessionID: sessionID,
+            recordingID: recordingID,
+            modelID: "chatterbox-fp16",
+            language: "en-US",
+            transcript: "The retained local transcript.",
+            duration: 9,
+            tuning: tuning,
+            referenceURL: referenceURL
+        )
+
+        let saved = try store.saveRecorded(draft, name: "Velvet Finch")
+        let record = try #require(store.record(id: saved.id))
+
+        #expect(saved.origin == .recordedClone)
+        #expect(record.transcript == "The retained local transcript.")
+        #expect(record.tuning == tuning)
+        #expect(
+            FileManager.default.fileExists(
+                atPath: try store.referenceURL(for: record).path
+            )
+        )
+    }
+
+    @Test("Drafts older than twenty-four hours are pruned")
+    @MainActor
+    func oldDraftCleanup() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let oldDraft = directories.voiceDrafts.appending(
+            path: UUID().uuidString
+        )
+        try FileManager.default.createDirectory(
+            at: oldDraft,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.setAttributes(
+            [
+                .modificationDate:
+                    Date.now.addingTimeInterval(-25 * 60 * 60)
+            ],
+            ofItemAtPath: oldDraft.path
+        )
+
+        _ = VoiceProfileStore(directories: directories)
+
+        #expect(!FileManager.default.fileExists(atPath: oldDraft.path))
+    }
+
     @MainActor
     private func makeDraft(
         directories: AppDirectories,

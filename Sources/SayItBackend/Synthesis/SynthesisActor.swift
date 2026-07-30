@@ -119,6 +119,27 @@ actor SynthesisActor: SpeechSynthesizing {
             parameters.repetitionPenalty = Float(value)
         }
         parameters.seed = seed
+        applyModelSpecificTuning(tuning, to: loadedModel)
+        if let omniVoice = loadedModel as? OmniVoiceModel,
+           tuning.parameters["diffusionSteps"] != nil {
+            let samples = try await generateOmniVoiceSamples(
+                model: omniVoice,
+                text: text,
+                voice: nil,
+                referenceAudio: UncheckedSendable(referenceAudio),
+                refText: reference?.transcript,
+                language: language,
+                parameters: omniVoiceParameters(from: tuning)
+            )
+            guard !samples.isEmpty else {
+                throw SynthesisError.generatedNoAudio
+            }
+            scheduleIdleUnload()
+            return GeneratedVoiceSample(
+                samples: samples,
+                sampleRate: Double(loadedModel.sampleRate)
+            )
+        }
         let stream = loadedModel.generateSamplesStream(
             text: text,
             voice: nil,
@@ -160,6 +181,7 @@ actor SynthesisActor: SpeechSynthesizing {
             to: loadedModel,
             model: request.model
         )
+        applyModelSpecificTuning(request.voiceTuning, to: loadedModel)
 
         var referenceAudio = try request.voiceReference.map {
             try loadReferenceAudio(
@@ -251,20 +273,10 @@ actor SynthesisActor: SpeechSynthesizing {
                     parameters.repetitionPenalty = Float(value)
                 }
             }
-            let stream = loadedModel.generateSamplesStream(
-                text: chunk.text,
-                voice: voiceArgument,
-                refAudio: usesReference ? referenceAudio : nil,
-                refText: usesReference ? referenceText : nil,
-                language: request.language,
-                generationParameters: parameters,
-                streamingInterval: request.model.playbackMode == .progressive ? 0.32 : 2
-            )
-
             do {
-                for try await samples in stream {
+                func emit(_ samples: [Float]) throws {
                     try Task.checkCancellation()
-                    guard !samples.isEmpty else { continue }
+                    guard !samples.isEmpty else { return }
 
                     if chunk.startsParagraph,
                        generatedSamples > 0,
@@ -293,6 +305,37 @@ actor SynthesisActor: SpeechSynthesizing {
                     continuation.yield(.audio(audio))
                     chunkSamples += samples.count
                     generatedSamples += samples.count
+                }
+
+                if let omniVoice = loadedModel as? OmniVoiceModel,
+                   let tuning = request.voiceTuning,
+                   tuning.parameters["diffusionSteps"] != nil {
+                    let samples = try await generateOmniVoiceSamples(
+                        model: omniVoice,
+                        text: chunk.text,
+                        voice: voiceArgument,
+                        referenceAudio: UncheckedSendable(
+                            usesReference ? referenceAudio : nil
+                        ),
+                        refText: usesReference ? referenceText : nil,
+                        language: request.language,
+                        parameters: omniVoiceParameters(from: tuning)
+                    )
+                    try emit(samples)
+                } else {
+                    let stream = loadedModel.generateSamplesStream(
+                        text: chunk.text,
+                        voice: voiceArgument,
+                        refAudio: usesReference ? referenceAudio : nil,
+                        refText: usesReference ? referenceText : nil,
+                        language: request.language,
+                        generationParameters: parameters,
+                        streamingInterval: request.model.playbackMode
+                            == .progressive ? 0.32 : 2
+                    )
+                    for try await samples in stream {
+                        try emit(samples)
+                    }
                 }
             } catch {
                 let replacements = chunker.subchunks(of: chunk)
@@ -332,6 +375,54 @@ actor SynthesisActor: SpeechSynthesizing {
         continuation.finish()
         currentTask = nil
         scheduleIdleUnload()
+    }
+
+    private func applyModelSpecificTuning(
+        _ tuning: VoiceSynthesisTuning?,
+        to model: SpeechGenerationModel
+    ) {
+        guard let chatterbox = model as? ChatterboxModel else { return }
+        chatterbox.cfgWeightOverride = tuning?.parameters["cfg"].map(Float.init)
+        chatterbox.emotionAdvOverride =
+            tuning?.parameters["exaggeration"].map(Float.init)
+    }
+
+    private func omniVoiceParameters(
+        from tuning: VoiceSynthesisTuning
+    ) -> OmniVoiceGenerateParameters {
+        OmniVoiceGenerateParameters(
+            numStep: Int(
+                (tuning.parameters["diffusionSteps"] ?? 32).rounded()
+            ),
+            guidanceScale: Float(tuning.parameters["guidance"] ?? 2),
+            tShift: Float(tuning.parameters["timeShift"] ?? 0.1),
+            positionTemperature: Float(
+                tuning.parameters["positionTemperature"] ?? 5
+            ),
+            classTemperature: Float(
+                tuning.parameters["classTemperature"] ?? 0
+            )
+        )
+    }
+
+    nonisolated private func generateOmniVoiceSamples(
+        model: OmniVoiceModel,
+        text: String,
+        voice: String?,
+        referenceAudio: UncheckedSendable<MLXArray?>,
+        refText: String?,
+        language: String?,
+        parameters: OmniVoiceGenerateParameters
+    ) async throws -> [Float] {
+        let audio = try await model.generate(
+            text: text,
+            voice: voice,
+            refAudio: referenceAudio.value,
+            refText: refText,
+            language: language,
+            ovParameters: parameters
+        )
+        return audio.asType(.float32).asArray(Float.self)
     }
 
     private func makeTextProcessor(
@@ -536,5 +627,13 @@ actor SynthesisActor: SpeechSynthesizing {
             guard !Task.isCancelled else { return }
             await self?.unloadModel()
         }
+    }
+}
+
+private struct UncheckedSendable<Value>: @unchecked Sendable {
+    let value: Value
+
+    init(_ value: Value) {
+        self.value = value
     }
 }

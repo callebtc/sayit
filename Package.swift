@@ -194,7 +194,16 @@ let package = Package(
         ),
         .testTarget(
             name: "SayItHTTPTests",
-            dependencies: ["SayItHTTP", "SayItProtocol"],
+            dependencies: [
+                "SayItCore",
+                "SayItBackend",
+                "SayItHTTP",
+                "SayItProtocol",
+                .product(
+                    name: "HummingbirdTesting",
+                    package: "hummingbird"
+                )
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]

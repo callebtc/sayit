@@ -146,50 +146,19 @@ struct SpeakCommand: AsyncParsableCommand {
                 message: "The service did not return saved voices."
             )
         }
-        let profile: VoiceProfileSnapshot?
-        if let id = UUID(uuidString: voiceProfile) {
-            profile = profiles.first { $0.id == id }
-        } else {
-            let requestedModel: String
-            if let model {
-                requestedModel = model
-            } else {
-                let snapshotResponse = try await service.call(.snapshot)
-                guard case .snapshot(let snapshot) = snapshotResponse else {
-                    throw ServiceFailure(
-                        code: "voice.invalid_response",
-                        message: "The service did not return its active model."
-                    )
-                }
-                requestedModel = snapshot.settings.activeModelID
-            }
-            let matches = profiles.filter {
-                $0.modelID == requestedModel
-                    && $0.displayName.compare(
-                        voiceProfile,
-                        options: [.caseInsensitive, .diacriticInsensitive]
-                    ) == .orderedSame
-            }
-            guard matches.count <= 1 else {
-                throw ServiceFailure(
-                    code: "voice.ambiguous_name",
-                    message: "More than one saved voice has that name. Use its UUID."
-                )
-            }
-            profile = matches.first
-        }
-        guard let profile else {
+        let snapshotResponse = try await service.call(.snapshot)
+        guard case .snapshot(let snapshot) = snapshotResponse else {
             throw ServiceFailure(
-                code: "voice.not_found",
-                message: "The saved voice was not found."
+                code: "voice.invalid_response",
+                message: "The service did not return its active model."
             )
         }
-        if let model, model != profile.modelID {
-            throw ServiceFailure(
-                code: "voice.model_mismatch",
-                message: "That saved voice belongs to \(profile.modelID)."
-            )
-        }
+        let profile = try VoiceProfileResolver().resolve(
+            identifier: voiceProfile,
+            requestedModelID: model,
+            currentModelID: snapshot.settings.activeModelID,
+            profiles: profiles
+        )
         return (.profile(profile.id), profile.modelID)
     }
 

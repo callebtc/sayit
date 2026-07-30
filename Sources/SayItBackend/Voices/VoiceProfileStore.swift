@@ -93,10 +93,12 @@ final class VoiceProfileStore {
         _ draft: VoiceDraftCandidate,
         name: String
     ) throws -> VoiceProfileSnapshot {
-        guard isSafeModelID(draft.modelID) else {
+        guard isSafeModelID(draft.modelID),
+              isContained(draft.audioURL, by: directories.voiceDrafts),
+              FileManager.default.fileExists(atPath: draft.audioURL.path) else {
             throw ServiceFailure(
                 code: "voice.invalid_profile",
-                message: "The voice profile model identifier is invalid."
+                message: "The voice profile source is invalid."
             )
         }
         let validatedName = try validated(
@@ -137,6 +139,68 @@ final class VoiceProfileStore {
                 updatedAt: now,
                 tuning: draft.tuning,
                 generationSeed: draft.generationSeed
+            )
+            try write(record, to: directory)
+            recordsByID[id] = record
+            return record.snapshot
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
+    func saveRecorded(
+        _ draft: VoiceCloneDraft,
+        name: String
+    ) throws -> VoiceProfileSnapshot {
+        guard isSafeModelID(draft.modelID),
+              isContained(draft.referenceURL, by: directories.voiceDrafts),
+              FileManager.default.fileExists(
+                  atPath: draft.referenceURL.path
+              ) else {
+            throw ServiceFailure(
+                code: "voice.invalid_profile",
+                message: "The voice profile source is invalid."
+            )
+        }
+        let validatedName = try validated(
+            name: name,
+            modelID: draft.modelID,
+            excluding: nil
+        )
+        let id = UUID()
+        let directory = profileDirectory(modelID: draft.modelID, id: id)
+        guard isContained(directory, by: directories.voiceProfiles) else {
+            throw ServiceFailure(
+                code: "voice.invalid_profile",
+                message: "The voice profile location is invalid."
+            )
+        }
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let destination = directory.appending(path: "reference.wav")
+        do {
+            try FileManager.default.copyItem(
+                at: draft.referenceURL,
+                to: destination
+            )
+            let now = Date.now
+            let record = VoiceProfileRecord(
+                schemaVersion: 1,
+                id: id,
+                modelID: draft.modelID,
+                displayName: validatedName,
+                origin: .recordedClone,
+                language: draft.language,
+                transcript: draft.transcript,
+                duration: draft.duration,
+                referenceFilename: "reference.wav",
+                createdAt: now,
+                updatedAt: now,
+                tuning: draft.tuning,
+                generationSeed: nil
             )
             try write(record, to: directory)
             recordsByID[id] = record
@@ -246,14 +310,17 @@ final class VoiceProfileStore {
             }
             for directory in profileDirectories {
                 let metadata = directory.appending(path: "profile.json")
+                let reference = directory.appending(path: "reference.wav")
                 guard isContained(metadata, by: directories.voiceProfiles),
+                      isContained(reference, by: directory),
+                      manager.fileExists(atPath: reference.path),
                       let data = try? Data(contentsOf: metadata),
                       let record = try? JSONDecoder.sayIt.decode(
                           VoiceProfileRecord.self,
                           from: data
                       ),
-                      record.schemaVersion == 1,
-                      isSafeModelID(record.modelID),
+                      isValid(record),
+                      modelDirectory.lastPathComponent == record.modelID,
                       directory.lastPathComponent == record.id.uuidString else {
                     continue
                 }
@@ -285,9 +352,25 @@ final class VoiceProfileStore {
         }
     }
 
+    private func isValid(_ record: VoiceProfileRecord) -> Bool {
+        let trimmedName = record.displayName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        return record.schemaVersion == 1
+            && isSafeModelID(record.modelID)
+            && record.displayName == trimmedName
+            && (1...50).contains(trimmedName.count)
+            && record.duration.isFinite
+            && record.duration > 0
+            && record.referenceFilename == "reference.wav"
+            && record.tuning.parameters.values.allSatisfy(\.isFinite)
+    }
+
     private func isContained(_ child: URL, by parent: URL) -> Bool {
-        let parentPath = parent.standardizedFileURL.path
-        let childPath = child.standardizedFileURL.path
+        let parentPath = parent.resolvingSymlinksInPath()
+            .standardizedFileURL.path
+        let childPath = child.resolvingSymlinksInPath()
+            .standardizedFileURL.path
         return childPath == parentPath
             || childPath.hasPrefix(parentPath + "/")
     }

@@ -273,6 +273,37 @@ final class AppState {
         )
     }
 
+    func startVoiceClone(_ request: VoiceCloneRequest) async -> Bool {
+        do {
+            let response = try await send(.startVoiceClone(request))
+            guard case .voiceStudio(let studio) = response else {
+                try requireSuccess(response)
+                return false
+            }
+            voiceStudio = studio
+            return true
+        } catch {
+            presentError(error.localizedDescription)
+            return false
+        }
+    }
+
+    func saveVoiceClone(sessionID: UUID, name: String) async -> Bool {
+        do {
+            let response = try await send(
+                .saveVoiceClone(sessionID, name: name)
+            )
+            try requireSuccess(response)
+            voicePreview.stop()
+            voiceStudio = nil
+            await refreshVoices()
+            return true
+        } catch {
+            presentError(error.localizedDescription)
+            return false
+        }
+    }
+
     func cancelVoiceStudio() {
         voicePreview.stop()
         perform(.cancelVoiceStudio)

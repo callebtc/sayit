@@ -131,6 +131,87 @@ struct ProtocolRoundTripTests {
     }
 
     @Test
+    func voiceCloneCommandsRoundTripThroughProtocolV3() throws {
+        let recordingID = UUID()
+        let request = ServiceRequest(
+            command: .startVoiceClone(
+                VoiceCloneRequest(
+                    recordingID: recordingID,
+                    modelID: "omnivoice",
+                    language: "en-US",
+                    transcript: "A clear reference passage.",
+                    tuning: VoiceTuning(
+                        preset: .faithful,
+                        parameters: ["guidance": 2.5]
+                    )
+                )
+            )
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            ServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        guard case .startVoiceClone(let clone) = decoded.command else {
+            Issue.record("Expected a clone command")
+            return
+        }
+        #expect(clone.recordingID == recordingID)
+        #expect(clone.modelID == "omnivoice")
+        #expect(clone.tuning.preset == .faithful)
+        #expect(clone.tuning.parameters["guidance"] == 2.5)
+    }
+
+    @Test
+    func cliVoiceProfileResolutionSupportsUUIDAndModelScopedNames() throws {
+        let qwen = voiceProfile(name: "Silver Lark", modelID: "qwen")
+        let omni = voiceProfile(name: "Silver Lark", modelID: "omni")
+        let resolver = VoiceProfileResolver()
+
+        #expect(
+            try resolver.resolve(
+                identifier: qwen.id.uuidString,
+                requestedModelID: nil,
+                currentModelID: "omni",
+                profiles: [qwen, omni]
+            ).id == qwen.id
+        )
+        #expect(
+            try resolver.resolve(
+                identifier: "silver lark",
+                requestedModelID: "omni",
+                currentModelID: "qwen",
+                profiles: [qwen, omni]
+            ).id == omni.id
+        )
+        #expect(throws: ServiceFailure.self) {
+            _ = try resolver.resolve(
+                identifier: qwen.id.uuidString,
+                requestedModelID: "omni",
+                currentModelID: "omni",
+                profiles: [qwen, omni]
+            )
+        }
+    }
+
+    private func voiceProfile(
+        name: String,
+        modelID: String
+    ) -> VoiceProfileSnapshot {
+        VoiceProfileSnapshot(
+            id: UUID(),
+            modelID: modelID,
+            displayName: name,
+            origin: .generated,
+            language: "en-US",
+            duration: 7,
+            createdAt: .now,
+            updatedAt: .now,
+            tuning: VoiceTuning()
+        )
+    }
+
+    @Test
     func localHTTPFailuresRoundTripSeparatelyFromGlobalErrors() throws {
         let snapshot = ServiceSnapshot(
             serviceVersion: "1.0",
@@ -181,6 +262,8 @@ struct ProtocolRoundTripTests {
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
         legacyJSON["httpServiceError"] = nil
+        legacyJSON["voicesRevision"] = nil
+        legacyJSON["voiceStudio"] = nil
         let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
 
         let decoded = try SayItWireCodec.decode(
@@ -189,5 +272,7 @@ struct ProtocolRoundTripTests {
         )
 
         #expect(decoded.httpServiceError == nil)
+        #expect(decoded.voicesRevision == 0)
+        #expect(decoded.voiceStudio == nil)
     }
 }

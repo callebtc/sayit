@@ -9,6 +9,7 @@ struct VoicesSettingsView: View {
     @State private var selectedModelID = ModelID("")
     @State private var selection = VoiceSelection.automaticStable
     @State private var discoveryModel: ModelDescriptor?
+    @State private var cloneModel: ModelDescriptor?
 
     var body: some View {
         Form {
@@ -81,17 +82,41 @@ struct VoicesSettingsView: View {
             }
 
             if let model = selectedModel,
-               model.capabilities.supportsVoiceDiscovery {
+               model.capabilities.supportsVoiceDiscovery
+                || model.capabilities.voiceCloneRequirements != nil {
                 Section("Create") {
-                    Button(
-                        "Discover Voices…",
-                        systemImage: "sparkles",
-                        action: showDiscovery
-                    )
-                    .disabled(
-                        !isSelectedModelInstalled
-                            || state.serviceSnapshot?.activeJob != nil
-                    )
+                    if model.capabilities.supportsVoiceDiscovery {
+                        Button(
+                            "Discover Voices…",
+                            systemImage: "sparkles",
+                            action: showDiscovery
+                        )
+                        .disabled(isCreationUnavailable)
+                    }
+                    if model.capabilities.voiceCloneRequirements != nil {
+                        Button(
+                            "Clone a Voice…",
+                            systemImage: "mic.badge.plus"
+                        ) {
+                            cloneModel = model
+                        }
+                        .disabled(isCreationUnavailable)
+                    }
+                    if state.serviceSnapshot?.activeJob != nil {
+                        Label(
+                            "Voice creation is available after current speech finishes.",
+                            systemImage: "speaker.wave.2"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    } else if state.voiceStudio != nil {
+                        Label(
+                            "Another voice creation session is in progress.",
+                            systemImage: "hourglass"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -100,6 +125,9 @@ struct VoicesSettingsView: View {
         }
         .sheet(item: $discoveryModel) {
             VoiceDiscoveryView(model: $0)
+        }
+        .sheet(item: $cloneModel) {
+            VoiceCloneWizard(model: $0)
         }
     }
 
@@ -128,6 +156,12 @@ struct VoicesSettingsView: View {
 
     private var isSelectedModelActive: Bool {
         settings.activeModelID == selectedModelID
+    }
+
+    private var isCreationUnavailable: Bool {
+        !isSelectedModelInstalled
+            || state.serviceSnapshot?.activeJob != nil
+            || state.voiceStudio != nil
     }
 
     private func selectInitialModel() {
