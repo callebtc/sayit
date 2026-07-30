@@ -115,6 +115,7 @@ struct SpeechLyricsView: View {
                 }
             }
             .padding(.vertical, 24)
+            .padding(.leading, 8)
         }
     }
 
