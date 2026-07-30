@@ -30,7 +30,7 @@ fail() {
     exit 1
 }
 
-verify_release_code() {
+verify_timestamped_code() {
     code_path=$1
     code_label=$2
 
@@ -43,10 +43,14 @@ verify_release_code() {
     printf '%s\n' "$code_signature" \
         | grep -F "TeamIdentifier=$expected_team_id" >/dev/null \
         || fail "$code_label is not signed by the expected team."
-    printf '%s\n' "$code_signature" | grep -F "flags=0x10000(runtime)" >/dev/null \
-        || fail "$code_label does not have hardened runtime enabled."
     printf '%s\n' "$code_signature" | grep -F "Timestamp=" >/dev/null \
         || fail "$code_label is missing a secure signing timestamp."
+}
+
+verify_release_code() {
+    verify_timestamped_code "$1" "$2"
+    printf '%s\n' "$code_signature" | grep -F "flags=0x10000(runtime)" >/dev/null \
+        || fail "$code_label does not have hardened runtime enabled."
 }
 
 case "$allow_dirty_worktree" in
@@ -177,6 +181,11 @@ verify_release_code \
     "$app_root/Contents/Library/LaunchServices/SayItSelectionAgent" \
     "the selection helper"
 
+find "$app_root" -type f -name '*.dylib' -print \
+    | while IFS= read -r dylib_path; do
+        verify_timestamped_code "$dylib_path" "an embedded dynamic library"
+    done
+
 dmg_signature=$(
     codesign --display --verbose=4 "$dmg_path" 2>&1
 )
@@ -252,6 +261,12 @@ verify_release_code \
 verify_release_code \
     "$mounted_app/Contents/Library/LaunchServices/SayItSelectionAgent" \
     "the mounted selection helper"
+
+find "$mounted_app" -type f -name '*.dylib' -print \
+    | while IFS= read -r dylib_path; do
+        verify_timestamped_code "$dylib_path" \
+            "a mounted embedded dynamic library"
+    done
 
 # Check regular files only so the /Applications symlink is never traversed.
 if find "$mounted_app" -type f -exec grep -a -E -l \

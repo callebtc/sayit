@@ -32,7 +32,7 @@ settings:
     ARCHS: arm64
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
-    CURRENT_PROJECT_VERSION: 2
+    CURRENT_PROJECT_VERSION: 3
     DEAD_CODE_STRIPPING: true
     DEVELOPMENT_TEAM: D7AHD3GLH6
     ENABLE_APP_SANDBOX: true
@@ -362,6 +362,16 @@ targets:
           # removing their development metadata; Xcode signs the outer app last.
           if [[ "${CODE_SIGNING_ALLOWED:-NO}" == "YES" \
               && -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]]; then
+            find "${app_dir}" \
+              -type f \
+              -name '*.dylib' \
+              -exec /usr/bin/codesign \
+                --force \
+                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
+                ${timestamp_option} \
+                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
+                {} \;
+
             find "${app_dir}" \
               -type d \
               -name '*.framework' \
