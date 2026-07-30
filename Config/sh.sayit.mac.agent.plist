@@ -5,7 +5,7 @@
 	<key>Label</key>
 	<string>sh.sayit.mac.agent</string>
 	<key>BundleProgram</key>
-	<string>Contents/Library/LaunchServices/SayItAgent</string>
+	<string>Contents/Library/LaunchServices/SayItAgent.app/Contents/MacOS/SayItAgent</string>
 	<key>MachServices</key>
 	<dict>
 		<key>group.sh.sayit.mac.agent</key>

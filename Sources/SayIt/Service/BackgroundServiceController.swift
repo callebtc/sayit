@@ -269,7 +269,10 @@ final class BackgroundServiceController {
 
     private var agentURL: URL {
         Bundle.main.bundleURL.appending(
-            path: "Contents/Library/LaunchServices/SayItAgent"
+            path: """
+            Contents/Library/LaunchServices/\
+            SayItAgent.app/Contents/MacOS/SayItAgent
+            """
         )
     }
     #endif

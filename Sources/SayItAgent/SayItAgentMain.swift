@@ -29,6 +29,9 @@ struct SayItAgentMain {
             let listener = NSXPCListener(
                 machServiceName: SayItServiceIdentifiers.machService
             )
+            if let requirement = delegate.codeSigningRequirement {
+                listener.setConnectionCodeSigningRequirement(requirement)
+            }
             listener.delegate = delegate
             listener.resume()
 

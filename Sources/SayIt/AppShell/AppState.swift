@@ -728,7 +728,9 @@ final class AppState {
 
     var commandLineToolURL: URL? {
         let url = Bundle.main.bundleURL
-            .appending(path: "Contents/Helpers/sayit")
+            .appending(
+                path: "Contents/Helpers/SayItCLI.app/Contents/MacOS/sayit"
+            )
         return FileManager.default.isExecutableFile(atPath: url.path)
             ? url
             : nil

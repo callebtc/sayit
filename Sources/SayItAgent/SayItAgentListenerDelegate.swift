@@ -9,6 +9,10 @@ final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate,
     private let connectionLock = NSLock()
     private var connections: [ObjectIdentifier: NSXPCConnection] = [:]
 
+    var codeSigningRequirement: String? {
+        validator.codeSigningRequirement
+    }
+
     init(backend: SayItBackendService) {
         service = SayItXPCExportedService(backend: backend)
     }

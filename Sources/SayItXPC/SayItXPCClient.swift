@@ -63,6 +63,10 @@ public actor SayItXPCClient {
             machServiceName: machServiceName,
             options: []
         )
+        if let requirement = SayItCodeSigningRequirement
+            .forBundleIdentifiers([SayItServiceIdentifiers.agentBundle]) {
+            connection.setCodeSigningRequirement(requirement)
+        }
         connection.remoteObjectInterface = NSXPCInterface(
             with: SayItXPCProtocol.self
         )

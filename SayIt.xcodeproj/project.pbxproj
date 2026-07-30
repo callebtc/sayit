@@ -105,12 +105,14 @@
 		457DDAEE9ECE2D7E62DD35D7 /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		45E5E96E262A16E29BC0B1C3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D05793EC7DD8A6AD63C5EB8 /* AppDelegate.swift */; };
 		466EF460CC2E6FADDF770B9E /* IdempotencyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */; };
+		46AA742DBE34EAA5E41B2A71 /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		47F2189FF5531A33CA2B00DE /* SayItXPCExportedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B452881D666854D351A6EF /* SayItXPCExportedService.swift */; };
 		48D749D47ED1BD0895F0A364 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029B4E9368A75CA1F818245E /* HistoryView.swift */; };
 		49FDF14558C27BFE52DEA9F3 /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 4D514FBB81728B5F7E53FCCE /* openapi.yaml */; };
 		4AD11952B99AA60C9269CB49 /* VoiceFingerprintView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDFFB903F1FBBCD6596888E8 /* VoiceFingerprintView.swift */; };
 		4BC00C950E7DD2A85A22890D /* HTTPVoiceRouteIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6262901F90523430DD888CF9 /* HTTPVoiceRouteIntegrationTests.swift */; };
 		4C03756876697C1768B8C149 /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
+		4C5BABA28D54261BDBFDE2A7 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		4C7C91395A2A7B358CB8BA6C /* BackendSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */; };
 		4CE460CE35392215336F897C /* VoiceNameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC5F2FC0E4503014A525B1A /* VoiceNameGenerator.swift */; };
 		4D59452091289DFCDC2C8742 /* ModelCatalogError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */; };
@@ -144,12 +146,14 @@
 		560E27275E9D1815E261F41E /* TimeInterval+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7392C8CFFBB121658EBD9597 /* TimeInterval+Formatting.swift */; };
 		56ECCB4BAC727F46AA2408EF /* VoiceCloneRequirements.swift in Sources */ = {isa = PBXBuildFile; fileRef = E052AB297B6730E47BF28A4D /* VoiceCloneRequirements.swift */; };
 		56F431F50DFF88F2785B215B /* SpeechTitleGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF89D0850C4A3A612A71C738 /* SpeechTitleGeneratorTests.swift */; };
+		57BFA8CA39699493AD5E0F97 /* SayItHTTP.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		58F83E662C322E4BC40E6F4B /* MenuBarLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */; };
 		59A9A6B109F8C906DF06087F /* ModelCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */; };
 		5A2DF64A186464BD8109F198 /* VoiceRibbonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */; };
 		5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */; };
 		5E463C8DB9A3EE6B6DCD969B /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
 		5E4F195C99A8660397FBB6A6 /* StopCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3143D35E528697F33A92BD89 /* StopCommand.swift */; };
+		5FBEFE4EA78B23047757B007 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		60080A0011D69A2FFB07DFCD /* InputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */; };
 		602F28C04FFDF118AEB7C006 /* GeneratedVoiceSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBBC444E81871E8DC37224 /* GeneratedVoiceSample.swift */; };
 		6031661FBE161FAAE146395D /* SayItService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A4DC744C75D2B42E40DFCC /* SayItService.swift */; };
@@ -272,6 +276,7 @@
 		A63DE17B0E6CB0604EB0B083 /* HistoryItemSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36BC441FD70A479EBA22F750 /* HistoryItemSnapshot.swift */; };
 		A7412271ED12DDEA24E130CB /* SayItXPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE1191A01FC022FE06707AD /* SayItXPCProtocol.swift */; };
 		A75DB9B824D2FF3AC9285396 /* APITokenRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */; };
+		A932D7435C65BDBFC9FD74D4 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AA6D5B796425A1C9EBBDFA68 /* HTTPVoiceCatalogResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155D0F41862548CA3C78A8FA /* HTTPVoiceCatalogResponse.swift */; };
 		AA9C16F9ABAD0BC811CA776F /* PrivacyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF4201E7A00CB96AD7F1F15 /* PrivacyOnboardingView.swift */; };
 		AB5E37AC8EDF9B95E2DCB1E7 /* DiagnosticsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */; };
@@ -293,6 +298,7 @@
 		B936622D4C0ADF9D079FB168 /* HTTPSubmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46A2C77FAF415C25A265B262 /* HTTPSubmission.swift */; };
 		B95A804F262234D3231DD46F /* OneTimeTokenSecretView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AA5F5AB8D3484FBAE06795 /* OneTimeTokenSecretView.swift */; };
 		BA0E846F8D1DFC39EBE22B02 /* PlaybackControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119ABD163EB0CEAA78357FC2 /* PlaybackControlling.swift */; };
+		BB2DBFDEFA34F9BDBB2841E7 /* SayItXPC.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BC777898E233D8551231A00C /* CLIExitCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4721772B92A83D55E5373290 /* CLIExitCode.swift */; };
 		BD604084C8E309239D84FEBE /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = D32C1E8AC5B0B86155A50698 /* MLXAudioCore */; };
 		BD7E756DBD67FF169CDD68C2 /* SynthesisActorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC8FE48DDB4640E0887AC670 /* SynthesisActorTests.swift */; };
@@ -325,6 +331,7 @@
 		CD657C1B79B4D3F8B8786387 /* HistoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0988A39F0FE54069C0F6CC /* HistoryDetailView.swift */; };
 		CE26C9B85F4F078CE05A2AFF /* RenameVoiceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745C087B527F63B7846E417F /* RenameVoiceRequest.swift */; };
 		CEBEFEB790A606C40703E445 /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
+		CF2E186577C6D41248F65E0E /* SayItXPC.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 00445B56A690FA19B85A8F34 /* SayItXPC.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		CF9A01A54BE9B5BF2AC55EC6 /* ServiceFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = B505BBBD717AD2DD95A53A71 /* ServiceFailure.swift */; };
 		D039C27B12FC10F17D34BFDB /* TextIngesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E66744D40D68014ECE91FD4 /* TextIngesting.swift */; };
 		D06DB429E41AB26F6F3AAD09 /* VoiceProfileSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893C6A2226C5DB7DD366D9A /* VoiceProfileSnapshot.swift */; };
@@ -634,6 +641,21 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		70AFBA110878095671F391E1 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				46AA742DBE34EAA5E41B2A71 /* SayItBackend.framework in Embed Frameworks */,
+				A932D7435C65BDBFC9FD74D4 /* SayItCore.framework in Embed Frameworks */,
+				57BFA8CA39699493AD5E0F97 /* SayItHTTP.framework in Embed Frameworks */,
+				5FBEFE4EA78B23047757B007 /* SayItProtocol.framework in Embed Frameworks */,
+				BB2DBFDEFA34F9BDBB2841E7 /* SayItXPC.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A3982C98462CE213A19502C7 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -655,6 +677,18 @@
 			dstSubfolderSpec = 10;
 			files = (
 				D2FAB8F8B684BF21199B35B7 /* SayItProtocol.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD340AA34C753DC4D2A12295 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				4C5BABA28D54261BDBFDE2A7 /* SayItProtocol.framework in Embed Frameworks */,
+				CF2E186577C6D41248F65E0E /* SayItXPC.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -836,6 +870,7 @@
 		6E66744D40D68014ECE91FD4 /* TextIngesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextIngesting.swift; sourceTree = "<group>"; };
 		6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendSettingsSnapshot.swift; sourceTree = "<group>"; };
 		6F0AC916C8F3D571E4E78407 /* TextCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleaner.swift; sourceTree = "<group>"; };
+		6F4A9544644C63B9CF8C700A /* SayItCLI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayItCLI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F5168863C71F245E6BAFF50 /* AudioArchiveResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioArchiveResult.swift; sourceTree = "<group>"; };
 		6FB4CFAC282562BEBAE93BB0 /* ServiceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSnapshot.swift; sourceTree = "<group>"; };
 		70120889C7D5939C0578DB4D /* ModelCatalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ModelCatalog.json; sourceTree = "<group>"; };
@@ -909,12 +944,12 @@
 		A022F5B29532790F5FB8FEA7 /* SelectionServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceError.swift; sourceTree = "<group>"; };
 		A0607E47123E83EC79342535 /* ModelLicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLicense.swift; sourceTree = "<group>"; };
 		A07CB98D7E8BB1E9C661C03A /* ModelArchiveImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveImporterTests.swift; sourceTree = "<group>"; };
-		A34B5CCE5898CC0D0B34624D /* SayItCLI */ = {isa = PBXFileReference; includeInIndex = 0; path = SayItCLI; sourceTree = BUILT_PRODUCTS_DIR; };
 		A42DE1A1821373642D9C83EC /* VoiceDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDiscoveryView.swift; sourceTree = "<group>"; };
 		A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadProgress.swift; sourceTree = "<group>"; };
 		A5E69C5B004A8649EF5386AF /* ExportKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportKind.swift; sourceTree = "<group>"; };
 		A7FD50F093D897C5794716C1 /* ModelManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManaging.swift; sourceTree = "<group>"; };
 		A89BAB57F71A7F5E2FBB982E /* SayIt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayIt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A8C3FAB8E768F21BF7E8DFA3 /* SayItAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayItAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A93E5EE6D37AD52B74C09BA2 /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
 		AAF4631A47E3A2C9DBA64C88 /* SelectedTextReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectedTextReader.swift; sourceTree = "<group>"; };
 		AB04A144E7B0EC58078BD43A /* ModelID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelID.swift; sourceTree = "<group>"; };
@@ -1019,7 +1054,6 @@
 		EC76CEA03D4FFD60C2E74C9D /* VoiceCloneDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneDraft.swift; sourceTree = "<group>"; };
 		ECC95C922639DA5E240A1C7A /* SayItCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItCommand.swift; sourceTree = "<group>"; };
 		ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStatusView.swift; sourceTree = "<group>"; };
-		ED8FA9418526551FA54A3047 /* SayItAgent */ = {isa = PBXFileReference; includeInIndex = 0; path = SayItAgent; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDFFB903F1FBBCD6596888E8 /* VoiceFingerprintView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceFingerprintView.swift; sourceTree = "<group>"; };
 		EE0B498E2479F4BBFF960B12 /* HTTPVoiceSubmissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPVoiceSubmissionTests.swift; sourceTree = "<group>"; };
 		EEFE8094B2B64B9859E711A2 /* DiagnosticRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticRecorder.swift; sourceTree = "<group>"; };
@@ -1695,10 +1729,10 @@
 			isa = PBXGroup;
 			children = (
 				A89BAB57F71A7F5E2FBB982E /* SayIt.app */,
-				ED8FA9418526551FA54A3047 /* SayItAgent */,
+				A8C3FAB8E768F21BF7E8DFA3 /* SayItAgent.app */,
 				7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */,
 				7E69CC9DD867211672C68925 /* SayItBackendTests.xctest */,
-				A34B5CCE5898CC0D0B34624D /* SayItCLI */,
+				6F4A9544644C63B9CF8C700A /* SayItCLI.app */,
 				3E5B162BA286FB4707D990A4 /* SayItCore.framework */,
 				6BB69A7620D3CE582DB267B3 /* SayItCoreTests.xctest */,
 				7E0D0C006406346A39E5C37E /* SayItHTTP.framework */,
@@ -1977,6 +2011,7 @@
 			buildPhases = (
 				EEF708522C037F1C84E4D938 /* Sources */,
 				694B96306AEE986493C6187D /* Frameworks */,
+				70AFBA110878095671F391E1 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -1991,8 +2026,8 @@
 			packageProductDependencies = (
 			);
 			productName = SayItAgent;
-			productReference = ED8FA9418526551FA54A3047 /* SayItAgent */;
-			productType = "com.apple.product-type.tool";
+			productReference = A8C3FAB8E768F21BF7E8DFA3 /* SayItAgent.app */;
+			productType = "com.apple.product-type.application";
 		};
 		08A937CF27D492EAD096D59D /* SayItBackend */ = {
 			isa = PBXNativeTarget;
@@ -2022,6 +2057,7 @@
 			buildPhases = (
 				627BC4B9E6BC05EB624FB5D9 /* Sources */,
 				70D1C07CB639FDE79DA76FD6 /* Frameworks */,
+				CD340AA34C753DC4D2A12295 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -2034,8 +2070,8 @@
 				5998E2DDB565ABE0CAAD3F16 /* ArgumentParser */,
 			);
 			productName = SayItCLI;
-			productReference = A34B5CCE5898CC0D0B34624D /* SayItCLI */;
-			productType = "com.apple.product-type.tool";
+			productReference = 6F4A9544644C63B9CF8C700A /* SayItCLI.app */;
+			productType = "com.apple.product-type.application";
 		};
 		106925F20E0CA1189E7A5FB7 /* SayItUITests */ = {
 			isa = PBXNativeTarget;
@@ -2261,8 +2297,62 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					04190B6B59C5B7838DB3D3E5 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					06B8B306387E5860F2C96821 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Manual;
+					};
+					08A937CF27D492EAD096D59D = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					0E6A4DF449BCF8EC396A9A2F = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Manual;
+					};
 					106925F20E0CA1189E7A5FB7 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
 						TestTargetID = 8F86AD8C9F6B4A4C4524329A;
+					};
+					29BF54346ADCD47588183FAA = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					32A7DAF7678EFA659391EF80 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					6A4303A3D2D6CF1067B59EC0 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					76FCBBBD58375040CFAEC740 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					805D294C1B998FB17D83063C = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					8F86AD8C9F6B4A4C4524329A = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Manual;
+					};
+					95793290520BEA9ABABE8DA0 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					A4CD6DF3FF16CD2ACEF30207 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
+					B4824402F65B5745F1B19F74 = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -2362,7 +2452,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${service_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    --identifier sh.sayit.mac.selection \\\n    \"${service_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.selection.plist\" \"${agent_dir}/sh.sayit.mac.selection.plist\"\n";
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${service_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier sh.sayit.mac.selection \\\n    \"${service_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.selection.plist\" \"${agent_dir}/sh.sayit.mac.selection.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  find \"${app_dir}\" \\\n    -type d \\\n    -name '*.framework' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}/Contents\" \\\n    -type d \\\n    -name '*.app' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2963,6 +3053,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayIt.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				EXECUTABLE_NAME = SayIt;
 				INFOPLIST_FILE = Config/Info.plist;
@@ -2972,6 +3064,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
 				PRODUCT_NAME = SayIt;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It Developer ID";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -2979,18 +3072,22 @@
 		1A251DED8DBC14751D6486E8 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayItCLI.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/SayItCLIProducts";
-				FRAMEWORKS_FOLDER_PATH = SayItCLIFrameworks;
-				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/PackageFrameworks";
+				EXECUTABLE_NAME = sayit;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It CLI";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../../../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.cli;
-				PRODUCT_NAME = sayit;
+				PRODUCT_NAME = SayItCLI;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It CLI Developer ID";
 				SDKROOT = macosx;
-				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				SKIP_INSTALL = YES;
 			};
 			name = Release;
 		};
@@ -3159,9 +3256,13 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				COPY_PHASE_STRIP = NO;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = YES;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEPLOYMENT_POSTPROCESSING = YES;
+				DEVELOPMENT_TEAM = D7AHD3GLH6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -3175,13 +3276,17 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_SERIALIZE_DEBUGGING_OPTIONS = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_VERSION = 6.0;
@@ -3303,13 +3408,22 @@
 		771A4CADC592DC7B4CA7C507 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayItAgent.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				EXECUTABLE_NAME = SayItAgent;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It Background Service";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../../../../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.agent;
 				PRODUCT_NAME = SayItAgent;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It Agent Developer ID";
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Release;
 		};
@@ -3342,6 +3456,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayIt.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				EXECUTABLE_NAME = SayIt;
 				INFOPLIST_FILE = Config/Info.plist;
@@ -3351,6 +3467,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
 				PRODUCT_NAME = SayIt;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It Developer ID";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -3358,13 +3475,22 @@
 		86DDB5480CD09FD05000EF67 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayItAgent.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				EXECUTABLE_NAME = SayItAgent;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It Background Service";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../../../../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.agent;
 				PRODUCT_NAME = SayItAgent;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It Agent Developer ID";
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
@@ -3395,6 +3521,7 @@
 		89F74DF240E7E858FDADAB13 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3464,9 +3591,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = D7AHD3GLH6;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -3486,6 +3616,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -3535,6 +3666,7 @@
 		A8EE586D194CD1C8469B8FF0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3604,18 +3736,22 @@
 		EB094859BD1CAC3420276E31 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Config/SayItCLI.entitlements;
+				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/SayItCLIProducts";
-				FRAMEWORKS_FOLDER_PATH = SayItCLIFrameworks;
-				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/PackageFrameworks";
+				EXECUTABLE_NAME = sayit;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It CLI";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../../../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.cli;
-				PRODUCT_NAME = sayit;
+				PRODUCT_NAME = SayItCLI;
+				PROVISIONING_PROFILE_SPECIFIER = "Say It CLI Developer ID";
 				SDKROOT = macosx;
-				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};

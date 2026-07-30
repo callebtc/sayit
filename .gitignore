@@ -24,6 +24,7 @@ xcuserdata/
 .env
 .env.*
 !.env.example
+!.env.release.example
 *.cer
 *.key
 *.mobileprovision

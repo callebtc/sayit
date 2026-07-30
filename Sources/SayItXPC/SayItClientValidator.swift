@@ -1,9 +1,40 @@
 import Foundation
-import Security
 import SayItProtocol
+
+public enum SayItCodeSigningRequirement {
+    public static func forBundleIdentifiers(
+        _ bundleIdentifiers: Set<String>
+    ) -> String? {
+#if DEBUG || SAYIT_LOCAL_BUILD
+        nil
+#else
+        let identifierRequirement = bundleIdentifiers
+            .sorted()
+            .map { "identifier \"\($0)\"" }
+            .joined(separator: " or ")
+        guard !identifierRequirement.isEmpty else {
+            return nil
+        }
+
+        return """
+        anchor apple generic and \
+        certificate 1[field.1.2.840.113635.100.6.2.6] exists and \
+        certificate leaf[field.1.2.840.113635.100.6.1.13] exists and \
+        certificate leaf[subject.OU] = "\(SayItServiceIdentifiers.teamIdentifier)" and \
+        (\(identifierRequirement))
+        """
+#endif
+    }
+}
 
 public struct SayItClientValidator {
     private let trustedBundleIdentifiers: Set<String>
+
+    public var codeSigningRequirement: String? {
+        SayItCodeSigningRequirement.forBundleIdentifiers(
+            trustedBundleIdentifiers
+        )
+    }
 
     public init(
         trustedBundleIdentifiers: Set<String> = Set(
@@ -14,82 +45,6 @@ public struct SayItClientValidator {
     }
 
     public func accepts(_ connection: NSXPCConnection) -> Bool {
-#if DEBUG || SAYIT_LOCAL_BUILD
         connection.effectiveUserIdentifier == geteuid()
-#else
-        guard connection.effectiveUserIdentifier == geteuid(),
-              let client = signingInformation(
-                processIdentifier: connection.processIdentifier
-              ),
-              client.hasClientEntitlement,
-              trustedBundleIdentifiers.contains(client.identifier),
-              let own = signingInformation(processIdentifier: getpid()) else {
-            return false
-        }
-
-        if let ownTeam = own.teamIdentifier {
-            return client.teamIdentifier == ownTeam
-        }
-        return client.teamIdentifier == nil
-#endif
     }
-
-#if !DEBUG && !SAYIT_LOCAL_BUILD
-    private func signingInformation(
-        processIdentifier: pid_t
-    ) -> SigningInformation? {
-        let attributes = [
-            kSecGuestAttributePid: processIdentifier as CFNumber
-        ] as CFDictionary
-        var code: SecCode?
-        guard SecCodeCopyGuestWithAttributes(
-            nil,
-            attributes,
-            SecCSFlags(),
-            &code
-        ) == errSecSuccess,
-        let code else {
-            return nil
-        }
-
-        var staticCode: SecStaticCode?
-        guard SecCodeCopyStaticCode(
-            code,
-            SecCSFlags(),
-            &staticCode
-        ) == errSecSuccess,
-        let staticCode else {
-            return nil
-        }
-
-        var information: CFDictionary?
-        guard SecCodeCopySigningInformation(
-            staticCode,
-            SecCSFlags(rawValue: kSecCSSigningInformation),
-            &information
-        ) == errSecSuccess,
-        let dictionary = information as? [CFString: Any],
-        let identifier = dictionary[kSecCodeInfoIdentifier] as? String else {
-            return nil
-        }
-
-        let entitlements = dictionary[kSecCodeInfoEntitlementsDict]
-            as? [String: Any]
-        return SigningInformation(
-            identifier: identifier,
-            teamIdentifier: dictionary[kSecCodeInfoTeamIdentifier] as? String,
-            hasClientEntitlement: entitlements?[
-                SayItServiceIdentifiers.clientEntitlement
-            ] as? Bool == true
-        )
-    }
-#endif
 }
-
-#if !DEBUG && !SAYIT_LOCAL_BUILD
-private struct SigningInformation {
-    let identifier: String
-    let teamIdentifier: String?
-    let hasClientEntitlement: Bool
-}
-#endif
