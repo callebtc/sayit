@@ -96,6 +96,12 @@ brew install xcodegen
 ./Scripts/build-app.sh
 ```
 
+Local builds compile independent targets and Swift source batches in parallel,
+using all available logical CPUs by default. Set `SAYIT_BUILD_JOBS` to cap the
+number of concurrent build operations. Signed release builds keep whole-module
+optimization; set `SAYIT_SWIFT_COMPILATION_MODE=wholemodule` to reproduce that
+behavior in an ad-hoc local build.
+
 Tests run with `swift test --disable-sandbox`.
 
 ## More screenshots

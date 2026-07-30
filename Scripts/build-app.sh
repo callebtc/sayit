@@ -9,6 +9,14 @@ module_cache="$build_root/ModuleCache"
 swiftpm_cache="$build_root/SwiftPMCache"
 app_root="$derived_data/Build/Products/Release/SayIt.app"
 sign_identity="${SAYIT_SIGN_IDENTITY:--}"
+build_jobs="${SAYIT_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}"
+
+case "$build_jobs" in
+    ''|*[!0-9]*|0)
+        echo "SAYIT_BUILD_JOBS must be a positive integer." >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "$source_packages" "$module_cache" "$swiftpm_cache"
 
@@ -26,6 +34,8 @@ build() {
         -project "$project_root/SayIt.xcodeproj" \
         -scheme SayIt \
         -configuration Release \
+        -parallelizeTargets \
+        -jobs "$build_jobs" \
         -derivedDataPath "$derived_data" \
         -clonedSourcePackagesDirPath "$source_packages" \
         -skipPackagePluginValidation \
@@ -43,7 +53,8 @@ if [ "$sign_identity" = "-" ]; then
         CODE_SIGNING_ALLOWED=NO \
         CODE_SIGNING_REQUIRED=NO \
         ENABLE_HARDENED_RUNTIME=NO \
-        SAYIT_LOCAL_SWIFT_FLAG=-DSAYIT_LOCAL_BUILD
+        SAYIT_LOCAL_SWIFT_FLAG=-DSAYIT_LOCAL_BUILD \
+        SWIFT_COMPILATION_MODE="${SAYIT_SWIFT_COMPILATION_MODE:-singlefile}"
 
     codesign --force --deep --sign - "$app_root"
 else
