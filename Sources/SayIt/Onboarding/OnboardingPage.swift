@@ -7,32 +7,40 @@ struct OnboardingPage<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(spacing: DesignTokens.generousSpacing + 4) {
-            Spacer(minLength: 0)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: DesignTokens.generousSpacing + 4) {
+                    Spacer(minLength: 0)
 
-            Image(systemName: symbol)
-                .font(.system(size: 44, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
-                .accessibilityHidden(true)
+                    Image(systemName: symbol)
+                        .font(.system(size: 44, weight: .regular))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
 
-            VStack(spacing: DesignTokens.compactSpacing) {
-                Text(title)
-                    .font(.largeTitle)
-                    .bold()
-                    .accessibilityAddTraits(.isHeader)
-                Text(subtitle)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: DesignTokens.onboardingCardWidth)
+                    VStack(spacing: DesignTokens.compactSpacing) {
+                        Text(title)
+                            .font(.largeTitle)
+                            .bold()
+                            .accessibilityAddTraits(.isHeader)
+                        Text(subtitle)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: DesignTokens.onboardingCardWidth)
+                    }
+
+                    content
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 40)
+                .padding(.vertical, 20)
+                .frame(minWidth: proxy.size.width)
+                .frame(minHeight: proxy.size.height)
             }
-
-            content
-
-            Spacer(minLength: 0)
+            .scrollIndicators(.never)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 24)
     }
 }
 

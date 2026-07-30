@@ -48,7 +48,7 @@ struct OnboardingView: View {
             .background(.bar)
         }
         .animation(DesignTokens.quickAnimation, value: step)
-        .frame(width: 560, height: 470)
+        .frame(width: 560, height: 500)
         .onDisappear(perform: state.onboardingWindowDidClose)
     }
 

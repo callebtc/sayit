@@ -12,7 +12,7 @@ struct AnywhereOnboardingView: View {
             subtitle: "Select text and use its shortcut, read the clipboard, or choose Services → Say It."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
-                VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                VStack(alignment: .leading, spacing: 10) {
                     LabeledContent("Speak selected text") {
                         ShortcutRecorderView(
                             shortcut: state.settings.selectionShortcut,
@@ -44,9 +44,10 @@ struct AnywhereOnboardingView: View {
                         )
                         .font(.callout)
                         .foregroundStyle(.red)
+                        .lineLimit(2)
                     }
                 }
-                .padding(DesignTokens.generousSpacing)
+                .padding(DesignTokens.standardSpacing)
                 .frame(maxWidth: DesignTokens.onboardingCardWidth)
                 .background(
                     .quaternary.opacity(0.55),
@@ -56,7 +57,7 @@ struct AnywhereOnboardingView: View {
                 Text(
                     "Accessibility is used only when you invoke the selection shortcut. Clipboard text is read only when you invoke its shortcut."
                 )
-                .font(.callout)
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: DesignTokens.onboardingCardWidth)
