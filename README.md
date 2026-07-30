@@ -14,7 +14,7 @@ stay on your Mac.
 
 <p align="center">
   <video
-    src="public/resources/introducing.mp4"
+    src="https://github.com/callebtc/sayit/releases/download/readme-assets/introducing.mp4"
     controls
     playsinline
     width="720">
