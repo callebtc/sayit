@@ -19,6 +19,12 @@ struct VoiceCandidateCard: View {
                 TextField("Voice name", text: $name)
                     .textFieldStyle(.plain)
                     .font(.headline)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        .primary.opacity(isSaved ? 0 : 0.05),
+                        in: .rect(cornerRadius: DesignTokens.rowCornerRadius)
+                    )
                     .disabled(isSaved)
                 Spacer()
                 Text(

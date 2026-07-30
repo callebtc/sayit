@@ -47,7 +47,7 @@ struct AnywhereOnboardingView: View {
                     }
                 }
                 .padding(DesignTokens.generousSpacing)
-                .frame(maxWidth: 400)
+                .frame(maxWidth: DesignTokens.onboardingCardWidth)
                 .background(
                     .quaternary.opacity(0.55),
                     in: .rect(cornerRadius: DesignTokens.cardCornerRadius)
@@ -59,7 +59,7 @@ struct AnywhereOnboardingView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
+                .frame(maxWidth: DesignTokens.onboardingCardWidth)
             }
         }
         .task {

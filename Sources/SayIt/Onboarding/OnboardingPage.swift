@@ -7,7 +7,7 @@ struct OnboardingPage<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignTokens.generousSpacing + 4) {
             Spacer(minLength: 0)
 
             Image(systemName: symbol)
@@ -24,7 +24,7 @@ struct OnboardingPage<Content: View>: View {
                 Text(subtitle)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: 430)
+                    .frame(maxWidth: DesignTokens.onboardingCardWidth)
             }
 
             content

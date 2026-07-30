@@ -24,9 +24,10 @@ struct RecommendedOnboardingModelView: View {
             }
 
             statusRow
+                .frame(height: 26, alignment: .leading)
         }
         .padding(DesignTokens.generousSpacing)
-        .frame(maxWidth: 400)
+        .frame(maxWidth: DesignTokens.onboardingCardWidth)
         .background(
             .quaternary.opacity(0.55),
             in: .rect(cornerRadius: DesignTokens.cardCornerRadius)
@@ -40,12 +41,15 @@ struct RecommendedOnboardingModelView: View {
                     "Installed and verified",
                     systemImage: "checkmark.circle.fill"
                 )
+                .font(.callout)
                 .foregroundStyle(.green)
                 Spacer()
                 if state.settings.activeModelID == model.id {
                     Button("Play sample", action: state.speakSample)
+                        .controlSize(.small)
                 } else {
                     Button("Use \(model.displayName)", action: selectModel)
+                        .controlSize(.small)
                 }
             }
         } else if state.requestedModelInstallID == model.id {
@@ -53,14 +57,15 @@ struct RecommendedOnboardingModelView: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("Starting download…")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
         } else if let progress = state.downloadProgress,
                   progress.modelID == model.id {
-            DownloadStatusView(
+            OnboardingModelDownloadView(
                 progress: progress,
-                selectAfterDownload: true
+                modelName: model.displayName
             )
         } else if state.downloadProgress == nil,
                   state.requestedModelInstallID == nil {
@@ -68,6 +73,7 @@ struct RecommendedOnboardingModelView: View {
                 Spacer()
                 Button("Download \(model.displayName)", action: downloadModel)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                     .disabled(!state.isServiceOnline)
             }
         }

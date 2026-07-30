@@ -63,7 +63,7 @@ struct VoiceDiscoveryView: View {
             )
         }
         .padding(DesignTokens.generousSpacing)
-        .frame(width: 640, height: 560)
+        .frame(width: 640, height: 600)
         .interactiveDismissDisabled(isGenerating)
         .onDisappear(perform: state.cancelVoiceStudio)
         .animation(DesignTokens.smoothAnimation, value: studio?.errorMessage)
@@ -95,6 +95,12 @@ struct VoiceDiscoveryView: View {
             )
             .lineLimit(2...4)
             .textFieldStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                .primary.opacity(0.05),
+                in: .rect(cornerRadius: DesignTokens.rowCornerRadius)
+            )
 
             Picker("Character", selection: $tuningPreset) {
                 ForEach(VoiceTuningPreset.allCases, id: \.self) {

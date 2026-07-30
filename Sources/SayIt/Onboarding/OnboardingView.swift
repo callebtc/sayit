@@ -20,27 +20,40 @@ struct OnboardingView: View {
             .id(step)
             .transition(.opacity)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
 
             Divider()
-            HStack {
-                if step != .privacy {
-                    Button("Back", action: goBack)
-                        .controlSize(.large)
-                }
-                Spacer()
+
+            ZStack {
                 OnboardingProgressView(currentStep: step)
-                Spacer()
-                Button(nextButtonTitle, action: goForward)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(step == .voice && state.installedModelIDs.isEmpty)
+                HStack {
+                    if step != .privacy {
+                        Button("Back", action: goBack)
+                            .controlSize(.large)
+                    }
+                    Spacer()
+                    Button(nextButtonTitle, action: goForward)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(nextButtonIsDisabled)
+                        .help(
+                            nextButtonIsDisabled
+                                ? "Download a voice model to continue"
+                                : ""
+                        )
+                }
             }
             .padding(DesignTokens.generousSpacing)
+            .background(.bar)
         }
         .animation(DesignTokens.quickAnimation, value: step)
-        .frame(width: 540, height: 430)
+        .frame(width: 560, height: 470)
         .onDisappear(perform: state.onboardingWindowDidClose)
+    }
+
+    private var nextButtonIsDisabled: Bool {
+        step == .voice && state.installedModelIDs.isEmpty
     }
 
     private var nextButtonTitle: String {

@@ -7,35 +7,52 @@ struct OnboardingModelDownloadView: View {
     let modelName: String
 
     var body: some View {
-        HStack(spacing: DesignTokens.compactSpacing) {
-            VStack(alignment: .leading, spacing: 4) {
-                Label(
-                    statusTitle,
-                    systemImage: statusSymbol
+        HStack(spacing: 10) {
+            Image(systemName: statusSymbol)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(
+                    progress.state == .failed ? Color.red : Color.accentColor
                 )
-                ProgressView(value: progress.fractionCompleted)
-                    .accessibilityLabel("\(modelName) download")
-                    .accessibilityValue(
-                        Text(progress.fractionCompleted, format: .percent)
-                    )
-            }
+                .accessibilityHidden(true)
+            Text(statusTitle)
+                .font(.callout)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 4)
+            ProgressView(value: progress.fractionCompleted)
+                .frame(width: 90)
+                .accessibilityLabel("\(modelName) download")
+                .accessibilityValue(
+                    Text(progress.fractionCompleted, format: .percent)
+                )
             Text(
                 progress.fractionCompleted,
                 format: .percent.precision(.fractionLength(0))
             )
-            .monospacedDigit()
-            if progress.state == .failed || progress.state == .paused {
-                Button("Retry", action: retryDownload)
-            } else {
-                Button(
-                    "Cancel download",
-                    systemImage: "xmark.circle",
-                    action: state.cancelModelInstall
-                )
-                .labelStyle(.iconOnly)
-            }
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.secondary)
+            actionButton
         }
-        .frame(maxWidth: 380)
+        .frame(maxWidth: DesignTokens.onboardingCardWidth)
+        .frame(height: 22)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var actionButton: some View {
+        if progress.state == .failed || progress.state == .paused {
+            Button("Retry", action: retryDownload)
+                .controlSize(.small)
+        } else {
+            Button(
+                "Cancel download",
+                systemImage: "xmark.circle.fill",
+                action: state.cancelModelInstall
+            )
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .imageScale(.medium)
+        }
     }
 
     private var statusTitle: String {
@@ -54,13 +71,13 @@ struct OnboardingModelDownloadView: View {
     private var statusSymbol: String {
         switch progress.state {
         case .paused:
-            "pause.circle"
+            "pause.circle.fill"
         case .failed:
-            "exclamationmark.triangle"
+            "exclamationmark.triangle.fill"
         case .verifying:
-            "checkmark.shield"
+            "checkmark.shield.fill"
         default:
-            "arrow.down.circle"
+            "arrow.down.circle.fill"
         }
     }
 

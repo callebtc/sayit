@@ -22,7 +22,7 @@ struct VoiceFingerprintView: View {
                 )
             }
         }
-        .frame(minWidth: 120, idealWidth: 180, maxWidth: 240, minHeight: 32)
+        .frame(minHeight: 24)
         .animation(DesignTokens.smoothAnimation, value: isActive)
         .accessibilityHidden(true)
     }

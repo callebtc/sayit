@@ -9,7 +9,7 @@ struct VoiceOnboardingView: View {
         OnboardingPage(
             symbol: "waveform.circle",
             title: "Choose a voice",
-            subtitle: "Kokoro is compact, multilingual, and recommended for this Mac."
+            subtitle: "A compact, multilingual voice model, recommended for this Mac."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
                 if let model = recommendedModel {
@@ -34,9 +34,21 @@ struct VoiceOnboardingView: View {
                         progress: progress,
                         modelName: modelName(for: progress.modelID)
                     )
+                    .transition(
+                        .opacity.combined(with: .move(edge: .bottom))
+                    )
                 }
             }
+            .animation(
+                DesignTokens.smoothAnimation,
+                value: showsExternalDownload
+            )
         }
+    }
+
+    private var showsExternalDownload: Bool {
+        guard let progress = state.downloadProgress else { return false }
+        return progress.modelID != recommendedModel?.id
     }
 
     private var recommendedModel: ModelDescriptor? {

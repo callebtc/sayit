@@ -409,7 +409,8 @@ struct VoiceCloneWizard: View {
         if let recordingError {
             Label(recordingError, systemImage: "exclamationmark.triangle")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.red)
+                .lineLimit(2)
                 .transition(.opacity)
                 .accessibilityLabel("Recording problem: \(recordingError)")
         }
@@ -543,7 +544,8 @@ struct VoiceCloneWizard: View {
                         .frame(width: 140, height: 28)
                         Text(candidate.suggestedName)
                             .font(.callout)
-                        Spacer()
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
                         Button {
                             togglePlay(candidate)
                         } label: {
@@ -567,6 +569,8 @@ struct VoiceCloneWizard: View {
                 if let error = studio.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.callout)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
                 }
             } else {
                 HStack(spacing: DesignTokens.compactSpacing) {
@@ -620,6 +624,12 @@ struct VoiceCloneWizard: View {
                 TextField("Voice name", text: $name)
                     .textFieldStyle(.plain)
                     .font(.body.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        .primary.opacity(0.05),
+                        in: .rect(cornerRadius: DesignTokens.rowCornerRadius)
+                    )
                     .accessibilityLabel("Voice name")
                 Button {
                     withAnimation(DesignTokens.springAnimation) {
