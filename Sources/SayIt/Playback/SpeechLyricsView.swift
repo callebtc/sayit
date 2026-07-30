@@ -165,54 +165,60 @@ struct SpeechLyricsView: View {
 
         if current.lowerBound > block.range.lowerBound {
             let pastEnd = min(current.lowerBound, block.range.upperBound)
-            setColor(
-                .primary.opacity(0.95),
+            if let pastRange = Self.attributedRange(
                 for: block.range.lowerBound..<pastEnd,
-                in: &attributed
-            )
+                within: block.range,
+                sourceText: text,
+                attributedText: attributed
+            ) {
+                attributed[pastRange].foregroundColor = .primary.opacity(0.95)
+            }
         }
         let wordStart = max(current.lowerBound, block.range.lowerBound)
         let wordEnd = min(current.upperBound, block.range.upperBound)
-        if wordStart < wordEnd {
-            setColor(.accentColor, for: wordStart..<wordEnd, in: &attributed)
-            setFont(.callout.weight(.semibold), for: wordStart..<wordEnd, in: &attributed)
+        if wordStart < wordEnd,
+           let wordRange = Self.attributedRange(
+               for: wordStart..<wordEnd,
+               within: block.range,
+               sourceText: text,
+               attributedText: attributed
+           ) {
+            attributed[wordRange].foregroundColor = .accentColor
+            attributed[wordRange].font = .callout.weight(.semibold)
         }
         return attributed
     }
 
-    private func setColor(
-        _ color: Color,
-        for range: Range<String.Index>,
-        in attributed: inout AttributedString
-    ) {
-        guard let lower = AttributedString.Index(
-            range.lowerBound,
-            within: attributed
-        ),
-        let upper = AttributedString.Index(
-            range.upperBound,
-            within: attributed
-        ) else {
-            return
+    nonisolated static func attributedRange(
+        for sourceRange: Range<String.Index>,
+        within blockRange: Range<String.Index>,
+        sourceText: String,
+        attributedText: AttributedString
+    ) -> Range<AttributedString.Index>? {
+        guard sourceRange.lowerBound >= blockRange.lowerBound,
+              sourceRange.upperBound <= blockRange.upperBound else {
+            return nil
         }
-        attributed[lower..<upper].foregroundColor = color
-    }
-
-    private func setFont(
-        _ font: Font,
-        for range: Range<String.Index>,
-        in attributed: inout AttributedString
-    ) {
-        guard let lower = AttributedString.Index(
-            range.lowerBound,
-            within: attributed
+        let lowerOffset = sourceText.distance(
+            from: blockRange.lowerBound,
+            to: sourceRange.lowerBound
+        )
+        let upperOffset = sourceText.distance(
+            from: blockRange.lowerBound,
+            to: sourceRange.upperBound
+        )
+        guard let lower = attributedText.characters.index(
+            attributedText.startIndex,
+            offsetBy: lowerOffset,
+            limitedBy: attributedText.endIndex
         ),
-        let upper = AttributedString.Index(
-            range.upperBound,
-            within: attributed
+        let upper = attributedText.characters.index(
+            attributedText.startIndex,
+            offsetBy: upperOffset,
+            limitedBy: attributedText.endIndex
         ) else {
-            return
+            return nil
         }
-        attributed[lower..<upper].font = font
+        return lower..<upper
     }
 }
