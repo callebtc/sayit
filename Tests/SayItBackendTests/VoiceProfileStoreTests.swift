@@ -134,6 +134,121 @@ struct VoiceProfileStoreTests {
         #expect(!FileManager.default.fileExists(atPath: oldDraft.path))
     }
 
+    @Test("Profiles rename, sort, filter, delete, and remove drafts")
+    @MainActor
+    func profileCRUDAndOrdering() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let first = try store.saveGenerated(
+            makeDraft(directories: directories, modelID: "model-b"),
+            name: "Zulu"
+        )
+        let second = try store.saveGenerated(
+            makeDraft(directories: directories, modelID: "model-a"),
+            name: "Beta"
+        )
+        let third = try store.saveGenerated(
+            makeDraft(directories: directories, modelID: "model-a"),
+            name: "Alpha"
+        )
+
+        #expect(
+            store.snapshots.map(\.id) == [third.id, second.id, first.id]
+        )
+        #expect(
+            Set(store.records(modelID: "model-a").map(\.id))
+                == [second.id, third.id]
+        )
+
+        let renamed = try store.rename(id: second.id, name: "  Gamma  ")
+        #expect(renamed.displayName == "Gamma")
+        #expect(store.record(id: second.id)?.displayName == "Gamma")
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.rename(id: second.id, name: "alpha")
+        }
+        for invalidName in ["", "   ", String(repeating: "x", count: 51)] {
+            #expect(throws: ServiceFailure.self) {
+                _ = try store.rename(id: second.id, name: invalidName)
+            }
+        }
+
+        let draftID = UUID()
+        let draftDirectory = try store.prepareDraftDirectory(id: draftID)
+        try Data([1]).write(
+            to: try store.draftURL(id: draftID, filename: "sample.wav")
+        )
+        store.removeDraft(id: draftID)
+        #expect(!FileManager.default.fileExists(atPath: draftDirectory.path))
+        store.removeDraft(id: UUID())
+
+        try store.delete(id: first.id)
+        #expect(store.record(id: first.id) == nil)
+        #expect(throws: ServiceFailure.self) {
+            try store.delete(id: first.id)
+        }
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.rename(id: UUID(), name: "Missing")
+        }
+    }
+
+    @Test("Missing and external profile sources are rejected")
+    @MainActor
+    func invalidProfileSources() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let missing = VoiceDraftCandidate(
+            snapshot: VoiceCandidateSnapshot(
+                id: UUID(),
+                suggestedName: "Missing",
+                duration: 1,
+                fingerprint: []
+            ),
+            modelID: "qwen3_tts",
+            language: nil,
+            transcript: "Missing",
+            tuning: VoiceTuning(),
+            generationSeed: 1,
+            audioURL: directories.voiceDrafts.appending(path: "missing.wav")
+        )
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.saveGenerated(missing, name: "Missing")
+        }
+
+        let outside = root.appending(path: "outside.wav")
+        try Data([1]).write(to: outside)
+        let clone = VoiceCloneDraft(
+            sessionID: UUID(),
+            recordingID: UUID(),
+            modelID: "qwen3_tts",
+            language: nil,
+            transcript: nil,
+            duration: 1,
+            tuning: VoiceTuning(),
+            referenceURL: outside
+        )
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.saveRecorded(clone, name: "Outside")
+        }
+
+        let valid = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Reference"
+        )
+        let record = try #require(store.record(id: valid.id))
+        try FileManager.default.removeItem(
+            at: try store.referenceURL(for: record)
+        )
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.referenceURL(for: record)
+        }
+    }
+
     @MainActor
     private func makeDraft(
         directories: AppDirectories,
