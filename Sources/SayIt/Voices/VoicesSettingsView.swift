@@ -1,6 +1,7 @@
 import SayItCore
 import SayItProtocol
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct VoicesSettingsView: View {
     @Environment(AppState.self) private var state
@@ -10,6 +11,7 @@ struct VoicesSettingsView: View {
     @State private var selection = VoiceSelection.automaticStable
     @State private var discoveryModel: ModelDescriptor?
     @State private var cloneModel: ModelDescriptor?
+    @State private var draggingProfileID: UUID?
 
     var body: some View {
         Form {
@@ -78,7 +80,22 @@ struct VoicesSettingsView: View {
                             },
                             onDelete: {
                                 state.deleteVoice(profile)
+                            },
+                            makeDragItem: {
+                                draggingProfileID = profile.id
+                                return NSItemProvider(
+                                    object: profile.id.uuidString as NSString
+                                )
                             }
+                        )
+                        .onDrop(
+                            of: [.text],
+                            delegate: VoiceReorderDropDelegate(
+                                target: profile,
+                                profiles: profiles,
+                                draggingProfileID: $draggingProfileID,
+                                onMove: moveVoice
+                            )
                         )
                     }
                 }
@@ -205,6 +222,17 @@ struct VoicesSettingsView: View {
         state.selectModel(model)
     }
 
+    private func moveVoice(_ draggedID: UUID, before targetID: UUID) {
+        var ids = profiles.map(\.id)
+        guard let from = ids.firstIndex(of: draggedID),
+              let to = ids.firstIndex(of: targetID),
+              from != to else {
+            return
+        }
+        ids.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
+        state.reorderVoices(modelID: selectedModelID.rawValue, orderedIDs: ids)
+    }
+
     private func showDiscovery() {
         discoveryModel = selectedModel
     }
@@ -241,5 +269,32 @@ struct VoicesSettingsView: View {
         }
         .buttonStyle(.sayItRow)
         .disabled(isCreationUnavailable)
+    }
+}
+
+private struct VoiceReorderDropDelegate: DropDelegate {
+    let target: VoiceProfileSnapshot
+    let profiles: [VoiceProfileSnapshot]
+    @Binding var draggingProfileID: UUID?
+    let onMove: (UUID, UUID) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedID = draggingProfileID,
+              draggedID != target.id,
+              profiles.contains(where: { $0.id == draggedID }) else {
+            return
+        }
+        withAnimation(DesignTokens.smoothAnimation) {
+            onMove(draggedID, target.id)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingProfileID = nil
+        return true
     }
 }

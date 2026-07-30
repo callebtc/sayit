@@ -382,6 +382,11 @@ public final class SayItBackendService: SayItService {
             voicesRevision &+= 1
             revision &+= 1
             return .accepted
+        case .reorderVoices(let modelID, let orderedIDs):
+            try voiceProfiles.reorder(modelID: modelID, orderedIDs: orderedIDs)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
         case .deleteVoice(let id):
             try await deleteVoice(id: id)
             return .accepted
