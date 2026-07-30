@@ -15,6 +15,16 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
     public var historyQuotaBytes: Int64
     public var httpEnabled: Bool
     public var httpPort: Int
+    public var chunkCharacterTarget: Int
+    public var chunkDelaySeconds: Double
+    public var paragraphPauseSeconds: Double
+    public var modelUnloadDelaySeconds: Double
+    public var textCleaningEnabled: Bool
+    public var textCleaningStripMarkdown: Bool
+    public var textCleaningStripHTML: Bool
+    public var textCleaningStripCodeBlocks: Bool
+    public var textCleaningStripSpecialCharacters: Bool
+    public var textCleaningNormalizeWhitespace: Bool
 
     public init(
         activeModelID: String = "kokoro-bf16",
@@ -30,7 +40,17 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         retentionPeriod: String = "thirtyDays",
         historyQuotaBytes: Int64 = 2 * 1_024 * 1_024 * 1_024,
         httpEnabled: Bool = false,
-        httpPort: Int = 59_125
+        httpPort: Int = 59_125,
+        chunkCharacterTarget: Int = 650,
+        chunkDelaySeconds: Double = 0,
+        paragraphPauseSeconds: Double = 0.18,
+        modelUnloadDelaySeconds: Double = 600,
+        textCleaningEnabled: Bool = true,
+        textCleaningStripMarkdown: Bool = true,
+        textCleaningStripHTML: Bool = true,
+        textCleaningStripCodeBlocks: Bool = true,
+        textCleaningStripSpecialCharacters: Bool = true,
+        textCleaningNormalizeWhitespace: Bool = true
     ) {
         self.activeModelID = activeModelID
         self.activeVoice = activeVoice
@@ -46,6 +66,17 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         self.historyQuotaBytes = historyQuotaBytes
         self.httpEnabled = httpEnabled
         self.httpPort = httpPort
+        self.chunkCharacterTarget = chunkCharacterTarget
+        self.chunkDelaySeconds = chunkDelaySeconds
+        self.paragraphPauseSeconds = paragraphPauseSeconds
+        self.modelUnloadDelaySeconds = modelUnloadDelaySeconds
+        self.textCleaningEnabled = textCleaningEnabled
+        self.textCleaningStripMarkdown = textCleaningStripMarkdown
+        self.textCleaningStripHTML = textCleaningStripHTML
+        self.textCleaningStripCodeBlocks = textCleaningStripCodeBlocks
+        self.textCleaningStripSpecialCharacters =
+            textCleaningStripSpecialCharacters
+        self.textCleaningNormalizeWhitespace = textCleaningNormalizeWhitespace
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -63,6 +94,16 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         case historyQuotaBytes
         case httpEnabled
         case httpPort
+        case chunkCharacterTarget
+        case chunkDelaySeconds
+        case paragraphPauseSeconds
+        case modelUnloadDelaySeconds
+        case textCleaningEnabled
+        case textCleaningStripMarkdown
+        case textCleaningStripHTML
+        case textCleaningStripCodeBlocks
+        case textCleaningStripSpecialCharacters
+        case textCleaningNormalizeWhitespace
     }
 
     public init(from decoder: any Decoder) throws {
@@ -126,5 +167,45 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
             Int.self,
             forKey: .httpPort
         ) ?? 59_125
+        chunkCharacterTarget = try container.decodeIfPresent(
+            Int.self,
+            forKey: .chunkCharacterTarget
+        ) ?? 650
+        chunkDelaySeconds = try container.decodeIfPresent(
+            Double.self,
+            forKey: .chunkDelaySeconds
+        ) ?? 0
+        paragraphPauseSeconds = try container.decodeIfPresent(
+            Double.self,
+            forKey: .paragraphPauseSeconds
+        ) ?? 0.18
+        modelUnloadDelaySeconds = try container.decodeIfPresent(
+            Double.self,
+            forKey: .modelUnloadDelaySeconds
+        ) ?? 600
+        textCleaningEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningEnabled
+        ) ?? true
+        textCleaningStripMarkdown = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningStripMarkdown
+        ) ?? true
+        textCleaningStripHTML = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningStripHTML
+        ) ?? true
+        textCleaningStripCodeBlocks = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningStripCodeBlocks
+        ) ?? true
+        textCleaningStripSpecialCharacters = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningStripSpecialCharacters
+        ) ?? true
+        textCleaningNormalizeWhitespace = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .textCleaningNormalizeWhitespace
+        ) ?? true
     }
 }

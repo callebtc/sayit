@@ -36,8 +36,9 @@ struct RecentHistoryView: View {
         dismiss()
         Task {
             try? await Task.sleep(for: .milliseconds(150))
+            WindowActivator.prepareForWindowPresentation()
             openWindow(id: AppWindowID.history)
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

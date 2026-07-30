@@ -4,11 +4,7 @@ struct PlaybackControlsView: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
-        HStack {
-            PlaybackRateMenu()
-
-            Spacer()
-
+        ZStack {
             HStack(spacing: DesignTokens.generousSpacing) {
                 Button(
                     "Back \(Int(state.settings.rewindInterval)) seconds",
@@ -39,16 +35,33 @@ struct PlaybackControlsView: View {
                 .buttonStyle(CircularIconButtonStyle())
             }
 
-            Spacer()
+            HStack(spacing: DesignTokens.compactSpacing) {
+                PlaybackRateMenu()
 
-            Button(
-                "Clear",
-                systemImage: "xmark",
-                action: state.clearCurrentSpeech
-            )
-            .labelStyle(.iconOnly)
-            .buttonStyle(CircularIconButtonStyle())
+                Spacer()
+
+                if state.clipboardHasNewText {
+                    Button(
+                        "Read Clipboard",
+                        systemImage: "doc.on.clipboard",
+                        action: state.readClipboard
+                    )
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(CircularIconButtonStyle())
+                    .help("Clear this and read the clipboard instead")
+                    .transition(.opacity.combined(with: .scale(scale: 0.5)))
+                }
+
+                Button(
+                    "Clear",
+                    systemImage: "xmark",
+                    action: state.clearCurrentSpeech
+                )
+                .labelStyle(.iconOnly)
+                .buttonStyle(CircularIconButtonStyle())
+            }
         }
+        .animation(DesignTokens.springAnimation, value: state.clipboardHasNewText)
         .disabled(!state.isServiceOnline)
         .accessibilityHint(
             state.isServiceOnline

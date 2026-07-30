@@ -52,6 +52,9 @@ final class AppState {
     private(set) var oneTimeTokenSecret: String?
     private(set) var updateStatus = "Up to date"
     private(set) var availableUpdateURL: URL?
+    private(set) var clipboardHasNewText = false
+    @ObservationIgnored
+    private var lastReadChangeCount = NSPasteboard.general.changeCount
     var isShowingOnboarding: Bool
 
     private init() {
@@ -108,12 +111,23 @@ final class AppState {
     }
 
     func readClipboard() {
+        lastReadChangeCount = NSPasteboard.general.changeCount
+        clipboardHasNewText = false
         receive(
             PasteboardPayloadReader.payload(
                 from: .general,
                 source: .clipboard
             )
         )
+    }
+
+    func refreshClipboardState() {
+        let pasteboard = NSPasteboard.general
+        let hasText = !(pasteboard.string(forType: .string)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty ?? true)
+        clipboardHasNewText = hasText
+            && pasteboard.changeCount != lastReadChangeCount
     }
 
     func speakSample() {

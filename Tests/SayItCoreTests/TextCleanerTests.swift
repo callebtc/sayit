@@ -76,6 +76,45 @@ struct TextCleanerTests {
         #expect(result.text.contains("1. Preheat the oven.\n2. Bake for 20 minutes!"))
     }
 
+    @Test("Cleanup can be disabled for raw passthrough")
+    func rawPassthroughWhenDisabled() async throws {
+        let input = "# Title\n\n- Item **one**  \nwith   spaces"
+        let result = try await TextCleaner(
+            options: .init(isEnabled: false)
+        ).ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(result.text == input)
+    }
+
+    @Test("Markdown survives when stripping is off while code blocks are removed")
+    func keepsMarkdownWhenStrippingOff() async throws {
+        let input = "# Title\n\n```\ncode\n```\n\n- Item **one**"
+        let result = try await TextCleaner(
+            options: .init(stripMarkdown: false)
+        ).ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(result.text.contains("# Title"))
+        #expect(result.text.contains("**one**"))
+        #expect(!result.text.contains("code"))
+        #expect(result.cleanupSummary.removedCodeBlocks == 1)
+    }
+
+    @Test("Whitespace is preserved when normalization is off")
+    func preservesWhitespaceWhenNormalizationOff() async throws {
+        let input = "First   sentence.\n\n\n\nSecond    paragraph."
+        let result = try await TextCleaner(
+            options: .init(normalizeWhitespace: false)
+        ).ingest(
+            TextSourcePayload(source: .service, plainText: input)
+        )
+
+        #expect(result.text == "First   sentence.\n\n\n\nSecond    paragraph.")
+    }
+
     @Test("Whitespace is normalized without removing paragraph pauses")
     func normalizesWhitespace() async throws {
         let input = "  First   sentence.\r\n\r\n\r\n Second\tparagraph. \u{0000} "

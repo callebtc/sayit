@@ -12,7 +12,10 @@ actor SynthesisActor: SpeechSynthesizing {
     private static let kokoroTokenBudget = 500
 
     private let modelURLProvider: ModelURLProvider
-    private let chunker: TextChunker
+    private var chunker: TextChunker
+    private var chunkDelay: Double = 0
+    private var paragraphPause: Double = 0.18
+    private var idleUnloadDelay: Double = 600
     private var loadedModel: SpeechGenerationModel?
     private var loadedModelID: ModelID?
     private var loadedTextProcessor: (any TextProcessor)?
@@ -70,6 +73,25 @@ actor SynthesisActor: SpeechSynthesizing {
         loadedModel = nil
         loadedModelID = nil
         loadedTextProcessor = nil
+    }
+
+    func updateConfiguration(
+        chunkTarget: Int,
+        chunkDelay: Double,
+        paragraphPause: Double,
+        idleUnloadDelay: Double
+    ) {
+        chunker = TextChunker(
+            targetCharacterCount: chunkTarget,
+            hardCharacterLimit: max(1_000, chunkTarget + 350)
+        )
+        self.chunkDelay = max(chunkDelay, 0)
+        self.paragraphPause = max(paragraphPause, 0)
+        self.idleUnloadDelay = max(idleUnloadDelay, 0)
+        if idleUnloadDelay <= 0 {
+            idleUnloadTask?.cancel()
+            idleUnloadTask = nil
+        }
     }
 
     func prepareDependencies(for model: ModelDescriptor) async throws {
@@ -249,6 +271,9 @@ actor SynthesisActor: SpeechSynthesizing {
         var generatedSamples = 0
         while chunkCursor < chunks.count {
             try Task.checkCancellation()
+            if chunkCursor > 0, chunkDelay > 0 {
+                try await Task.sleep(for: .seconds(chunkDelay))
+            }
             let chunk = chunks[chunkCursor]
             continuation.yield(
                 .chunkStarted(
@@ -288,9 +313,10 @@ actor SynthesisActor: SpeechSynthesizing {
 
                     if chunk.startsParagraph,
                        generatedSamples > 0,
-                       chunkSamples == 0 {
+                       chunkSamples == 0,
+                       paragraphPause > 0 {
                         let silenceCount = Int(
-                            Double(loadedModel.sampleRate) * 0.18
+                            Double(loadedModel.sampleRate) * paragraphPause
                         )
                         let silence = AudioChunk(
                             requestID: request.id,
@@ -630,8 +656,10 @@ actor SynthesisActor: SpeechSynthesizing {
 
     private func scheduleIdleUnload() {
         idleUnloadTask?.cancel()
+        guard idleUnloadDelay > 0 else { return }
+        let delay = idleUnloadDelay
         idleUnloadTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(600))
+            try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             await self?.unloadModel()
         }

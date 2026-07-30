@@ -24,6 +24,7 @@ struct PlaybackSectionView: View {
                     generatedDuration: state.playback.generatedDuration,
                     estimatedDuration: state.playback.estimatedDuration,
                     isPlaying: state.playback.state == .playing,
+                    isBuffering: state.playback.state == .buffering,
                     onSeek: state.playback.seek
                 )
                 .transition(.opacity)

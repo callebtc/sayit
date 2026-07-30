@@ -54,8 +54,9 @@ struct HistorySettingsView: View {
     }
 
     private func showHistory() {
+        WindowActivator.prepareForWindowPresentation()
         openWindow(id: AppWindowID.history)
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func confirmClearHistory() {

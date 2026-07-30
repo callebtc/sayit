@@ -2,16 +2,28 @@ import AppKit
 import Foundation
 
 struct TextParser: Sendable {
+    var options = TextCleaningOptions()
+
     func parse(_ payload: TextSourcePayload) throws -> (
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int,
         normalizedWhitespace: Bool
     ) {
+        guard options.isEnabled else {
+            return try rawPassthrough(payload)
+        }
+
         let parsed: (text: String, sourceFormat: String, removedCodeBlocks: Int)
 
         if let html = payload.html {
-            parsed = (try cleanHTML(html), "HTML", 0)
+            if options.stripHTML {
+                parsed = (try cleanHTML(html), "HTML", 0)
+            } else if let raw = String(data: html, encoding: .utf8) {
+                parsed = (raw, "HTML", 0)
+            } else {
+                throw TextIngestionError.invalidRepresentation
+            }
         } else if let richText = payload.richText {
             parsed = (try cleanRichText(richText), "Rich text", 0)
         } else if let plainText = payload.plainText {
@@ -29,26 +41,61 @@ struct TextParser: Sendable {
         )
     }
 
+    private func rawPassthrough(_ payload: TextSourcePayload) throws -> (
+        text: String,
+        sourceFormat: String,
+        removedCodeBlocks: Int,
+        normalizedWhitespace: Bool
+    ) {
+        if let plainText = payload.plainText {
+            return (
+                sanitize(plainText),
+                "Plain text",
+                0,
+                false
+            )
+        }
+        if let html = payload.html,
+           let raw = String(data: html, encoding: .utf8) {
+            return (sanitize(raw), "HTML", 0, false)
+        }
+        if let richText = payload.richText {
+            return (sanitize(try cleanRichText(richText)), "Rich text", 0, false)
+        }
+        throw TextIngestionError.noReadableText
+    }
+
+    private func sanitize(_ input: String) -> String {
+        input
+            .replacing("\r\n", with: "\n")
+            .replacing("\r", with: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func cleanPlainText(_ input: String) -> (
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int
     ) {
-        let detectionInput = input
-            .replacing("\r\n", with: "\n")
-            .replacing("\r", with: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let detectionInput = sanitize(input)
 
-        if looksLikeHTML(detectionInput),
+        if options.stripHTML,
+           looksLikeHTML(detectionInput),
            let data = detectionInput.data(using: .utf8),
            let html = try? cleanHTML(data) {
             return (html, "HTML", 0)
         }
 
         if looksLikeMarkdown(detectionInput) {
-            let stripped = stripMarkdownBlocks(from: detectionInput)
-            let parsed = parseMarkdown(stripped.text)
-            return (parsed, "Markdown", stripped.removedCodeBlocks)
+            if options.stripMarkdown {
+                let stripped = stripMarkdownBlocks(from: detectionInput)
+                let parsed = parseMarkdown(stripped.text)
+                return (parsed, "Markdown", stripped.removedCodeBlocks)
+            }
+            if options.stripCodeBlocks {
+                let stripped = removeCodeBlocks(from: detectionInput)
+                return (stripped.text, "Markdown", stripped.removedCodeBlocks)
+            }
         }
 
         return (input, "Plain text", 0)
@@ -176,17 +223,26 @@ struct TextParser: Sendable {
            )..<working.endIndex) {
             working.removeSubrange(working.startIndex..<range.upperBound)
         }
+        guard options.stripCodeBlocks else {
+            return (working, 0)
+        }
+        return removeCodeBlocks(from: working)
+    }
 
+    private func removeCodeBlocks(from input: String) -> (
+        text: String,
+        removedCodeBlocks: Int
+    ) {
         let expression = try? NSRegularExpression(
             pattern: #"(?ms)^[ \t]*(```|~~~).*?^[ \t]*\1[ \t]*$"#
         )
-        let range = NSRange(working.startIndex..., in: working)
-        let count = expression?.numberOfMatches(in: working, range: range) ?? 0
+        let range = NSRange(input.startIndex..., in: input)
+        let count = expression?.numberOfMatches(in: input, range: range) ?? 0
         let withoutBlocks = expression?.stringByReplacingMatches(
-            in: working,
+            in: input,
             range: range,
             withTemplate: "\n"
-        ) ?? working
+        ) ?? input
         return (withoutBlocks, count)
     }
 
@@ -195,12 +251,20 @@ struct TextParser: Sendable {
             .replacing("\r\n", with: "\n")
             .replacing("\r", with: "\n")
 
-        let allowedControls = CharacterSet.newlines.union(.whitespaces)
-        let withoutControls = canonical.unicodeScalars.filter { scalar in
-            !CharacterSet.controlCharacters.contains(scalar)
-                || allowedControls.contains(scalar)
+        var value: String
+        if options.stripSpecialCharacters {
+            let allowedControls = CharacterSet.newlines.union(.whitespaces)
+            let withoutControls = canonical.unicodeScalars.filter { scalar in
+                !CharacterSet.controlCharacters.contains(scalar)
+                    || allowedControls.contains(scalar)
+            }
+            value = String(String.UnicodeScalarView(withoutControls))
+        } else {
+            value = canonical
         }
-        var value = String(String.UnicodeScalarView(withoutControls))
+        guard options.normalizeWhitespace else {
+            return value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         value = replacingMatches(
             in: value,
             pattern: #"[ \t]+"#,

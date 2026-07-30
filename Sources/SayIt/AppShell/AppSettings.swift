@@ -27,6 +27,18 @@ final class AppSettings {
         static let shortcutKeyCode = "shortcutKeyCode"
         static let shortcutModifiers = "shortcutModifiers"
         static let shortcutKeyLabel = "shortcutKeyLabel"
+        static let chunkCharacterTarget = "chunkCharacterTarget"
+        static let chunkDelaySeconds = "chunkDelaySeconds"
+        static let paragraphPauseSeconds = "paragraphPauseSeconds"
+        static let modelUnloadDelaySeconds = "modelUnloadDelaySeconds"
+        static let textCleaningEnabled = "textCleaningEnabled"
+        static let textCleaningStripMarkdown = "textCleaningStripMarkdown"
+        static let textCleaningStripHTML = "textCleaningStripHTML"
+        static let textCleaningStripCodeBlocks = "textCleaningStripCodeBlocks"
+        static let textCleaningStripSpecialCharacters =
+            "textCleaningStripSpecialCharacters"
+        static let textCleaningNormalizeWhitespace =
+            "textCleaningNormalizeWhitespace"
     }
 
     private let defaults: UserDefaults
@@ -139,6 +151,81 @@ final class AppSettings {
     var shortcutKeyLabel: String {
         didSet { defaults.set(shortcutKeyLabel, forKey: Key.shortcutKeyLabel) }
     }
+    var chunkCharacterTarget: Int {
+        didSet {
+            defaults.set(chunkCharacterTarget, forKey: Key.chunkCharacterTarget)
+            notifyBackendChange()
+        }
+    }
+    var chunkDelaySeconds: Double {
+        didSet {
+            defaults.set(chunkDelaySeconds, forKey: Key.chunkDelaySeconds)
+            notifyBackendChange()
+        }
+    }
+    var paragraphPauseSeconds: Double {
+        didSet {
+            defaults.set(paragraphPauseSeconds, forKey: Key.paragraphPauseSeconds)
+            notifyBackendChange()
+        }
+    }
+    var modelUnloadDelaySeconds: Double {
+        didSet {
+            defaults.set(
+                modelUnloadDelaySeconds,
+                forKey: Key.modelUnloadDelaySeconds
+            )
+            notifyBackendChange()
+        }
+    }
+    var textCleaningEnabled: Bool {
+        didSet {
+            defaults.set(textCleaningEnabled, forKey: Key.textCleaningEnabled)
+            notifyBackendChange()
+        }
+    }
+    var textCleaningStripMarkdown: Bool {
+        didSet {
+            defaults.set(
+                textCleaningStripMarkdown,
+                forKey: Key.textCleaningStripMarkdown
+            )
+            notifyBackendChange()
+        }
+    }
+    var textCleaningStripHTML: Bool {
+        didSet {
+            defaults.set(textCleaningStripHTML, forKey: Key.textCleaningStripHTML)
+            notifyBackendChange()
+        }
+    }
+    var textCleaningStripCodeBlocks: Bool {
+        didSet {
+            defaults.set(
+                textCleaningStripCodeBlocks,
+                forKey: Key.textCleaningStripCodeBlocks
+            )
+            notifyBackendChange()
+        }
+    }
+    var textCleaningStripSpecialCharacters: Bool {
+        didSet {
+            defaults.set(
+                textCleaningStripSpecialCharacters,
+                forKey: Key.textCleaningStripSpecialCharacters
+            )
+            notifyBackendChange()
+        }
+    }
+    var textCleaningNormalizeWhitespace: Bool {
+        didSet {
+            defaults.set(
+                textCleaningNormalizeWhitespace,
+                forKey: Key.textCleaningNormalizeWhitespace
+            )
+            notifyBackendChange()
+        }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -198,6 +285,37 @@ final class AppSettings {
         )
         shortcutKeyLabel = defaults.string(forKey: Key.shortcutKeyLabel)
             ?? defaultShortcut.keyLabel
+        let storedChunkTarget = defaults.object(
+            forKey: Key.chunkCharacterTarget
+        ) as? Int
+        chunkCharacterTarget = storedChunkTarget ?? 650
+        chunkDelaySeconds = defaults.double(forKey: Key.chunkDelaySeconds)
+        let storedParagraphPause = defaults.object(
+            forKey: Key.paragraphPauseSeconds
+        ) as? Double
+        paragraphPauseSeconds = storedParagraphPause ?? 0.18
+        let storedUnloadDelay = defaults.object(
+            forKey: Key.modelUnloadDelaySeconds
+        ) as? Double
+        modelUnloadDelaySeconds = storedUnloadDelay ?? 600
+        textCleaningEnabled = defaults.object(
+            forKey: Key.textCleaningEnabled
+        ) as? Bool ?? true
+        textCleaningStripMarkdown = defaults.object(
+            forKey: Key.textCleaningStripMarkdown
+        ) as? Bool ?? true
+        textCleaningStripHTML = defaults.object(
+            forKey: Key.textCleaningStripHTML
+        ) as? Bool ?? true
+        textCleaningStripCodeBlocks = defaults.object(
+            forKey: Key.textCleaningStripCodeBlocks
+        ) as? Bool ?? true
+        textCleaningStripSpecialCharacters = defaults.object(
+            forKey: Key.textCleaningStripSpecialCharacters
+        ) as? Bool ?? true
+        textCleaningNormalizeWhitespace = defaults.object(
+            forKey: Key.textCleaningNormalizeWhitespace
+        ) as? Bool ?? true
     }
 
     var globalShortcut: GlobalShortcut {
@@ -226,7 +344,18 @@ final class AppSettings {
             retentionPeriod: retentionPeriod.rawValue,
             historyQuotaBytes: historyQuotaBytes,
             httpEnabled: httpEnabled,
-            httpPort: httpPort
+            httpPort: httpPort,
+            chunkCharacterTarget: chunkCharacterTarget,
+            chunkDelaySeconds: chunkDelaySeconds,
+            paragraphPauseSeconds: paragraphPauseSeconds,
+            modelUnloadDelaySeconds: modelUnloadDelaySeconds,
+            textCleaningEnabled: textCleaningEnabled,
+            textCleaningStripMarkdown: textCleaningStripMarkdown,
+            textCleaningStripHTML: textCleaningStripHTML,
+            textCleaningStripCodeBlocks: textCleaningStripCodeBlocks,
+            textCleaningStripSpecialCharacters:
+                textCleaningStripSpecialCharacters,
+            textCleaningNormalizeWhitespace: textCleaningNormalizeWhitespace
         )
     }
 
@@ -247,6 +376,18 @@ final class AppSettings {
             rawValue: snapshot.retentionPeriod
         ) ?? .thirtyDays
         historyQuotaBytes = snapshot.historyQuotaBytes
+        chunkCharacterTarget = snapshot.chunkCharacterTarget
+        chunkDelaySeconds = snapshot.chunkDelaySeconds
+        paragraphPauseSeconds = snapshot.paragraphPauseSeconds
+        modelUnloadDelaySeconds = snapshot.modelUnloadDelaySeconds
+        textCleaningEnabled = snapshot.textCleaningEnabled
+        textCleaningStripMarkdown = snapshot.textCleaningStripMarkdown
+        textCleaningStripHTML = snapshot.textCleaningStripHTML
+        textCleaningStripCodeBlocks = snapshot.textCleaningStripCodeBlocks
+        textCleaningStripSpecialCharacters =
+            snapshot.textCleaningStripSpecialCharacters
+        textCleaningNormalizeWhitespace =
+            snapshot.textCleaningNormalizeWhitespace
         isApplyingBackendSnapshot = false
     }
 

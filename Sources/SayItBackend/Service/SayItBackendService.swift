@@ -112,6 +112,18 @@ public final class SayItBackendService: SayItService {
 
         restoreJobJournal()
         applyPlaybackSettings(settingsStore.value)
+        let initialSettings = settingsStore.value
+        Task { [synthesizer, textCleaner] in
+            await synthesizer.updateConfiguration(
+                chunkTarget: initialSettings.chunkCharacterTarget,
+                chunkDelay: initialSettings.chunkDelaySeconds,
+                paragraphPause: initialSettings.paragraphPauseSeconds,
+                idleUnloadDelay: initialSettings.modelUnloadDelaySeconds
+            )
+            await textCleaner.update(
+                options: Self.textCleaningOptions(from: initialSettings)
+            )
+        }
         playback.onFailure = { [weak self] message in
             self?.recordFailure(message)
         }
@@ -2006,12 +2018,41 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
+        guard (100...5_000).contains(settings.chunkCharacterTarget) else {
+            throw ServiceFailure(
+                code: "settings.invalid_chunk_size",
+                message: "Text block size must be between 100 and 5,000 characters."
+            )
+        }
+        guard (0...10).contains(settings.chunkDelaySeconds),
+              (0...2).contains(settings.paragraphPauseSeconds) else {
+            throw ServiceFailure(
+                code: "settings.invalid_chunk_timing",
+                message: "Block and paragraph delays are outside the supported range."
+            )
+        }
+        guard settings.modelUnloadDelaySeconds == 0
+                || settings.modelUnloadDelaySeconds >= 30 else {
+            throw ServiceFailure(
+                code: "settings.invalid_unload_delay",
+                message: "Model unload delay must be at least 30 seconds, or off."
+            )
+        }
         try settingsStore.update(settings)
         if settings.httpEnabled != previousSettings.httpEnabled
             || settings.httpPort != previousSettings.httpPort {
             httpServiceError = nil
         }
         applyPlaybackSettings(settings)
+        await synthesizer.updateConfiguration(
+            chunkTarget: settings.chunkCharacterTarget,
+            chunkDelay: settings.chunkDelaySeconds,
+            paragraphPause: settings.paragraphPauseSeconds,
+            idleUnloadDelay: settings.modelUnloadDelaySeconds
+        )
+        await textCleaner.update(
+            options: Self.textCleaningOptions(from: settings)
+        )
         if settings.activeModelID != previousModelID,
            installedModelIDs.contains(ModelID(settings.activeModelID)) {
             await synthesizer.cancelCurrentRequest()
@@ -2027,6 +2068,19 @@ public final class SayItBackendService: SayItService {
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+    }
+
+    private static func textCleaningOptions(
+        from settings: BackendSettingsSnapshot
+    ) -> TextCleaningOptions {
+        TextCleaningOptions(
+            isEnabled: settings.textCleaningEnabled,
+            stripMarkdown: settings.textCleaningStripMarkdown,
+            stripHTML: settings.textCleaningStripHTML,
+            stripCodeBlocks: settings.textCleaningStripCodeBlocks,
+            stripSpecialCharacters: settings.textCleaningStripSpecialCharacters,
+            normalizeWhitespace: settings.textCleaningNormalizeWhitespace
+        )
     }
 
     private func legacyVoice(

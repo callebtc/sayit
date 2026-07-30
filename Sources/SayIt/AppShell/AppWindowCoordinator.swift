@@ -22,7 +22,8 @@ struct AppWindowCoordinator: View {
     ) {
         _ = oldValue
         guard newValue else { return }
+        WindowActivator.prepareForWindowPresentation()
         openWindow(id: AppWindowID.onboarding)
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

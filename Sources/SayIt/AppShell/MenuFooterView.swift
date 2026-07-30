@@ -33,8 +33,9 @@ struct MenuFooterView: View {
         dismiss()
         Task {
             try? await Task.sleep(for: .milliseconds(150))
+            WindowActivator.prepareForWindowPresentation()
             showSettings()
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

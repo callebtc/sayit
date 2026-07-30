@@ -31,8 +31,9 @@ struct ErrorStatusView: View {
         Task {
             try? await Task.sleep(for: .milliseconds(150))
             state.showOnboarding()
+            WindowActivator.prepareForWindowPresentation()
             openWindow(id: AppWindowID.onboarding)
-            NSApp.activate()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

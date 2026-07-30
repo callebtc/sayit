@@ -9,6 +9,7 @@ struct VoiceRibbonView: View {
     let generatedDuration: TimeInterval
     let estimatedDuration: TimeInterval
     let isPlaying: Bool
+    let isBuffering: Bool
     let onSeek: (TimeInterval) -> Void
 
     private var progress: Double {
@@ -40,7 +41,12 @@ struct VoiceRibbonView: View {
                 }
         )
         .overlay(alignment: .bottom) {
-            HStack {
+            HStack(spacing: 5) {
+                if isBuffering {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .transition(.opacity)
+                }
                 Text(elapsed.formattedDuration)
                     .contentTransition(.numericText(value: elapsed))
                 Spacer()
@@ -49,6 +55,7 @@ struct VoiceRibbonView: View {
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
             .offset(y: 13)
+            .animation(DesignTokens.smoothAnimation, value: isBuffering)
         }
         .padding(.bottom, 13)
         .onChange(of: progress, initial: true) { oldValue, newValue in

@@ -2,6 +2,11 @@ import SwiftUI
 
 struct MenuBarRootView: View {
     @Environment(AppState.self) private var state
+    private let clipboardTimer = Timer.publish(
+        every: 1,
+        on: .main,
+        in: .common
+    ).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -63,6 +68,10 @@ struct MenuBarRootView: View {
         }
         .frame(width: DesignTokens.popoverWidth)
         .animation(.smooth(duration: 0.3), value: section)
+        .onAppear(perform: state.refreshClipboardState)
+        .onReceive(clipboardTimer) { _ in
+            state.refreshClipboardState()
+        }
     }
 
     private var section: Int {

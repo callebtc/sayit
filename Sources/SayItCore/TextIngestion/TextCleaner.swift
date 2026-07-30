@@ -4,10 +4,16 @@ import NaturalLanguage
 public actor TextCleaner: TextIngesting {
     public static let confirmationThreshold = 50_000
     public static let maximumCharacterCount = 200_000
-    private let parser = TextParser()
+    private var parser: TextParser
     private let titleGenerator = SpeechTitleGenerator()
 
-    public init() {}
+    public init(options: TextCleaningOptions = .init()) {
+        parser = TextParser(options: options)
+    }
+
+    public func update(options: TextCleaningOptions) {
+        parser = TextParser(options: options)
+    }
 
     public func ingest(_ payload: TextSourcePayload) async throws -> CleanedText {
         let parsed = try parser.parse(payload)
