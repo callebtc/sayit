@@ -387,6 +387,10 @@ private final class HTTPTestPlayback: BackendPlaybackControlling {
         generatedDuration = 0
     }
 
+    func stopForModelSwitch() async {
+        stop()
+    }
+
     func seek(to seconds: TimeInterval) { elapsed = seconds }
     func skip(by seconds: TimeInterval) { elapsed += seconds }
     func finishBuffering() { state = .playing }

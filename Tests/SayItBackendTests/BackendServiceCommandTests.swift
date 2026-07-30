@@ -631,7 +631,7 @@ struct BackendServiceCommandTests {
         #expect(fixture.playback.spokenText == "Valid preset reaches model loading.")
     }
 
-    @Test("Installed models validate and run voice-studio failure paths")
+    @Test("Installed models validate and complete voice-studio workflows")
     func installedModelVoiceStudio() async throws {
         let fixture = try ServiceFixture()
         defer { fixture.remove() }
@@ -754,9 +754,33 @@ struct BackendServiceCommandTests {
             )
         )
         #expect(discovery.state == .generating)
-        try await waitForVoiceStudioState(
-            .failed,
-            service: fixture.service
+        try await waitForVoiceStudioState(.ready, service: fixture.service)
+        let readyDiscovery = try #require(
+            try snapshot(
+                await fixture.service.handle(.init(command: .snapshot))
+            ).voiceStudio
+        )
+        let discoveredCandidate = try #require(
+            readyDiscovery.candidates.first
+        )
+        let discoveryPreview = try exportedFile(
+            await fixture.service.handle(
+                .init(command: .voicePreview(discoveredCandidate.id))
+            )
+        )
+        #expect(discoveryPreview.contentType == "audio/wav")
+        #expect(!discoveryPreview.data.isEmpty)
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(
+                        command: .saveVoiceCandidate(
+                            discoveredCandidate.id,
+                            name: "Copper Finch"
+                        )
+                    )
+                )
+            )
         )
         #expect(
             isAccepted(
@@ -784,16 +808,31 @@ struct BackendServiceCommandTests {
             )
         )
         #expect(clone.state == .generating)
-        try await waitForVoiceStudioState(
-            .failed,
-            service: fixture.service
+        try await waitForVoiceStudioState(.ready, service: fixture.service)
+        let readyClone = try #require(
+            try snapshot(
+                await fixture.service.handle(.init(command: .snapshot))
+            ).voiceStudio
         )
+        #expect(readyClone.candidates.count == 3)
         #expect(
             isAccepted(
                 await fixture.service.handle(
-                    .init(command: .cancelVoiceStudio)
+                    .init(
+                        command: .saveVoiceClone(
+                            readyClone.id,
+                            name: "Recorded Harbor"
+                        )
+                    )
                 )
             )
+        )
+        let savedVoices = try voices(
+            await fixture.service.handle(.init(command: .voices(modelID: nil)))
+        )
+        #expect(
+            Set(savedVoices.map(\.displayName))
+                == ["Copper Finch", "Recorded Harbor"]
         )
     }
 
@@ -856,6 +895,7 @@ private final class ServiceFixture {
     let root: URL
     let directories: AppDirectories
     let playback: RecordingBackendPlayback
+    let synthesizer: DeterministicSynthesizer
     let service: SayItBackendService
     let seedModelID = "qwen3-06b-base-8bit"
     private(set) var profileID: UUID?
@@ -877,10 +917,12 @@ private final class ServiceFixture {
             historyID = try Self.seedHistory(directories: directories)
         }
         playback = RecordingBackendPlayback()
+        synthesizer = DeterministicSynthesizer()
         service = try SayItBackendService(
             directories: directories,
             serviceVersion: "test-version",
-            playback: playback
+            playback: playback,
+            synthesizer: synthesizer
         )
     }
 
@@ -1006,6 +1048,48 @@ private final class ServiceFixture {
     }
 }
 
+private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
+    func synthesize(
+        _ request: SpeechRequest
+    ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.loadingModel(request.model.id))
+            continuation.finish(throwing: SynthesisError.modelNotInstalled)
+        }
+    }
+
+    func cancelCurrentRequest() async {}
+
+    func unloadModel() async {}
+
+    func updateConfiguration(
+        chunkTarget _: Int,
+        chunkDelay _: Double,
+        paragraphPause _: Double,
+        idleUnloadDelay _: Double
+    ) async {}
+
+    func prepareDependencies(for _: ModelDescriptor) async throws {}
+
+    func generateVoiceSample(
+        model _: ModelDescriptor,
+        text _: String,
+        language _: String?,
+        tuning _: VoiceSynthesisTuning,
+        seed _: UInt64,
+        reference _: VoiceReference?
+    ) async throws -> GeneratedVoiceSample {
+        GeneratedVoiceSample(
+            samples: (0..<2_400).map { frame in
+                Float(
+                    sin(2 * .pi * 220 * Double(frame) / 24_000) * 0.1
+                )
+            },
+            sampleRate: 24_000
+        )
+    }
+}
+
 @MainActor
 private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
@@ -1068,6 +1152,10 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         generatedDuration = 0
         estimatedDuration = 0
         currentTitle = ""
+    }
+
+    func stopForModelSwitch() async {
+        stop()
     }
 
     func seek(to seconds: TimeInterval) {

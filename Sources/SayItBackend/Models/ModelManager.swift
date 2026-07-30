@@ -615,9 +615,22 @@ actor ModelManager: ModelManaging {
 
     private func preflight(requiredBytes: Int64) throws {
         let values = try directories.models.resourceValues(
-            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+            forKeys: [
+                .volumeAvailableCapacityForImportantUsageKey,
+                .volumeAvailableCapacityKey
+            ]
         )
-        guard let available = values.volumeAvailableCapacityForImportantUsage,
+        let fileSystemAttributes = try? FileManager.default
+            .attributesOfFileSystem(forPath: directories.models.path)
+        let fileSystemCapacity = (
+            fileSystemAttributes?[.systemFreeSize] as? NSNumber
+        )?.int64Value
+        let available = [
+            values.volumeAvailableCapacityForImportantUsage,
+            values.volumeAvailableCapacity.map(Int64.init),
+            fileSystemCapacity
+        ].compactMap(\.self).max()
+        guard let available,
               available >= requiredBytes + requiredBytes / 5 else {
             throw ModelManagerError.insufficientDiskSpace(
                 required: requiredBytes + requiredBytes / 5

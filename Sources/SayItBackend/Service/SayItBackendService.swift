@@ -8,7 +8,7 @@ public final class SayItBackendService: SayItService {
     private let directories: AppDirectories
     private let catalog: ModelCatalog
     private let modelManager: ModelManager
-    private let synthesizer: SynthesisActor
+    private let synthesizer: any BackendSpeechSynthesizing
     private let textCleaner = TextCleaner()
     private let playback: any BackendPlaybackControlling
     private let history: HistoryStore
@@ -71,7 +71,8 @@ public final class SayItBackendService: SayItService {
     init(
         directories: AppDirectories,
         serviceVersion: String = "0.1.0",
-        playback: any BackendPlaybackControlling
+        playback: any BackendPlaybackControlling,
+        synthesizer: (any BackendSpeechSynthesizing)? = nil
     ) throws {
         self.directories = directories
         self.serviceVersion = serviceVersion
@@ -105,9 +106,15 @@ public final class SayItBackendService: SayItService {
         huggingFaceTokenStore = tokenStore
         modelManager = manager
         models = catalog.models
-        synthesizer = SynthesisActor { id in
-            await manager.installedURL(for: id)
+        let resolvedSynthesizer: any BackendSpeechSynthesizing
+        if let synthesizer {
+            resolvedSynthesizer = synthesizer
+        } else {
+            resolvedSynthesizer = SynthesisActor { id in
+                await manager.installedURL(for: id)
+            }
         }
+        self.synthesizer = resolvedSynthesizer
         audioArchive = AudioArchive(directory: directories.historyAudio)
         voiceAudioArchive = AudioArchive(directory: directories.voiceDrafts)
         diagnostics = DiagnosticRecorder(
@@ -117,7 +124,7 @@ public final class SayItBackendService: SayItService {
         restoreJobJournal()
         applyPlaybackSettings(settingsStore.value)
         let initialSettings = settingsStore.value
-        Task { [synthesizer, textCleaner] in
+        Task { [synthesizer = resolvedSynthesizer, textCleaner] in
             await synthesizer.updateConfiguration(
                 chunkTarget: initialSettings.chunkCharacterTarget,
                 chunkDelay: initialSettings.chunkDelaySeconds,
@@ -556,7 +563,8 @@ public final class SayItBackendService: SayItService {
                         preset: tuning.preset.rawValue,
                         parameters: tuning.parameters
                     ),
-                    seed: seed
+                    seed: seed,
+                    reference: nil
                 )
                 try Task.checkCancellation()
                 let audioURL = directory.appending(

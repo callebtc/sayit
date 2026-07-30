@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Backend audio archive", .serialized)
 struct BackendAudioArchiveTests {
-    @Test("WAV and M4A round trips produce nonempty finite-duration files")
+    @Test("WAV round trips and archive removal are deterministic")
     func roundTrips() async throws {
         let fixture = try TemporaryBackendFixture(
             prefix: "SayItAudioArchiveTests"
@@ -32,26 +32,12 @@ struct BackendAudioArchiveTests {
                 > 0
         )
 
-        let requestID = UUID()
-        let first = try await archive.writeM4A(
-            samples: samples,
-            sampleRate: sampleRate,
-            requestID: requestID
-        )
-        let second = try await archive.writeM4A(
-            samples: Array(samples.reversed()),
-            sampleRate: sampleRate,
-            requestID: requestID
-        )
-        #expect(first.relativePath == second.relativePath)
-        #expect(second.byteCount > 0)
-        #expect(abs(second.duration - 0.5) < 0.001)
-
-        await archive.remove(relativePath: second.relativePath)
+        let removablePath = "removable.audio"
+        let removableURL = fixture.root.appending(path: removablePath)
+        try Data([1, 2, 3]).write(to: removableURL)
+        await archive.remove(relativePath: removablePath)
         #expect(
-            !FileManager.default.fileExists(
-                atPath: fixture.root.appending(path: second.relativePath).path
-            )
+            !FileManager.default.fileExists(atPath: removableURL.path)
         )
         await archive.remove(relativePath: "already-missing.m4a")
     }

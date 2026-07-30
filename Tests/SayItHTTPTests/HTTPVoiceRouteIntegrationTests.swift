@@ -1,7 +1,7 @@
 import Foundation
 import Hummingbird
 import HummingbirdTesting
-import SayItBackend
+@testable import SayItBackend
 import SayItCore
 import SayItProtocol
 import Testing
@@ -156,7 +156,8 @@ private extension HTTPVoiceRouteIntegrationTests {
                 directories: directories
             )
             let backend = try SayItBackendService(
-                directories: directories
+                directories: directories,
+                playback: HTTPVoiceTestPlayback()
             )
             let readToken = makeToken(
                 secret: "voice-route-read",
@@ -276,5 +277,77 @@ private extension HTTPVoiceRouteIntegrationTests {
         let updatedAt: Date
         let tuning: VoiceTuning
         let generationSeed: UInt64?
+    }
+}
+
+@MainActor
+private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
+    var onFailure: (@MainActor (String) -> Void)?
+    private(set) var state: PlaybackState = .idle
+    private(set) var elapsed: TimeInterval = 0
+    private(set) var generatedDuration: TimeInterval = 0
+    private(set) var estimatedDuration: TimeInterval = 0
+    private(set) var amplitudes: [Float] = []
+    private(set) var currentTitle = ""
+    private(set) var spokenText = ""
+    private(set) var spokenChunks: [PlaybackTextChunk] = []
+    var shouldStartWhenBuffered = false
+    var showTitleInNowPlaying = false
+    var rate: Double = 1
+    var backwardSkipInterval: TimeInterval = 15
+    var forwardSkipInterval: TimeInterval = 30
+
+    func prepare(
+        requestID _: UUID,
+        title: String,
+        estimatedDuration: TimeInterval
+    ) {
+        currentTitle = title
+        self.estimatedDuration = estimatedDuration
+        state = .preparing
+    }
+
+    func enqueue(_ chunk: AudioChunk) throws {
+        generatedDuration += chunk.duration
+        state = .buffering
+    }
+
+    func setSpokenText(_ text: String) {
+        spokenText = text
+        spokenChunks = []
+    }
+
+    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
+        spokenChunks.append(chunk)
+    }
+
+    func play() { state = .playing }
+    func pause() { state = .paused }
+
+    func stop() {
+        state = .idle
+        elapsed = 0
+        generatedDuration = 0
+        estimatedDuration = 0
+        currentTitle = ""
+    }
+
+    func stopForModelSwitch() async {
+        stop()
+    }
+
+    func seek(to seconds: TimeInterval) { elapsed = seconds }
+    func skip(by seconds: TimeInterval) { elapsed += seconds }
+    func finishBuffering() { state = .playing }
+
+    func archive(
+        using _: AudioArchive
+    ) async throws -> AudioArchiveResult {
+        throw CocoaError(.featureUnsupported)
+    }
+
+    func playFile(at _: URL, title: String) throws {
+        currentTitle = title
+        state = .playing
     }
 }

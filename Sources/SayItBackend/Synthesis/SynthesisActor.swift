@@ -7,7 +7,7 @@ import MLXAudioCore
 @preconcurrency import MLXLMCommon
 import SayItCore
 
-actor SynthesisActor: SpeechSynthesizing {
+actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
