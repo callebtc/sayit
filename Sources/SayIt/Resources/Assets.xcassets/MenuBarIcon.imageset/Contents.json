@@ -1,8 +1,19 @@
 {
   "images" : [
     {
-      "filename" : "MenuBarIcon.pdf",
-      "idiom" : "universal"
+      "filename" : "MenuBarIcon19.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "MenuBarIcon38.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "MenuBarIcon57.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
   "info" : {
@@ -10,7 +21,6 @@
     "version" : 1
   },
   "properties" : {
-    "preserves-vector-representation" : true,
     "template-rendering-intent" : "template"
   }
 }
