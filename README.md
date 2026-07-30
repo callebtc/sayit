@@ -96,9 +96,7 @@ Tests run with `swift test --disable-sandbox`.
 
 ## More screenshots
 
-[Voice cloning](public/resources/cloning.png) ·
-[Menu-bar controls](public/resources/menu.png) ·
-[Service and local API](public/resources/service.png)
+[Voice cloning](public/resources/cloning.png)
 
 ## License
 
