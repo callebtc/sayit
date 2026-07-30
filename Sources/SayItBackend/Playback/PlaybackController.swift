@@ -696,8 +696,33 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in self?.pause() }
             return .success
         }
+        commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.state == .playing {
+                    self.pause()
+                } else {
+                    self.play()
+                }
+            }
+            return .success
+        }
         commands.stopCommand.addTarget { [weak self] _ in
             Task { @MainActor in self?.stop() }
+            return .success
+        }
+        commands.nextTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.skip(by: self.forwardSkipInterval)
+            }
+            return .success
+        }
+        commands.previousTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.skip(by: -self.backwardSkipInterval)
+            }
             return .success
         }
         commands.skipBackwardCommand.preferredIntervals = [

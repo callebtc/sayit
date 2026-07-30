@@ -8,6 +8,7 @@ struct VoiceRibbonView: View {
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
     let estimatedDuration: TimeInterval
+    let isPlaying: Bool
     let onSeek: (TimeInterval) -> Void
 
     private var progress: Double {
@@ -52,8 +53,21 @@ struct VoiceRibbonView: View {
         .padding(.bottom, 13)
         .onChange(of: progress, initial: true) { oldValue, newValue in
             let isJump = newValue < oldValue || abs(newValue - oldValue) > 0.03
-            withAnimation(isJump ? .smooth(duration: 0.4) : .linear(duration: 0.12)) {
-                smoothedProgress = newValue
+            if isPlaying, !isJump {
+                let target = min(newValue + (newValue - oldValue), 1)
+                withAnimation(.linear(duration: 0.1)) {
+                    smoothedProgress = target
+                }
+            } else {
+                withAnimation(.smooth(duration: isJump ? 0.4 : 0.25)) {
+                    smoothedProgress = newValue
+                }
+            }
+        }
+        .onChange(of: isPlaying) { _, playing in
+            guard !playing else { return }
+            withAnimation(.smooth(duration: 0.2)) {
+                smoothedProgress = progress
             }
         }
         .onChange(of: amplitudes.count, initial: true) { oldValue, newValue in

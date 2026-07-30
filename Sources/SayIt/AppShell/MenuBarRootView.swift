@@ -37,7 +37,8 @@ struct MenuBarRootView: View {
                     text: state.playback.spokenText,
                     chunks: state.playback.spokenChunks,
                     elapsed: state.playback.elapsed,
-                    generatedDuration: state.playback.generatedDuration
+                    generatedDuration: state.playback.generatedDuration,
+                    onSeek: state.playback.seek
                 )
                 .frame(height: 150)
                 .padding(.horizontal, DesignTokens.generousSpacing)

@@ -23,6 +23,7 @@ struct PlaybackSectionView: View {
                     elapsed: state.playback.elapsed,
                     generatedDuration: state.playback.generatedDuration,
                     estimatedDuration: state.playback.estimatedDuration,
+                    isPlaying: state.playback.state == .playing,
                     onSeek: state.playback.seek
                 )
                 .transition(.opacity)

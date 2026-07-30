@@ -55,24 +55,57 @@ struct TextParser: Sendable {
     }
 
     private func parseMarkdown(_ input: String) -> String {
-        let normalizedParagraphs = replacingMatches(
-            in: input,
-            pattern: #"(?m)\n[ \t]*\n+"#,
-            with: "\n\n"
+        input
+            .components(separatedBy: "\n")
+            .map(cleanMarkdownLine)
+            .joined(separator: "\n")
+    }
+
+    private func cleanMarkdownLine(_ line: String) -> String {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return "" }
+        if trimmed.range(
+            of: #"^(([-*_])\s*){3,}$|^=+$"#,
+            options: .regularExpression
+        ) != nil {
+            return ""
+        }
+        var working = trimmed
+        var prefix = ""
+        if let bullet = working.range(
+            of: #"^([-*+•]|\d+[.)])\s+"#,
+            options: .regularExpression
+        ) {
+            prefix = String(working[bullet])
+            working.removeSubrange(bullet)
+        }
+        working = replacingMatches(in: working, pattern: #"^#{1,6}\s+"#, with: "")
+        working = replacingMatches(in: working, pattern: #"^>\s?"#, with: "")
+        working = replacingMatches(
+            in: working,
+            pattern: #"!\[([^\]]*)\]\([^)]+\)"#,
+            with: "$1"
         )
-        return normalizedParagraphs
-            .components(separatedBy: "\n\n")
-            .compactMap { paragraph -> String? in
-                let text = (try? AttributedString(
-                    markdown: paragraph,
-                    options: .init(interpretedSyntax: .full)
-                )).map { String($0.characters) } ?? paragraph
-                let trimmed = text.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                return trimmed.isEmpty ? nil : trimmed
-            }
-            .joined(separator: "\n\n")
+        working = replacingMatches(
+            in: working,
+            pattern: #"\[([^\]]+)\]\([^)]+\)"#,
+            with: "$1"
+        )
+        working = replacingMatches(in: working, pattern: #"`([^`]*)`"#, with: "$1")
+        working = replacingMatches(in: working, pattern: #"\*\*([^*]+)\*\*"#, with: "$1")
+        working = replacingMatches(
+            in: working,
+            pattern: #"(?<!\w)__([^_]+)__(?!\w)"#,
+            with: "$1"
+        )
+        working = replacingMatches(in: working, pattern: #"\*([^*]+)\*"#, with: "$1")
+        working = replacingMatches(
+            in: working,
+            pattern: #"(?<!\w)_([^_]+)_(?!\w)"#,
+            with: "$1"
+        )
+        working = replacingMatches(in: working, pattern: #"~~([^~]+)~~"#, with: "$1")
+        return prefix + working
     }
 
     private func cleanHTML(_ data: Data) throws -> String {

@@ -56,6 +56,26 @@ struct TextCleanerTests {
         #expect(result.cleanupSummary.removedCodeBlocks == 1)
     }
 
+    @Test("Lists, line breaks, and punctuation survive cleanup")
+    func preservesListsLineBreaksAndPunctuation() async throws {
+        let input = """
+        Groceries:
+        - Milk, eggs
+        - Bread (sourdough)
+
+        Steps:
+        1. Preheat the oven.
+        2. Bake for 20 minutes!
+        """
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(result.text.contains("- Milk, eggs"))
+        #expect(result.text.contains("- Bread (sourdough)"))
+        #expect(result.text.contains("1. Preheat the oven.\n2. Bake for 20 minutes!"))
+    }
+
     @Test("Whitespace is normalized without removing paragraph pauses")
     func normalizesWhitespace() async throws {
         let input = "  First   sentence.\r\n\r\n\r\n Second\tparagraph. \u{0000} "

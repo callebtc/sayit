@@ -1,3 +1,4 @@
+import AppKit
 import SayItProtocol
 import SwiftUI
 
@@ -6,6 +7,7 @@ struct SpeechLyricsView: View {
     let chunks: [PlaybackTextChunk]
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
+    var onSeek: ((TimeInterval) -> Void)?
 
     @State private var blocks: [Block] = []
     @State private var tokens: [WordToken] = []
@@ -23,6 +25,7 @@ struct SpeechLyricsView: View {
         let id: Int
         let range: Range<String.Index>
         let blockID: Int
+        var newlinesBefore: Int = 0
     }
 
     private struct ScrollMetrics: Equatable {
@@ -30,6 +33,11 @@ struct SpeechLyricsView: View {
         var contentHeight: Double = 1
         var containerHeight: Double = 1
     }
+
+    private static let naturalSpaceWidth: Double = {
+        let font = NSFont.preferredFont(forTextStyle: .callout)
+        return Double((" " as NSString).size(withAttributes: [.font: font]).width)
+    }()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -91,15 +99,20 @@ struct SpeechLyricsView: View {
 
     @ViewBuilder
     private func blockView(for block: Block) -> some View {
-        WordsFlowLayout(horizontalSpacing: 3.5, verticalSpacing: 3) {
-            ForEach(block.words) { token in
-                wordView(for: token)
+        VStack(alignment: .leading, spacing: 3) {
+            WordsFlowLayout(
+                horizontalSpacing: Self.naturalSpaceWidth,
+                verticalSpacing: 3
+            ) {
+                ForEach(block.words) { token in
+                    wordView(for: token)
+                }
+            }
+            if block.id != blocks.last?.id {
+                ChunkMarkerView()
             }
         }
         .id(Self.scrollID(forBlock: block.id))
-        if block.id != blocks.last?.id {
-            ChunkMarkerView()
-        }
     }
 
     private var currentWord: String {
@@ -179,19 +192,35 @@ struct SpeechLyricsView: View {
     private func wordView(for token: WordToken) -> some View {
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
+        let seekTime = startTime(for: token.range)
+        let canSeek = onSeek != nil && seekTime <= generatedDuration
         return Text(text[token.range])
             .font(.callout)
             .foregroundStyle(wordColor(isCurrent: isCurrent, isPast: isPast))
-            .padding(.horizontal, 2)
-            .padding(.vertical, 1)
             .background {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.accentColor.opacity(isCurrent ? 0.13 : 0))
+                    .padding(.horizontal, -2.5)
+                    .padding(.vertical, -1.5)
             }
             .scaleEffect(isCurrent ? 1.09 : 1)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard canSeek else { return }
+                onSeek?(seekTime)
+            }
+            .onHover { hovering in
+                guard canSeek else { return }
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
             .animation(.spring(response: 0.32, dampingFraction: 0.72), value: isCurrent)
             .animation(.smooth(duration: 0.35), value: isPast)
             .id(Self.scrollID(forWord: token.id))
+            .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
     }
 
     private func wordColor(isCurrent: Bool, isPast: Bool) -> Color {
@@ -213,7 +242,7 @@ struct SpeechLyricsView: View {
                     .fill(.primary.opacity(0.08))
                     .frame(height: 1)
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 0)
         }
     }
 
@@ -237,10 +266,19 @@ struct SpeechLyricsView: View {
         var index = 0
         for (blockID, range) in blockRanges.enumerated() {
             var block = Block(id: blockID, range: range)
+            var previousUpper = range.lowerBound
             for wordRange in Self.wordRanges(in: text, within: range) {
-                let token = WordToken(id: index, range: wordRange, blockID: blockID)
+                let newlines = text[previousUpper..<wordRange.lowerBound]
+                    .reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
+                let token = WordToken(
+                    id: index,
+                    range: wordRange,
+                    blockID: blockID,
+                    newlinesBefore: newlines
+                )
                 block.words.append(token)
                 newTokens.append(token)
+                previousUpper = wordRange.upperBound
                 index += 1
             }
             newBlocks.append(block)
@@ -329,9 +367,14 @@ struct SpeechLyricsView: View {
     }
 }
 
+private struct NewlinesBeforeKey: LayoutValueKey {
+    static let defaultValue = 0
+}
+
 private struct WordsFlowLayout: Layout {
     var horizontalSpacing: Double = 3.5
     var verticalSpacing: Double = 3
+    var paragraphSpacing: Double = 8
 
     func sizeThatFits(
         proposal: ProposedViewSize,
@@ -375,7 +418,13 @@ private struct WordsFlowLayout: Layout {
         var maxX: Double = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x > 0, x + size.width > maxWidth {
+            let newlines = subview[NewlinesBeforeKey.self]
+            if !positions.isEmpty, newlines > 0 {
+                x = 0
+                y += rowHeight + verticalSpacing
+                    + (newlines > 1 ? paragraphSpacing : 0)
+                rowHeight = 0
+            } else if x > 0, x + size.width > maxWidth {
                 x = 0
                 y += rowHeight + verticalSpacing
                 rowHeight = 0
