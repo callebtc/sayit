@@ -13,12 +13,7 @@ stay on your Mac.
 </table>
 
 <p align="center">
-  <video
-    src="https://github.com/callebtc/sayit/releases/download/readme-assets/introducing.mp4"
-    controls
-    playsinline
-    width="720">
-  </video>
+  <a href="public/resources/introducing.mp4">Watch the introduction</a>
 </p>
 
 ## Highlights
