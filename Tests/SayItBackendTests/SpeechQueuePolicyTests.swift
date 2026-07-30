@@ -144,6 +144,270 @@ struct SpeechQueuePolicyTests {
     }
 
     @Test
+    func modelSwitchCancelsActiveAndQueuedWorkAtomically() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString,
+            directoryHint: .isDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let directories = try AppDirectories.testing(root: root)
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let originalID = ModelID("kokoro-bf16")
+        let replacementID = ModelID("kitten-mini-08")
+        try seedInstallation(
+            for: originalID,
+            catalog: catalog,
+            directories: directories
+        )
+        try seedInstallation(
+            for: replacementID,
+            catalog: catalog,
+            directories: directories
+        )
+        let playback = MockPlaybackController()
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playback
+        )
+        await service.start()
+
+        let active = try submittedJob(
+            await service.handle(
+                ServiceRequest(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: String(repeating: "Long speech. ", count: 5_000),
+                            source: .frontend
+                        )
+                    )
+                )
+            )
+        )
+        try await waitForState(
+            .awaitingConfirmation,
+            jobID: active.id,
+            service: service
+        )
+        let queued = try submittedJob(
+            await service.handle(
+                ServiceRequest(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: "Queued speech",
+                            source: .frontend,
+                            queuePolicy: .enqueue
+                        )
+                    )
+                )
+            )
+        )
+
+        let response = await service.handle(
+            ServiceRequest(command: .selectModel(replacementID.rawValue))
+        )
+        guard case .accepted = response else {
+            Issue.record("Expected the model switch to be accepted.")
+            return
+        }
+        let switched = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        )
+        let jobs = try jobList(
+            await service.handle(ServiceRequest(command: .jobs))
+        )
+
+        #expect(switched.settings.activeModelID == replacementID.rawValue)
+        #expect(switched.activeJob == nil)
+        #expect(switched.queuedJobs.isEmpty)
+        #expect(jobs.first(where: { $0.id == active.id })?.state == .canceled)
+        #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
+        #expect(playback.modelSwitchStopCount == 1)
+        await service.shutdown()
+    }
+
+    @Test
+    func staleSettingsCannotUndoAnInFlightModelSwitch() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString,
+            directoryHint: .isDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let directories = try AppDirectories.testing(root: root)
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let originalID = ModelID("kokoro-bf16")
+        let replacementID = ModelID("kitten-mini-08")
+        for id in [originalID, replacementID] {
+            try seedInstallation(
+                for: id,
+                catalog: catalog,
+                directories: directories
+            )
+        }
+        let playback = MockPlaybackController()
+        playback.modelSwitchStopDelay = .milliseconds(75)
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playback
+        )
+        await service.start()
+        var staleSettings = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        ).settings
+        staleSettings.speakingPace = SpeakingPace.fast.rawValue
+
+        let selection = Task {
+            await service.handle(
+                ServiceRequest(command: .selectModel(replacementID.rawValue))
+            )
+        }
+        try await waitForModelSwitchStop(playback, count: 1)
+        let settingsResponse = await service.handle(
+            ServiceRequest(command: .updateSettings(staleSettings))
+        )
+        guard case .accepted = settingsResponse else {
+            Issue.record("Expected the settings update to be accepted.")
+            return
+        }
+        guard case .accepted = await selection.value else {
+            Issue.record("Expected the model switch to be accepted.")
+            return
+        }
+
+        let updated = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        )
+        #expect(updated.settings.activeModelID == replacementID.rawValue)
+        #expect(updated.settings.speakingPace == SpeakingPace.fast.rawValue)
+        await service.shutdown()
+    }
+
+    @Test
+    func settingsWritersWaitForAnInFlightModelSwitch() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString,
+            directoryHint: .isDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let directories = try AppDirectories.testing(root: root)
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let originalID = ModelID("kokoro-bf16")
+        let replacementID = ModelID("kitten-mini-08")
+        for id in [originalID, replacementID] {
+            try seedInstallation(
+                for: id,
+                catalog: catalog,
+                directories: directories
+            )
+        }
+        let playback = MockPlaybackController()
+        playback.modelSwitchStopDelay = .milliseconds(75)
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playback
+        )
+        await service.start()
+
+        let selection = Task {
+            await service.handle(
+                ServiceRequest(command: .selectModel(replacementID.rawValue))
+            )
+        }
+        try await waitForModelSwitchStop(playback, count: 1)
+        let rateResponse = await service.handle(
+            ServiceRequest(command: .setPlaybackRate(1.5))
+        )
+        guard case .accepted = rateResponse,
+              case .accepted = await selection.value else {
+            Issue.record("Expected both serialized settings commands to succeed.")
+            return
+        }
+
+        let updated = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        )
+        #expect(updated.settings.activeModelID == replacementID.rawValue)
+        #expect(updated.settings.playbackRate == 1.5)
+        #expect(playback.rate == 1.5)
+        await service.shutdown()
+    }
+
+    @Test
+    func rapidModelSwitchesKeepOnlyTheLatestSelection() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString,
+            directoryHint: .isDirectory
+        )
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let directories = try AppDirectories.testing(root: root)
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let originalID = ModelID("kokoro-bf16")
+        let firstReplacementID = ModelID("kitten-mini-08")
+        let finalReplacementID = ModelID("pocket-tts")
+        for id in [originalID, firstReplacementID, finalReplacementID] {
+            try seedInstallation(
+                for: id,
+                catalog: catalog,
+                directories: directories
+            )
+        }
+        let playback = MockPlaybackController()
+        playback.modelSwitchStopDelay = .milliseconds(75)
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playback
+        )
+        await service.start()
+
+        let firstSelection = Task {
+            await service.handle(
+                ServiceRequest(
+                    command: .selectModel(firstReplacementID.rawValue)
+                )
+            )
+        }
+        try await waitForModelSwitchStop(playback, count: 1)
+        let finalResponse = await service.handle(
+            ServiceRequest(command: .selectModel(finalReplacementID.rawValue))
+        )
+        guard case .accepted = finalResponse else {
+            Issue.record("Expected the latest model switch to be accepted.")
+            return
+        }
+        guard case .failure(let superseded) = await firstSelection.value else {
+            Issue.record("Expected the earlier model switch to be superseded.")
+            return
+        }
+
+        let updated = try snapshot(
+            await service.handle(ServiceRequest(command: .snapshot))
+        )
+        let diagnostics = try diagnosticList(
+            await service.handle(ServiceRequest(command: .diagnostics))
+        )
+        #expect(updated.settings.activeModelID == finalReplacementID.rawValue)
+        #expect(playback.modelSwitchStopCount == 2)
+        #expect(superseded.code == "service.request_canceled")
+        #expect(
+            diagnostics.filter { $0.code == "model.switch_started" }.count == 2
+        )
+        #expect(
+            diagnostics.filter { $0.code == "model.switch_canceled" }.count == 1
+        )
+        #expect(
+            diagnostics.filter { $0.code == "model.switch_completed" }.count == 1
+        )
+        await service.shutdown()
+    }
+
+    @Test
     func unfinishedJobsDoNotStartAfterServiceRestart() async throws {
         let root = FileManager.default.temporaryDirectory.appending(
             path: UUID().uuidString,
@@ -294,6 +558,62 @@ struct SpeechQueuePolicyTests {
         }
         return jobs
     }
+
+    private func diagnosticList(
+        _ response: ServiceResponse
+    ) throws -> [DiagnosticSnapshot] {
+        guard case .diagnostics(let diagnostics) = response else {
+            Issue.record("Expected a diagnostic list.")
+            throw ServiceFailure(
+                code: "test.invalid_response",
+                message: "Expected a diagnostic list."
+            )
+        }
+        return diagnostics
+    }
+
+    private func seedInstallation(
+        for id: ModelID,
+        catalog: ModelCatalog,
+        directories: AppDirectories
+    ) throws {
+        let model = try #require(catalog.models.first { $0.id == id })
+        let relativePath = "\(model.id.rawValue)/\(model.revision)"
+        let directory = directories.models.appending(
+            path: relativePath,
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let installation = ModelInstallation(
+            modelID: model.id,
+            revision: model.revision,
+            installedBytes: model.estimatedDiskBytes,
+            verifiedAt: .now,
+            dependenciesVerifiedAt: .now,
+            relativePath: relativePath
+        )
+        try JSONEncoder.sayIt.encode(installation).write(
+            to: directory.appending(path: "installation.json"),
+            options: .atomic
+        )
+    }
+
+    private func waitForModelSwitchStop(
+        _ playback: MockPlaybackController,
+        count: Int
+    ) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(1))
+        while playback.modelSwitchStopCount < count {
+            guard ContinuousClock.now < deadline else {
+                Issue.record("Timed out waiting for the model switch to start.")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
 }
 
 @MainActor
@@ -312,6 +632,8 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     var rate: Double = 1
     var backwardSkipInterval: TimeInterval = 15
     var forwardSkipInterval: TimeInterval = 30
+    private(set) var modelSwitchStopCount = 0
+    var modelSwitchStopDelay: Duration?
 
     func prepare(
         requestID: UUID,
@@ -351,6 +673,14 @@ private final class MockPlaybackController: BackendPlaybackControlling {
         generatedDuration = 0
         estimatedDuration = 0
         currentTitle = ""
+    }
+
+    func stopForModelSwitch() async {
+        modelSwitchStopCount += 1
+        if let modelSwitchStopDelay {
+            try? await Task.sleep(for: modelSwitchStopDelay)
+        }
+        stop()
     }
 
     func seek(to seconds: TimeInterval) {

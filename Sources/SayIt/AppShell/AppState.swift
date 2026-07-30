@@ -24,6 +24,8 @@ final class AppState {
     private var startupTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
+    private var modelSelectionTask: Task<Void, Never>?
+    private var modelSelectionGeneration: UInt64 = 0
     private var serviceRepairTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
@@ -255,7 +257,7 @@ final class AppState {
     }
 
     func selectModel(_ model: ModelDescriptor) {
-        perform(.selectModel(model.id.rawValue))
+        requestModelSelection(model.id)
     }
 
     func updateLanguageForVoice(
@@ -769,7 +771,7 @@ final class AppState {
         if let modelIDToSelectAfterInstallation,
            installedModelIDs.contains(modelIDToSelectAfterInstallation) {
             self.modelIDToSelectAfterInstallation = nil
-            perform(.selectModel(modelIDToSelectAfterInstallation.rawValue))
+            requestModelSelection(modelIDToSelectAfterInstallation)
         }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
@@ -911,6 +913,39 @@ final class AppState {
                 try self.requireSuccess(response)
             } catch {
                 self.presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func requestModelSelection(_ id: ModelID) {
+        settingsPushTask?.cancel()
+        modelSelectionTask?.cancel()
+        modelSelectionGeneration &+= 1
+        let generation = modelSelectionGeneration
+        statusText = "Switching model"
+        modelSelectionTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if generation == self.modelSelectionGeneration {
+                    self.modelSelectionTask = nil
+                }
+            }
+            do {
+                let response = try await self.send(.selectModel(id.rawValue))
+                guard !Task.isCancelled,
+                      generation == self.modelSelectionGeneration else {
+                    return
+                }
+                try self.requireSuccess(response)
+                try await self.reloadServiceSnapshot()
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation == self.modelSelectionGeneration else {
+                    return
+                }
+                self.presentError(error.localizedDescription)
+                try? await self.reloadServiceSnapshot()
             }
         }
     }

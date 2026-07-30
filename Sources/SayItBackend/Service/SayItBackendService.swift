@@ -31,6 +31,8 @@ public final class SayItBackendService: SayItService {
     private var downloadProgress: ModelDownloadProgress?
     private var downloadTask: Task<Void, Never>?
     private var jobTask: Task<Void, Never>?
+    private var modelTransitionTask: Task<Void, Error>?
+    private var modelTransitionSequence: UInt64 = 0
     private var jobsByID: [UUID: SpeechJob] = [:]
     private var jobOrder: [UUID] = []
     private var pendingJobs: [UUID: PendingSpeechJob] = [:]
@@ -51,6 +53,8 @@ public final class SayItBackendService: SayItService {
     private var voiceCloneDraft: VoiceCloneDraft?
     private var lastProgressRevisionDate = Date.distantPast
     private var lastReplayProgressTick: Int?
+    private var isModelTransitionInProgress = false
+    private var isShuttingDown = false
     private let serviceVersion: String
 
     public convenience init(
@@ -164,7 +168,43 @@ public final class SayItBackendService: SayItService {
         startNextJobIfNeeded()
     }
 
+    public func shutdown() async {
+        guard !isShuttingDown else { return }
+        isShuttingDown = true
+        statusText = "Stopping service"
+        revision &+= 1
+
+        let transitionTask = modelTransitionTask
+        let installTask = downloadTask
+        transitionTask?.cancel()
+        installTask?.cancel()
+        if let modelID = downloadProgress?.modelID {
+            await modelManager.cancelInstall(modelID)
+        }
+
+        cancelQueuedJobs()
+        await cancelActiveJob(startNext: false)
+        await cancelVoiceStudio()
+        await installTask?.value
+        _ = await transitionTask?.result
+        await synthesizer.unloadModel()
+        playback.stop()
+
+        modelTransitionTask = nil
+        downloadTask = nil
+        statusText = "Service stopped"
+        revision &+= 1
+    }
+
     public func handle(_ request: ServiceRequest) async -> ServiceResponse {
+        guard !isShuttingDown else {
+            return .failure(
+                ServiceFailure(
+                    code: "service.shutting_down",
+                    message: "The background service is shutting down."
+                )
+            )
+        }
         guard request.protocolVersion == SayItProtocolVersion.current else {
             return .failure(
                 ServiceFailure(
@@ -176,6 +216,13 @@ public final class SayItBackendService: SayItService {
 
         do {
             return try await handle(request.command)
+        } catch is CancellationError {
+            return .failure(
+                ServiceFailure(
+                    code: "service.request_canceled",
+                    message: "The request was canceled or superseded."
+                )
+            )
         } catch let failure as ServiceFailure {
             return .failure(failure)
         } catch {
@@ -219,6 +266,7 @@ public final class SayItBackendService: SayItService {
     }
 
     public func reportHTTPServiceError(_ message: String) async {
+        await waitForPendingModelTransitions()
         var settings = settingsStore.value
         settings.httpEnabled = false
         try? settingsStore.update(settings)
@@ -245,14 +293,14 @@ public final class SayItBackendService: SayItService {
         case .events(let sequence):
             return .events(await events(after: sequence))
         case .submit(let submission):
-            return .job(try submit(submission))
+            return .job(try await submit(submission))
         case .jobs:
             return .jobs(jobOrder.compactMap { jobsByID[$0] })
         case .confirmJob(let id):
             try confirmJob(id)
             return .accepted
         case .cancelJob(let id):
-            cancelJob(id)
+            await cancelJob(id)
             return .accepted
         case .play:
             playback.play()
@@ -265,7 +313,7 @@ public final class SayItBackendService: SayItService {
             revision &+= 1
             return .accepted
         case .clear:
-            cancelActiveJob()
+            await cancelActiveJob()
             return .accepted
         case .clearError:
             errorMessage = nil
@@ -283,7 +331,7 @@ public final class SayItBackendService: SayItService {
             revision &+= 1
             return .accepted
         case .setPlaybackRate(let rate):
-            try setPlaybackRate(rate)
+            try await setPlaybackRate(rate)
             return .accepted
         case .models:
             return .models(models.map(\.serviceSnapshot))
@@ -309,18 +357,18 @@ public final class SayItBackendService: SayItService {
         case .startVoiceClone(let request):
             return .voiceStudio(try startVoiceClone(request))
         case .cancelVoiceStudio:
-            cancelVoiceStudio()
+            await cancelVoiceStudio()
             return .accepted
         case .voicePreview(let id):
             return .file(try voicePreview(id: id))
         case .saveVoiceCandidate(let id, let name):
-            _ = try saveVoiceCandidate(id: id, name: name)
+            _ = try await saveVoiceCandidate(id: id, name: name)
             return .accepted
         case .saveVoiceClone(let id, let name):
-            _ = try saveVoiceClone(sessionID: id, name: name)
+            _ = try await saveVoiceClone(sessionID: id, name: name)
             return .accepted
         case .selectVoice(let id):
-            try selectVoice(id: id)
+            try await selectVoice(id: id)
             return .accepted
         case .renameVoice(let id, let name):
             _ = try voiceProfiles.rename(id: id, name: name)
@@ -328,7 +376,7 @@ public final class SayItBackendService: SayItService {
             revision &+= 1
             return .accepted
         case .deleteVoice(let id):
-            try deleteVoice(id: id)
+            try await deleteVoice(id: id)
             return .accepted
         case .addCommunityModel(
             let repository,
@@ -349,10 +397,10 @@ public final class SayItBackendService: SayItService {
         case .exportHistory(let id, let format):
             return .file(try await exportHistory(id: id, format: format))
         case .replayHistory(let id):
-            try replayHistory(id)
+            try await replayHistory(id)
             return .accepted
         case .regenerateHistory(let id):
-            return .job(try regenerateHistory(id))
+            return .job(try await regenerateHistory(id))
         case .toggleHistoryPinned(let id):
             try history.togglePinned(id: id)
             historyRevision &+= 1
@@ -395,9 +443,19 @@ public final class SayItBackendService: SayItService {
         return ![PlaybackState.paused, .finished, .failed].contains(playback.state)
     }
 
+    private var modelSwitchIsPending: Bool {
+        isModelTransitionInProgress || modelTransitionTask != nil
+    }
+
     private func startVoiceDiscovery(
         _ request: VoiceDiscoveryRequest
     ) throws -> VoiceStudioSnapshot {
+        guard !modelSwitchIsPending else {
+            throw ServiceFailure(
+                code: "model.switch_in_progress",
+                message: "Wait for the model switch to finish before creating voices."
+            )
+        }
         guard !voiceStudioIsBusy else {
             throw ServiceFailure(
                 code: "voice.studio_busy",
@@ -580,6 +638,12 @@ public final class SayItBackendService: SayItService {
     private func startVoiceClone(
         _ request: VoiceCloneRequest
     ) throws -> VoiceStudioSnapshot {
+        guard !modelSwitchIsPending else {
+            throw ServiceFailure(
+                code: "model.switch_in_progress",
+                message: "Wait for the model switch to finish before creating voices."
+            )
+        }
         guard !voiceStudioIsBusy else {
             throw ServiceFailure(
                 code: "voice.studio_busy",
@@ -794,11 +858,13 @@ public final class SayItBackendService: SayItService {
         }
     }
 
-    private func cancelVoiceStudio() {
-        voiceStudioTask?.cancel()
+    private func cancelVoiceStudio() async {
+        let task = voiceStudioTask
+        task?.cancel()
         voiceStudioTask = nil
         discardVoiceStudio(removeCloneRecording: true)
         revision &+= 1
+        await task?.value
     }
 
     private func discardVoiceStudio(removeCloneRecording: Bool) {
@@ -834,7 +900,8 @@ public final class SayItBackendService: SayItService {
     private func saveVoiceCandidate(
         id: UUID,
         name: String
-    ) throws -> VoiceProfileSnapshot {
+    ) async throws -> VoiceProfileSnapshot {
+        await waitForPendingModelTransitions()
         guard let draft = voiceDraftsByID[id] else {
             throw ServiceFailure(
                 code: "voice.preview_not_found",
@@ -842,7 +909,7 @@ public final class SayItBackendService: SayItService {
             )
         }
         let profile = try voiceProfiles.saveGenerated(draft, name: name)
-        try selectVoice(id: profile.id)
+        try await selectVoice(id: profile.id)
         voicesRevision &+= 1
         revision &+= 1
         return profile
@@ -852,7 +919,8 @@ public final class SayItBackendService: SayItService {
     private func saveVoiceClone(
         sessionID: UUID,
         name: String
-    ) throws -> VoiceProfileSnapshot {
+    ) async throws -> VoiceProfileSnapshot {
+        await waitForPendingModelTransitions()
         guard let draft = voiceCloneDraft,
               draft.sessionID == sessionID,
               voiceStudioSnapshot?.id == sessionID,
@@ -863,7 +931,7 @@ public final class SayItBackendService: SayItService {
             )
         }
         let profile = try voiceProfiles.saveRecorded(draft, name: name)
-        try selectVoice(id: profile.id)
+        try await selectVoice(id: profile.id)
         voicesRevision &+= 1
         discardVoiceStudio(removeCloneRecording: true)
         revision &+= 1
@@ -942,7 +1010,8 @@ public final class SayItBackendService: SayItService {
         }
     }
 
-    private func selectVoice(id: UUID) throws {
+    private func selectVoice(id: UUID) async throws {
+        await waitForPendingModelTransitions()
         guard let record = voiceProfiles.record(id: id) else {
             throw ServiceFailure(
                 code: "voice.not_found",
@@ -958,7 +1027,8 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
-    private func deleteVoice(id: UUID) throws {
+    private func deleteVoice(id: UUID) async throws {
+        await waitForPendingModelTransitions()
         guard let record = voiceProfiles.record(id: id) else {
             throw ServiceFailure(
                 code: "voice.not_found",
@@ -990,7 +1060,13 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private func submit(_ submission: SpeechSubmission) throws -> SpeechJob {
+    private func submit(_ submission: SpeechSubmission) async throws -> SpeechJob {
+        guard !modelSwitchIsPending else {
+            throw ServiceFailure(
+                code: "model.switch_in_progress",
+                message: "Wait for the model switch to finish before speaking."
+            )
+        }
         guard voiceStudioTask == nil else {
             throw ServiceFailure(
                 code: "voice.studio_busy",
@@ -1016,9 +1092,9 @@ public final class SayItBackendService: SayItService {
         case .enqueue:
             break
         case .interruptCurrent:
-            cancelActiveJob(startNext: false)
+            await cancelActiveJob(startNext: false)
         case .replaceAll:
-            cancelActiveJob(startNext: false)
+            await cancelActiveJob(startNext: false)
             cancelQueuedJobs()
         }
 
@@ -1043,7 +1119,12 @@ public final class SayItBackendService: SayItService {
     }
 
     private func startNextJobIfNeeded() {
-        guard activeJobID == nil, let id = queuedJobIDs.first else { return }
+        guard !isShuttingDown,
+              !modelSwitchIsPending,
+              activeJobID == nil,
+              let id = queuedJobIDs.first else {
+            return
+        }
         queuedJobIDs.removeFirst()
         activeJobID = id
         persistJobJournal()
@@ -1394,9 +1475,9 @@ public final class SayItBackendService: SayItService {
         }
     }
 
-    private func cancelJob(_ id: UUID) {
+    private func cancelJob(_ id: UUID) async {
         if activeJobID == id {
-            cancelActiveJob()
+            await cancelActiveJob()
             return
         }
         queuedJobIDs.removeAll { $0 == id }
@@ -1404,33 +1485,46 @@ public final class SayItBackendService: SayItService {
         finishQueuedJob(id, state: .canceled)
     }
 
-    private func cancelActiveJob(startNext: Bool = true) {
+    private func cancelActiveJob(
+        startNext: Bool = true,
+        forModelSwitch: Bool = false
+    ) async {
         guard let id = activeJobID else {
-            playback.stop()
+            if forModelSwitch {
+                await playback.stopForModelSwitch()
+                await synthesizer.cancelCurrentRequest()
+            } else {
+                playback.stop()
+            }
             statusText = "Ready to speak"
             revision &+= 1
-            if startNext {
+            if startNext, !isShuttingDown, !modelSwitchIsPending {
                 startNextJobIfNeeded()
             }
             return
         }
-        jobTask?.cancel()
+        let task = jobTask
+        let request = activeRequest
+        task?.cancel()
         jobTask = nil
-        Task {
-            await synthesizer.cancelCurrentRequest()
+        activeRequest = nil
+        activeJobID = nil
+        pendingJobs[id] = nil
+        if forModelSwitch {
+            await playback.stopForModelSwitch()
+        } else {
+            playback.stop()
         }
-        playback.stop()
-        if let request = activeRequest, request.source != .preview {
+        if let request, request.source != .preview {
             try? history.markIncomplete(id: request.id, state: .canceled)
             historyRevision &+= 1
         }
-        activeRequest = nil
-        pendingJobs[id] = nil
-        activeJobID = nil
         finishQueuedJob(id, state: .canceled)
         statusText = "Ready to speak"
         persistJobJournal()
-        if startNext {
+        await synthesizer.cancelCurrentRequest()
+        await task?.value
+        if startNext, !isShuttingDown, !modelSwitchIsPending {
             startNextJobIfNeeded()
         }
     }
@@ -1667,7 +1761,7 @@ public final class SayItBackendService: SayItService {
         }
     }
 
-    private func setPlaybackRate(_ rate: Double) throws {
+    private func setPlaybackRate(_ rate: Double) async throws {
         let validated = validatedPlaybackRate(rate)
         guard validated == rate else {
             throw ServiceFailure(
@@ -1675,6 +1769,7 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
+        await waitForPendingModelTransitions()
         playback.rate = validated
         var settings = settingsStore.value
         settings.playbackRate = validated
@@ -1695,9 +1790,6 @@ public final class SayItBackendService: SayItService {
                 message: "Install the model before selecting it."
             )
         }
-        cancelActiveJob()
-        await synthesizer.unloadModel()
-        try await modelManager.select(id)
         var settings = settingsStore.value
         settings.activeModelID = id.rawValue
         settings.activeVoice = legacyVoice(
@@ -1705,8 +1797,173 @@ public final class SayItBackendService: SayItService {
             fallback: model.defaultVoice
         )
         settings.activeLanguage = model.defaultLanguage ?? ""
-        try settingsStore.update(settings)
+        try await enqueueModelTransition(to: id, settings: settings)
+    }
+
+    private func enqueueModelTransition(
+        to id: ModelID,
+        settings: BackendSettingsSnapshot
+    ) async throws {
+        modelTransitionSequence &+= 1
+        let sequence = modelTransitionSequence
+        let predecessor = modelTransitionTask
+        predecessor?.cancel()
+        let task = Task { @MainActor [weak self, predecessor] in
+            if let predecessor {
+                _ = await predecessor.result
+            }
+            try Task.checkCancellation()
+            guard let self else {
+                throw CancellationError()
+            }
+            try await self.performModelTransition(to: id, settings: settings)
+        }
+        modelTransitionTask = task
+
+        do {
+            try await task.value
+        } catch {
+            if sequence == modelTransitionSequence {
+                modelTransitionTask = nil
+            }
+            throw error
+        }
+        if sequence == modelTransitionSequence {
+            modelTransitionTask = nil
+        }
+    }
+
+    private func performModelTransition(
+        to id: ModelID,
+        settings requestedSettings: BackendSettingsSnapshot
+    ) async throws {
+        guard models.contains(where: { $0.id == id }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested model was not found."
+            )
+        }
+        guard installedModelIDs.contains(id) else {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install the model before selecting it."
+            )
+        }
+
+        var settings = requestedSettings
+        settings.activeModelID = id.rawValue
+        let previousSettings = settingsStore.value
+        let previousID = ModelID(previousSettings.activeModelID)
+        guard previousID != id else {
+            try settingsStore.update(settings)
+            revision &+= 1
+            return
+        }
+
+        isModelTransitionInProgress = true
+        statusText = "Switching model"
         revision &+= 1
+        let started = ContinuousClock.now
+        await diagnostics.record(
+            DiagnosticEvent(
+                severity: .info,
+                category: .model,
+                code: "model.switch_started",
+                modelID: id
+            )
+        )
+        diagnosticsRevision &+= 1
+
+        do {
+            await cancelVoiceStudio()
+            await cancelActiveJob(
+                startNext: false,
+                forModelSwitch: true
+            )
+            cancelQueuedJobs()
+            await synthesizer.unloadModel()
+            try Task.checkCancellation()
+            do {
+                try await modelManager.select(id)
+                try Task.checkCancellation()
+                try settingsStore.update(settings)
+            } catch {
+                let transitionError = error
+                do {
+                    try await modelManager.select(previousID)
+                } catch {
+                    await diagnostics.record(
+                        DiagnosticEvent(
+                            severity: .error,
+                            category: .model,
+                            code: "model.switch_rollback_failed",
+                            modelID: id
+                        )
+                    )
+                    diagnosticsRevision &+= 1
+                    throw ServiceFailure(
+                        code: "model.switch_rollback_failed",
+                        message: "The previous model could not be restored after the switch failed."
+                    )
+                }
+                throw transitionError
+            }
+
+            isModelTransitionInProgress = false
+            statusText = "Ready to speak"
+            errorMessage = nil
+            revision &+= 1
+            let duration = started.duration(to: .now)
+            await diagnostics.record(
+                DiagnosticEvent(
+                    severity: .info,
+                    category: .model,
+                    code: "model.switch_completed",
+                    modelID: id,
+                    durationMilliseconds: Int(
+                        duration.components.seconds * 1_000
+                            + duration.components.attoseconds / 1_000_000_000_000_000
+                    )
+                )
+            )
+            diagnosticsRevision &+= 1
+        } catch is CancellationError {
+            isModelTransitionInProgress = false
+            if !isShuttingDown {
+                statusText = "Switching model"
+                revision &+= 1
+            }
+            let duration = started.duration(to: .now)
+            await diagnostics.record(
+                DiagnosticEvent(
+                    severity: .info,
+                    category: .model,
+                    code: "model.switch_canceled",
+                    modelID: id,
+                    durationMilliseconds: Int(
+                        duration.components.seconds * 1_000
+                            + duration.components.attoseconds / 1_000_000_000_000_000
+                    )
+                )
+            )
+            diagnosticsRevision &+= 1
+            throw CancellationError()
+        } catch {
+            isModelTransitionInProgress = false
+            statusText = "Model switch failed"
+            errorMessage = error.localizedDescription
+            revision &+= 1
+            await diagnostics.record(
+                DiagnosticEvent(
+                    severity: .error,
+                    category: .model,
+                    code: "model.switch_failed",
+                    modelID: id
+                )
+            )
+            diagnosticsRevision &+= 1
+            throw error
+        }
     }
 
     private func installModel(_ id: ModelID) throws {
@@ -1821,9 +2078,6 @@ public final class SayItBackendService: SayItService {
                     message: "Install another compatible model before removing the active model."
                 )
             }
-            await synthesizer.cancelCurrentRequest()
-            await synthesizer.unloadModel()
-            try await modelManager.select(replacement.id)
             var settings = settingsStore.value
             settings.activeModelID = replacement.id.rawValue
             settings.activeVoice = legacyVoice(
@@ -1831,7 +2085,10 @@ public final class SayItBackendService: SayItService {
                 fallback: replacement.defaultVoice
             )
             settings.activeLanguage = replacement.defaultLanguage ?? ""
-            try settingsStore.update(settings)
+            try await enqueueModelTransition(
+                to: replacement.id,
+                settings: settings
+            )
         }
         try await modelManager.remove(id)
         models = await modelManager.models()
@@ -1887,7 +2144,7 @@ public final class SayItBackendService: SayItService {
         recordFailure(error.localizedDescription)
     }
 
-    private func replayHistory(_ id: UUID) throws {
+    private func replayHistory(_ id: UUID) async throws {
         guard let item = history.items.first(where: { $0.id == id }),
               let url = history.audioURL(for: item) else {
             throw ServiceFailure(
@@ -1895,7 +2152,7 @@ public final class SayItBackendService: SayItService {
                 message: "This history item has no completed audio."
             )
         }
-        cancelActiveJob(startNext: false)
+        await cancelActiveJob(startNext: false)
         try playback.playFile(at: url, title: item.title)
         playback.setSpokenText(item.cleanedText)
         activeSpokenText = item.cleanedText
@@ -1907,14 +2164,14 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
-    private func regenerateHistory(_ id: UUID) throws -> SpeechJob {
+    private func regenerateHistory(_ id: UUID) async throws -> SpeechJob {
         guard let item = history.items.first(where: { $0.id == id }) else {
             throw ServiceFailure(
                 code: "history.not_found",
                 message: "The history item was not found."
             )
         }
-        return try submit(
+        return try await submit(
             SpeechSubmission(
                 text: item.cleanedText,
                 source: .history,
@@ -1994,16 +2251,39 @@ public final class SayItBackendService: SayItService {
     }
 
     private func updateSettings(
-        _ settings: BackendSettingsSnapshot
+        _ requestedSettings: BackendSettingsSnapshot
     ) async throws {
+        let modelIDAtReceipt = settingsStore.value.activeModelID
+        var settings = requestedSettings
+        if settings.activeModelID == modelIDAtReceipt {
+            await waitForPendingModelTransitions()
+            let currentSettings = settingsStore.value
+            if currentSettings.activeModelID != modelIDAtReceipt {
+                // This was a general settings write based on a snapshot taken
+                // before a model switch completed. Keep the authoritative
+                // model-specific values instead of silently switching back.
+                settings.activeModelID = currentSettings.activeModelID
+                settings.activeVoice = currentSettings.activeVoice
+                settings.activeLanguage = currentSettings.activeLanguage
+            }
+        }
+
         let previousSettings = settingsStore.value
         let previousModelID = previousSettings.activeModelID
+        let requestedModelID = ModelID(settings.activeModelID)
         guard models.contains(where: {
-            $0.id.rawValue == settings.activeModelID
+            $0.id == requestedModelID
         }) else {
             throw ServiceFailure(
                 code: "settings.model_not_found",
                 message: "The selected model was not found."
+            )
+        }
+        if settings.activeModelID != previousModelID,
+           !installedModelIDs.contains(requestedModelID) {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install the model before selecting it."
             )
         }
         guard SpeakingPace(rawValue: settings.speakingPace) != nil else {
@@ -2038,7 +2318,14 @@ public final class SayItBackendService: SayItService {
                 message: "Model unload delay must be at least 30 seconds, or off."
             )
         }
-        try settingsStore.update(settings)
+        if settings.activeModelID != previousModelID {
+            try await enqueueModelTransition(
+                to: requestedModelID,
+                settings: settings
+            )
+        } else {
+            try settingsStore.update(settings)
+        }
         if settings.httpEnabled != previousSettings.httpEnabled
             || settings.httpPort != previousSettings.httpPort {
             httpServiceError = nil
@@ -2053,14 +2340,16 @@ public final class SayItBackendService: SayItService {
         await textCleaner.update(
             options: Self.textCleaningOptions(from: settings)
         )
-        if settings.activeModelID != previousModelID,
-           installedModelIDs.contains(ModelID(settings.activeModelID)) {
-            await synthesizer.cancelCurrentRequest()
-            await synthesizer.unloadModel()
-            try await modelManager.select(ModelID(settings.activeModelID))
-        }
         enforceRetention()
         revision &+= 1
+    }
+
+    private func waitForPendingModelTransitions() async {
+        while let task = modelTransitionTask {
+            let sequence = modelTransitionSequence
+            _ = await task.result
+            guard sequence != modelTransitionSequence else { return }
+        }
     }
 
     private func applyPlaybackSettings(_ settings: BackendSettingsSnapshot) {

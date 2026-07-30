@@ -8,7 +8,11 @@ extension DiagnosticEvent {
             timestamp: timestamp,
             severity: severity.rawValue,
             category: category.rawValue,
-            code: code
+            code: code,
+            modelID: modelID?.rawValue,
+            durationMilliseconds: durationMilliseconds,
+            byteCount: byteCount,
+            numericValue: numericValue
         )
     }
 }

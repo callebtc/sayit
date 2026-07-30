@@ -3,13 +3,21 @@ import Foundation
 
 @preconcurrency import MLX
 import MLXAudioCore
-import MLXAudioTTS
+@preconcurrency import MLXAudioTTS
+@preconcurrency import MLXLMCommon
 import SayItCore
 
 actor SynthesisActor: SpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let operationGate = SynthesisOperationGate()
+
+    private struct ActiveOperation: Sendable {
+        let id: UInt64
+        let cancel: @Sendable () -> Void
+        let completion: Task<Void, Never>
+    }
 
     private let modelURLProvider: ModelURLProvider
     private var chunker: TextChunker
@@ -20,7 +28,8 @@ actor SynthesisActor: SpeechSynthesizing {
     private var loadedModelID: ModelID?
     private var loadedTextProcessor: (any TextProcessor)?
     private var retainedReferenceAudio: MLXArray?
-    private var currentTask: Task<Void, Never>?
+    private var operationGeneration: UInt64 = 0
+    private var activeOperation: ActiveOperation?
     private var idleUnloadTask: Task<Void, Never>?
 
     init(
@@ -34,8 +43,11 @@ actor SynthesisActor: SpeechSynthesizing {
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
-        currentTask?.cancel()
-        idleUnloadTask?.cancel()
+        let (operationID, previousOperation) = reserveOperation()
+        await waitForOperationToFinish(previousOperation)
+        guard operationID == operationGeneration else {
+            return cancelledStream()
+        }
 
         let (stream, continuation) =
             AsyncThrowingStream<SynthesisEvent, Error>.makeStream()
@@ -45,34 +57,49 @@ actor SynthesisActor: SpeechSynthesizing {
                 return
             }
             do {
-                try await self.run(request, continuation: continuation)
+                try await Self.operationGate.perform {
+                    try await self.runAndQuiesce(
+                        request,
+                        operationID: operationID,
+                        continuation: continuation
+                    )
+                }
             } catch is CancellationError {
                 continuation.yield(.cancelled)
                 continuation.finish(throwing: CancellationError())
             } catch {
                 continuation.finish(throwing: error)
             }
+            await self.operationDidFinish(operationID)
         }
-        currentTask = task
+        activeOperation = ActiveOperation(
+            id: operationID,
+            cancel: { task.cancel() },
+            completion: task
+        )
         continuation.onTermination = { @Sendable _ in
             task.cancel()
         }
         return stream
     }
 
-    func cancelCurrentRequest() {
-        currentTask?.cancel()
-        currentTask = nil
+    func cancelCurrentRequest() async {
+        let previousOperation = invalidateCurrentOperation()
+        await waitForOperationToFinish(previousOperation)
     }
 
-    func unloadModel() {
-        currentTask?.cancel()
-        idleUnloadTask?.cancel()
-        currentTask = nil
-        idleUnloadTask = nil
-        loadedModel = nil
-        loadedModelID = nil
-        loadedTextProcessor = nil
+    func unloadModel() async {
+        let (operationID, previousOperation) = reserveOperation()
+        await waitForOperationToFinish(previousOperation)
+        do {
+            try await Self.operationGate.perform {
+                await self.releaseLoadedModel(ifCurrent: operationID)
+            }
+        } catch is CancellationError {
+            // A newer operation superseded this unload while it was waiting.
+        } catch {
+            assertionFailure("Unexpected model unload failure: \(error)")
+        }
     }
 
     func updateConfiguration(
@@ -95,6 +122,14 @@ actor SynthesisActor: SpeechSynthesizing {
     }
 
     func prepareDependencies(for model: ModelDescriptor) async throws {
+        try await Self.operationGate.perform {
+            try await self.performDependencyPreparation(for: model)
+        }
+    }
+
+    private func performDependencyPreparation(
+        for model: ModelDescriptor
+    ) async throws {
         switch model.modelType.lowercased() {
         case "kokoro", "kokoro_tts":
             let processor = KokoroMultilingualProcessor()
@@ -117,8 +152,62 @@ actor SynthesisActor: SpeechSynthesizing {
         seed: UInt64,
         reference: VoiceReference? = nil
     ) async throws -> GeneratedVoiceSample {
-        idleUnloadTask?.cancel()
-        try await ensureModelLoaded(model)
+        let (operationID, previousOperation) = reserveOperation()
+        await waitForOperationToFinish(previousOperation)
+        guard operationID == operationGeneration else {
+            throw CancellationError()
+        }
+
+        let resultTask = Task { [weak self] in
+            guard let self else {
+                throw CancellationError()
+            }
+            do {
+                let result = try await Self.operationGate.perform {
+                    try await self.generateVoiceSampleAndQuiesce(
+                        model: model,
+                        text: text,
+                        language: language,
+                        tuning: tuning,
+                        seed: seed,
+                        reference: reference,
+                        operationID: operationID
+                    )
+                }
+                await self.operationDidFinish(operationID)
+                return result
+            } catch {
+                await self.operationDidFinish(operationID)
+                throw error
+            }
+        }
+        let completion = Task {
+            _ = try? await resultTask.value
+        }
+        activeOperation = ActiveOperation(
+            id: operationID,
+            cancel: { resultTask.cancel() },
+            completion: completion
+        )
+
+        return try await withTaskCancellationHandler {
+            try await resultTask.value
+        } onCancel: {
+            resultTask.cancel()
+        }
+    }
+
+    private func performVoiceSampleGeneration(
+        model: ModelDescriptor,
+        text: String,
+        language: String?,
+        tuning: VoiceSynthesisTuning,
+        seed: UInt64,
+        reference: VoiceReference?,
+        operationID: UInt64
+    ) async throws -> GeneratedVoiceSample {
+        try await ensureModelLoaded(model, operationID: operationID)
+        try checkOperation(operationID)
         guard let loadedModel else {
             throw SynthesisError.modelNotInstalled
         }
@@ -152,41 +241,37 @@ actor SynthesisActor: SpeechSynthesizing {
         applyModelSpecificTuning(tuning, to: loadedModel)
         if let omniVoice = loadedModel as? OmniVoiceModel,
            tuning.parameters["diffusionSteps"] != nil {
-            let samples = try await generateOmniVoiceSamples(
-                model: omniVoice,
-                text: text,
-                voice: nil,
-                referenceAudio: UncheckedSendable(referenceAudio),
-                refText: reference?.transcript,
-                language: language,
-                parameters: omniVoiceParameters(from: tuning)
-            )
+            let samples = try await SerializedSpeechModel(omniVoice)
+                .generateOmniVoiceSamples(
+                    text: text,
+                    voice: nil,
+                    referenceAudio: SerializedMLXArray(referenceAudio),
+                    refText: reference?.transcript,
+                    language: language,
+                    parameters: omniVoiceParameters(from: tuning)
+                )
+            try checkOperation(operationID)
             guard !samples.isEmpty else {
                 throw SynthesisError.generatedNoAudio
             }
-            scheduleIdleUnload()
             return GeneratedVoiceSample(
                 samples: samples,
                 sampleRate: Double(loadedModel.sampleRate)
             )
         }
-        let stream = loadedModel.generateSamplesStream(
-            text: text,
-            voice: nil,
-            refAudio: referenceAudio,
-            refText: reference?.transcript,
-            language: language,
-            generationParameters: parameters
-        )
-        var samples: [Float] = []
-        for try await chunk in stream {
-            try Task.checkCancellation()
-            samples.append(contentsOf: chunk)
-        }
+        let samples = try await SerializedSpeechModel(loadedModel)
+            .generateSamples(
+                text: text,
+                voice: nil,
+                referenceAudio: SerializedMLXArray(referenceAudio),
+                refText: reference?.transcript,
+                language: language,
+                generationParameters: parameters
+            )
+        try checkOperation(operationID)
         guard !samples.isEmpty else {
             throw SynthesisError.generatedNoAudio
         }
-        scheduleIdleUnload()
         return GeneratedVoiceSample(
             samples: samples,
             sampleRate: Double(loadedModel.sampleRate)
@@ -195,11 +280,17 @@ actor SynthesisActor: SpeechSynthesizing {
 
     private func run(
         _ request: SpeechRequest,
+        operationID: UInt64,
         continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation
     ) async throws {
+        try checkOperation(operationID)
         if loadedModelID != request.model.id || loadedModel == nil {
             continuation.yield(.loadingModel(request.model.id))
-            try await ensureModelLoaded(request.model)
+            try await ensureModelLoaded(
+                request.model,
+                operationID: operationID
+            )
+            try checkOperation(operationID)
             continuation.yield(.modelLoaded(request.model.id))
         }
 
@@ -218,6 +309,9 @@ actor SynthesisActor: SpeechSynthesizing {
                 from: $0.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
             )
+        }
+        if referenceAudio != nil {
+            retainedReferenceAudio = referenceAudio
         }
         var referenceText = request.voiceReference?.transcript
         if request.voiceMode == .automaticStable,
@@ -245,23 +339,21 @@ actor SynthesisActor: SpeechSynthesizing {
             let anchorVoice = request.model.capabilities.voiceDescription
                 ? request.voiceDescription
                 : nil
-            let anchorStream = loadedModel.generateSamplesStream(
-                text: anchorText,
-                voice: anchorVoice,
-                refAudio: nil,
-                refText: nil,
-                language: request.language,
-                generationParameters: parameters
-            )
-            var anchorSamples: [Float] = []
-            for try await samples in anchorStream {
-                try Task.checkCancellation()
-                anchorSamples.append(contentsOf: samples)
-            }
+            let anchorSamples = try await SerializedSpeechModel(loadedModel)
+                .generateSamples(
+                    text: anchorText,
+                    voice: anchorVoice,
+                    referenceAudio: SerializedMLXArray(nil),
+                    refText: nil,
+                    language: request.language,
+                    generationParameters: parameters
+                )
+            try checkOperation(operationID)
             guard !anchorSamples.isEmpty else {
                 throw SynthesisError.generatedNoAudio
             }
             referenceAudio = MLXArray(anchorSamples)
+            retainedReferenceAudio = referenceAudio
             referenceText = anchorText
         }
 
@@ -344,23 +436,27 @@ actor SynthesisActor: SpeechSynthesizing {
                 if let omniVoice = loadedModel as? OmniVoiceModel,
                    let tuning = request.voiceTuning,
                    tuning.parameters["diffusionSteps"] != nil {
-                    let samples = try await generateOmniVoiceSamples(
-                        model: omniVoice,
-                        text: chunk.text,
-                        voice: voiceArgument,
-                        referenceAudio: UncheckedSendable(
-                            usesReference ? referenceAudio : nil
-                        ),
-                        refText: usesReference ? referenceText : nil,
-                        language: request.language,
-                        parameters: omniVoiceParameters(from: tuning)
-                    )
+                    let samples = try await SerializedSpeechModel(omniVoice)
+                        .generateOmniVoiceSamples(
+                            text: chunk.text,
+                            voice: voiceArgument,
+                            referenceAudio: SerializedMLXArray(
+                                usesReference ? referenceAudio : nil
+                            ),
+                            refText: usesReference ? referenceText : nil,
+                            language: request.language,
+                            parameters: omniVoiceParameters(from: tuning)
+                        )
+                    try checkOperation(operationID)
                     try emit(samples)
                 } else {
-                    let stream = loadedModel.generateSamplesStream(
+                    let stream = SerializedSpeechModel(loadedModel)
+                        .generateSamplesStream(
                         text: chunk.text,
                         voice: voiceArgument,
-                        refAudio: usesReference ? referenceAudio : nil,
+                        referenceAudio: SerializedMLXArray(
+                            usesReference ? referenceAudio : nil
+                        ),
                         refText: usesReference ? referenceText : nil,
                         language: request.language,
                         generationParameters: parameters,
@@ -368,6 +464,7 @@ actor SynthesisActor: SpeechSynthesizing {
                             == .progressive ? 0.32 : 2
                     )
                     for try await samples in stream {
+                        try checkOperation(operationID)
                         try emit(samples)
                     }
                 }
@@ -407,8 +504,6 @@ actor SynthesisActor: SpeechSynthesizing {
         }
         continuation.yield(.completed)
         continuation.finish()
-        currentTask = nil
-        scheduleIdleUnload()
     }
 
     private func applyModelSpecificTuning(
@@ -439,26 +534,6 @@ actor SynthesisActor: SpeechSynthesizing {
         )
     }
 
-    nonisolated private func generateOmniVoiceSamples(
-        model: OmniVoiceModel,
-        text: String,
-        voice: String?,
-        referenceAudio: UncheckedSendable<MLXArray?>,
-        refText: String?,
-        language: String?,
-        parameters: OmniVoiceGenerateParameters
-    ) async throws -> [Float] {
-        let audio = try await model.generate(
-            text: text,
-            voice: voice,
-            refAudio: referenceAudio.value,
-            refText: refText,
-            language: language,
-            ovParameters: parameters
-        )
-        return audio.asType(.float32).asArray(Float.self)
-    }
-
     private func makeTextProcessor(
         for model: ModelDescriptor
     ) -> (any TextProcessor)? {
@@ -472,22 +547,42 @@ actor SynthesisActor: SpeechSynthesizing {
         }
     }
 
-    private func ensureModelLoaded(_ model: ModelDescriptor) async throws {
+    private func ensureModelLoaded(
+        _ model: ModelDescriptor,
+        operationID: UInt64
+    ) async throws {
+        try checkOperation(operationID)
         if loadedModelID != model.id {
-            loadedModel = nil
-            loadedModelID = nil
-            loadedTextProcessor = nil
+            releaseLoadedModel()
         }
         guard loadedModel == nil else { return }
-        guard let modelURL = await modelURLProvider(model.id) else {
+        let modelURL = await modelURLProvider(model.id)
+        try checkOperation(operationID)
+        guard let modelURL else {
             throw SynthesisError.modelNotInstalled
         }
         let textProcessor = makeTextProcessor(for: model)
-        loadedModel = try await TTS.loadModel(
-            modelRepo: modelURL.path,
-            modelType: model.modelType,
-            textProcessor: textProcessor
-        )
+        let candidate: SpeechGenerationModel
+        do {
+            candidate = try await TTS.loadModel(
+                modelRepo: modelURL.path,
+                modelType: model.modelType,
+                textProcessor: textProcessor
+            )
+        } catch {
+            Stream.gpu.synchronize()
+            Memory.clearCache()
+            throw error
+        }
+        do {
+            try checkOperation(operationID)
+        } catch {
+            Stream.gpu.synchronize()
+            withExtendedLifetime(candidate) {}
+            Memory.clearCache()
+            throw error
+        }
+        loadedModel = candidate
         loadedModelID = model.id
         loadedTextProcessor = textProcessor
     }
@@ -654,22 +749,272 @@ actor SynthesisActor: SpeechSynthesizing {
         }
     }
 
-    private func scheduleIdleUnload() {
+    private func reserveOperation() -> (UInt64, ActiveOperation?) {
+        operationGeneration &+= 1
+        idleUnloadTask?.cancel()
+        idleUnloadTask = nil
+        let previousOperation = activeOperation
+        previousOperation?.cancel()
+        return (operationGeneration, previousOperation)
+    }
+
+    private func invalidateCurrentOperation() -> ActiveOperation? {
+        operationGeneration &+= 1
+        idleUnloadTask?.cancel()
+        idleUnloadTask = nil
+        let previousOperation = activeOperation
+        previousOperation?.cancel()
+        return previousOperation
+    }
+
+    private func waitForOperationToFinish(
+        _ operation: ActiveOperation?
+    ) async {
+        guard let operation else { return }
+        await operation.completion.value
+        if activeOperation?.id == operation.id {
+            activeOperation = nil
+        }
+    }
+
+    private func checkOperation(_ operationID: UInt64) throws {
+        try Task.checkCancellation()
+        guard operationID == operationGeneration,
+              activeOperation?.id == operationID else {
+            throw CancellationError()
+        }
+    }
+
+    private func operationDidFinish(_ operationID: UInt64) {
+        guard activeOperation?.id == operationID else { return }
+        activeOperation = nil
+        guard operationID == operationGeneration else { return }
+        scheduleIdleUnload(for: operationID)
+    }
+
+    private func cancelledStream()
+        -> AsyncThrowingStream<SynthesisEvent, Error> {
+        let (stream, continuation) =
+            AsyncThrowingStream<SynthesisEvent, Error>.makeStream()
+        continuation.yield(.cancelled)
+        continuation.finish(throwing: CancellationError())
+        return stream
+    }
+
+    private func runAndQuiesce(
+        _ request: SpeechRequest,
+        operationID: UInt64,
+        continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation
+    ) async throws {
+        do {
+            try await run(
+                request,
+                operationID: operationID,
+                continuation: continuation
+            )
+            synchronizeMLXIfLoaded()
+        } catch {
+            synchronizeMLXIfLoaded()
+            throw error
+        }
+    }
+
+    private func generateVoiceSampleAndQuiesce(
+        model: ModelDescriptor,
+        text: String,
+        language: String?,
+        tuning: VoiceSynthesisTuning,
+        seed: UInt64,
+        reference: VoiceReference?,
+        operationID: UInt64
+    ) async throws -> GeneratedVoiceSample {
+        do {
+            let result = try await performVoiceSampleGeneration(
+                model: model,
+                text: text,
+                language: language,
+                tuning: tuning,
+                seed: seed,
+                reference: reference,
+                operationID: operationID
+            )
+            synchronizeMLXIfLoaded()
+            return result
+        } catch {
+            synchronizeMLXIfLoaded()
+            throw error
+        }
+    }
+
+    private func releaseLoadedModel(ifCurrent operationID: UInt64) {
+        guard operationID == operationGeneration else { return }
+        releaseLoadedModel()
+    }
+
+    private func releaseLoadedModel() {
+        guard loadedModel != nil || retainedReferenceAudio != nil else {
+            loadedModelID = nil
+            loadedTextProcessor = nil
+            return
+        }
+        Stream.gpu.synchronize()
+        loadedModel = nil
+        loadedModelID = nil
+        loadedTextProcessor = nil
+        retainedReferenceAudio = nil
+        Memory.clearCache()
+    }
+
+    private func synchronizeMLXIfLoaded() {
+        guard loadedModel != nil || retainedReferenceAudio != nil else { return }
+        Stream.gpu.synchronize()
+    }
+
+    private func scheduleIdleUnload(for operationID: UInt64) {
         idleUnloadTask?.cancel()
         guard idleUnloadDelay > 0 else { return }
         let delay = idleUnloadDelay
         idleUnloadTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
-            await self?.unloadModel()
+            await self?.idleUnloadTimerFired(for: operationID)
         }
+    }
+
+    private func idleUnloadTimerFired(for operationID: UInt64) async {
+        guard operationID == operationGeneration,
+              activeOperation == nil else { return }
+        idleUnloadTask = nil
+        await unloadModel()
     }
 }
 
-private struct UncheckedSendable<Value>: @unchecked Sendable {
-    let value: Value
+actor SynthesisOperationGate {
+    private var generation: UInt64 = 0
+    private var tail: (
+        id: UInt64,
+        completion: Task<Void, Never>
+    )?
 
-    init(_ value: Value) {
+    func perform<Value: Sendable>(
+        _ operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        generation &+= 1
+        let operationID = generation
+        let predecessor = tail?.completion
+        let task = Task {
+            await predecessor?.value
+            try Task.checkCancellation()
+            return try await operation()
+        }
+        let completion = Task {
+            _ = try? await task.value
+        }
+        tail = (operationID, completion)
+
+        do {
+            let value = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            operationFinished(operationID)
+            return value
+        } catch {
+            operationFinished(operationID)
+            throw error
+        }
+    }
+
+    private func operationFinished(_ operationID: UInt64) {
+        guard tail?.id == operationID else { return }
+        tail = nil
+    }
+}
+
+/// MLX Audio's public model protocol is not concurrency annotated. Instances
+/// are only accessed while `SynthesisOperationGate` is held, and this adapter
+/// prevents the non-Sendable model and arrays from escaping that critical
+/// section. Callers only receive materialized, Sendable sample buffers.
+private final class SerializedSpeechModel: @unchecked Sendable {
+    private let model: SpeechGenerationModel
+
+    init(_ model: SpeechGenerationModel) {
+        self.model = model
+    }
+
+    func generateSamples(
+        text: String,
+        voice: String?,
+        referenceAudio: SerializedMLXArray,
+        refText: String?,
+        language: String?,
+        generationParameters: GenerateParameters
+    ) async throws -> [Float] {
+        let audio = try await model.generate(
+            text: text,
+            voice: voice,
+            refAudio: referenceAudio.value,
+            refText: refText,
+            language: language,
+            generationParameters: generationParameters
+        )
+        let samples = audio.asType(.float32).asArray(Float.self)
+        try Task.checkCancellation()
+        return samples
+    }
+
+    func generateOmniVoiceSamples(
+        text: String,
+        voice: String?,
+        referenceAudio: SerializedMLXArray,
+        refText: String?,
+        language: String?,
+        parameters: OmniVoiceGenerateParameters
+    ) async throws -> [Float] {
+        guard let model = model as? OmniVoiceModel else {
+            throw SynthesisError.generatedNoAudio
+        }
+        let audio = try await model.generate(
+            text: text,
+            voice: voice,
+            refAudio: referenceAudio.value,
+            refText: refText,
+            language: language,
+            ovParameters: parameters
+        )
+        let samples = audio.asType(.float32).asArray(Float.self)
+        try Task.checkCancellation()
+        return samples
+    }
+
+    func generateSamplesStream(
+        text: String,
+        voice: String?,
+        referenceAudio: SerializedMLXArray,
+        refText: String?,
+        language: String?,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double
+    ) -> AsyncThrowingStream<[Float], Error> {
+        model.generateSamplesStream(
+            text: text,
+            voice: voice,
+            refAudio: referenceAudio.value,
+            refText: refText,
+            language: language,
+            generationParameters: generationParameters,
+            streamingInterval: streamingInterval
+        )
+    }
+}
+
+/// See `SerializedSpeechModel`: this value never leaves the globally
+/// serialized MLX operation.
+private struct SerializedMLXArray: @unchecked Sendable {
+    let value: MLXArray?
+
+    init(_ value: MLXArray?) {
         self.value = value
     }
 }

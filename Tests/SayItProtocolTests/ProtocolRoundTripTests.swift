@@ -52,6 +52,31 @@ struct ProtocolRoundTripTests {
     }
 
     @Test
+    func diagnosticDetailsRoundTripThroughJSON() throws {
+        let snapshot = DiagnosticSnapshot(
+            id: UUID(),
+            timestamp: .now,
+            severity: "info",
+            category: "model",
+            code: "model.switch_completed",
+            modelID: "kitten-mini-08",
+            durationMilliseconds: 42,
+            byteCount: 128,
+            numericValue: 3.5
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            DiagnosticSnapshot.self,
+            from: SayItWireCodec.encode(snapshot)
+        )
+
+        #expect(decoded.modelID == snapshot.modelID)
+        #expect(decoded.durationMilliseconds == 42)
+        #expect(decoded.byteCount == 128)
+        #expect(decoded.numericValue == 3.5)
+    }
+
+    @Test
     func tokenPresetsNeverGrantWritesToReadOnlyClients() {
         #expect(!APITokenPreset.readOnly.scopes.contains(.speechSubmit))
         #expect(!APITokenPreset.readOnly.scopes.contains(.settingsWrite))

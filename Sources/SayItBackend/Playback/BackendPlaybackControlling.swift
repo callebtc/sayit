@@ -26,6 +26,7 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     )
     func setSpokenText(_ text: String)
     func appendSpokenChunk(_ chunk: PlaybackTextChunk)
+    func stopForModelSwitch() async
     func finishBuffering()
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult
     func playFile(at url: URL, title: String) throws

@@ -9,23 +9,28 @@ struct SpeechLyricsView: View {
     let generatedDuration: TimeInterval
     var onSeek: ((TimeInterval) -> Void)?
 
-    @State private var blocks: [Block] = []
-    @State private var tokens: [WordToken] = []
+    @State private var tokenization = Tokenization()
     @State private var autoFollow = true
     @State private var lastScrolledWord = -1
     @State private var scrollMetrics = ScrollMetrics()
 
     private struct Block: Identifiable {
         let id: Int
-        let range: Range<String.Index>
         var words: [WordToken] = []
     }
 
     private struct WordToken: Identifiable {
         let id: Int
-        let range: Range<String.Index>
+        let offsetRange: Range<Int>
         let blockID: Int
         var newlinesBefore: Int = 0
+    }
+
+    private struct Tokenization {
+        var sourceText = ""
+        var sourceChunks: [PlaybackTextChunk] = []
+        var blocks: [Block] = []
+        var tokens: [WordToken] = []
     }
 
     private struct ScrollMetrics: Equatable {
@@ -38,6 +43,21 @@ struct SpeechLyricsView: View {
         let font = NSFont.preferredFont(forTextStyle: .callout)
         return Double((" " as NSString).size(withAttributes: [.font: font]).width)
     }()
+
+    private var activeTokenization: Tokenization? {
+        guard tokenization.sourceText == text, tokenization.sourceChunks == chunks else {
+            return nil
+        }
+        return tokenization
+    }
+
+    private var blocks: [Block] {
+        activeTokenization?.blocks ?? []
+    }
+
+    private var tokens: [WordToken] {
+        activeTokenization?.tokens ?? []
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -117,14 +137,20 @@ struct SpeechLyricsView: View {
 
     private var currentWord: String {
         guard let index = currentWordIndex, tokens.indices.contains(index) else { return "" }
-        return String(text[tokens[index].range])
+        return Self.resolvedText(
+            in: text,
+            tokenizedText: tokenization.sourceText,
+            offsetRange: tokens[index].offsetRange
+        ) ?? ""
     }
 
     private var currentWordIndex: Int? {
         guard !tokens.isEmpty else { return nil }
         var current: Int?
         for (index, token) in tokens.enumerated() {
-            guard startTime(for: token.range) <= elapsed + 0.08 else { break }
+            guard startTime(forOffset: token.offsetRange.lowerBound) <= elapsed + 0.08 else {
+                break
+            }
             current = index
         }
         return current
@@ -192,9 +218,14 @@ struct SpeechLyricsView: View {
     private func wordView(for token: WordToken) -> some View {
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
-        let seekTime = startTime(for: token.range)
+        let seekTime = startTime(forOffset: token.offsetRange.lowerBound)
         let canSeek = onSeek != nil && seekTime <= generatedDuration
-        return Text(text[token.range])
+        let word = Self.resolvedText(
+            in: text,
+            tokenizedText: tokenization.sourceText,
+            offsetRange: token.offsetRange
+        ) ?? ""
+        return Text(word)
             .font(.callout)
             .foregroundStyle(wordColor(isCurrent: isCurrent, isPast: isPast))
             .background {
@@ -265,14 +296,14 @@ struct SpeechLyricsView: View {
         var newTokens: [WordToken] = []
         var index = 0
         for (blockID, range) in blockRanges.enumerated() {
-            var block = Block(id: blockID, range: range)
+            var block = Block(id: blockID)
             var previousUpper = range.lowerBound
             for wordRange in Self.wordRanges(in: text, within: range) {
                 let newlines = text[previousUpper..<wordRange.lowerBound]
                     .reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
                 let token = WordToken(
                     id: index,
-                    range: wordRange,
+                    offsetRange: Self.offsetRange(for: wordRange, in: text),
                     blockID: blockID,
                     newlinesBefore: newlines
                 )
@@ -283,13 +314,17 @@ struct SpeechLyricsView: View {
             }
             newBlocks.append(block)
         }
-        blocks = newBlocks
-        tokens = newTokens
+        tokenization = Tokenization(
+            sourceText: text,
+            sourceChunks: chunks,
+            blocks: newBlocks,
+            tokens: newTokens
+        )
     }
 
-    private func startTime(for word: Range<String.Index>) -> TimeInterval {
+    private func startTime(forOffset offset: Int) -> TimeInterval {
         Self.startTime(
-            forWordAt: text.distance(from: text.startIndex, to: word.lowerBound),
+            forWordAt: offset,
             text: text,
             chunks: chunks,
             generatedDuration: generatedDuration
@@ -332,6 +367,39 @@ struct SpeechLyricsView: View {
         within range: Range<String.Index>
     ) -> [Range<String.Index>] {
         text[range].ranges(of: #/\S+/#).map { $0 }
+    }
+
+    nonisolated static func offsetRange(
+        for range: Range<String.Index>,
+        in text: String
+    ) -> Range<Int> {
+        let lower = text.distance(from: text.startIndex, to: range.lowerBound)
+        let upper = text.distance(from: text.startIndex, to: range.upperBound)
+        return lower..<upper
+    }
+
+    nonisolated static func resolvedText(
+        in text: String,
+        tokenizedText: String,
+        offsetRange: Range<Int>
+    ) -> String? {
+        guard text == tokenizedText,
+              offsetRange.lowerBound >= 0,
+              offsetRange.upperBound >= offsetRange.lowerBound,
+              let lower = text.index(
+                  text.startIndex,
+                  offsetBy: offsetRange.lowerBound,
+                  limitedBy: text.endIndex
+              ),
+              let upper = text.index(
+                  text.startIndex,
+                  offsetBy: offsetRange.upperBound,
+                  limitedBy: text.endIndex
+              ),
+              lower <= upper else {
+            return nil
+        }
+        return String(text[lower..<upper])
     }
 
     nonisolated static func startTime(

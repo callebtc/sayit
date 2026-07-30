@@ -10,6 +10,8 @@ import SayItProtocol
 @Observable
 final class PlaybackController: BackendPlaybackControlling {
     private static let baseStartBufferDuration: TimeInterval = 1.2
+    static let modelSwitchFadeDuration: Duration = .milliseconds(24)
+    static let modelSwitchFadeStepCount = 8
     static let highQualityTimePitchOverlap: Float = 32
 
     static func preferredStartBufferDuration(
@@ -37,6 +39,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private var amplitudePendingSampleCount = 0
     private var amplitudeWindowFrameCount = 1_200
     private var lastNowPlayingTimelineUpdate = Date.distantPast
+    private var stopTransitionGeneration = 0
 
     @ObservationIgnored
     var onFailure: (@MainActor (String) -> Void)?
@@ -164,8 +167,57 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func stop() {
+        stopTransitionGeneration &+= 1
+        finishStopping()
+    }
+
+    func stopForModelSwitch() async {
+        stopTransitionGeneration &+= 1
+        let generation = stopTransitionGeneration
+
+        // Reject any late synthesis chunks as soon as the transition starts,
+        // while allowing already-scheduled audio to fade out briefly.
+        requestID = nil
+        guard player.isPlaying else {
+            finishStopping()
+            return
+        }
+
+        let initialVolume = player.volume
+        let stepDuration = Self.modelSwitchFadeDuration
+            / Self.modelSwitchFadeStepCount
+        for step in 1...Self.modelSwitchFadeStepCount {
+            do {
+                try await Task.sleep(for: stepDuration)
+            } catch {
+                guard generation == stopTransitionGeneration else { return }
+                finishStopping()
+                return
+            }
+            guard generation == stopTransitionGeneration else { return }
+            player.volume = initialVolume
+                * Self.modelSwitchFadeVolume(
+                    step: step,
+                    stepCount: Self.modelSwitchFadeStepCount
+                )
+        }
+        finishStopping()
+    }
+
+    static func modelSwitchFadeVolume(
+        step: Int,
+        stepCount: Int
+    ) -> Float {
+        guard stepCount > 0 else { return 0 }
+        let progress = Float(min(max(step, 0), stepCount))
+            / Float(stepCount)
+        return 1 - progress
+    }
+
+    private func finishStopping() {
         invalidateScheduledAudio()
         engine.pause()
+        player.volume = 1
         accumulatedSamples.removeAll(keepingCapacity: false)
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil

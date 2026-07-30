@@ -12,7 +12,9 @@ struct SayItAgentMain {
             let directories = try AppDirectories.shared(
                 appGroupIdentifier: SayItServiceIdentifiers.appGroup
             )
-            armParentWatchdog(in: directories.applicationSupport)
+            let parentPID = monitoredParentPID(
+                in: directories.applicationSupport
+            )
 
             let version = Bundle.main.object(
                 forInfoDictionaryKey: "CFBundleShortVersionString"
@@ -33,12 +35,11 @@ struct SayItAgentMain {
             let httpSupervisor = HTTPServerSupervisor(backend: backend)
             httpSupervisor.start()
 
-            while !Task.isCancelled {
-                try await Task.sleep(for: .seconds(3_600))
-            }
+            await waitForTermination(parentPID: parentPID)
 
-            httpSupervisor.stop()
             listener.invalidate()
+            httpSupervisor.stop()
+            await backend.shutdown()
             withExtendedLifetime(delegate) {}
         } catch {
             FileHandle.standardError.write(
@@ -47,19 +48,23 @@ struct SayItAgentMain {
         }
     }
 
-    private static func armParentWatchdog(in directory: URL) {
+    private static func monitoredParentPID(in directory: URL) -> pid_t? {
         guard let parentPID = ParentProcessFile.readPID(from: directory),
               parentPID > 1,
               parentPID != getpid(),
               ParentProcessFile.isAlive(parentPID) else {
-            return
+            return nil
         }
-        Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard ParentProcessFile.isAlive(parentPID) else {
-                    exit(EXIT_SUCCESS)
-                }
+        return parentPID
+    }
+
+    private static func waitForTermination(parentPID: pid_t?) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            if let parentPID,
+               !ParentProcessFile.isAlive(parentPID) {
+                return
             }
         }
     }

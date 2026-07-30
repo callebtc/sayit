@@ -48,4 +48,30 @@ struct AppSettingsTests {
                 == .profile(profileID)
         )
     }
+
+    @Test("Model selection uses the dedicated backend command")
+    @MainActor
+    func modelSelectionDoesNotScheduleSettingsPush() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: defaults)
+        var backendChangeCount = 0
+        settings.onBackendChange = {
+            backendChangeCount += 1
+        }
+
+        settings.activeModelID = ModelID("qwen3-06b-base-8bit")
+
+        #expect(backendChangeCount == 0)
+        #expect(
+            defaults.string(forKey: "activeModelID")
+                == "qwen3-06b-base-8bit"
+        )
+
+        settings.speakingPace = .fast
+        #expect(backendChangeCount == 1)
+    }
 }

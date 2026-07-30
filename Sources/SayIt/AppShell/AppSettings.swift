@@ -53,8 +53,10 @@ final class AppSettings {
     var activeModelID: ModelID {
         didSet {
             defaults.set(activeModelID.rawValue, forKey: Key.activeModelID)
+            let wasApplyingBackendSnapshot = isApplyingBackendSnapshot
+            isApplyingBackendSnapshot = true
             synchronizeLegacyVoice()
-            notifyBackendChange()
+            isApplyingBackendSnapshot = wasApplyingBackendSnapshot
         }
     }
     var activeVoice: String {
