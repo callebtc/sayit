@@ -69,12 +69,14 @@ struct CircularIconButtonStyle: ButtonStyle {
                 Circle()
                     .fill(background(isPressed: configuration.isPressed))
             }
+            .scaleEffect(configuration.isPressed ? 0.86 : 1)
             .contentShape(Circle())
             .onHover { hovering in
                 withAnimation(DesignTokens.quickAnimation) {
                     isHovering = hovering
                 }
             }
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
     }
 
     private func background(isPressed: Bool) -> Color {

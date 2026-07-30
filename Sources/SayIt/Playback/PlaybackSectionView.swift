@@ -16,6 +16,7 @@ struct PlaybackSectionView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: DesignTokens.ribbonHeight + 13)
                 .accessibilityElement(children: .combine)
+                .transition(.opacity)
             } else {
                 VoiceRibbonView(
                     amplitudes: state.playback.amplitudes,
@@ -24,8 +25,10 @@ struct PlaybackSectionView: View {
                     estimatedDuration: state.playback.estimatedDuration,
                     onSeek: state.playback.seek
                 )
+                .transition(.opacity)
             }
             PlaybackControlsView()
         }
+        .animation(.smooth(duration: 0.3), value: state.playback.state == .preparing)
     }
 }

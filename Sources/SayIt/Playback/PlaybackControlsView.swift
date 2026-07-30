@@ -18,13 +18,15 @@ struct PlaybackControlsView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(CircularIconButtonStyle())
 
-                Button(
-                    state.playback.state == .playing ? "Pause" : "Play",
-                    systemImage: state.playback.state == .playing
-                        ? "pause.fill"
-                        : "play.fill",
-                    action: togglePlayback
-                )
+                Button(action: togglePlayback) {
+                    Image(
+                        systemName: state.playback.state == .playing
+                            ? "pause.fill"
+                            : "play.fill"
+                    )
+                    .contentTransition(.symbolEffect(.replace.offUp))
+                }
+                .accessibilityLabel(state.playback.state == .playing ? "Pause" : "Play")
                 .labelStyle(.iconOnly)
                 .buttonStyle(CircularIconButtonStyle(size: 36, prominent: true))
 
