@@ -6,7 +6,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.sayit.mac</string>
+		<string>group.sh.sayit.mac</string>
 	</array>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
@@ -14,7 +14,7 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.sayit.client</key>
+	<key>sh.sayit.client</key>
 	<true/>
 </dict>
 </plist>

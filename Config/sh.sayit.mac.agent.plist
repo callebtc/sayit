@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.sayit.mac.agent</string>
+	<string>sh.sayit.mac.agent</string>
 	<key>BundleProgram</key>
 	<string>Contents/Library/LaunchServices/SayItAgent</string>
 	<key>MachServices</key>
 	<dict>
-		<key>group.com.sayit.mac.agent</key>
+		<key>group.sh.sayit.mac.agent</key>
 		<true/>
 	</dict>
 	<key>ProcessType</key>

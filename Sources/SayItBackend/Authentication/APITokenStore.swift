@@ -4,7 +4,7 @@ import SayItProtocol
 import Security
 
 actor APITokenStore {
-    private static let service = "com.sayit.mac.api-tokens"
+    private static let service = "sh.sayit.mac.api-tokens"
 
     func create(
         name: String,

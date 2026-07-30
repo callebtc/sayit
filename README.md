@@ -12,6 +12,15 @@ stay on your Mac.
   </tr>
 </table>
 
+<p align="center">
+  <video
+    src="public/resources/introducing.mp4"
+    controls
+    playsinline
+    width="720">
+  </video>
+</p>
+
 ## Highlights
 
 - **Speak from anywhere.** Select text in any app and choose

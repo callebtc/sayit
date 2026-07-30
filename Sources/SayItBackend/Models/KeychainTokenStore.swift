@@ -3,7 +3,7 @@ import Foundation
 import Security
 
 actor KeychainTokenStore {
-    private let service = "com.sayit.mac.huggingface"
+    private let service = "sh.sayit.mac.huggingface"
     private let account = "token"
 
     func token() throws -> String? {

@@ -22,7 +22,7 @@ public final class SayItBackendService: SayItService {
     private let jobJournalStore: JobJournalStore
     private let communityModelResolver = CommunityModelResolver()
     private let logger = Logger(
-        subsystem: "com.sayit.mac.agent",
+        subsystem: "sh.sayit.mac.agent",
         category: "backend"
     )
 

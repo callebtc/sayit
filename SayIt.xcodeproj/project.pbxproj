@@ -2227,7 +2227,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/com.sayit.mac.agent.plist\" \"${agent_dir}/com.sayit.mac.agent.plist\"\n";
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nplatform_suffix=\"${EFFECTIVE_PLATFORM_NAME:-}\"\ncli_products=\"${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts\"\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \"${agent_dir}/com.sayit.mac.agent.plist\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent\" \"${service_dir}/SayItAgent\"\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${cli_products}/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -2799,7 +2799,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
 				PRODUCT_NAME = SayIt;
 				SDKROOT = macosx;
 			};
@@ -2816,7 +2816,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.cli;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.cli;
 				PRODUCT_NAME = sayit;
 				SDKROOT = macosx;
 				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
@@ -2839,7 +2839,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.http;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.http;
 				PRODUCT_NAME = SayItHTTP;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -2863,7 +2863,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.protocol;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.protocol;
 				PRODUCT_NAME = SayItProtocol;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -2882,7 +2882,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.ui-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.ui-tests";
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = SayIt;
 			};
@@ -2904,7 +2904,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.backend;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.backend;
 				PRODUCT_NAME = SayItBackend;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -2923,7 +2923,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.ui-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.ui-tests";
 				SDKROOT = macosx;
 				TEST_TARGET_NAME = SayIt;
 			};
@@ -2945,7 +2945,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.core;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.core;
 				PRODUCT_NAME = SayItCore;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3033,7 +3033,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.http;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.http;
 				PRODUCT_NAME = SayItHTTP;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3052,7 +3052,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.protocol-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.protocol-tests";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -3068,7 +3068,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.backend-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.backend-tests";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -3084,7 +3084,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.http-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.http-tests";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -3105,7 +3105,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.xpc;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.xpc;
 				PRODUCT_NAME = SayItXPC;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3124,7 +3124,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.backend-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.backend-tests";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -3136,7 +3136,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.agent;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.agent;
 				PRODUCT_NAME = SayItAgent;
 				SDKROOT = macosx;
 			};
@@ -3158,7 +3158,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.protocol;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.protocol;
 				PRODUCT_NAME = SayItProtocol;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3178,7 +3178,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
 				PRODUCT_NAME = SayIt;
 				SDKROOT = macosx;
 			};
@@ -3191,7 +3191,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.agent;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.agent;
 				PRODUCT_NAME = SayItAgent;
 				SDKROOT = macosx;
 			};
@@ -3213,7 +3213,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.backend;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.backend;
 				PRODUCT_NAME = SayItBackend;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3237,7 +3237,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.core;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.core;
 				PRODUCT_NAME = SayItCore;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3327,7 +3327,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.http-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.http-tests";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -3343,7 +3343,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.core-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.core-tests";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -3359,7 +3359,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.core-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.core-tests";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -3375,7 +3375,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sayit.mac.protocol-tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.protocol-tests";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -3396,7 +3396,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.xpc;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.xpc;
 				PRODUCT_NAME = SayItXPC;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -3415,7 +3415,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				LIBRARY_SEARCH_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.mac.cli;
+				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.cli;
 				PRODUCT_NAME = sayit;
 				SDKROOT = macosx;
 				SWIFT_INCLUDE_PATHS = "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
