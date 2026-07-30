@@ -28,6 +28,7 @@ xcuserdata/
 *.cer
 *.key
 *.mobileprovision
+*.p8
 *.p12
 *.provisionprofile
 
