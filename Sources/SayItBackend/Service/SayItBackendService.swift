@@ -377,13 +377,19 @@ public final class SayItBackendService: SayItService {
         }
     }
 
+    private var voiceStudioIsBusy: Bool {
+        if voiceStudioTask != nil { return true }
+        guard activeJobID != nil else { return false }
+        return ![PlaybackState.paused, .finished, .failed].contains(playback.state)
+    }
+
     private func startVoiceDiscovery(
         _ request: VoiceDiscoveryRequest
     ) throws -> VoiceStudioSnapshot {
-        guard activeJobID == nil, voiceStudioTask == nil else {
+        guard !voiceStudioIsBusy else {
             throw ServiceFailure(
                 code: "voice.studio_busy",
-                message: "Finish or stop the current speech before creating voices."
+                message: "Pause or stop the current speech before creating voices."
             )
         }
         guard let model = models.first(where: {
@@ -562,10 +568,10 @@ public final class SayItBackendService: SayItService {
     private func startVoiceClone(
         _ request: VoiceCloneRequest
     ) throws -> VoiceStudioSnapshot {
-        guard activeJobID == nil, voiceStudioTask == nil else {
+        guard !voiceStudioIsBusy else {
             throw ServiceFailure(
                 code: "voice.studio_busy",
-                message: "Finish or stop the current speech before cloning a voice."
+                message: "Pause or stop the current speech before cloning a voice."
             )
         }
         guard let model = models.first(where: {

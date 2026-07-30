@@ -16,6 +16,7 @@ actor SynthesisActor: SpeechSynthesizing {
     private var loadedModel: SpeechGenerationModel?
     private var loadedModelID: ModelID?
     private var loadedTextProcessor: (any TextProcessor)?
+    private var retainedReferenceAudio: MLXArray?
     private var currentTask: Task<Void, Never>?
     private var idleUnloadTask: Task<Void, Never>?
 
@@ -99,11 +100,18 @@ actor SynthesisActor: SpeechSynthesizing {
         guard let loadedModel else {
             throw SynthesisError.modelNotInstalled
         }
-        let referenceAudio = try reference.map {
-            try loadReferenceAudio(
-                from: $0.audioURL,
+        // Retain each reference array until the next one is allocated: the
+        // pinned Qwen3 wrapper caches reference conditioning by the array's
+        // ObjectIdentifier without retaining it, so a freed address reused by
+        // the next array would falsely hit that cache and replay stale audio.
+        var referenceAudio: MLXArray?
+        if let reference {
+            let audio = try loadReferenceAudio(
+                from: reference.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
             )
+            retainedReferenceAudio = audio
+            referenceAudio = audio
         }
         var parameters = loadedModel.defaultGenerationParameters
         if let value = tuning.parameters["temperature"] {

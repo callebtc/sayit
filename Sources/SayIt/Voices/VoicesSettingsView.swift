@@ -62,6 +62,9 @@ struct VoicesSettingsView: View {
                                 selection = .profile(profile.id)
                                 state.selectVoice(profile)
                             },
+                            onTest: {
+                                state.previewVoice(profile)
+                            },
                             onRename: {
                                 state.renameVoice(profile, name: $0)
                             },
@@ -105,9 +108,9 @@ struct VoicesSettingsView: View {
                 } header: {
                     Text("Create")
                 } footer: {
-                    if state.serviceSnapshot?.activeJob != nil {
+                    if isPlaybackBusy {
                         Label(
-                            "Voice creation is available after current speech finishes.",
+                            "Voice creation is available once playback is paused or stopped.",
                             systemImage: "speaker.wave.2"
                         )
                     } else if state.voiceStudio != nil {
@@ -159,8 +162,16 @@ struct VoicesSettingsView: View {
 
     private var isCreationUnavailable: Bool {
         !isSelectedModelInstalled
-            || state.serviceSnapshot?.activeJob != nil
+            || isPlaybackBusy
             || state.voiceStudio != nil
+    }
+
+    private var isPlaybackBusy: Bool {
+        [
+            PlaybackState.preparing,
+            .buffering,
+            .playing
+        ].contains(state.playback.state)
     }
 
     private func selectInitialModel() {

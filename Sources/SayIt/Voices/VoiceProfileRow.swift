@@ -1,3 +1,4 @@
+import AppKit
 import SayItProtocol
 import SwiftUI
 
@@ -6,6 +7,7 @@ struct VoiceProfileRow: View {
     let isSelected: Bool
     let isModelInstalled: Bool
     let onSelect: () -> Void
+    let onTest: () -> Void
     let onRename: (String) -> Void
     let onDelete: () -> Void
 
@@ -18,6 +20,7 @@ struct VoiceProfileRow: View {
         isSelected: Bool,
         isModelInstalled: Bool,
         onSelect: @escaping () -> Void,
+        onTest: @escaping () -> Void,
         onRename: @escaping (String) -> Void,
         onDelete: @escaping () -> Void
     ) {
@@ -25,6 +28,7 @@ struct VoiceProfileRow: View {
         self.isSelected = isSelected
         self.isModelInstalled = isModelInstalled
         self.onSelect = onSelect
+        self.onTest = onTest
         self.onRename = onRename
         self.onDelete = onDelete
         _name = State(initialValue: profile.displayName)
@@ -32,9 +36,76 @@ struct VoiceProfileRow: View {
 
     var body: some View {
         HStack(spacing: DesignTokens.standardSpacing) {
+            rowContent
+                .contentShape(.rect)
+                .onTapGesture {
+                    guard canUse else { return }
+                    onSelect()
+                }
+                .onHover { hovering in
+                    guard canUse else { return }
+                    if hovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel("Use voice \(profile.displayName)")
+                .accessibilityHint(
+                    canUse
+                        ? "Selects this voice for speech"
+                        : isSelected
+                            ? "This voice is selected"
+                            : "Reinstall the model to use this voice"
+                )
+
+            if !isRenaming {
+                Menu("Voice actions", systemImage: "ellipsis.circle") {
+                    Button(
+                        "Test Voice",
+                        systemImage: "speaker.wave.2",
+                        action: onTest
+                    )
+                    .disabled(!isModelInstalled)
+                    Button("Rename", action: beginRename)
+                    Button(
+                        "Delete",
+                        systemImage: "trash",
+                        role: .destructive,
+                        action: confirmDelete
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .labelStyle(.iconOnly)
+            }
+        }
+        .padding(.vertical, 2)
+        .animation(DesignTokens.smoothAnimation, value: isRenaming)
+        .animation(DesignTokens.smoothAnimation, value: isSelected)
+        .confirmationDialog(
+            "Delete \(profile.displayName)?",
+            isPresented: $isConfirmingDelete
+        ) {
+            Button("Delete Voice", role: .destructive, action: onDelete)
+        } message: {
+            Text(
+                "The reference recording will be removed. Existing history audio stays available."
+            )
+        }
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: DesignTokens.standardSpacing) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.5))
+                .foregroundStyle(
+                    isSelected
+                        ? Color.accentColor
+                        : Color.secondary.opacity(0.5)
+                )
                 .contentTransition(.symbolEffect(.replace.offUp))
                 .frame(width: 20)
 
@@ -67,42 +138,11 @@ struct VoiceProfileRow: View {
             }
 
             Spacer()
+        }
+    }
 
-            if !isRenaming {
-                if !isSelected {
-                    Button("Use Voice", action: onSelect)
-                        .controlSize(.small)
-                        .disabled(!isModelInstalled)
-                        .transition(.opacity)
-                }
-                Menu("Voice actions", systemImage: "ellipsis.circle") {
-                    Button("Rename", action: beginRename)
-                    Button(
-                        "Delete",
-                        systemImage: "trash",
-                        role: .destructive,
-                        action: confirmDelete
-                    )
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .labelStyle(.iconOnly)
-            }
-        }
-        .padding(.vertical, 2)
-        .animation(DesignTokens.smoothAnimation, value: isRenaming)
-        .animation(DesignTokens.smoothAnimation, value: isSelected)
-        .confirmationDialog(
-            "Delete \(profile.displayName)?",
-            isPresented: $isConfirmingDelete
-        ) {
-            Button("Delete Voice", role: .destructive, action: onDelete)
-        } message: {
-            Text(
-                "The reference recording will be removed. Existing history audio stays available."
-            )
-        }
+    private var canUse: Bool {
+        isModelInstalled && !isSelected && !isRenaming
     }
 
     private func beginRename() {

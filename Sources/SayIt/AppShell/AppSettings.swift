@@ -13,6 +13,7 @@ final class AppSettings {
         static let voiceSelections = "voiceSelections"
         static let activeLanguage = "activeLanguage"
         static let voiceDescription = "voiceDescription"
+        static let voicePreviewSample = "voicePreviewSample"
         static let speakingPace = "speakingPace"
         static let playbackRate = "playbackRate"
         static let rewindInterval = "rewindInterval"
@@ -69,6 +70,11 @@ final class AppSettings {
         didSet {
             defaults.set(voiceDescription, forKey: Key.voiceDescription)
             notifyBackendChange()
+        }
+    }
+    var voicePreviewSample: String {
+        didSet {
+            defaults.set(voicePreviewSample, forKey: Key.voicePreviewSample)
         }
     }
     var speakingPace: SpeakingPace {
@@ -157,6 +163,8 @@ final class AppSettings {
         }
         activeLanguage = defaults.string(forKey: Key.activeLanguage) ?? "en-US"
         voiceDescription = defaults.string(forKey: Key.voiceDescription) ?? ""
+        voicePreviewSample = defaults.string(forKey: Key.voicePreviewSample)
+            ?? "Say It turns the words on your Mac into calm, private audio."
         speakingPace = SpeakingPace(
             rawValue: defaults.double(forKey: Key.speakingPace)
         ) ?? .natural

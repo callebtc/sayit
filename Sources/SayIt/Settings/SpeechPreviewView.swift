@@ -3,14 +3,13 @@ import SwiftUI
 
 struct SpeechPreviewView: View {
     @Environment(AppState.self) private var state
-    @State private var sampleText =
-        "Say It turns the words on your Mac into calm, private audio."
 
     var body: some View {
+        @Bindable var settings = state.settings
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
             TextField(
                 "Sample sentence",
-                text: $sampleText,
+                text: $settings.voicePreviewSample,
                 axis: .vertical
             )
             .lineLimit(2...4)
@@ -49,12 +48,14 @@ struct SpeechPreviewView: View {
     }
 
     private var canTestVoice: Bool {
-        !sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !state.settings.voicePreviewSample.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty
             && state.installedModelIDs.contains(state.settings.activeModelID)
             && state.isServiceOnline
     }
 
     private func testVoice() {
-        state.speakSample(sampleText)
+        state.speakSample(state.settings.voicePreviewSample)
     }
 }

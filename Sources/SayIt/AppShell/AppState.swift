@@ -139,6 +139,25 @@ final class AppState {
         )
     }
 
+    func previewVoice(_ profile: VoiceProfileSnapshot) {
+        let sample = settings.voicePreviewSample.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !sample.isEmpty else { return }
+        submit(
+            SpeechSubmission(
+                text: sample,
+                source: .preview,
+                modelID: profile.modelID,
+                voiceSelection: .profile(profile.id),
+                speakingPace: settings.speakingPace.rawValue,
+                playbackRate: settings.playbackRate,
+                queuePolicy: .interruptCurrent,
+                permitsLongText: true
+            )
+        )
+    }
+
     func receive(_ payload: TextSourcePayload) {
         let submission: SpeechSubmission
         if let html = payload.html {
