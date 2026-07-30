@@ -84,38 +84,37 @@ struct VoicesSettingsView: View {
             if let model = selectedModel,
                model.capabilities.supportsVoiceDiscovery
                 || model.capabilities.voiceCloneRequirements != nil {
-                Section("Create") {
+                Section {
                     if model.capabilities.supportsVoiceDiscovery {
-                        Button(
-                            "Discover Voices…",
-                            systemImage: "sparkles",
+                        creationRow(
+                            title: "Discover Voices…",
+                            subtitle: "Generate random voices and keep your favorites.",
+                            icon: "sparkles",
                             action: showDiscovery
                         )
-                        .disabled(isCreationUnavailable)
                     }
                     if model.capabilities.voiceCloneRequirements != nil {
-                        Button(
-                            "Clone a Voice…",
-                            systemImage: "mic.badge.plus"
+                        creationRow(
+                            title: "Clone a Voice…",
+                            subtitle: "Record a short reference to create a voice profile.",
+                            icon: "mic.badge.plus"
                         ) {
                             cloneModel = model
                         }
-                        .disabled(isCreationUnavailable)
                     }
+                } header: {
+                    Text("Create")
+                } footer: {
                     if state.serviceSnapshot?.activeJob != nil {
                         Label(
                             "Voice creation is available after current speech finishes.",
                             systemImage: "speaker.wave.2"
                         )
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
                     } else if state.voiceStudio != nil {
                         Label(
                             "Another voice creation session is in progress.",
                             systemImage: "hourglass"
                         )
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -189,5 +188,39 @@ struct VoicesSettingsView: View {
 
     private func showDiscovery() {
         discoveryModel = selectedModel
+    }
+
+    private func creationRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: DesignTokens.standardSpacing) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        Color.accentColor.opacity(0.12),
+                        in: .rect(cornerRadius: 7)
+                    )
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.sayItRow)
+        .disabled(isCreationUnavailable)
     }
 }

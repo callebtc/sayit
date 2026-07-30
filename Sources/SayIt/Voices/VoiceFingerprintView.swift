@@ -2,13 +2,14 @@ import SwiftUI
 
 struct VoiceFingerprintView: View {
     let values: [Float]
+    var isActive = false
 
     var body: some View {
         Canvas { context, size in
             guard !values.isEmpty else { return }
             let barWidth = size.width / Double(values.count)
             for (index, value) in values.enumerated() {
-                let height = max(Double(value) * size.height, 2)
+                let height = max(Double(value) * size.height, 2.5)
                 let rectangle = CGRect(
                     x: Double(index) * barWidth,
                     y: (size.height - height) / 2,
@@ -17,11 +18,17 @@ struct VoiceFingerprintView: View {
                 )
                 context.fill(
                     Path(roundedRect: rectangle, cornerRadius: 2),
-                    with: .color(.accentColor)
+                    with: .color(.accentColor.opacity(opacity(for: value)))
                 )
             }
         }
         .frame(minWidth: 120, idealWidth: 180, maxWidth: 240, minHeight: 32)
+        .animation(DesignTokens.smoothAnimation, value: isActive)
         .accessibilityHidden(true)
+    }
+
+    private func opacity(for value: Float) -> Double {
+        let base = 0.45 + Double(min(max(value, 0), 1)) * 0.55
+        return isActive ? base : base * 0.75
     }
 }

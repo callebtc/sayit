@@ -14,40 +14,58 @@ struct VoiceCandidateCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                VoiceFingerprintView(values: candidate.fingerprint)
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+            HStack(alignment: .firstTextBaseline) {
+                TextField("Voice name", text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.headline)
+                    .disabled(isSaved)
                 Spacer()
                 Text(
-                    candidate.duration,
-                    format: .number.precision(.fractionLength(1))
+                    "\(candidate.duration.formatted(.number.precision(.fractionLength(1)))) sec"
                 )
-                Text("sec")
-                    .foregroundStyle(.secondary)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
             }
 
-            HStack {
-                TextField("Voice name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                Button(
-                    "Play Sample",
-                    systemImage: "play.fill",
-                    action: play
-                )
-                Button(
-                    isSaved ? "Saved" : "Save Voice",
-                    systemImage: isSaved ? "checkmark" : "plus",
-                    action: save
-                )
+            VoiceFingerprintView(
+                values: candidate.fingerprint,
+                isActive: isPlayingThis
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+
+            HStack(spacing: DesignTokens.standardSpacing) {
+                Button(action: togglePlay) {
+                    Image(systemName: isPlayingThis ? "stop.fill" : "play.fill")
+                        .contentTransition(.symbolEffect(.replace.offUp))
+                }
+                .buttonStyle(CircularIconButtonStyle(size: 30, prominent: isPlayingThis))
+                .accessibilityLabel(isPlayingThis ? "Stop sample" : "Play sample")
+
+                Spacer()
+
+                Button(action: save) {
+                    Label(
+                        isSaved ? "Saved" : "Save Voice",
+                        systemImage: isSaved ? "checkmark" : "plus"
+                    )
+                    .contentTransition(.symbolEffect(.replace))
+                }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(isSaved ? .green : nil)
                 .disabled(isSaved || nameIsInvalid)
+                .animation(DesignTokens.smoothAnimation, value: isSaved)
             }
         }
-        .padding()
-        .background(.quaternary)
-        .clipShape(.rect(cornerRadius: 12))
+        .sayItCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Voice candidate \(name)")
+    }
+
+    private var isPlayingThis: Bool {
+        state.voicePreview.isPlaying && state.voicePreview.playingID == candidate.id
     }
 
     private var nameIsInvalid: Bool {
@@ -57,12 +75,18 @@ struct VoiceCandidateCard: View {
         return !(1...50).contains(count)
     }
 
-    private func play() {
-        state.playVoicePreview(candidate)
+    private func togglePlay() {
+        if isPlayingThis {
+            state.voicePreview.stop()
+        } else {
+            state.playVoicePreview(candidate)
+        }
     }
 
     private func save() {
+        withAnimation(DesignTokens.springAnimation) {
+            isSaved = true
+        }
         state.saveVoiceCandidate(candidate, name: name)
-        isSaved = true
     }
 }

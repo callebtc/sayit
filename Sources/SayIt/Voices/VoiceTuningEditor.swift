@@ -8,23 +8,53 @@ struct VoiceTuningEditor: View {
     @State private var showsAdvanced = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
             Picker("Refinement", selection: $tuning.preset) {
                 ForEach(VoiceTuningPreset.allCases, id: \.self) {
                     Text($0.title).tag($0)
                 }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .onChange(of: tuning.preset) {
                 resetDefaults()
             }
 
-            DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
-                VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: DesignTokens.compactSpacing) {
+                Button {
+                    withAnimation(DesignTokens.smoothAnimation) {
+                        showsAdvanced.toggle()
+                    }
+                } label: {
+                    HStack(spacing: DesignTokens.compactSpacing) {
+                        Text("Advanced")
+                            .font(.callout.weight(.medium))
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(showsAdvanced ? 0 : -90))
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                if showsAdvanced {
+                    Button("Reset Defaults", action: resetDefaults)
+                        .buttonStyle(.borderless)
+                        .font(.callout)
+                        .controlSize(.small)
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
+            }
+
+            if showsAdvanced, !parameters.isEmpty {
+                VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
                     ForEach(parameters, id: \.key) { parameter in
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(parameter.title)
+                                    .font(.callout)
                                 Spacer()
                                 Text(
                                     value(parameter.key).formatted(
@@ -33,20 +63,24 @@ struct VoiceTuningEditor: View {
                                         ))
                                     )
                                 )
-                                .monospacedDigit()
+                                .font(.callout.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                                .contentTransition(
+                                    .numericText(value: value(parameter.key))
+                                )
                             }
                             Slider(
                                 value: binding(parameter.key),
                                 in: parameter.range,
                                 step: parameter.step
                             )
+                            .controlSize(.small)
                             .accessibilityLabel(parameter.title)
                         }
                     }
-                    Button("Reset Defaults", action: resetDefaults)
                 }
-                .padding(.top, 8)
+                .padding(.top, DesignTokens.compactSpacing)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .task {

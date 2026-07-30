@@ -10,4 +10,6 @@ enum DesignTokens {
     static let cardCornerRadius: Double = 10
     static let rowCornerRadius: Double = 6
     static let quickAnimation = Animation.easeOut(duration: 0.14)
+    static let smoothAnimation = Animation.smooth(duration: 0.3)
+    static let springAnimation = Animation.spring(response: 0.32, dampingFraction: 0.72)
 }

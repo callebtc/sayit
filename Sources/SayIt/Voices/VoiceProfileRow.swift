@@ -31,44 +31,68 @@ struct VoiceProfileRow: View {
     }
 
     var body: some View {
-        LabeledContent {
-            HStack {
+        HStack(spacing: DesignTokens.standardSpacing) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.5))
+                .contentTransition(.symbolEffect(.replace.offUp))
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 3) {
                 if isRenaming {
-                    TextField("Voice name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 140)
-                    Button("Save", action: saveRename)
-                    Button("Cancel", action: cancelRename)
-                } else {
-                    Button("Use Voice", action: onSelect)
-                        .disabled(!isModelInstalled || isSelected)
-                    Menu("Voice actions", systemImage: "ellipsis.circle") {
-                        Button("Rename", action: beginRename)
-                        Button(
-                            "Delete",
-                            systemImage: "trash",
-                            role: .destructive,
-                            action: confirmDelete
-                        )
+                    HStack(spacing: DesignTokens.compactSpacing) {
+                        TextField("Voice name", text: $name)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 140)
+                            .onSubmit(saveRename)
+                        Button("Save", action: saveRename)
+                            .controlSize(.small)
+                        Button("Cancel", action: cancelRename)
+                            .controlSize(.small)
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
                     }
-                    .menuStyle(.borderlessButton)
+                } else {
+                    Text(profile.displayName)
+                        .font(.body.weight(isSelected ? .semibold : .regular))
+                    SayItBadge(
+                        title: profile.origin == .generated
+                            ? "Discovered"
+                            : "Cloned",
+                        tint: profile.origin == .generated
+                            ? .accentColor
+                            : .indigo
+                    )
                 }
             }
-        } label: {
-            VStack(alignment: .leading) {
-                Label(
-                    profile.displayName,
-                    systemImage: isSelected
-                        ? "checkmark.circle.fill"
-                        : profile.origin == .generated
-                            ? "sparkles"
-                            : "mic.fill"
-                )
-                Text(profile.origin == .generated ? "Discovered" : "Recorded")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+            Spacer()
+
+            if !isRenaming {
+                if !isSelected {
+                    Button("Use Voice", action: onSelect)
+                        .controlSize(.small)
+                        .disabled(!isModelInstalled)
+                        .transition(.opacity)
+                }
+                Menu("Voice actions", systemImage: "ellipsis.circle") {
+                    Button("Rename", action: beginRename)
+                    Button(
+                        "Delete",
+                        systemImage: "trash",
+                        role: .destructive,
+                        action: confirmDelete
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .labelStyle(.iconOnly)
             }
         }
+        .padding(.vertical, 2)
+        .animation(DesignTokens.smoothAnimation, value: isRenaming)
+        .animation(DesignTokens.smoothAnimation, value: isSelected)
         .confirmationDialog(
             "Delete \(profile.displayName)?",
             isPresented: $isConfirmingDelete

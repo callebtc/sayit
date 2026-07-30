@@ -4,26 +4,44 @@ struct VoiceLevelMeter: View {
     let level: Float
     let peak: Float
 
+    private let barCount = 24
+
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(0..<18, id: \.self) { index in
+            ForEach(0..<barCount, id: \.self) { index in
                 Capsule()
-                    .fill(index < activeBars ? Color.accentColor : .secondary.opacity(0.2))
-                    .frame(width: 6, height: barHeight(index))
+                    .fill(barColor(for: index))
+                    .frame(width: 5, height: barHeight(index))
+                    .opacity(index < activeBars ? 1 : 0.25)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 34)
+        .animation(.linear(duration: 0.08), value: activeBars)
+        .animation(DesignTokens.quickAnimation, value: isTooLoud)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Microphone level")
         .accessibilityValue(levelDescription)
     }
 
     private var activeBars: Int {
-        min(max(Int(sqrt(max(level, 0)) * 24), 0), 18)
+        let scaled = Double(max(level, 0)).squareRoot() * Double(barCount + 6)
+        return min(max(Int(scaled), 0), barCount)
+    }
+
+    private var isTooLoud: Bool {
+        peak >= 0.995
+    }
+
+    private func barColor(for index: Int) -> Color {
+        guard index < activeBars else { return .secondary.opacity(0.35) }
+        if isTooLoud, index >= barCount - 4 { return .red }
+        if index >= barCount - 6 { return .orange }
+        return .accentColor
     }
 
     private func barHeight(_ index: Int) -> CGFloat {
-        10 + CGFloat(index % 5) * 4
+        let wave = sin(Double(index) / Double(barCount) * .pi)
+        return 8 + CGFloat(wave) * 14
     }
 
     private var levelDescription: String {

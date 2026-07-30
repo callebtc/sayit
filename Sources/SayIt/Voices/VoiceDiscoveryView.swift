@@ -20,27 +20,81 @@ struct VoiceDiscoveryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Discover \(model.displayName) Voices")
-                        .font(.title2)
-                        .bold()
-                    Text(
-                        "Each sample starts from a fresh voice. Save only the ones you want to keep."
-                    )
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Done", action: dismiss.callAsFunction)
+        VStack(alignment: .leading, spacing: DesignTokens.generousSpacing) {
+            header
+
+            setupCard
+
+            if let error = studio?.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .transition(.opacity)
             }
 
+            Group {
+                if candidates.isEmpty, isGenerating {
+                    VStack(spacing: DesignTokens.standardSpacing) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Voicing the same sentence four ways…")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                } else if candidates.isEmpty, !isGenerating {
+                    ContentUnavailableView(
+                        "Ready to Listen",
+                        systemImage: "waveform.badge.plus",
+                        description: Text(
+                            "Generate a batch, compare the same sentence, and keep your favorites."
+                        )
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+                } else {
+                    candidateList
+                }
+            }
+            .animation(
+                DesignTokens.smoothAnimation,
+                value: candidates.isEmpty || isGenerating
+            )
+        }
+        .padding(DesignTokens.generousSpacing)
+        .frame(width: 640, height: 560)
+        .interactiveDismissDisabled(isGenerating)
+        .onDisappear(perform: state.cancelVoiceStudio)
+        .animation(DesignTokens.smoothAnimation, value: studio?.errorMessage)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Discover \(model.displayName) Voices")
+                    .font(.title2.weight(.semibold))
+                Text(
+                    "Each sample starts from a fresh voice. Save only the ones you want to keep."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Done", action: dismiss.callAsFunction)
+                .keyboardShortcut(.cancelAction)
+        }
+    }
+
+    private var setupCard: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
             TextField(
                 "Comparison text",
                 text: $sampleText,
                 axis: .vertical
             )
-            .lineLimit(2...5)
+            .lineLimit(2...4)
+            .textFieldStyle(.plain)
 
             Picker("Character", selection: $tuningPreset) {
                 ForEach(VoiceTuningPreset.allCases, id: \.self) {
@@ -48,8 +102,9 @@ struct VoiceDiscoveryView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
 
-            HStack {
+            HStack(spacing: DesignTokens.standardSpacing) {
                 Button(
                     candidates.isEmpty
                         ? "Generate Four Voices"
@@ -65,39 +120,33 @@ struct VoiceDiscoveryView: View {
                         value: Double(studio?.completedCount ?? 0),
                         total: Double(studio?.totalCount ?? 4)
                     )
-                    .frame(maxWidth: 220)
+                    .frame(maxWidth: 160)
                     Button("Cancel", role: .cancel, action: state.cancelVoiceStudio)
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            if let error = studio?.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-            }
-
-            if candidates.isEmpty, !isGenerating {
-                ContentUnavailableView(
-                    "Ready to Listen",
-                    systemImage: "waveform.badge.plus",
-                    description: Text(
-                        "Generate a batch, compare the same sentence, and keep your favorites."
-                    )
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack {
-                        ForEach(candidates) { candidate in
-                            VoiceCandidateCard(candidate: candidate)
-                        }
-                    }
-                }
-            }
+            .animation(DesignTokens.smoothAnimation, value: isGenerating)
         }
-        .padding()
-        .frame(minWidth: 640, minHeight: 520)
-        .interactiveDismissDisabled(isGenerating)
-        .onDisappear(perform: state.cancelVoiceStudio)
+        .sayItCard()
+    }
+
+    private var candidateList: some View {
+        ScrollView {
+            LazyVStack(spacing: DesignTokens.standardSpacing) {
+                ForEach(candidates) { candidate in
+                    VoiceCandidateCard(candidate: candidate)
+                        .transition(
+                            .opacity
+                                .combined(with: .scale(scale: 0.96))
+                                .combined(with: .move(edge: .bottom))
+                        )
+                }
+            }
+            .padding(1)
+            .animation(DesignTokens.springAnimation, value: candidates.count)
+        }
+        .scrollIndicators(.never)
     }
 
     private var studio: VoiceStudioSnapshot? {

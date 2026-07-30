@@ -25,6 +25,7 @@ struct VoiceCloneWizard: View {
     let initialModel: ModelDescriptor
 
     @State private var step = Step.prepare
+    @State private var stepDirection = 1
     @State private var selectedModelID: ModelID
     @State private var language: String
     @State private var hasPermissionToClone = false
@@ -57,21 +58,22 @@ struct VoiceCloneWizard: View {
         VStack(spacing: 0) {
             header
             Divider()
-            Group {
+            ZStack {
                 switch step {
                 case .prepare:
-                    prepareStep
+                    prepareStep.transition(stepTransition)
                 case .record:
-                    recordStep
+                    recordStep.transition(stepTransition)
                 case .preview:
-                    previewStep
+                    previewStep.transition(stepTransition)
                 }
             }
+            .clipped()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             footer
         }
-        .frame(minWidth: 620, idealWidth: 680, minHeight: 560)
+        .frame(width: 640, height: 600)
         .interactiveDismissDisabled(recorder.isRecording || isSubmitting)
         .onReceive(
             NotificationCenter.default.publisher(
@@ -86,176 +88,341 @@ struct VoiceCloneWizard: View {
         .onDisappear(perform: cleanUp)
     }
 
+    private var stepTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .opacity
+                .combined(with: .move(edge: stepDirection > 0 ? .trailing : .leading)),
+            removal: .opacity
+                .combined(with: .move(edge: stepDirection > 0 ? .leading : .trailing))
+        )
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Clone a Voice")
                         .font(.title2.weight(.semibold))
-                    Text("A local reference profile—no model training or upload.")
+                    Text("A local reference profile — no training, nothing uploaded.")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Cancel", action: cancel)
                     .keyboardShortcut(.cancelAction)
             }
-            HStack(spacing: 8) {
-                ForEach(Step.allCases, id: \.self) { item in
-                    Label(
-                        item.title,
-                        systemImage: item.rawValue < step.rawValue
-                            ? "checkmark.circle.fill"
-                            : "\(item.rawValue + 1).circle"
-                    )
-                    .foregroundStyle(
-                        item.rawValue <= step.rawValue
-                            ? Color.primary
-                            : Color.secondary
-                    )
-                    if item != .preview {
-                        Divider().frame(width: 28)
+            stepIndicator
+        }
+        .padding(DesignTokens.generousSpacing)
+    }
+
+    private var stepIndicator: some View {
+        HStack(spacing: 6) {
+            ForEach(Step.allCases, id: \.self) { item in
+                HStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .fill(indicatorFill(for: item))
+                        if item.rawValue < step.rawValue {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .transition(.opacity.combined(with: .scale(scale: 0.5)))
+                        } else {
+                            Text("\(item.rawValue + 1)")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(
+                                    item == step ? Color.accentColor : Color.secondary
+                                )
+                        }
                     }
+                    .frame(width: 20, height: 20)
+                    Text(item.title)
+                        .font(.callout.weight(item == step ? .semibold : .regular))
+                        .foregroundStyle(
+                            item.rawValue <= step.rawValue
+                                ? Color.primary
+                                : Color.secondary
+                        )
+                }
+                if item != .preview {
+                    Capsule()
+                        .fill(
+                            item.rawValue < step.rawValue
+                                ? Color.accentColor.opacity(0.6)
+                                : Color.primary.opacity(0.12)
+                        )
+                        .frame(width: 24, height: 2)
                 }
             }
-            .font(.callout)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(
-                "Step \(step.rawValue + 1) of 3, \(step.title)"
-            )
         }
-        .padding(20)
+        .animation(DesignTokens.springAnimation, value: step)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "Step \(step.rawValue + 1) of 3, \(step.title)"
+        )
+    }
+
+    private func indicatorFill(for item: Step) -> Color {
+        if item.rawValue < step.rawValue { return .accentColor }
+        if item == step { return .accentColor.opacity(0.15) }
+        return .primary.opacity(0.07)
     }
 
     private var prepareStep: some View {
-        Form {
-            Section("Voice model") {
-                Picker("Model", selection: $selectedModelID) {
-                    ForEach(cloneModels) { model in
-                        Text(model.displayName).tag(model.id)
+        ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                VStack(alignment: .leading, spacing: 0) {
+                    pickerRow(title: "Model") {
+                        Picker(selection: $selectedModelID) {
+                            ForEach(cloneModels) { model in
+                                Text(model.displayName).tag(model.id)
+                            }
+                        } label: {
+                            EmptyView()
+                        }
+                        .labelsHidden()
+                        .onChange(of: selectedModelID) {
+                            language = selectedModel.defaultLanguage ?? "en-US"
+                            tuning = VoiceTuning(
+                                preset: .natural,
+                                parameters: VoiceTuningDefaults.values(
+                                    modelType: selectedModel.modelType,
+                                    preset: .natural
+                                )
+                            )
+                            lastGeneratedTuning = nil
+                            name = uniqueRandomName()
+                        }
+                    }
+                    Divider()
+                        .padding(.vertical, DesignTokens.compactSpacing)
+                    pickerRow(title: "Language") {
+                        Picker(selection: $language) {
+                            ForEach(selectedModel.languages, id: \.self) {
+                                Text($0).tag($0)
+                            }
+                        } label: {
+                            EmptyView()
+                        }
+                        .labelsHidden()
+                        .disabled(!selectedModel.capabilities.languageSelection)
                     }
                 }
-                .onChange(of: selectedModelID) {
-                    language = selectedModel.defaultLanguage ?? "en-US"
-                    tuning = VoiceTuning(
-                        preset: .natural,
-                        parameters: VoiceTuningDefaults.values(
-                            modelType: selectedModel.modelType,
-                            preset: .natural
+                .sayItCard()
+
+                VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                    guidanceRow(
+                        icon: "lock.shield",
+                        tint: .accentColor,
+                        text: "The recording and generated voice stay on this Mac."
+                    )
+                    guidanceRow(
+                        icon: "waveform.path",
+                        tint: .accentColor,
+                        text: "Cloning uses your recording as a reference; it does not fine-tune model weights."
+                    )
+                    if let requirements {
+                        guidanceRow(
+                            icon: "timer",
+                            tint: .accentColor,
+                            text: durationGuidance(requirements)
                         )
-                    )
-                    lastGeneratedTuning = nil
-                    name = uniqueRandomName()
-                }
-                Picker("Language", selection: $language) {
-                    ForEach(selectedModel.languages, id: \.self) {
-                        Text($0).tag($0)
                     }
                 }
-                .disabled(!selectedModel.capabilities.languageSelection)
-            }
+                .sayItCard()
 
-            Section("Before you record") {
-                Label(
-                    "The recording and generated voice stay on this Mac.",
-                    systemImage: "lock.shield"
-                )
-                Label(
-                    "Cloning uses the recording as a reference; it does not fine-tune model weights.",
-                    systemImage: "waveform.path"
-                )
-                if let requirements {
-                    Label(
-                        durationGuidance(requirements),
-                        systemImage: "timer"
-                    )
+                VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                    microphoneStatus
                 }
-            }
+                .sayItCard()
 
-            Section("Microphone") {
-                microphoneStatus
+                HStack {
+                    Toggle(
+                        "I have permission to clone the voice I will record.",
+                        isOn: $hasPermissionToClone
+                    )
+                    .toggleStyle(.checkbox)
+                    Spacer()
+                }
+                .sayItCard()
             }
-
-            Section {
-                Toggle(
-                    "I have permission to clone the voice I will record.",
-                    isOn: $hasPermissionToClone
-                )
-                .toggleStyle(.checkbox)
-            }
+            .padding(DesignTokens.generousSpacing)
         }
-        .formStyle(.grouped)
+        .scrollIndicators(.never)
+    }
+
+    private func pickerRow<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            content()
+                .pickerStyle(.menu)
+                .fixedSize()
+        }
+    }
+
+    private func guidanceRow(icon: String, tint: Color, text: String) -> some View {
+        HStack(alignment: .top, spacing: DesignTokens.standardSpacing) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.12), in: .rect(cornerRadius: 6))
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var recordStep: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Read this passage naturally")
-                    .font(.title3.weight(.semibold))
-                Text(passage)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Passage to record")
-
-                microphoneStatus
-
-                VoiceLevelMeter(level: recorder.level, peak: recorder.peak)
-
-                HStack {
-                    Label(
-                        recorder.duration.formatted(
-                            .number.precision(.fractionLength(1))
-                        ) + " seconds",
-                        systemImage: "timer"
-                    )
-                    .monospacedDigit()
-                    Spacer()
-                    Text(targetDurationText)
+            VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                    Text("READ ALOUD")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                    Text(passage)
+                        .font(.body)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel("Passage to record")
                 }
+                .sayItCard()
 
-                HStack {
-                    if recorder.isRecording {
-                        Button(
-                            "Stop Recording",
-                            systemImage: "stop.fill",
-                            action: stopRecording
+                VStack(spacing: DesignTokens.generousSpacing) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(
+                            recorder.duration.formatted(
+                                .number.precision(.fractionLength(1))
+                            ) + " s"
                         )
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                    } else {
-                        Button(
-                            analysis == nil ? "Start Recording" : "Record Again",
-                            systemImage: "mic.fill",
-                            action: startRecording
+                        .font(.title3.monospacedDigit().weight(.medium))
+                        .contentTransition(
+                            .numericText(value: recorder.duration.rounded())
                         )
-                        .buttonStyle(.borderedProminent)
-                        .disabled(recorder.access != .granted)
+                        .animation(
+                            DesignTokens.quickAnimation,
+                            value: recorder.duration.rounded()
+                        )
+                        Spacer()
+                        Text(targetDurationText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    if let referenceURL, analysis != nil {
-                        Button("Play Recording", systemImage: "play.fill") {
-                            play(url: referenceURL)
+
+                    VoiceLevelMeter(level: recorder.level, peak: recorder.peak)
+
+                    HStack(spacing: DesignTokens.generousSpacing) {
+                        Spacer()
+                        recordButton
+                        if let referenceURL, analysis != nil, !recorder.isRecording {
+                            Button {
+                                play(url: referenceURL)
+                            } label: {
+                                Image(
+                                    systemName: state.voicePreview.isPlaying
+                                        ? "stop.fill"
+                                        : "play.fill"
+                                )
+                                .contentTransition(.symbolEffect(.replace.offUp))
+                            }
+                            .buttonStyle(CircularIconButtonStyle(size: 32))
+                            .accessibilityLabel(
+                                state.voicePreview.isPlaying
+                                    ? "Stop recording playback"
+                                    : "Play recording"
+                            )
+                            .transition(
+                                .opacity.combined(with: .scale(scale: 0.6))
+                            )
                         }
+                        Spacer()
                     }
-                }
-
-                if let analysis {
-                    Label(
-                        "Ready: \(analysis.duration.formatted(.number.precision(.fractionLength(1)))) seconds of usable audio",
-                        systemImage: "checkmark.circle.fill"
+                    .animation(
+                        DesignTokens.springAnimation,
+                        value: analysis != nil && !recorder.isRecording
                     )
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("Recording accepted")
                 }
-                if let recordingError {
-                    Label(recordingError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Recording problem: \(recordingError)")
-                }
+                .sayItCard()
+
+                microphoneStatusCard
+
+                statusMessages
             }
-            .padding(24)
+            .padding(DesignTokens.generousSpacing)
+        }
+        .scrollIndicators(.never)
+    }
+
+    private var recordButton: some View {
+        Button {
+            if recorder.isRecording {
+                stopRecording()
+            } else {
+                startRecording()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .stroke(.primary.opacity(0.18), lineWidth: 3)
+                RoundedRectangle(
+                    cornerRadius: recorder.isRecording ? 5 : 23,
+                    style: .continuous
+                )
+                .fill(.red)
+                .frame(
+                    width: recorder.isRecording ? 20 : 46,
+                    height: recorder.isRecording ? 20 : 46
+                )
+            }
+            .frame(width: 54, height: 54)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .animation(DesignTokens.springAnimation, value: recorder.isRecording)
+        .disabled(!recorder.isRecording && recorder.access != .granted)
+        .opacity(!recorder.isRecording && recorder.access != .granted ? 0.4 : 1)
+        .animation(DesignTokens.quickAnimation, value: recorder.access)
+        .accessibilityLabel(
+            recorder.isRecording ? "Stop recording" : "Start recording"
+        )
+    }
+
+    @ViewBuilder
+    private var statusMessages: some View {
+        if let analysis {
+            Label(
+                "Ready: \(analysis.duration.formatted(.number.precision(.fractionLength(1)))) seconds of usable audio",
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(.callout)
+            .foregroundStyle(.green)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .accessibilityLabel("Recording accepted")
+        }
+        if let recordingError {
+            Label(recordingError, systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
+                .accessibilityLabel("Recording problem: \(recordingError)")
+        }
+    }
+
+    @ViewBuilder
+    private var microphoneStatusCard: some View {
+        if recorder.access != .granted {
+            VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                microphoneStatus
+            }
+            .sayItCard()
+            .transition(.opacity)
         }
     }
 
@@ -263,120 +430,223 @@ struct VoiceCloneWizard: View {
     private var microphoneStatus: some View {
         switch recorder.access {
         case .unknown:
-            Button("Allow Microphone Access", systemImage: "mic.badge.plus") {
-                Task { _ = await recorder.requestAccess() }
+            statusRow(
+                icon: "mic.badge.plus",
+                text: "Microphone access is needed to record your reference."
+            ) {
+                Button("Allow Access") {
+                    Task { _ = await recorder.requestAccess() }
+                }
+                .controlSize(.small)
             }
         case .requesting:
-            Label("Waiting for microphone permission", systemImage: "ellipsis")
+            statusRow(
+                icon: "ellipsis",
+                text: "Waiting for microphone permission…"
+            ) {
+                ProgressView()
+                    .controlSize(.small)
+            }
         case .granted:
-            Label("Microphone ready", systemImage: recorder.access.symbol)
-                .foregroundStyle(.secondary)
+            statusRow(icon: recorder.access.symbol, text: "Microphone ready") {}
         case .denied:
-            VStack(alignment: .leading, spacing: 8) {
-                Label(
-                    "Microphone access is denied. Allow Say It in Privacy & Security, then return here.",
-                    systemImage: recorder.access.symbol
-                )
+            VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                statusRow(
+                    icon: recorder.access.symbol,
+                    text: "Microphone access is denied. Allow Say It in Privacy & Security, then return here."
+                ) {}
                 Button("Open Microphone Settings", action: openMicrophoneSettings)
+                    .controlSize(.small)
             }
         case .restricted:
-            Label(
-                "Microphone access is restricted by this Mac. Ask its administrator to allow recording.",
-                systemImage: recorder.access.symbol
-            )
+            statusRow(
+                icon: recorder.access.symbol,
+                text: "Microphone access is restricted by this Mac. Ask its administrator to allow recording."
+            ) {}
         case .noDevice:
-            Label(
-                "No input device is available. Connect a microphone or choose one in Sound Settings.",
-                systemImage: recorder.access.symbol
-            )
+            statusRow(
+                icon: recorder.access.symbol,
+                text: "No input device is available. Connect a microphone or choose one in Sound Settings."
+            ) {}
+        }
+    }
+
+    private func statusRow<Content: View>(
+        icon: String,
+        text: String,
+        @ViewBuilder action: () -> Content
+    ) -> some View {
+        HStack(spacing: DesignTokens.standardSpacing) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .background(
+                    .primary.opacity(0.07),
+                    in: .rect(cornerRadius: 6)
+                )
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            action()
         }
     }
 
     private var previewStep: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if let studio = state.voiceStudio,
-                   studio.id == currentStudioID {
-                    GroupBox("Validation samples") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if studio.state == .generating {
-                                ProgressView(
-                                    value: Double(studio.completedCount),
-                                    total: Double(studio.totalCount)
-                                ) {
-                                    Text(
-                                        "Generating sample \(min(studio.completedCount + 1, studio.totalCount)) of \(studio.totalCount)"
-                                    )
-                                }
-                            }
-                            ForEach(studio.candidates) { candidate in
-                                HStack {
-                                    VoiceFingerprintView(
-                                        values: candidate.fingerprint
-                                    )
-                                    .frame(width: 150, height: 28)
-                                    Text(candidate.suggestedName)
-                                    Spacer()
-                                    Button("Play", systemImage: "play.fill") {
-                                        state.playVoicePreview(candidate)
-                                    }
-                                    .labelStyle(.iconOnly)
-                                    .accessibilityLabel(
-                                        "Play \(candidate.suggestedName)"
-                                    )
-                                }
-                            }
-                            if let error = studio.errorMessage {
-                                Label(
-                                    error,
-                                    systemImage: "exclamationmark.triangle"
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                } else {
-                    ProgressView("Preparing voice previews")
-                }
+            VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+                samplesCard
+                refineCard
+                saveCard
+            }
+            .padding(DesignTokens.generousSpacing)
+        }
+        .scrollIndicators(.never)
+    }
 
-                GroupBox("Refine") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        VoiceTuningEditor(
-                            model: selectedModel,
-                            tuning: $tuning
+    @ViewBuilder
+    private var samplesCard: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
+            Text("VALIDATION SAMPLES")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if let studio = state.voiceStudio,
+               studio.id == currentStudioID {
+                if studio.state == .generating {
+                    VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                        ProgressView(
+                            value: Double(studio.completedCount),
+                            total: Double(studio.totalCount)
                         )
-                        if lastGeneratedTuning != tuning {
-                            Label(
-                                "Regenerate to hear and save these refinement changes.",
-                                systemImage: "arrow.clockwise"
-                            )
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        }
+                        .animation(
+                            DesignTokens.smoothAnimation,
+                            value: studio.completedCount
+                        )
+                        Text(
+                            "Generating sample \(min(studio.completedCount + 1, studio.totalCount)) of \(studio.totalCount)…"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(
+                            .numericText(value: Double(studio.completedCount))
+                        )
                     }
-                    .padding(.vertical, 6)
                 }
-
-                GroupBox("Save to My Voices") {
-                    TextField("Voice name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Voice name")
+                ForEach(studio.candidates) { candidate in
+                    HStack(spacing: DesignTokens.standardSpacing) {
+                        VoiceFingerprintView(
+                            values: candidate.fingerprint,
+                            isActive: isPlaying(candidate)
+                        )
+                        .frame(width: 140, height: 28)
+                        Text(candidate.suggestedName)
+                            .font(.callout)
+                        Spacer()
+                        Button {
+                            togglePlay(candidate)
+                        } label: {
+                            Image(
+                                systemName: isPlaying(candidate)
+                                    ? "stop.fill"
+                                    : "play.fill"
+                            )
+                            .contentTransition(.symbolEffect(.replace.offUp))
+                        }
+                        .buttonStyle(
+                            CircularIconButtonStyle(
+                                size: 26,
+                                prominent: isPlaying(candidate)
+                            )
+                        )
+                        .accessibilityLabel("Play \(candidate.suggestedName)")
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                if let error = studio.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                }
+            } else {
+                HStack(spacing: DesignTokens.compactSpacing) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Preparing voice previews…")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .padding(24)
         }
+        .sayItCard()
+        .animation(
+            DesignTokens.springAnimation,
+            value: state.voiceStudio?.candidates.count
+        )
+    }
+
+    private var refineCard: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+            Text("REFINE")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            VoiceTuningEditor(
+                model: selectedModel,
+                tuning: $tuning
+            )
+            if lastGeneratedTuning != tuning {
+                Label(
+                    "Regenerate to hear and save these refinement changes.",
+                    systemImage: "arrow.clockwise"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .transition(.opacity)
+            }
+        }
+        .sayItCard()
+        .animation(
+            DesignTokens.smoothAnimation,
+            value: lastGeneratedTuning != tuning
+        )
+    }
+
+    private var saveCard: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+            Text("SAVE TO MY VOICES")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: DesignTokens.compactSpacing) {
+                TextField("Voice name", text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.body.weight(.medium))
+                    .accessibilityLabel("Voice name")
+                Button {
+                    withAnimation(DesignTokens.springAnimation) {
+                        name = uniqueRandomName()
+                    }
+                } label: {
+                    Image(systemName: "dice")
+                }
+                .buttonStyle(CircularIconButtonStyle(size: 26))
+                .accessibilityLabel("Suggest a different name")
+            }
+        }
+        .sayItCard()
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: DesignTokens.standardSpacing) {
             if step != .prepare {
                 Button(step == .preview ? "Re-record" : "Back") {
                     if step == .preview {
                         reRecord()
                     } else {
-                        step = .prepare
+                        changeStep(.prepare)
                     }
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             switch step {
@@ -388,30 +658,31 @@ struct VoiceCloneWizard: View {
                         }
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+                .prominentFooterButton()
                 .disabled(!hasPermissionToClone || requirements == nil)
             case .record:
                 Button("Generate Previews") {
                     Task { await generatePreviews() }
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+                .prominentFooterButton()
                 .disabled(analysis == nil || recorder.isRecording || isSubmitting)
             case .preview:
                 Button("Regenerate") {
                     Task { await generatePreviews(stayOnStep: true) }
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
                 .disabled(isSubmitting || recorder.isRecording)
                 Button("Save Voice") {
                     Task { await save() }
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
+                .prominentFooterButton()
                 .disabled(!canSave)
             }
         }
-        .padding(16)
+        .padding(.horizontal, DesignTokens.generousSpacing)
+        .padding(.vertical, DesignTokens.standardSpacing)
+        .animation(DesignTokens.smoothAnimation, value: step)
     }
 
     private var cloneModels: [ModelDescriptor] {
@@ -459,6 +730,19 @@ struct VoiceCloneWizard: View {
         ) && lastGeneratedTuning == tuning && !isSubmitting
     }
 
+    private func isPlaying(_ candidate: VoiceCandidateSnapshot) -> Bool {
+        state.voicePreview.isPlaying
+            && state.voicePreview.playingID == candidate.id
+    }
+
+    private func togglePlay(_ candidate: VoiceCandidateSnapshot) {
+        if isPlaying(candidate) {
+            state.voicePreview.stop()
+        } else {
+            state.playVoicePreview(candidate)
+        }
+    }
+
     private func durationGuidance(
         _ requirements: VoiceCloneRequirements
     ) -> String {
@@ -466,10 +750,11 @@ struct VoiceCloneWizard: View {
     }
 
     private func changeStep(_ newStep: Step) {
+        stepDirection = newStep.rawValue > step.rawValue ? 1 : -1
         if reduceMotion {
             step = newStep
         } else {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(DesignTokens.smoothAnimation) {
                 step = newStep
             }
         }
@@ -676,5 +961,13 @@ struct VoiceCloneWizard: View {
             "Cedar", "Finch", "Harbor", "Lark", "Willow", "Wren"
         ].randomElement() ?? "Lark"
         return "\(first) \(second)"
+    }
+}
+
+private extension View {
+    func prominentFooterButton() -> some View {
+        buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
     }
 }

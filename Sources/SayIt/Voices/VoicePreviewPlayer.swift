@@ -7,8 +7,9 @@ import Observation
 final class VoicePreviewPlayer {
     private var player: AVAudioPlayer?
     private(set) var isPlaying = false
+    private(set) var playingID: UUID?
 
-    func play(data: Data) throws {
+    func play(data: Data, id: UUID? = nil) throws {
         stop()
         let player = try AVAudioPlayer(data: data)
         player.prepareToPlay()
@@ -17,6 +18,7 @@ final class VoicePreviewPlayer {
         }
         self.player = player
         isPlaying = true
+        playingID = id
         Task { [weak self, weak player] in
             while let player, player.isPlaying {
                 try? await Task.sleep(for: .milliseconds(100))
@@ -24,6 +26,7 @@ final class VoicePreviewPlayer {
             guard let self, self.player === player else { return }
             self.player = nil
             self.isPlaying = false
+            self.playingID = nil
         }
     }
 
@@ -31,5 +34,6 @@ final class VoicePreviewPlayer {
         player?.stop()
         player = nil
         isPlaying = false
+        playingID = nil
     }
 }

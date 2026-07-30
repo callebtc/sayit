@@ -15,26 +15,37 @@ struct SpeechPreviewView: View {
             )
             .lineLimit(2...4)
 
-            HStack {
+            HStack(alignment: .center) {
                 Text(
                     "Speaking pace is generated into new audio. Playback speed changes listening instantly."
                 )
-                .font(.callout)
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 Spacer()
                 Button(
                     "Test Voice",
-                    systemImage: "speaker.wave.2.fill",
+                    systemImage: state.playback.state == .playing
+                        ? "speaker.wave.2.fill"
+                        : "speaker.wave.2",
                     action: testVoice
                 )
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
                 .disabled(!canTestVoice)
             }
 
             if state.playback.state != .idle {
                 Divider()
                 PlaybackSectionView()
+                    .transition(
+                        .opacity.combined(with: .move(edge: .top))
+                    )
             }
         }
+        .animation(
+            DesignTokens.smoothAnimation,
+            value: state.playback.state != .idle
+        )
     }
 
     private var canTestVoice: Bool {

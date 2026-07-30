@@ -317,7 +317,7 @@ final class AppState {
                     try requireSuccess(response)
                     return
                 }
-                try voicePreview.play(data: file.data)
+                try voicePreview.play(data: file.data, id: candidate.id)
             } catch {
                 presentError(error.localizedDescription)
             }
