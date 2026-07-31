@@ -14,6 +14,10 @@ let package = Package(
         .library(name: "SayItBackend", targets: ["SayItBackend"]),
         .library(name: "SayItXPC", targets: ["SayItXPC"]),
         .executable(name: "SayItAgent", targets: ["SayItAgent"]),
+        .executable(
+            name: "SayItSelectionAgent",
+            targets: ["SayItSelectionAgent"]
+        ),
         .executable(name: "SayItCLI", targets: ["SayItCLI"]),
         .executable(name: "SayIt", targets: ["SayIt"])
     ],
@@ -80,6 +84,9 @@ let package = Package(
             dependencies: ["SayItProtocol"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
+            ],
+            linkerSettings: [
+                .linkedFramework("Security")
             ]
         ),
         .target(
@@ -125,6 +132,20 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("Security")
+            ]
+        ),
+        .executableTarget(
+            name: "SayItSelectionAgent",
+            dependencies: [
+                "SayItProtocol",
+                "SayItXPC"
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
+            ],
+            linkerSettings: [
+                .linkedFramework("ApplicationServices"),
+                .linkedFramework("AppKit")
             ]
         ),
         .executableTarget(

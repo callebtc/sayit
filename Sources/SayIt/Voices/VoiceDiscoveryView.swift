@@ -8,7 +8,8 @@ struct VoiceDiscoveryView: View {
 
     let model: ModelDescriptor
     @State private var sampleText: String
-    @State private var tuningPreset = VoiceTuningPreset.natural
+    @State private var characterPosition = 0.5
+    @State private var surpriseMe = true
 
     init(model: ModelDescriptor) {
         self.model = model
@@ -63,7 +64,7 @@ struct VoiceDiscoveryView: View {
             )
         }
         .padding(DesignTokens.generousSpacing)
-        .frame(width: 640, height: 560)
+        .frame(width: 640, height: 600)
         .interactiveDismissDisabled(isGenerating)
         .onDisappear(perform: state.cancelVoiceStudio)
         .animation(DesignTokens.smoothAnimation, value: studio?.errorMessage)
@@ -95,24 +96,57 @@ struct VoiceDiscoveryView: View {
             )
             .lineLimit(2...4)
             .textFieldStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                .primary.opacity(0.05),
+                in: .rect(cornerRadius: DesignTokens.rowCornerRadius)
+            )
 
-            Picker("Character", selection: $tuningPreset) {
-                ForEach(VoiceTuningPreset.allCases, id: \.self) {
-                    Text(label(for: $0)).tag($0)
+            VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
+                HStack {
+                    Text("Character")
+                        .font(.callout.weight(.medium))
+                    Spacer()
+                    Text(characterLabel)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
+                Slider(value: $characterPosition, in: 0...1)
+                    .controlSize(.small)
+                    .disabled(surpriseMe)
+                    .accessibilityLabel("Voice character")
+                    .accessibilityValue(characterLabel)
+                HStack {
+                    Text("Faithful")
+                    Spacer()
+                    Text("Expressive")
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+                Toggle(
+                    "Surprise me — random settings for every voice",
+                    isOn: $surpriseMe
+                )
+                .toggleStyle(.checkbox)
+                .font(.callout)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
 
             HStack(spacing: DesignTokens.standardSpacing) {
-                Button(
-                    candidates.isEmpty
-                        ? "Generate Four Voices"
-                        : "Generate Four More",
-                    systemImage: "sparkles",
-                    action: generate
-                )
-                .buttonStyle(.borderedProminent)
+                Button(action: generate) {
+                    HStack {
+                        Label(
+                            candidates.isEmpty
+                                ? "Generate Four Voices"
+                                : "Generate Four More",
+                            systemImage: surpriseMe ? "dice" : "sparkles"
+                        )
+                        .font(.callout.weight(.medium))
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.sayItRow)
                 .disabled(isGenerating || sampleTextIsInvalid)
 
                 if isGenerating {
@@ -135,7 +169,7 @@ struct VoiceDiscoveryView: View {
         ScrollView {
             LazyVStack(spacing: DesignTokens.standardSpacing) {
                 ForEach(candidates) { candidate in
-                    VoiceCandidateCard(candidate: candidate)
+                    VoiceCandidateCard(candidate: candidate, model: model)
                         .transition(
                             .opacity
                                 .combined(with: .scale(scale: 0.96))
@@ -172,16 +206,29 @@ struct VoiceDiscoveryView: View {
     }
 
     private func generate() {
+        let tuning = VoiceTuningSpace.interpolated(
+            modelType: model.modelType,
+            position: characterPosition
+        )
+        let candidateTunings: [VoiceTuning]? = surpriseMe
+            ? (0..<4).map { _ in
+                VoiceTuningSpace.randomized(modelType: model.modelType)
+            }
+            : nil
         state.startVoiceDiscovery(
             model: model,
             language: model.defaultLanguage,
             text: sampleText,
-            tuning: VoiceTuning(preset: tuningPreset)
+            tuning: tuning,
+            candidateTunings: candidateTunings
         )
     }
 
-    private func label(for preset: VoiceTuningPreset) -> String {
-        switch preset {
+    private var characterLabel: String {
+        if surpriseMe { return "Random" }
+        return switch VoiceTuningSpace.nearestPreset(
+            position: characterPosition
+        ) {
         case .faithful: "Faithful"
         case .natural: "Natural"
         case .expressive: "Expressive"

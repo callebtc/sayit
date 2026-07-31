@@ -3,7 +3,7 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 app_root="$project_root/Build/DerivedData/Build/Products/Release/SayIt.app"
-cli="$app_root/Contents/Helpers/sayit"
+cli="$app_root/Contents/Helpers/SayItCLI.app/Contents/MacOS/sayit"
 bundle_identifier="sh.sayit.mac"
 launch_services="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 

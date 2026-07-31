@@ -17,12 +17,18 @@ final class VoiceProfileStore {
         recordsByID.values
             .map(\.snapshot)
             .sorted {
-                if $0.modelID == $1.modelID {
-                    $0.displayName.localizedStandardCompare($1.displayName)
-                        == .orderedAscending
-                } else {
-                    $0.modelID < $1.modelID
+                if $0.modelID != $1.modelID {
+                    return $0.modelID < $1.modelID
                 }
+                if $0.sortOrder != $1.sortOrder {
+                    return $0.sortOrder < $1.sortOrder
+                }
+                if $0.createdAt != $1.createdAt {
+                    return $0.createdAt < $1.createdAt
+                }
+                return $0.displayName.localizedStandardCompare(
+                    $1.displayName
+                ) == .orderedAscending
             }
     }
 
@@ -137,6 +143,7 @@ final class VoiceProfileStore {
                 referenceFilename: "reference.wav",
                 createdAt: now,
                 updatedAt: now,
+                sortOrder: nextSortOrder(modelID: draft.modelID),
                 tuning: draft.tuning,
                 generationSeed: draft.generationSeed
             )
@@ -199,6 +206,7 @@ final class VoiceProfileStore {
                 referenceFilename: "reference.wav",
                 createdAt: now,
                 updatedAt: now,
+                sortOrder: nextSortOrder(modelID: draft.modelID),
                 tuning: draft.tuning,
                 generationSeed: nil
             )
@@ -232,6 +240,117 @@ final class VoiceProfileStore {
         return record.snapshot
     }
 
+    func reorder(modelID: String, orderedIDs: [UUID]) throws {
+        let existing = recordsByID.values.filter { $0.modelID == modelID }
+        guard isSafeModelID(modelID),
+              orderedIDs.count == existing.count,
+              Set(orderedIDs) == Set(existing.map(\.id)) else {
+            throw ServiceFailure(
+                code: "voice.invalid_reorder",
+                message: "The voice order does not match the saved voices."
+            )
+        }
+        for (index, id) in orderedIDs.enumerated() {
+            guard var record = recordsByID[id], record.sortOrder != index else {
+                continue
+            }
+            record.sortOrder = index
+            try write(
+                record,
+                to: profileDirectory(modelID: record.modelID, id: id)
+            )
+            recordsByID[id] = record
+        }
+    }
+
+    func updateTuning(
+        id: UUID,
+        tuning: VoiceTuning
+    ) throws -> VoiceProfileSnapshot {
+        guard tuning.parameters.values.allSatisfy(\.isFinite),
+              var record = recordsByID[id] else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        record.tuning = tuning
+        record.updatedAt = .now
+        try write(
+            record,
+            to: profileDirectory(modelID: record.modelID, id: id)
+        )
+        recordsByID[id] = record
+        return record.snapshot
+    }
+
+    func duplicate(
+        id: UUID,
+        name: String,
+        tuning: VoiceTuning
+    ) throws -> VoiceProfileSnapshot {
+        guard tuning.parameters.values.allSatisfy(\.isFinite),
+              let source = recordsByID[id] else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        let validatedName = try validated(
+            name: name,
+            modelID: source.modelID,
+            excluding: nil
+        )
+        let newID = UUID()
+        let sourceDirectory = profileDirectory(
+            modelID: source.modelID,
+            id: source.id
+        )
+        let directory = profileDirectory(modelID: source.modelID, id: newID)
+        guard isContained(directory, by: directories.voiceProfiles) else {
+            throw ServiceFailure(
+                code: "voice.invalid_profile",
+                message: "The voice profile location is invalid."
+            )
+        }
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        do {
+            try FileManager.default.copyItem(
+                at: sourceDirectory.appending(path: source.referenceFilename),
+                to: directory.appending(path: "reference.wav")
+            )
+            let now = Date.now
+            let nextOrder = (recordsByID.values.filter {
+                $0.modelID == source.modelID
+            }.map(\.sortOrder).max() ?? -1) + 1
+            let record = VoiceProfileRecord(
+                schemaVersion: 1,
+                id: newID,
+                modelID: source.modelID,
+                displayName: validatedName,
+                origin: source.origin,
+                language: source.language,
+                transcript: source.transcript,
+                duration: source.duration,
+                referenceFilename: "reference.wav",
+                createdAt: now,
+                updatedAt: now,
+                sortOrder: nextOrder,
+                tuning: tuning,
+                generationSeed: source.generationSeed
+            )
+            try write(record, to: directory)
+            recordsByID[newID] = record
+            return record.snapshot
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
     func delete(id: UUID) throws {
         guard let record = recordsByID[id] else {
             throw ServiceFailure(
@@ -259,6 +378,12 @@ final class VoiceProfileStore {
             return
         }
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func nextSortOrder(modelID: String) -> Int {
+        let orders = recordsByID.values.filter { $0.modelID == modelID }
+            .map(\.sortOrder)
+        return (orders.max() ?? -1) + 1
     }
 
     private func validated(

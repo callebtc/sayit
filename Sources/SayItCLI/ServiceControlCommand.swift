@@ -139,17 +139,28 @@ enum CLIServiceJob {
         urls.append(
             executable
                 .deletingLastPathComponent()
-                .appending(path: "../Library/LaunchServices/SayItAgent")
+                .appending(
+                    path: """
+                    ../../../../Library/LaunchServices/\
+                    SayItAgent.app/Contents/MacOS/SayItAgent
+                    """
+                )
                 .standardizedFileURL
         )
         urls.append(
             URL(filePath:
-                "/Applications/SayIt.app/Contents/Library/LaunchServices/SayItAgent"
+                """
+                /Applications/SayIt.app/Contents/Library/LaunchServices/\
+                SayItAgent.app/Contents/MacOS/SayItAgent
+                """
             )
         )
         urls.append(
             URL.homeDirectory.appending(path:
-                "Applications/SayIt.app/Contents/Library/LaunchServices/SayItAgent"
+                """
+                Applications/SayIt.app/Contents/Library/LaunchServices/\
+                SayItAgent.app/Contents/MacOS/SayItAgent
+                """
             )
         )
         return urls

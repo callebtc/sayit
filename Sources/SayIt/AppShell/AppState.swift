@@ -16,6 +16,7 @@ final class AppState {
     let history = HistoryStore()
     let launchAtLogin = LaunchAtLoginController()
     let backgroundService = BackgroundServiceController()
+    let selectionService = SelectionServiceController()
     let voicePreview = VoicePreviewPlayer()
 
     private let client = SayItXPCClient()
@@ -52,8 +53,9 @@ final class AppState {
     private(set) var httpAPIErrorMessage: String?
     private(set) var apiTokenErrorMessage: String?
     private(set) var oneTimeTokenSecret: String?
-    private(set) var updateStatus = "Up to date"
+    private(set) var updateStatus = "Not checked yet"
     private(set) var availableUpdateURL: URL?
+    private(set) var isCheckingForUpdates = false
     private(set) var clipboardHasNewText = false
     @ObservationIgnored
     private var lastReadChangeCount = NSPasteboard.general.changeCount
@@ -121,6 +123,34 @@ final class AppState {
                 source: .clipboard
             )
         )
+    }
+
+    func speakSelectedText() {
+        Task {
+            do {
+                let text = try await selectionService.selectedText(
+                    promptIfNeeded: true
+                )
+                receive(
+                    TextSourcePayload(
+                        source: .selection,
+                        plainText: text
+                    )
+                )
+            } catch {
+                presentError(error.localizedDescription)
+            }
+        }
+    }
+
+    func refreshSelectionAccessibilityAccess() async {
+        await selectionService.refreshAuthorization()
+    }
+
+    func requestSelectionAccessibilityAccess() {
+        Task {
+            await selectionService.requestAuthorization()
+        }
     }
 
     func refreshClipboardState() {
@@ -302,7 +332,8 @@ final class AppState {
         model: ModelDescriptor,
         language: String?,
         text: String,
-        tuning: VoiceTuning
+        tuning: VoiceTuning,
+        candidateTunings: [VoiceTuning]? = nil
     ) {
         perform(
             .startVoiceDiscovery(
@@ -310,7 +341,8 @@ final class AppState {
                     modelID: model.id.rawValue,
                     language: language,
                     sampleText: text,
-                    tuning: tuning
+                    tuning: tuning,
+                    candidateTunings: candidateTunings
                 )
             )
         )
@@ -369,9 +401,28 @@ final class AppState {
 
     func saveVoiceCandidate(
         _ candidate: VoiceCandidateSnapshot,
-        name: String
+        name: String,
+        tuning: VoiceTuning
     ) {
-        perform(.saveVoiceCandidate(candidate.id, name: name))
+        perform(.saveVoiceCandidate(candidate.id, name: name, tuning: tuning))
+    }
+
+    func regenerateVoiceCandidate(
+        _ candidate: VoiceCandidateSnapshot,
+        tuning: VoiceTuning
+    ) async {
+        do {
+            let response = try await send(
+                .regenerateVoiceCandidate(candidate.id, tuning: tuning)
+            )
+            guard case .voiceStudio(let studio) = response else {
+                try requireSuccess(response)
+                return
+            }
+            voiceStudio = studio
+        } catch {
+            presentError(error.localizedDescription)
+        }
     }
 
     func selectVoice(_ profile: VoiceProfileSnapshot) {
@@ -381,6 +432,83 @@ final class AppState {
 
     func renameVoice(_ profile: VoiceProfileSnapshot, name: String) {
         perform(.renameVoice(profile.id, name: name))
+    }
+
+    func reorderVoices(modelID: String, orderedIDs: [UUID]) {
+        applyVoiceOrder(modelID: modelID, orderedIDs: orderedIDs)
+        perform(.reorderVoices(modelID: modelID, orderedIDs: orderedIDs))
+    }
+
+    private func applyVoiceOrder(modelID: String, orderedIDs: [UUID]) {
+        let positions = Dictionary(
+            uniqueKeysWithValues: orderedIDs.enumerated().map { ($1, $0) }
+        )
+        voiceProfiles = voiceProfiles.map { profile in
+            guard profile.modelID == modelID,
+                  let position = positions[profile.id],
+                  profile.sortOrder != position else {
+                return profile
+            }
+            return VoiceProfileSnapshot(
+                id: profile.id,
+                modelID: profile.modelID,
+                displayName: profile.displayName,
+                origin: profile.origin,
+                language: profile.language,
+                duration: profile.duration,
+                createdAt: profile.createdAt,
+                updatedAt: profile.updatedAt,
+                sortOrder: position,
+                tuning: profile.tuning
+            )
+        }
+        voiceProfiles.sort {
+            if $0.modelID != $1.modelID {
+                return $0.modelID < $1.modelID
+            }
+            if $0.sortOrder != $1.sortOrder {
+                return $0.sortOrder < $1.sortOrder
+            }
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt < $1.createdAt
+            }
+            return $0.displayName.localizedStandardCompare($1.displayName)
+                == .orderedAscending
+        }
+    }
+
+    func updateVoiceTuning(
+        _ profile: VoiceProfileSnapshot,
+        tuning: VoiceTuning
+    ) {
+        perform(.updateVoiceTuning(profile.id, tuning))
+    }
+
+    func duplicateVoice(
+        _ profile: VoiceProfileSnapshot,
+        name: String,
+        tuning: VoiceTuning
+    ) {
+        perform(.duplicateVoiceProfile(profile.id, name: name, tuning: tuning))
+    }
+
+    func previewVoiceProfile(
+        _ profile: VoiceProfileSnapshot,
+        tuning: VoiceTuning,
+        text: String
+    ) async {
+        do {
+            let response = try await send(
+                .previewVoiceProfile(profile.id, tuning: tuning, text: text)
+            )
+            guard case .file(let file) = response else {
+                try requireSuccess(response)
+                return
+            }
+            try voicePreview.play(data: file.data, id: profile.id)
+        } catch {
+            presentError(error.localizedDescription)
+        }
     }
 
     func deleteVoice(_ profile: VoiceProfileSnapshot) {
@@ -461,12 +589,37 @@ final class AppState {
     func updateGlobalShortcut(_ shortcut: GlobalShortcut) {
         let previous = settings.globalShortcut
         do {
-            try GlobalHotKeyManager.shared.register(shortcut)
+            try GlobalHotKeyManager.shared.register(
+                shortcut,
+                for: .readClipboard
+            )
             settings.shortcutKeyCode = shortcut.keyCode
             settings.shortcutModifiers = shortcut.carbonModifiers
             settings.shortcutKeyLabel = shortcut.keyLabel
         } catch {
-            try? GlobalHotKeyManager.shared.register(previous)
+            try? GlobalHotKeyManager.shared.register(
+                previous,
+                for: .readClipboard
+            )
+            presentError("That shortcut is already in use.")
+        }
+    }
+
+    func updateSelectionShortcut(_ shortcut: GlobalShortcut) {
+        let previous = settings.selectionShortcut
+        do {
+            try GlobalHotKeyManager.shared.register(
+                shortcut,
+                for: .speakSelection
+            )
+            settings.selectionShortcutKeyCode = shortcut.keyCode
+            settings.selectionShortcutModifiers = shortcut.carbonModifiers
+            settings.selectionShortcutKeyLabel = shortcut.keyLabel
+        } catch {
+            try? GlobalHotKeyManager.shared.register(
+                previous,
+                for: .speakSelection
+            )
             presentError("That shortcut is already in use.")
         }
     }
@@ -626,12 +779,19 @@ final class AppState {
     }
 
     func terminateBackgroundServiceForQuit() async {
+        await selectionService.terminateForQuit()
         await backgroundService.terminateForQuit()
     }
 
     func checkForUpdates() {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
         updateStatus = "Checking…"
+        availableUpdateURL = nil
         Task {
+            defer {
+                isCheckingForUpdates = false
+            }
             do {
                 let result = try await updateChecker.check(
                     currentVersion: applicationVersion
@@ -641,6 +801,9 @@ final class AppState {
                 case .unconfigured:
                     updateStatus = "Update feed not configured"
                     availableUpdateURL = nil
+                case .noPublishedRelease:
+                    updateStatus = "No published releases yet"
+                    availableUpdateURL = nil
                 case .current:
                     updateStatus = "Up to date"
                     availableUpdateURL = nil
@@ -649,14 +812,14 @@ final class AppState {
                     availableUpdateURL = url
                 }
             } catch {
-                updateStatus = "Couldn’t check for updates"
+                updateStatus = if let error = error as? LocalizedError {
+                    error.errorDescription ?? "Couldn’t check for updates"
+                } else {
+                    "Couldn’t check for updates"
+                }
+                availableUpdateURL = nil
             }
         }
-    }
-
-    func openAvailableUpdate() {
-        guard let availableUpdateURL else { return }
-        NSWorkspace.shared.open(availableUpdateURL)
     }
 
     var applicationDisplayVersion: String {
@@ -673,7 +836,9 @@ final class AppState {
 
     var commandLineToolURL: URL? {
         let url = Bundle.main.bundleURL
-            .appending(path: "Contents/Helpers/sayit")
+            .appending(
+                path: "Contents/Helpers/SayItCLI.app/Contents/MacOS/sayit"
+            )
         return FileManager.default.isExecutableFile(atPath: url.path)
             ? url
             : nil
@@ -741,11 +906,20 @@ final class AppState {
             )
         }
         guard let event = events.last else { return }
-        guard event.id == lastServiceRevision + 1 else {
-            try await reloadServiceSnapshot()
+        guard Self.shouldApplyEvent(
+            id: event.id,
+            after: lastServiceRevision
+        ) else {
             return
         }
         apply(event.snapshot)
+    }
+
+    nonisolated static func shouldApplyEvent(
+        id: UInt64,
+        after revision: UInt64
+    ) -> Bool {
+        id > revision
     }
 
     private func reloadServiceSnapshot() async throws {

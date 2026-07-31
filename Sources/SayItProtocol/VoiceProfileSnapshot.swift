@@ -9,6 +9,7 @@ public struct VoiceProfileSnapshot: Codable, Equatable, Identifiable, Sendable {
     public let duration: TimeInterval
     public let createdAt: Date
     public let updatedAt: Date
+    public let sortOrder: Int
     public let tuning: VoiceTuning
 
     public init(
@@ -20,6 +21,7 @@ public struct VoiceProfileSnapshot: Codable, Equatable, Identifiable, Sendable {
         duration: TimeInterval,
         createdAt: Date,
         updatedAt: Date,
+        sortOrder: Int = 0,
         tuning: VoiceTuning
     ) {
         self.id = id
@@ -30,6 +32,7 @@ public struct VoiceProfileSnapshot: Codable, Equatable, Identifiable, Sendable {
         self.duration = duration
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.sortOrder = sortOrder
         self.tuning = tuning
     }
 }

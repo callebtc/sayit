@@ -6,29 +6,31 @@ struct VoiceFingerprintView: View {
 
     var body: some View {
         Canvas { context, size in
-            guard !values.isEmpty else { return }
-            let barWidth = size.width / Double(values.count)
+            guard values.count > 1 else { return }
+            let midY = size.height / 2
+            let spacing = size.width / Double(values.count - 1)
+            let maximum = max(values.max() ?? 0, 0.0001)
+            var path = Path()
             for (index, value) in values.enumerated() {
-                let height = max(Double(value) * size.height, 2.5)
-                let rectangle = CGRect(
-                    x: Double(index) * barWidth,
-                    y: (size.height - height) / 2,
-                    width: max(barWidth - 2, 1),
-                    height: height
+                let normalized = Double(value / maximum)
+                let halfHeight = max(
+                    1.5,
+                    normalized * Double(size.height) * 0.46
                 )
-                context.fill(
-                    Path(roundedRect: rectangle, cornerRadius: 2),
-                    with: .color(.accentColor.opacity(opacity(for: value)))
-                )
+                let x = Double(index) * spacing
+                path.move(to: CGPoint(x: x, y: midY - halfHeight))
+                path.addLine(to: CGPoint(x: x, y: midY + halfHeight))
             }
+            context.stroke(
+                path,
+                with: isActive
+                    ? .color(.accentColor)
+                    : .color(.primary.opacity(0.18)),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
+            )
         }
-        .frame(minWidth: 120, idealWidth: 180, maxWidth: 240, minHeight: 32)
+        .frame(minHeight: 24)
         .animation(DesignTokens.smoothAnimation, value: isActive)
         .accessibilityHidden(true)
-    }
-
-    private func opacity(for value: Float) -> Double {
-        let base = 0.45 + Double(min(max(value, 0), 1)) * 0.55
-        return isActive ? base : base * 0.75
     }
 }

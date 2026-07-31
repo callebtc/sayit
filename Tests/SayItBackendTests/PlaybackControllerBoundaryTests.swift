@@ -16,25 +16,4 @@ struct PlaybackControllerBoundaryTests {
             ) < 0.000_001
         )
     }
-
-    @Test("Model-switch fade clamps progress and reaches silence")
-    @MainActor
-    func fadeVolume() {
-        #expect(
-            PlaybackController.modelSwitchFadeVolume(step: -1, stepCount: 8)
-                == 1
-        )
-        #expect(
-            PlaybackController.modelSwitchFadeVolume(step: 4, stepCount: 8)
-                == 0.5
-        )
-        #expect(
-            PlaybackController.modelSwitchFadeVolume(step: 9, stepCount: 8)
-                == 0
-        )
-        #expect(
-            PlaybackController.modelSwitchFadeVolume(step: 1, stepCount: 0)
-                == 0
-        )
-    }
 }

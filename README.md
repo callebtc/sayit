@@ -18,8 +18,9 @@ stay on your Mac.
 
 ## Highlights
 
-- **Speak from anywhere.** Select text in any app and choose
-  **Services → Say It**, or copy text and press the configurable global hotkey.
+- **Speak from anywhere.** Select text in another app and press the configurable
+  selection hotkey, choose **Services → Say It**, or use the separate clipboard
+  hotkey.
 - **A native menu-bar player.** Read the clipboard, pause, seek, change playback
   speed, follow the spoken text, and revisit history without leaving your
   current app.
@@ -52,11 +53,12 @@ Say It requires macOS 15 or later on an Apple silicon Mac.
 
 1. Install and launch Say It.
 2. Choose and download a model during onboarding.
-3. Select text in another app and choose **Services → Say It**, or copy text and
-   press **Control–Option–S**.
+3. Optionally allow Accessibility access, select text in another app, and press
+   **Control–Option–S**. You can also copy text and press
+   **Control–Option–V**, or choose **Services → Say It**.
 
-The shortcut can be changed in Settings. Say It reads clipboard text only when
-you explicitly ask it to.
+Both shortcuts can be changed in Settings. Say It queries the current selection
+or reads clipboard text only when you explicitly invoke the matching action.
 
 ### Terminal
 
@@ -77,9 +79,10 @@ Run `sayit --help` to see all commands and options.
 
 The native SwiftUI frontend is separate from a per-user backend service that
 owns model downloads, synthesis, playback, and history. The app and CLI talk to
-that service over XPC. An optional, token-protected HTTP server exposes the same
-synthesis engine to other local apps through a versioned REST API bound to
-`127.0.0.1`.
+that service over XPC. A narrowly scoped accessibility helper retrieves the
+frontmost app's selection only when requested. An optional, token-protected HTTP
+server exposes the same synthesis engine to other local apps through a
+versioned REST API bound to `127.0.0.1`.
 
 The synthesis layer is built primarily on
 [MLX Audio](https://github.com/Blaizzy/mlx-audio), with the native Swift
@@ -96,7 +99,57 @@ brew install xcodegen
 ./Scripts/build-app.sh
 ```
 
+Local builds compile independent targets and Swift source batches in parallel,
+using all available logical CPUs by default. Set `SAYIT_BUILD_JOBS` to cap the
+number of concurrent build operations. Signed release builds keep whole-module
+optimization; set `SAYIT_SWIFT_COMPILATION_MODE=wholemodule` to reproduce that
+behavior in an ad-hoc local build.
+
+For a stable Accessibility grant across Debug rebuilds, set
+`SAYIT_SELECTION_SIGN_IDENTITY` to the same Apple Development signing identity
+used for the app. The build does not select a certificate from your keychain
+automatically.
+
 Tests run with `swift test --disable-sandbox`.
+
+## Make a release
+
+The release workflow is automated, but publishing to GitHub is deliberately
+separate. The script builds and tests the app, applies Developer ID signatures
+with secure timestamps, creates the DMG, submits it to Apple's notarization
+service, staples the ticket, mounts the result, and audits its signatures and
+contents.
+
+One time only:
+
+1. Copy `.env.release.example` to `.env.release`, set the Developer ID
+   Application identity, and set the GitHub latest-release API URL. A
+   certificate SHA-1 fingerprint avoids ambiguity when Keychain contains
+   multiple certificates with the same display name. The update URL is
+   injected only into built app bundles and is not stored in tracked project
+   configuration.
+2. Store App Store Connect notarization credentials in Keychain:
+
+   ```sh
+   xcrun notarytool store-credentials "sayit-notary" \
+     --apple-id "YOUR_APPLE_ID" \
+     --team-id "YOUR_TEAM_ID" \
+     --password "YOUR_APP_SPECIFIC_PASSWORD"
+   ```
+
+For each release, update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in
+`project.yml`, commit that release state, then run:
+
+```sh
+SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh 0.1.0
+```
+
+Replace `0.1.0` with the committed marketing version. The explicit environment
+flag authorizes that run's upload to Apple. The script stops if the Git
+worktree is dirty, a test or signature check fails, notarization is rejected,
+or the mounted DMG contains a local user path. It prints the final DMG path and
+SHA-256 checksum but does not create a GitHub release or upload anything to
+GitHub.
 
 ## More screenshots
 

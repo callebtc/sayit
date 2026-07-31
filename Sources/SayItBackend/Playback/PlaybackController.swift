@@ -9,15 +9,16 @@ import SayItProtocol
 @MainActor
 @Observable
 final class PlaybackController: BackendPlaybackControlling {
-    private static let baseStartBufferDuration: TimeInterval = 1.2
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
-    static let modelSwitchFadeStepCount = 8
     static let highQualityTimePitchOverlap: Float = 32
+    static let schedulingHorizon: TimeInterval = 12
+    static let schedulingChunkDuration: TimeInterval = 2
+    static let fileReadFrameCount = 65_536
 
     static func preferredStartBufferDuration(
         for rate: Double
     ) -> TimeInterval {
-        baseStartBufferDuration * max(rate, 1)
+        PlaybackBufferPolicy.progressiveBaseLead * max(rate, 1)
     }
 
     private let engine = AVAudioEngine()
@@ -25,13 +26,17 @@ final class PlaybackController: BackendPlaybackControlling {
     private let timePitch = AVAudioUnitTimePitch()
     private var timelineTask: Task<Void, Never>?
     private var audioConfigurationTask: Task<Void, Never>?
-    private var accumulatedSamples: [Float] = []
+    private var audioConfigurationRecoveryTask: Task<Void, Never>?
+    private var completionWatchdogTask: Task<Void, Never>?
+    private var pcmStore: PCMStore?
+    private var frameScheduler: PCMFrameScheduler?
     private var sampleRate: Double = 24_000
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
     private var scheduleGeneration = 0
     private var scheduledBufferCount = 0
+    private var shouldFadeInNextScheduledBuffer = false
     private var synthesisIsComplete = false
     private var isReconfiguringAudioGraph = false
     private var amplitudeWindows: [Float] = []
@@ -40,6 +45,12 @@ final class PlaybackController: BackendPlaybackControlling {
     private var amplitudeWindowFrameCount = 1_200
     private var lastNowPlayingTimelineUpdate = Date.distantPast
     private var stopTransitionGeneration = 0
+    private var audioConfigurationRecoveryGeneration = 0
+    private var lastStablePlaybackTime: TimeInterval = 0
+    private var playbackMode = PlaybackMode.progressive
+    private var performanceByModelID: [
+        String: SynthesisPerformanceEstimator
+    ] = [:]
 
     @ObservationIgnored
     var onFailure: (@MainActor (String) -> Void)?
@@ -55,14 +66,16 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
     var preferredStartBufferDuration: TimeInterval {
-        Self.preferredStartBufferDuration(for: rate)
+        bufferPolicy.preferredSourceLead
     }
     var shouldStartWhenBuffered: Bool {
         guard state == .preparing || state == .buffering else {
             return false
         }
-        return synthesisIsComplete
-            || bufferedDuration >= preferredStartBufferDuration
+        return bufferPolicy.shouldStart(
+            synthesisIsComplete: synthesisIsComplete,
+            bufferedDuration: bufferedDuration
+        )
     }
     var showTitleInNowPlaying = false {
         didSet { updateNowPlaying() }
@@ -70,6 +83,7 @@ final class PlaybackController: BackendPlaybackControlling {
     var rate: Double = 1 {
         didSet {
             timePitch.rate = Float(rate)
+            scheduleCompletionWatchdog()
             updateNowPlaying()
         }
     }
@@ -118,26 +132,28 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func enqueue(_ chunk: AudioChunk) throws {
         guard chunk.requestID == requestID else { return }
-        if !accumulatedSamples.isEmpty,
-           !sampleRatesMatch(sampleRate, chunk.sampleRate) {
+        guard !chunk.samples.isEmpty else {
+            throw PlaybackError.emptyAudio
+        }
+        if let pcmStore,
+           !sampleRatesMatch(pcmStore.sampleRate, chunk.sampleRate) {
             throw PlaybackError.inconsistentSampleRate
         }
-        let buffer = try makeBuffer(
-            samples: chunk.samples,
-            sampleRate: chunk.sampleRate
-        )
-        try prepareAudioGraph(for: buffer.format)
-        try validatePlayerFormat(for: buffer)
-        schedule(buffer)
-
-        if accumulatedSamples.isEmpty {
+        if pcmStore == nil {
             sampleRate = chunk.sampleRate
+            pcmStore = try PCMStore(sampleRate: chunk.sampleRate)
+            frameScheduler = makeFrameScheduler(sampleRate: chunk.sampleRate)
             resetAmplitudeAnalysis(sampleRate: chunk.sampleRate)
         }
 
-        accumulatedSamples.append(contentsOf: chunk.samples)
-        generatedDuration = Double(accumulatedSamples.count) / sampleRate
+        guard let pcmStore else {
+            throw PlaybackError.emptyAudio
+        }
+        try pcmStore.append(chunk.samples)
+        generatedDuration = Double(pcmStore.frameCount) / sampleRate
         appendAmplitudeSamples(chunk.samples)
+        try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+        try scheduleAvailableAudio()
         if state == .preparing || state == .buffering {
             state = .buffering
         }
@@ -153,7 +169,20 @@ final class PlaybackController: BackendPlaybackControlling {
         spokenChunks.append(chunk)
     }
 
+    func setPlaybackMode(_ mode: PlaybackMode) {
+        playbackMode = mode
+    }
+
+    func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
+        guard let currentModelID else { return }
+        var estimator = performanceByModelID[currentModelID]
+            ?? SynthesisPerformanceEstimator()
+        estimator.record(metrics)
+        performanceByModelID[currentModelID] = estimator
+    }
+
     func play() {
+        cancelAudioConfigurationRecovery()
         do {
             try startPlayback()
         } catch {
@@ -163,7 +192,13 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func pause() {
         guard state == .playing else { return }
-        elapsed = currentPlaybackTime()
+        elapsed = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: currentPlaybackTime(),
+            duration: generatedDuration
+        )
+        lastStablePlaybackTime = elapsed
+        cancelAudioConfigurationRecovery()
         player.pause()
         state = .paused
         updateNowPlaying()
@@ -174,54 +209,96 @@ final class PlaybackController: BackendPlaybackControlling {
         finishStopping()
     }
 
+    func stopSmoothly() async {
+        await performSmoothStop(duration: .milliseconds(12))
+    }
+
     func stopForModelSwitch() async {
+        await performSmoothStop(duration: Self.modelSwitchFadeDuration)
+    }
+
+    private func performSmoothStop(duration: Duration) async {
+        cancelAudioConfigurationRecovery()
         stopTransitionGeneration &+= 1
         let generation = stopTransitionGeneration
-
-        // Reject any late synthesis chunks as soon as the transition starts,
-        // while allowing already-scheduled audio to fade out briefly.
         requestID = nil
-        guard player.isPlaying else {
+
+        guard player.isPlaying, hasStoredAudio else {
             finishStopping()
             return
         }
 
-        let initialVolume = player.volume
-        let stepDuration = Self.modelSwitchFadeDuration
-            / Self.modelSwitchFadeStepCount
-        for step in 1...Self.modelSwitchFadeStepCount {
-            do {
-                try await Task.sleep(for: stepDuration)
-            } catch {
-                guard generation == stopTransitionGeneration else { return }
-                finishStopping()
-                return
-            }
+        do {
+            let actualDuration = try scheduleFadeOut(
+                from: currentPlaybackTime(),
+                requestedDuration: duration
+            )
+            state = .paused
+            try await Task.sleep(for: actualDuration)
+        } catch {
             guard generation == stopTransitionGeneration else { return }
-            player.volume = initialVolume
-                * Self.modelSwitchFadeVolume(
-                    step: step,
-                    stepCount: Self.modelSwitchFadeStepCount
-                )
+            finishStopping()
+            return
         }
+        guard generation == stopTransitionGeneration else { return }
         finishStopping()
     }
 
-    static func modelSwitchFadeVolume(
-        step: Int,
-        stepCount: Int
-    ) -> Float {
-        guard stepCount > 0 else { return 0 }
-        let progress = Float(min(max(step, 0), stepCount))
-            / Float(stepCount)
-        return 1 - progress
+    private func scheduleFadeOut(
+        from seconds: TimeInterval,
+        requestedDuration: Duration
+    ) throws -> Duration {
+        let target = min(max(seconds, 0), generatedDuration)
+        guard let pcmStore else {
+            return .zero
+        }
+        let startFrame = min(
+            Int64(target * sampleRate),
+            pcmStore.frameCount
+        )
+        guard startFrame < pcmStore.frameCount else {
+            return .zero
+        }
+        let requestedSeconds = Self.timeInterval(for: requestedDuration)
+        let requestedFrames = max(Int(requestedSeconds * sampleRate), 1)
+        let samples = try pcmStore.readFrames(
+            startingAt: startFrame,
+            count: requestedFrames
+        )
+        let buffer = try makeBuffer(
+            samples: PCMTransitionRamp.fadeOut(samples),
+            sampleRate: sampleRate
+        )
+
+        invalidateScheduledAudio()
+        scheduleOffset = target
+        if configuredSampleRate == nil {
+            try prepareAudioGraph(for: buffer.format)
+        } else {
+            try ensureEngineRunning()
+        }
+        try validatePlayerFormat(for: buffer)
+        player.scheduleBuffer(buffer)
+        player.volume = 1
+        player.play()
+        return .seconds(Double(samples.count) / sampleRate)
+    }
+
+    private static func timeInterval(for duration: Duration) -> TimeInterval {
+        let components = duration.components
+        return Double(components.seconds)
+            + Double(components.attoseconds) / 1e18
     }
 
     private func finishStopping() {
+        cancelAudioConfigurationRecovery()
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         invalidateScheduledAudio()
         engine.pause()
         player.volume = 1
-        accumulatedSamples.removeAll(keepingCapacity: false)
+        pcmStore = nil
+        frameScheduler = nil
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil
         currentTitle = ""
@@ -230,6 +307,7 @@ final class PlaybackController: BackendPlaybackControlling {
         spokenChunks = []
         failureMessage = nil
         elapsed = 0
+        lastStablePlaybackTime = 0
         generatedDuration = 0
         estimatedDuration = 0
         scheduleOffset = 0
@@ -245,18 +323,21 @@ final class PlaybackController: BackendPlaybackControlling {
             play()
         } else {
             finishPlaybackIfReady()
+            scheduleCompletionWatchdog()
         }
         updateNowPlaying()
     }
 
     func seek(to seconds: TimeInterval) {
-        guard !accumulatedSamples.isEmpty else { return }
+        guard hasStoredAudio else { return }
+        cancelAudioConfigurationRecovery()
         let target = min(max(seconds, 0), generatedDuration)
         let wasPlaying = state == .playing
 
         do {
             try rescheduleAudio(from: target)
             elapsed = target
+            lastStablePlaybackTime = target
             if wasPlaying {
                 try startPlayback()
             } else if target >= generatedDuration, synthesisIsComplete {
@@ -271,16 +352,21 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func skip(by seconds: TimeInterval) {
-        seek(to: currentPlaybackTime() + seconds)
+        let current = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: currentPlaybackTime(),
+            duration: generatedDuration
+        )
+        seek(to: current + seconds)
     }
 
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult {
-        guard let requestID, !accumulatedSamples.isEmpty else {
+        guard let requestID, let pcmStore, pcmStore.frameCount > 0 else {
             throw SynthesisError.generatedNoAudio
         }
+        let snapshot = try pcmStore.snapshot()
         return try await archive.writeM4A(
-            samples: accumulatedSamples,
-            sampleRate: sampleRate,
+            source: snapshot,
             requestID: requestID
         )
     }
@@ -291,52 +377,48 @@ final class PlaybackController: BackendPlaybackControlling {
             commonFormat: .pcmFormatFloat32,
             interleaved: false
         )
-        guard file.length > 0,
-              file.length <= AVAudioFramePosition(UInt32.max),
-              let buffer = AVAudioPCMBuffer(
-                pcmFormat: file.processingFormat,
-                frameCapacity: AVAudioFrameCount(file.length)
-              ) else {
+        guard file.length > 0 else {
             throw PlaybackError.unsupportedAudioFile
         }
-        try file.read(into: buffer)
-        let samples = try monoSamples(from: buffer)
-        let monoBuffer = try makeBuffer(
-            samples: samples,
-            sampleRate: file.processingFormat.sampleRate
-        )
 
         stop()
         requestID = UUID()
         currentTitle = title
         currentModelID = modelID
         sampleRate = file.processingFormat.sampleRate
-        accumulatedSamples = samples
-        generatedDuration = Double(samples.count) / sampleRate
-        estimatedDuration = generatedDuration
-        synthesisIsComplete = true
+        pcmStore = try PCMStore(sampleRate: sampleRate)
+        frameScheduler = makeFrameScheduler(sampleRate: sampleRate)
         resetAmplitudeAnalysis(sampleRate: sampleRate)
-        appendAmplitudeSamples(samples)
 
-        try prepareAudioGraph(for: monoBuffer.format)
-        try validatePlayerFormat(for: monoBuffer)
-        schedule(monoBuffer)
-        try startPlayback()
+        do {
+            try importAudioFile(file)
+            guard hasStoredAudio else {
+                throw PlaybackError.unsupportedAudioFile
+            }
+            generatedDuration = Double(pcmStore?.frameCount ?? 0) / sampleRate
+            estimatedDuration = generatedDuration
+            synthesisIsComplete = true
+            try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+            try scheduleAvailableAudio()
+            try startPlayback()
+        } catch {
+            stop()
+            throw error
+        }
     }
 
     func exportWAV(to destination: URL, using archive: AudioArchive) async throws {
-        guard !accumulatedSamples.isEmpty else {
+        guard let pcmStore, pcmStore.frameCount > 0 else {
             throw SynthesisError.generatedNoAudio
         }
         try await archive.writeWAV(
-            samples: accumulatedSamples,
-            sampleRate: sampleRate,
+            source: pcmStore.snapshot(),
             destination: destination
         )
     }
 
     private func startPlayback() throws {
-        guard !accumulatedSamples.isEmpty else { return }
+        guard hasStoredAudio else { return }
 
         if state == .finished {
             try rescheduleAudio(from: 0)
@@ -355,6 +437,8 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         failureMessage = nil
         state = .playing
+        lastStablePlaybackTime = elapsed
+        scheduleCompletionWatchdog()
         updateNowPlaying()
     }
 
@@ -484,7 +568,10 @@ final class PlaybackController: BackendPlaybackControlling {
         return samples
     }
 
-    private func schedule(_ buffer: AVAudioPCMBuffer) {
+    private func schedule(
+        _ buffer: AVAudioPCMBuffer,
+        sourceFrameCount: Int64
+    ) {
         let generation = scheduleGeneration
         scheduledBufferCount += 1
         player.scheduleBuffer(
@@ -492,44 +579,89 @@ final class PlaybackController: BackendPlaybackControlling {
             completionCallbackType: .dataPlayedBack
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.scheduledBufferFinished(generation: generation)
+                self?.scheduledBufferFinished(
+                    generation: generation,
+                    frameCount: sourceFrameCount
+                )
             }
         }
     }
 
-    private func scheduledBufferFinished(generation: Int) {
+    private func scheduledBufferFinished(
+        generation: Int,
+        frameCount: Int64
+    ) {
         guard generation == scheduleGeneration else { return }
         scheduledBufferCount = max(scheduledBufferCount - 1, 0)
+        frameScheduler?.didComplete(frameCount: frameCount)
+        do {
+            try scheduleAvailableAudio()
+        } catch {
+            reportFailure(error)
+            return
+        }
         finishPlaybackIfReady()
     }
 
     private func invalidateScheduledAudio() {
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         scheduleGeneration &+= 1
         scheduledBufferCount = 0
+        if var frameScheduler {
+            frameScheduler.reset(startingAt: frameScheduler.nextFrame)
+            self.frameScheduler = frameScheduler
+        }
         player.stop()
     }
 
     private func rescheduleAudio(from seconds: TimeInterval) throws {
         let target = min(max(seconds, 0), generatedDuration)
         invalidateScheduledAudio()
-        scheduleOffset = target
+        let availableFrameCount = pcmStore?.frameCount ?? 0
         let startFrame = min(
-            Int(target * sampleRate),
-            accumulatedSamples.count
+            Int64((target * sampleRate).rounded(.down)),
+            availableFrameCount
         )
-        guard startFrame < accumulatedSamples.count else { return }
-        let buffer = try makeBuffer(
-            samples: Array(accumulatedSamples[startFrame...]),
-            sampleRate: sampleRate
-        )
+        scheduleOffset = Double(startFrame) / sampleRate
+        frameScheduler?.reset(startingAt: startFrame)
+        shouldFadeInNextScheduledBuffer = startFrame < availableFrameCount
+        try scheduleAvailableAudio()
+    }
 
-        if configuredSampleRate == nil {
-            try prepareAudioGraph(for: buffer.format)
-        } else {
-            try ensureEngineRunning()
+    private func scheduleAvailableAudio() throws {
+        guard let pcmStore, var frameScheduler else { return }
+        while let range = frameScheduler.nextRange(
+            availableFrameCount: pcmStore.frameCount
+        ) {
+            var samples = try pcmStore.readFrames(
+                startingAt: range.lowerBound,
+                count: Int(range.count)
+            )
+            guard samples.count == range.count else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            if shouldFadeInNextScheduledBuffer {
+                samples = PCMTransitionRamp.fadeInHead(
+                    samples,
+                    frameCount: transitionFrameCount
+                )
+                shouldFadeInNextScheduledBuffer = false
+            }
+            let buffer = try makeBuffer(
+                samples: samples,
+                sampleRate: sampleRate
+            )
+            if configuredSampleRate == nil {
+                try prepareAudioGraph(for: buffer.format)
+            } else {
+                try ensureEngineRunning()
+            }
+            try validatePlayerFormat(for: buffer)
+            schedule(buffer, sourceFrameCount: Int64(range.count))
+            frameScheduler.didSchedule(range)
         }
-        try validatePlayerFormat(for: buffer)
-        schedule(buffer)
+        self.frameScheduler = frameScheduler
     }
 
     private func currentPlaybackTime() -> TimeInterval {
@@ -548,14 +680,17 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func completePlayback() {
         guard state != .finished else { return }
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         invalidateScheduledAudio()
         elapsed = generatedDuration
+        lastStablePlaybackTime = elapsed
         state = .finished
         updateNowPlaying()
     }
 
     private func finishPlaybackIfReady() {
-        guard !accumulatedSamples.isEmpty,
+        guard hasStoredAudio,
               scheduledBufferCount == 0 else {
             return
         }
@@ -573,8 +708,61 @@ final class PlaybackController: BackendPlaybackControlling {
         return max(generatedDuration - playbackPosition, 0)
     }
 
+    private var bufferPolicy: PlaybackBufferPolicy {
+        PlaybackBufferPolicy(
+            mode: playbackMode,
+            rate: rate,
+            estimator: currentModelID.flatMap {
+                performanceByModelID[$0]
+            } ?? SynthesisPerformanceEstimator()
+        )
+    }
+
+    private var transitionFrameCount: Int {
+        max(
+            Int((sampleRate * PCMStreamConditioner.boundaryDuration).rounded()),
+            1
+        )
+    }
+
+    private func scheduleCompletionWatchdog() {
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
+        guard synthesisIsComplete,
+              state == .playing,
+              generatedDuration > 0 else {
+            return
+        }
+        let remaining = max(
+            generatedDuration - currentPlaybackTime(),
+            0
+        )
+        let delay = remaining / max(rate, 0.1) + 0.75
+        let generation = scheduleGeneration
+        completionWatchdogTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            guard let self,
+                  generation == self.scheduleGeneration,
+                  self.state == .playing else {
+                return
+            }
+            self.elapsed = self.currentPlaybackTime()
+            let frameTolerance = 1 / max(self.sampleRate, 1)
+            if self.elapsed >= self.generatedDuration - frameTolerance {
+                self.completePlayback()
+            } else {
+                self.scheduleCompletionWatchdog()
+            }
+        }
+    }
+
     private func enterBufferingState() {
         elapsed = generatedDuration
+        lastStablePlaybackTime = elapsed
         invalidateScheduledAudio()
         scheduleOffset = elapsed
         state = .buffering
@@ -588,12 +776,8 @@ final class PlaybackController: BackendPlaybackControlling {
                 guard let self else { return }
                 if self.state == .playing {
                     self.elapsed = self.currentPlaybackTime()
-                    if self.synthesisIsComplete,
-                       self.elapsed >= self.generatedDuration - 0.05 {
-                        self.completePlayback()
-                    } else {
-                        self.updateNowPlaying(throttleTimeline: true)
-                    }
+                    self.lastStablePlaybackTime = self.elapsed
+                    self.updateNowPlaying(throttleTimeline: true)
                 }
             }
         }
@@ -607,37 +791,103 @@ final class PlaybackController: BackendPlaybackControlling {
                 object: engine
             ) {
                 guard !Task.isCancelled, let self else { return }
-                self.audioConfigurationDidChange()
+                self.scheduleAudioConfigurationRecovery()
             }
         }
     }
 
-    private func audioConfigurationDidChange() {
+    private func scheduleAudioConfigurationRecovery() {
         guard !isReconfiguringAudioGraph,
               configuredSampleRate != nil,
-              !accumulatedSamples.isEmpty else {
+              hasStoredAudio,
+              state != .idle,
+              state != .finished else {
             return
         }
         let previousState = state
-        let shouldResume = previousState == .playing
-        let resumeTime = currentPlaybackTime()
-
-        do {
-            invalidateScheduledAudio()
-            configuredSampleRate = nil
-            let format = try monoFormat(sampleRate: sampleRate)
-            try configureAudioGraph(for: format)
-            try rescheduleAudio(from: resumeTime)
-            elapsed = resumeTime
-            if shouldResume {
-                try startPlayback()
-            } else {
-                state = previousState == .failed ? .paused : previousState
-                updateNowPlaying()
+        let resumeTime = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: elapsed,
+            duration: generatedDuration
+        )
+        audioConfigurationRecoveryGeneration &+= 1
+        let generation = audioConfigurationRecoveryGeneration
+        audioConfigurationRecoveryTask?.cancel()
+        audioConfigurationRecoveryTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(
+                    for: AudioRouteRecoveryPolicy.debounceDelay
+                )
+                var lastError: Error?
+                for delay in AudioRouteRecoveryPolicy.retryDelays {
+                    if delay > .zero {
+                        try await Task.sleep(for: delay)
+                    }
+                    guard let self,
+                          generation
+                            == self.audioConfigurationRecoveryGeneration,
+                          self.hasStoredAudio else {
+                        return
+                    }
+                    do {
+                        try self.recoverAudioConfiguration(
+                            from: resumeTime,
+                            previousState: previousState
+                        )
+                        self.audioConfigurationRecoveryTask = nil
+                        return
+                    } catch {
+                        lastError = error
+                        guard AudioRouteRecoveryPolicy.canRetry(error) else {
+                            break
+                        }
+                    }
+                }
+                guard let self,
+                      generation
+                        == self.audioConfigurationRecoveryGeneration,
+                      let lastError else {
+                    return
+                }
+                self.audioConfigurationRecoveryTask = nil
+                self.reportFailure(lastError)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      generation
+                        == self.audioConfigurationRecoveryGeneration else {
+                    return
+                }
+                self.audioConfigurationRecoveryTask = nil
+                self.reportFailure(error)
             }
-        } catch {
-            reportFailure(error, shouldResume: shouldResume)
         }
+    }
+
+    private func recoverAudioConfiguration(
+        from resumeTime: TimeInterval,
+        previousState: PlaybackState
+    ) throws {
+        invalidateScheduledAudio()
+        configuredSampleRate = nil
+        let format = try monoFormat(sampleRate: sampleRate)
+        try configureAudioGraph(for: format)
+        try rescheduleAudio(from: resumeTime)
+        elapsed = resumeTime
+        lastStablePlaybackTime = resumeTime
+        if previousState == .playing {
+            try startPlayback()
+        } else {
+            state = previousState == .failed ? .paused : previousState
+            updateNowPlaying()
+        }
+    }
+
+    private func cancelAudioConfigurationRecovery() {
+        audioConfigurationRecoveryGeneration &+= 1
+        audioConfigurationRecoveryTask?.cancel()
+        audioConfigurationRecoveryTask = nil
     }
 
     private func monoFormat(sampleRate: Double) throws -> AVAudioFormat {
@@ -652,11 +902,52 @@ final class PlaybackController: BackendPlaybackControlling {
         return format
     }
 
+    private var hasStoredAudio: Bool {
+        (pcmStore?.frameCount ?? 0) > 0
+    }
+
+    private func makeFrameScheduler(
+        sampleRate: Double,
+        startingAt startFrame: Int64 = 0
+    ) -> PCMFrameScheduler {
+        PCMFrameScheduler(
+            sampleRate: sampleRate,
+            horizonDuration: Self.schedulingHorizon,
+            chunkDuration: Self.schedulingChunkDuration,
+            startingAt: startFrame
+        )
+    }
+
+    private func importAudioFile(_ file: AVAudioFile) throws {
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: file.processingFormat,
+            frameCapacity: AVAudioFrameCount(Self.fileReadFrameCount)
+        ) else {
+            throw PlaybackError.unsupportedAudioFile
+        }
+
+        while file.framePosition < file.length {
+            let remaining = file.length - file.framePosition
+            let frameCount = AVAudioFrameCount(
+                min(
+                    remaining,
+                    AVAudioFramePosition(Self.fileReadFrameCount)
+                )
+            )
+            try file.read(into: buffer, frameCount: frameCount)
+            guard buffer.frameLength > 0 else { break }
+            let samples = try monoSamples(from: buffer)
+            try pcmStore?.append(samples)
+            appendAmplitudeSamples(samples)
+        }
+    }
+
     private func sampleRatesMatch(_ lhs: Double, _ rhs: Double) -> Bool {
         abs(lhs - rhs) < 0.5
     }
 
     private func reportFailure(_ error: Error, shouldResume: Bool = false) {
+        cancelAudioConfigurationRecovery()
         if shouldResume {
             elapsed = currentPlaybackTime()
         }

@@ -26,19 +26,29 @@ struct AboutSettingsView: View {
             Form {
                 Section("Updates") {
                     LabeledContent("Status") {
-                        Text(state.updateStatus)
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: DesignTokens.compactSpacing) {
+                            if state.isCheckingForUpdates {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .accessibilityLabel(
+                                        "Checking for updates"
+                                    )
+                            }
+                            Text(state.updateStatus)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    if state.availableUpdateURL != nil {
-                        Button(
-                            "Download Update…",
-                            action: state.openAvailableUpdate
+                    if let updateURL = state.availableUpdateURL {
+                        Link(
+                            "Open Release on GitHub…",
+                            destination: updateURL
                         )
                     } else {
                         Button(
                             "Check for Updates…",
                             action: state.checkForUpdates
                         )
+                        .disabled(state.isCheckingForUpdates)
                     }
                 }
 

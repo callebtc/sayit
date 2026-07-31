@@ -53,6 +53,8 @@ public final class SayItBackendService: SayItService {
     private var voiceCloneDraft: VoiceCloneDraft?
     private var lastProgressRevisionDate = Date.distantPast
     private var lastReplayProgressTick: Int?
+    private var lastPlaybackContent: PlaybackContentState?
+    private var playbackContentRevision: UInt64 = 0
     private var isModelTransitionInProgress = false
     private var isShuttingDown = false
     private let serviceVersion: String
@@ -244,7 +246,7 @@ public final class SayItBackendService: SayItService {
     }
 
     public func events(after sequence: UInt64) async -> [ServiceEvent] {
-        let snapshot = makeSnapshot()
+        let snapshot = makeSnapshot(playbackContentAfter: sequence)
         guard snapshot.revision > sequence else { return [] }
         return [
             ServiceEvent(id: snapshot.revision, snapshot: snapshot)
@@ -368,9 +370,13 @@ public final class SayItBackendService: SayItService {
             return .accepted
         case .voicePreview(let id):
             return .file(try voicePreview(id: id))
-        case .saveVoiceCandidate(let id, let name):
-            _ = try await saveVoiceCandidate(id: id, name: name)
+        case .saveVoiceCandidate(let id, let name, let tuning):
+            _ = try await saveVoiceCandidate(id: id, name: name, tuning: tuning)
             return .accepted
+        case .regenerateVoiceCandidate(let id, let tuning):
+            return .voiceStudio(
+                try await regenerateVoiceCandidate(id: id, tuning: tuning)
+            )
         case .saveVoiceClone(let id, let name):
             _ = try await saveVoiceClone(sessionID: id, name: name)
             return .accepted
@@ -382,6 +388,25 @@ public final class SayItBackendService: SayItService {
             voicesRevision &+= 1
             revision &+= 1
             return .accepted
+        case .reorderVoices(let modelID, let orderedIDs):
+            try voiceProfiles.reorder(modelID: modelID, orderedIDs: orderedIDs)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
+        case .updateVoiceTuning(let id, let tuning):
+            _ = try updateVoiceTuning(id: id, tuning: tuning)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
+        case .duplicateVoiceProfile(let id, let name, let tuning):
+            _ = try duplicateVoiceProfile(id: id, name: name, tuning: tuning)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
+        case .previewVoiceProfile(let id, let tuning, let text):
+            return .file(
+                try await previewVoiceProfile(id: id, tuning: tuning, text: text)
+            )
         case .deleteVoice(let id):
             try await deleteVoice(id: id)
             return .accepted
@@ -509,6 +534,13 @@ public final class SayItBackendService: SayItService {
                 message: "Generate between 1 and 8 voices at a time."
             )
         }
+        if let candidateTunings = request.candidateTunings,
+           candidateTunings.count != request.candidateCount {
+            throw ServiceFailure(
+                code: "voice.invalid_candidate_count",
+                message: "Candidate refinements must match the voice count."
+            )
+        }
 
         discardVoiceStudio(removeCloneRecording: true)
         let session = VoiceStudioSnapshot(
@@ -556,8 +588,15 @@ public final class SayItBackendService: SayItService {
                 request.tuning,
                 model: model
             )
+            var candidateTunings: [VoiceTuning]?
+            if let provided = request.candidateTunings {
+                candidateTunings = try provided.map {
+                    try validatedTuning($0, model: model)
+                }
+            }
             for index in 0..<request.candidateCount {
                 try Task.checkCancellation()
+                let candidateTuning = candidateTunings?[index] ?? tuning
                 let id = UUID()
                 let seed = UInt64.random(in: UInt64.min...UInt64.max)
                 let generated = try await synthesizer.generateVoiceSample(
@@ -565,8 +604,8 @@ public final class SayItBackendService: SayItService {
                     text: request.sampleText,
                     language: request.language,
                     tuning: VoiceSynthesisTuning(
-                        preset: tuning.preset.rawValue,
-                        parameters: tuning.parameters
+                        preset: candidateTuning.preset.rawValue,
+                        parameters: candidateTuning.parameters
                     ),
                     seed: seed,
                     reference: nil
@@ -591,7 +630,8 @@ public final class SayItBackendService: SayItService {
                         / generated.sampleRate,
                     fingerprint: VoiceFingerprint.make(
                         samples: generated.samples
-                    )
+                    ),
+                    tuning: candidateTuning
                 )
                 candidates.append(candidate)
                 candidateIDs.append(id)
@@ -600,7 +640,7 @@ public final class SayItBackendService: SayItService {
                     modelID: model.id.rawValue,
                     language: request.language,
                     transcript: request.sampleText,
-                    tuning: tuning,
+                    tuning: candidateTuning,
                     generationSeed: seed,
                     audioURL: audioURL
                 )
@@ -813,7 +853,8 @@ public final class SayItBackendService: SayItService {
                         / generated.sampleRate,
                     fingerprint: VoiceFingerprint.make(
                         samples: generated.samples
-                    )
+                    ),
+                    tuning: tuning
                 )
                 candidates.append(candidate)
                 candidateIDs.append(id)
@@ -912,7 +953,8 @@ public final class SayItBackendService: SayItService {
     @discardableResult
     private func saveVoiceCandidate(
         id: UUID,
-        name: String
+        name: String,
+        tuning: VoiceTuning
     ) async throws -> VoiceProfileSnapshot {
         await waitForPendingModelTransitions()
         guard let draft = voiceDraftsByID[id] else {
@@ -921,11 +963,212 @@ public final class SayItBackendService: SayItService {
                 message: "That voice preview is no longer available."
             )
         }
-        let profile = try voiceProfiles.saveGenerated(draft, name: name)
+        guard let model = models.first(where: {
+            $0.id.rawValue == draft.modelID
+        }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested speech model was not found."
+            )
+        }
+        let validated = try validatedTuning(tuning, model: model)
+        let tunedDraft = VoiceDraftCandidate(
+            snapshot: draft.snapshot,
+            modelID: draft.modelID,
+            language: draft.language,
+            transcript: draft.transcript,
+            tuning: validated,
+            generationSeed: draft.generationSeed,
+            audioURL: draft.audioURL
+        )
+        let profile = try voiceProfiles.saveGenerated(tunedDraft, name: name)
         try await selectVoice(id: profile.id)
         voicesRevision &+= 1
         revision &+= 1
         return profile
+    }
+
+    private func regenerateVoiceCandidate(
+        id: UUID,
+        tuning: VoiceTuning
+    ) async throws -> VoiceStudioSnapshot {
+        await waitForPendingModelTransitions()
+        guard voiceStudioTask == nil else {
+            throw ServiceFailure(
+                code: "voice.studio_busy",
+                message: "Wait for voice creation to finish before re-rolling."
+            )
+        }
+        guard let session = voiceStudioSnapshot,
+              session.candidates.contains(where: { $0.id == id }),
+              let draft = voiceDraftsByID[id],
+              let model = models.first(where: {
+                  $0.id.rawValue == draft.modelID
+              }) else {
+            throw ServiceFailure(
+                code: "voice.preview_not_found",
+                message: "That voice preview is no longer available."
+            )
+        }
+        let validated = try validatedTuning(tuning, model: model)
+        let seed = UInt64.random(in: UInt64.min...UInt64.max)
+        let generated = try await synthesizer.generateVoiceSample(
+            model: model,
+            text: draft.transcript,
+            language: draft.language,
+            tuning: VoiceSynthesisTuning(
+                preset: validated.preset.rawValue,
+                parameters: validated.parameters
+            ),
+            seed: seed,
+            reference: nil
+        )
+        try await voiceAudioArchive.writeWAV(
+            samples: generated.samples,
+            sampleRate: generated.sampleRate,
+            destination: draft.audioURL
+        )
+        let updated = VoiceCandidateSnapshot(
+            id: draft.snapshot.id,
+            suggestedName: draft.snapshot.suggestedName,
+            duration: Double(generated.samples.count) / generated.sampleRate,
+            fingerprint: VoiceFingerprint.make(samples: generated.samples),
+            tuning: validated
+        )
+        voiceDraftsByID[id] = VoiceDraftCandidate(
+            snapshot: updated,
+            modelID: draft.modelID,
+            language: draft.language,
+            transcript: draft.transcript,
+            tuning: validated,
+            generationSeed: seed,
+            audioURL: draft.audioURL
+        )
+        let candidates = session.candidates.map {
+            $0.id == id ? updated : $0
+        }
+        let snapshot = VoiceStudioSnapshot(
+            id: session.id,
+            modelID: session.modelID,
+            state: session.state,
+            completedCount: session.completedCount,
+            totalCount: session.totalCount,
+            candidates: candidates
+        )
+        voiceStudioSnapshot = snapshot
+        revision &+= 1
+        return snapshot
+    }
+
+    private func updateVoiceTuning(
+        id: UUID,
+        tuning: VoiceTuning
+    ) throws -> VoiceProfileSnapshot {
+        let model = try modelForVoiceProfile(id: id)
+        let validated = try validatedTuning(tuning, model: model)
+        return try voiceProfiles.updateTuning(id: id, tuning: validated)
+    }
+
+    private func duplicateVoiceProfile(
+        id: UUID,
+        name: String,
+        tuning: VoiceTuning
+    ) throws -> VoiceProfileSnapshot {
+        let model = try modelForVoiceProfile(id: id)
+        let validated = try validatedTuning(tuning, model: model)
+        return try voiceProfiles.duplicate(
+            id: id,
+            name: name,
+            tuning: validated
+        )
+    }
+
+    private func modelForVoiceProfile(
+        id: UUID
+    ) throws -> ModelDescriptor {
+        guard let record = voiceProfiles.record(id: id) else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        guard let model = models.first(where: {
+            $0.id.rawValue == record.modelID
+        }) else {
+            throw ServiceFailure(
+                code: "model.not_found",
+                message: "The requested speech model was not found."
+            )
+        }
+        return model
+    }
+
+    private func previewVoiceProfile(
+        id: UUID,
+        tuning: VoiceTuning,
+        text: String
+    ) async throws -> ExportedFile {
+        await waitForPendingModelTransitions()
+        guard voiceStudioTask == nil else {
+            throw ServiceFailure(
+                code: "voice.studio_busy",
+                message: "Wait for voice creation to finish before previewing."
+            )
+        }
+        guard let record = voiceProfiles.record(id: id) else {
+            throw ServiceFailure(
+                code: "voice.not_found",
+                message: "The saved voice was not found."
+            )
+        }
+        let model = try modelForVoiceProfile(id: id)
+        guard installedModelIDs.contains(model.id) else {
+            throw ServiceFailure(
+                code: "model.not_installed",
+                message: "Install \(model.displayName) before previewing voices."
+            )
+        }
+        let sampleText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sampleText.isEmpty, sampleText.count <= 500 else {
+            throw ServiceFailure(
+                code: "voice.invalid_sample_text",
+                message: "Use a sample containing 1 to 500 characters."
+            )
+        }
+        let validated = try validatedTuning(tuning, model: model)
+        let referenceURL = try voiceProfiles.referenceURL(for: record)
+        let generated = try await synthesizer.generateVoiceSample(
+            model: model,
+            text: sampleText,
+            language: record.language,
+            tuning: VoiceSynthesisTuning(
+                preset: validated.preset.rawValue,
+                parameters: validated.parameters
+            ),
+            seed: UInt64.random(in: UInt64.min...UInt64.max),
+            reference: VoiceReference(
+                audioURL: referenceURL,
+                transcript: record.transcript
+            )
+        )
+        let temporary = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: temporary,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let audioURL = temporary.appending(path: "preview.wav")
+        try await voiceAudioArchive.writeWAV(
+            samples: generated.samples,
+            sampleRate: generated.sampleRate,
+            destination: audioURL
+        )
+        return ExportedFile(
+            filename: "\(id.uuidString).wav",
+            contentType: "audio/wav",
+            data: try Data(contentsOf: audioURL)
+        )
     }
 
     @discardableResult
@@ -1364,6 +1607,7 @@ public final class SayItBackendService: SayItService {
         playback.rate = validatedPlaybackRate(
             submission.playbackRate ?? settings.playbackRate
         )
+        playback.setPlaybackMode(request.model.playbackMode)
         playback.prepare(
             requestID: request.id,
             title: cleaned.title,
@@ -1427,7 +1671,7 @@ public final class SayItBackendService: SayItService {
         case .audio(let chunk):
             flushPendingSpokenChunk()
             try playback.enqueue(chunk)
-            spokenAudioCursor += Double(chunk.samples.count) / chunk.sampleRate
+            spokenAudioCursor = playback.generatedDuration
             if playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
@@ -1437,6 +1681,7 @@ public final class SayItBackendService: SayItService {
                 updateJob(request.id, state: .buffering, progress: 0.2)
             }
         case .metrics(let metrics):
+            playback.observeSynthesisMetrics(metrics)
             await diagnostics.record(
                 DiagnosticEvent(
                     severity: .info,
@@ -1533,7 +1778,7 @@ public final class SayItBackendService: SayItService {
         if forModelSwitch {
             await playback.stopForModelSwitch()
         } else {
-            playback.stop()
+            await playback.stopSmoothly()
         }
         if let request, request.source != .preview {
             try? history.markIncomplete(id: request.id, state: .canceled)
@@ -1695,7 +1940,9 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private func makeSnapshot() -> ServiceSnapshot {
+    private func makeSnapshot(
+        playbackContentAfter sequence: UInt64? = nil
+    ) -> ServiceSnapshot {
         if activeJobID == nil, playback.state == .playing {
             let tick = Int(playback.elapsed * 10)
             if tick != lastReplayProgressTick {
@@ -1711,6 +1958,21 @@ public final class SayItBackendService: SayItService {
             job.progress = playbackProgress
             activeJob = job
         }
+        let playbackContent = PlaybackContentState(
+            currentTitle: playback.currentTitle,
+            modelID: playback.currentModelID,
+            amplitudes: playback.amplitudes,
+            spokenText: playback.spokenText,
+            spokenChunks: playback.spokenChunks
+        )
+        if lastPlaybackContent != playbackContent {
+            lastPlaybackContent = playbackContent
+            revision &+= 1
+            playbackContentRevision = revision
+        }
+        let includesPlaybackContent = sequence.map {
+            playbackContentRevision > $0
+        } ?? true
         return ServiceSnapshot(
             serviceVersion: serviceVersion,
             revision: revision,
@@ -1725,11 +1987,22 @@ public final class SayItBackendService: SayItService {
                 generatedDuration: playback.generatedDuration,
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
-                currentTitle: playback.currentTitle,
-                modelID: playback.currentModelID,
-                amplitudes: playback.amplitudes,
-                spokenText: playback.spokenText,
-                spokenChunks: playback.spokenChunks
+                currentTitle: includesPlaybackContent
+                    ? playbackContent.currentTitle
+                    : "",
+                modelID: includesPlaybackContent
+                    ? playbackContent.modelID
+                    : nil,
+                amplitudes: includesPlaybackContent
+                    ? playbackContent.amplitudes
+                    : [],
+                spokenText: includesPlaybackContent
+                    ? playbackContent.spokenText
+                    : "",
+                spokenChunks: includesPlaybackContent
+                    ? playbackContent.spokenChunks
+                    : [],
+                includesContent: includesPlaybackContent
             ),
             download: downloadProgress?.serviceSnapshot,
             installedModelIDs: installedModelIDs

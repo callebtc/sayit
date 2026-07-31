@@ -1,7 +1,7 @@
 import Foundation
 
 enum VoiceFingerprint {
-    static func make(samples: [Float], barCount: Int = 28) -> [Float] {
+    static func make(samples: [Float], barCount: Int = 64) -> [Float] {
         guard !samples.isEmpty, barCount > 0 else { return [] }
         let windowSize = max(samples.count / barCount, 1)
         return (0..<barCount).map { index in

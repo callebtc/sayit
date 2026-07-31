@@ -17,8 +17,8 @@ struct AudioArchiveTests {
         )
     }
 
-    @Test("Generated speech is saved as audible AAC")
-    func generatedSpeechIsSavedAsAudibleAAC() async throws {
+    @Test("Generated speech is saved as a playable M4A")
+    func generatedSpeechIsSavedAsPlayableM4A() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(
@@ -65,5 +65,11 @@ struct AudioArchiveTests {
         #expect(result.byteCount > 0)
         #expect(abs(result.duration - 0.5) < 0.01)
         #expect(sqrt(meanSquare) > 0.01)
+        let header = try Data(contentsOf: url).prefix(12)
+        #expect(String(decoding: header[4..<8], as: UTF8.self) == "ftyp")
+        let names = try FileManager.default.contentsOfDirectory(
+            atPath: directory.path
+        )
+        #expect(!names.contains { $0.contains(".partial.") })
     }
 }

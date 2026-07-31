@@ -8,7 +8,5 @@
 	<array>
 		<string>group.sh.sayit.mac</string>
 	</array>
-	<key>sh.sayit.client</key>
-	<true/>
 </dict>
 </plist>

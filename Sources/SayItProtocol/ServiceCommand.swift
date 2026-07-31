@@ -24,10 +24,15 @@ public enum ServiceCommand: Codable, Sendable {
     case startVoiceClone(VoiceCloneRequest)
     case cancelVoiceStudio
     case voicePreview(UUID)
-    case saveVoiceCandidate(UUID, name: String)
+    case saveVoiceCandidate(UUID, name: String, tuning: VoiceTuning)
+    case regenerateVoiceCandidate(UUID, tuning: VoiceTuning)
     case saveVoiceClone(UUID, name: String)
     case selectVoice(UUID)
     case renameVoice(UUID, name: String)
+    case reorderVoices(modelID: String, orderedIDs: [UUID])
+    case updateVoiceTuning(UUID, VoiceTuning)
+    case duplicateVoiceProfile(UUID, name: String, tuning: VoiceTuning)
+    case previewVoiceProfile(UUID, tuning: VoiceTuning, text: String)
     case deleteVoice(UUID)
     case addCommunityModel(
         repository: String,

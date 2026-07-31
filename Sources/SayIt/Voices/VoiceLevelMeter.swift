@@ -15,7 +15,8 @@ struct VoiceLevelMeter: View {
                     .opacity(index < activeBars ? 1 : 0.25)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 34)
+        .frame(maxWidth: .infinity)
+        .frame(height: 34)
         .animation(.linear(duration: 0.08), value: activeBars)
         .animation(DesignTokens.quickAnimation, value: isTooLoud)
         .accessibilityElement(children: .ignore)

@@ -358,6 +358,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         }
 
         var chunks = try await chunks(for: request, model: loadedModel)
+        var conditioner = try PCMStreamConditioner(
+            sampleRate: Double(loadedModel.sampleRate)
+        )
         var chunkCursor = 0
         var completedChunkCount = 0
         var generatedSamples = 0
@@ -376,6 +379,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
             let start = ContinuousClock.now
             var chunkSamples = 0
+            let conditionerBeforeChunk = conditioner
             let usesReference = referenceAudio != nil
                 && request.voiceMode != .randomPerParagraph
             let voiceArgument = usesReference
@@ -403,34 +407,29 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     try Task.checkCancellation()
                     guard !samples.isEmpty else { return }
 
-                    if chunk.startsParagraph,
-                       generatedSamples > 0,
-                       chunkSamples == 0,
-                       paragraphPause > 0 {
-                        let silenceCount = Int(
-                            Double(loadedModel.sampleRate) * paragraphPause
-                        )
-                        let silence = AudioChunk(
-                            requestID: request.id,
-                            index: completedChunkCount,
-                            samples: Array(repeating: 0, count: silenceCount),
-                            sampleRate: Double(loadedModel.sampleRate),
-                            startsParagraph: true
-                        )
-                        continuation.yield(.audio(silence))
-                        generatedSamples += silenceCount
-                    }
+                    let pauseFrameCount = chunk.startsParagraph
+                        && generatedSamples > 0
+                        && chunkSamples == 0
+                        ? Int(Double(loadedModel.sampleRate) * paragraphPause)
+                        : 0
+                    let conditioned = try conditioner.append(
+                        samples,
+                        logicalChunkIndex: completedChunkCount,
+                        startsParagraph: chunk.startsParagraph,
+                        paragraphPauseFrameCount: pauseFrameCount
+                    )
+                    guard !conditioned.isEmpty else { return }
 
                     let audio = AudioChunk(
                         requestID: request.id,
                         index: completedChunkCount,
-                        samples: samples,
+                        samples: conditioned,
                         sampleRate: Double(loadedModel.sampleRate),
                         startsParagraph: chunk.startsParagraph
                     )
                     continuation.yield(.audio(audio))
-                    chunkSamples += samples.count
-                    generatedSamples += samples.count
+                    chunkSamples += conditioned.count
+                    generatedSamples += conditioned.count
                 }
 
                 if let omniVoice = loadedModel as? OmniVoiceModel,
@@ -475,11 +474,31 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                       replacements.count > 1 else {
                     throw error
                 }
+                conditioner = conditionerBeforeChunk
                 chunks.replaceSubrange(
                     chunkCursor...chunkCursor,
                     with: replacements
                 )
                 continue
+            }
+
+            if chunkCursor == chunks.count - 1 {
+                let tail = conditioner.finish()
+                if !tail.isEmpty {
+                    continuation.yield(
+                        .audio(
+                            AudioChunk(
+                                requestID: request.id,
+                                index: completedChunkCount,
+                                samples: tail,
+                                sampleRate: Double(loadedModel.sampleRate),
+                                startsParagraph: chunk.startsParagraph
+                            )
+                        )
+                    )
+                    chunkSamples += tail.count
+                    generatedSamples += tail.count
+                }
             }
 
             let duration = start.duration(to: .now)

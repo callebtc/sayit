@@ -4,6 +4,34 @@ import Testing
 
 struct ProtocolRoundTripTests {
     @Test
+    func selectionServiceMessagesRoundTripThroughJSON() throws {
+        let responses: [SelectionServiceResponse] = [
+            .authorizationStatus(isTrusted: true),
+            .selectedText("Selected text"),
+            .authorizationRequired,
+            .noSelection,
+            .selectionTooLong(maximumCharacters: 1_000_000),
+            .unavailable
+        ]
+
+        for response in responses {
+            let decoded = try SayItWireCodec.decode(
+                SelectionServiceResponse.self,
+                from: SayItWireCodec.encode(response)
+            )
+            #expect(decoded == response)
+        }
+
+        let request = SelectionServiceRequest.selectedText
+        let decodedRequest = try SayItWireCodec.decode(
+            SelectionServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        #expect(decodedRequest == request)
+        #expect(SayItProtocolVersion.current == 6)
+    }
+
+    @Test
     func serviceRequestRoundTripsThroughJSON() throws {
         let request = ServiceRequest(
             command: .submit(
@@ -219,6 +247,26 @@ struct ProtocolRoundTripTests {
         }
     }
 
+    @Test
+    func voiceReorderCommandRoundTripsThroughJSON() throws {
+        let orderedIDs = [UUID(), UUID(), UUID()]
+        let request = ServiceRequest(
+            command: .reorderVoices(modelID: "qwen3_tts", orderedIDs: orderedIDs)
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            ServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        guard case .reorderVoices(let modelID, let decodedIDs) = decoded.command
+        else {
+            Issue.record("Expected a reorder command")
+            return
+        }
+        #expect(modelID == "qwen3_tts")
+        #expect(decodedIDs == orderedIDs)
+    }
+
     private func voiceProfile(
         name: String,
         modelID: String
@@ -299,5 +347,30 @@ struct ProtocolRoundTripTests {
         #expect(decoded.httpServiceError == nil)
         #expect(decoded.voicesRevision == 0)
         #expect(decoded.voiceStudio == nil)
+    }
+
+    @Test
+    func playbackSnapshotContentMetadataIsBackwardCompatible() throws {
+        let snapshot = PlaybackSnapshot(
+            state: "playing",
+            elapsed: 2,
+            generatedDuration: 5,
+            estimatedDuration: 5,
+            spokenText: "Hello"
+        )
+        let encoded = try SayItWireCodec.encode(snapshot)
+        var legacyJSON = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacyJSON["includesContent"] = nil
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
+
+        let decoded = try SayItWireCodec.decode(
+            PlaybackSnapshot.self,
+            from: legacyData
+        )
+
+        #expect(decoded.includesContent)
+        #expect(decoded.spokenText == "Hello")
     }
 }

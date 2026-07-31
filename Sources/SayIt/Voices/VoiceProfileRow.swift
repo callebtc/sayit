@@ -8,12 +8,15 @@ struct VoiceProfileRow: View {
     let isModelInstalled: Bool
     let onSelect: () -> Void
     let onTest: () -> Void
+    let onCustomize: () -> Void
     let onRename: (String) -> Void
     let onDelete: () -> Void
+    let makeDragItem: () -> NSItemProvider
 
     @State private var name: String
     @State private var isRenaming = false
     @State private var isConfirmingDelete = false
+    @FocusState private var renameFocused: Bool
 
     init(
         profile: VoiceProfileSnapshot,
@@ -21,66 +24,82 @@ struct VoiceProfileRow: View {
         isModelInstalled: Bool,
         onSelect: @escaping () -> Void,
         onTest: @escaping () -> Void,
+        onCustomize: @escaping () -> Void,
         onRename: @escaping (String) -> Void,
-        onDelete: @escaping () -> Void
+        onDelete: @escaping () -> Void,
+        makeDragItem: @escaping () -> NSItemProvider
     ) {
         self.profile = profile
         self.isSelected = isSelected
         self.isModelInstalled = isModelInstalled
         self.onSelect = onSelect
         self.onTest = onTest
+        self.onCustomize = onCustomize
         self.onRename = onRename
         self.onDelete = onDelete
+        self.makeDragItem = makeDragItem
         _name = State(initialValue: profile.displayName)
     }
 
     var body: some View {
         HStack(spacing: DesignTokens.standardSpacing) {
-            rowContent
-                .contentShape(.rect)
-                .onTapGesture {
-                    guard canUse else { return }
-                    onSelect()
-                }
-                .onHover { hovering in
-                    guard canUse else { return }
-                    if hovering {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
+            if isRenaming {
+                rowContent
+                    .contentShape(.rect)
+                    .accessibilityLabel("Voice name")
+            } else {
+                rowContent
+                    .contentShape(.rect)
+                    .onDrag(makeDragItem) {
+                        Color.clear.frame(width: 1, height: 1)
                     }
-                }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityLabel("Use voice \(profile.displayName)")
-                .accessibilityHint(
-                    canUse
-                        ? "Selects this voice for speech"
-                        : isSelected
-                            ? "This voice is selected"
-                            : "Reinstall the model to use this voice"
-                )
-
-            if !isRenaming {
-                Menu("Voice actions", systemImage: "ellipsis.circle") {
-                    Button(
-                        "Test Voice",
-                        systemImage: "speaker.wave.2",
-                        action: onTest
+                    .onTapGesture {
+                        guard canUse else { return }
+                        onSelect()
+                    }
+                    .onHover { hovering in
+                        guard canUse else { return }
+                        if hovering {
+                            NSCursor.pointingHand.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Use voice \(profile.displayName)")
+                    .accessibilityHint(
+                        canUse
+                            ? "Selects this voice for speech"
+                            : isSelected
+                                ? "This voice is selected"
+                                : "Reinstall the model to use this voice"
                     )
-                    .disabled(!isModelInstalled)
-                    Button("Rename", action: beginRename)
-                    Button(
-                        "Delete",
-                        systemImage: "trash",
-                        role: .destructive,
-                        action: confirmDelete
-                    )
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .labelStyle(.iconOnly)
             }
+
+            Menu("Voice actions", systemImage: "ellipsis") {
+                Button(
+                    "Test Voice",
+                    systemImage: "speaker.wave.2",
+                    action: onTest
+                )
+                .disabled(!isModelInstalled)
+                Button(
+                    "Customize…",
+                    systemImage: "slider.horizontal.3",
+                    action: onCustomize
+                )
+                Button("Rename", action: beginRename)
+                Button(
+                    "Delete",
+                    systemImage: "trash",
+                    role: .destructive,
+                    action: confirmDelete
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .labelStyle(.iconOnly)
         }
         .padding(.vertical, 2)
         .animation(DesignTokens.smoothAnimation, value: isRenaming)
@@ -111,30 +130,35 @@ struct VoiceProfileRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 if isRenaming {
-                    HStack(spacing: DesignTokens.compactSpacing) {
-                        TextField("Voice name", text: $name)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(minWidth: 140)
-                            .onSubmit(saveRename)
-                        Button("Save", action: saveRename)
-                            .controlSize(.small)
-                        Button("Cancel", action: cancelRename)
-                            .controlSize(.small)
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
-                    }
+                    TextField("Voice name", text: $name)
+                        .textFieldStyle(.plain)
+                        .font(.body.weight(isSelected ? .semibold : .regular))
+                        .focused($renameFocused)
+                        .onSubmit(saveRename)
+                        .onExitCommand(perform: cancelRename)
+                        .onChange(of: renameFocused) { _, focused in
+                            if !focused {
+                                saveRename()
+                            }
+                        }
+                        .onAppear {
+                            renameFocused = true
+                        }
                 } else {
                     Text(profile.displayName)
                         .font(.body.weight(isSelected ? .semibold : .regular))
-                    SayItBadge(
-                        title: profile.origin == .generated
-                            ? "Discovered"
-                            : "Cloned",
-                        tint: profile.origin == .generated
-                            ? .accentColor
-                            : .indigo
-                    )
+                        .onTapGesture(count: 2) {
+                            beginRename()
+                        }
                 }
+                SayItBadge(
+                    title: profile.origin == .generated
+                        ? "Discovered"
+                        : "Cloned",
+                    tint: profile.origin == .generated
+                        ? .accentColor
+                        : .indigo
+                )
             }
 
             Spacer()
@@ -151,8 +175,13 @@ struct VoiceProfileRow: View {
     }
 
     private func saveRename() {
-        onRename(name)
+        guard isRenaming else { return }
         isRenaming = false
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, trimmed != profile.displayName {
+            onRename(name)
+        }
+        name = profile.displayName
     }
 
     private func cancelRename() {

@@ -156,7 +156,7 @@ struct VoiceProfileStoreTests {
         )
 
         #expect(
-            store.snapshots.map(\.id) == [third.id, second.id, first.id]
+            store.snapshots.map(\.id) == [second.id, third.id, first.id]
         )
         #expect(
             Set(store.records(modelID: "model-a").map(\.id))
@@ -191,6 +191,165 @@ struct VoiceProfileStoreTests {
         }
         #expect(throws: ServiceFailure.self) {
             _ = try store.rename(id: UUID(), name: "Missing")
+        }
+    }
+
+    @Test("Reordering persists and rejects mismatched voice lists")
+    @MainActor
+    func profileReordering() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let first = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let second = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Silver Lark"
+        )
+        let third = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Velvet Finch"
+        )
+        let other = try store.saveGenerated(
+            makeDraft(directories: directories, modelID: "other-model"),
+            name: "Cobalt Wren"
+        )
+
+        try store.reorder(
+            modelID: "omnivoice",
+            orderedIDs: [third.id, first.id, second.id]
+        )
+        #expect(
+            store.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+        #expect(store.record(id: first.id)?.sortOrder == 1)
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        #expect(
+            reloaded.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(modelID: "omnivoice", orderedIDs: [first.id])
+        }
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(
+                modelID: "omnivoice",
+                orderedIDs: [first.id, second.id, other.id]
+            )
+        }
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(modelID: "../escape", orderedIDs: [])
+        }
+        #expect(
+            store.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+    }
+
+    @Test("Profiles saved before sort order existed decode with defaults")
+    @MainActor
+    func legacyProfilesDecodeWithoutSortOrder() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let saved = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let metadata = directories.voiceProfiles
+            .appending(path: "omnivoice")
+            .appending(path: saved.id.uuidString)
+            .appending(path: "profile.json")
+        var json = try #require(
+            JSONSerialization.jsonObject(
+                with: Data(contentsOf: metadata)
+            ) as? [String: Any]
+        )
+        json["sortOrder"] = nil
+        try JSONSerialization.data(withJSONObject: json)
+            .write(to: metadata)
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        let record = try #require(reloaded.record(id: saved.id))
+        #expect(record.sortOrder == 0)
+        #expect(reloaded.snapshots.map(\.id) == [saved.id])
+    }
+
+    @Test("Tuning updates persist and duplicated profiles stay independent")
+    @MainActor
+    func tuningUpdateAndDuplication() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let saved = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let tuning = VoiceTuning(
+            preset: .expressive,
+            parameters: ["temperature": 0.85]
+        )
+
+        let updated = try store.updateTuning(id: saved.id, tuning: tuning)
+        #expect(updated.tuning == tuning)
+        #expect(updated.updatedAt >= saved.updatedAt)
+
+        let copyTuning = VoiceTuning(
+            preset: .faithful,
+            parameters: ["temperature": 0.45]
+        )
+        let copy = try store.duplicate(
+            id: saved.id,
+            name: "Amber Copy",
+            tuning: copyTuning
+        )
+        #expect(copy.id != saved.id)
+        #expect(copy.tuning == copyTuning)
+        let originalRecord = try #require(store.record(id: saved.id))
+        let copyRecord = try #require(store.record(id: copy.id))
+        let originalReference = try store.referenceURL(for: originalRecord)
+        let copyReference = try store.referenceURL(for: copyRecord)
+        #expect(originalReference != copyReference)
+        #expect(
+            FileManager.default.fileExists(atPath: copyReference.path)
+        )
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        #expect(reloaded.record(id: saved.id)?.tuning == tuning)
+        #expect(reloaded.record(id: copy.id)?.displayName == "Amber Copy")
+
+        try store.delete(id: copy.id)
+        #expect(store.record(id: saved.id) != nil)
+        #expect(
+            FileManager.default.fileExists(atPath: originalReference.path)
+        )
+
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.updateTuning(id: UUID(), tuning: tuning)
+        }
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.duplicate(
+                id: saved.id,
+                name: "amber brook",
+                tuning: tuning
+            )
+        }
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.updateTuning(
+                id: saved.id,
+                tuning: VoiceTuning(parameters: ["temperature": .nan])
+            )
         }
     }
 

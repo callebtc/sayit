@@ -30,15 +30,27 @@ packages:
 settings:
   base:
     ARCHS: arm64
+    CODE_SIGN_STYLE: Automatic
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
+    CURRENT_PROJECT_VERSION: 3
     DEAD_CODE_STRIPPING: true
+    DEVELOPMENT_TEAM: D7AHD3GLH6
     ENABLE_APP_SANDBOX: true
     ENABLE_HARDENED_RUNTIME: true
     MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "0.1.0"
     OTHER_SWIFT_FLAGS: "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)"
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: true
     SWIFT_VERSION: "6.0"
+  configs:
+    Release:
+      COPY_PHASE_STRIP: true
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      DEPLOYMENT_POSTPROCESSING: true
+      STRIP_INSTALLED_PRODUCT: true
+      STRIP_STYLE: non-global
+      SWIFT_SERIALIZE_DEBUGGING_OPTIONS: false
 
 targets:
   SayItProtocol:
@@ -98,6 +110,7 @@ targets:
       - path: Sources/SayItXPC
     dependencies:
       - target: SayItProtocol
+      - sdk: Security.framework
     settings:
       base:
         DEFINES_MODULE: true
@@ -131,7 +144,7 @@ targets:
         SKIP_INSTALL: true
 
   SayItAgent:
-    type: tool
+    type: application
     platform: macOS
     sources:
       - path: Sources/SayItAgent
@@ -151,14 +164,41 @@ targets:
       - target: SayItXPC
     settings:
       base:
+        CODE_SIGN_IDENTITY: "$(SAYIT_SIGN_IDENTITY)"
+        CODE_SIGN_STYLE: Manual
         CODE_SIGN_ENTITLEMENTS: Config/SayItAgent.entitlements
+        EXECUTABLE_NAME: SayItAgent
         GENERATE_INFOPLIST_FILE: true
-        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../Frameworks"
+        INFOPLIST_KEY_CFBundleDisplayName: Say It Background Service
+        INFOPLIST_KEY_LSBackgroundOnly: true
+        INFOPLIST_KEY_LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../../../../Frameworks"
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.agent
         PRODUCT_NAME: SayItAgent
+        PROVISIONING_PROFILE_SPECIFIER: Say It Agent Developer ID
+        SKIP_INSTALL: true
+
+  SayItSelectionAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/SayItSelectionAgent
+    dependencies:
+      - target: SayItProtocol
+      - target: SayItXPC
+      - sdk: ApplicationServices.framework
+      - sdk: AppKit.framework
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: false
+        ENABLE_APP_SANDBOX: false
+        GENERATE_INFOPLIST_FILE: true
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../Frameworks"
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.selection
+        PRODUCT_NAME: SayItSelectionAgent
 
   SayItCLI:
-    type: tool
+    type: application
     platform: macOS
     sources:
       - path: Sources/SayItCLI
@@ -168,7 +208,6 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
           - group.sh.sayit.mac
-        sh.sayit.client: true
     dependencies:
       - target: SayItProtocol
       - target: SayItXPC
@@ -176,16 +215,19 @@ targets:
         product: ArgumentParser
     settings:
       base:
+        CODE_SIGN_IDENTITY: "$(SAYIT_SIGN_IDENTITY)"
+        CODE_SIGN_STYLE: Manual
         CODE_SIGN_ENTITLEMENTS: Config/SayItCLI.entitlements
-        CONFIGURATION_BUILD_DIR: "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/SayItCLIProducts"
-        FRAMEWORKS_FOLDER_PATH: SayItCLIFrameworks
-        FRAMEWORK_SEARCH_PATHS: "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/PackageFrameworks"
+        EXECUTABLE_NAME: sayit
         GENERATE_INFOPLIST_FILE: true
-        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
-        LIBRARY_SEARCH_PATHS: "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"
+        INFOPLIST_KEY_CFBundleDisplayName: Say It CLI
+        INFOPLIST_KEY_LSBackgroundOnly: true
+        INFOPLIST_KEY_LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../../../Frameworks"
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.cli
-        PRODUCT_NAME: sayit
-        SWIFT_INCLUDE_PATHS: "$(inherited) $(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"
+        PRODUCT_NAME: SayItCLI
+        PROVISIONING_PROFILE_SPECIFIER: Say It CLI Developer ID
+        SKIP_INSTALL: true
 
   SayIt:
     type: application
@@ -200,11 +242,12 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: Say It
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSUIElement: true
         NSMicrophoneUsageDescription: Say It uses the microphone only when you choose to record a local voice reference.
+        SayItUpdateAPIURL: "$(SAYIT_UPDATE_API_URL)"
         NSServices:
           - NSMenuItem:
               default: Say It
@@ -230,7 +273,6 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.device.audio-input: true
         com.apple.security.network.client: true
-        sh.sayit.client: true
     dependencies:
       - target: SayItBackend
         embed: true
@@ -245,6 +287,9 @@ targets:
       - target: SayItAgent
         link: false
         embed: false
+      - target: SayItSelectionAgent
+        link: false
+        embed: false
       - target: SayItCLI
         link: false
         embed: false
@@ -256,12 +301,15 @@ targets:
         product: ArgumentParser
     settings:
       base:
+        CODE_SIGN_IDENTITY: "$(SAYIT_SIGN_IDENTITY)"
+        CODE_SIGN_STYLE: Manual
         CODE_SIGN_ENTITLEMENTS: Config/SayIt.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         EXECUTABLE_NAME: SayIt
         INFOPLIST_FILE: Config/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac
         PRODUCT_NAME: SayIt
+        PROVISIONING_PROFILE_SPECIFIER: Say It Developer ID
     postBuildScripts:
       - name: Embed Background Service and CLI
         basedOnDependencyAnalysis: false
@@ -270,14 +318,81 @@ targets:
           service_dir="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
           agent_dir="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents"
           cli_dir="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers"
-          platform_suffix="${EFFECTIVE_PLATFORM_NAME:-}"
-          cli_products="${BUILD_DIR}/${CONFIGURATION}${platform_suffix}/SayItCLIProducts"
+          timestamp_option=
+          if [[ "${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}" == "YES" ]]; then
+            timestamp_option=--timestamp=none
+          fi
           mkdir -p "${service_dir}" "${agent_dir}" "${cli_dir}"
-          rm -f "${agent_dir}/com.sayit.mac.agent.plist"
-          ditto "${BUILT_PRODUCTS_DIR}/SayItAgent" "${service_dir}/SayItAgent"
+          rm -f \
+            "${service_dir}/SayItAgent" \
+            "${cli_dir}/sayit" \
+            "${agent_dir}/com.sayit.mac.agent.plist" \
+            "${agent_dir}/com.sayit.mac.selection.plist"
+          rm -rf \
+            "${service_dir}/SayItAgent.app" \
+            "${cli_dir}/SayItCLI.app"
+          ditto "${BUILT_PRODUCTS_DIR}/SayItAgent.app" "${service_dir}/SayItAgent.app"
+          ditto "${BUILT_PRODUCTS_DIR}/SayItSelectionAgent" "${service_dir}/SayItSelectionAgent"
+          if [[ -n "${SAYIT_SELECTION_SIGN_IDENTITY:-}" ]]; then
+            /usr/bin/codesign \
+              --force \
+              --sign "${SAYIT_SELECTION_SIGN_IDENTITY}" \
+              ${timestamp_option} \
+              --options runtime \
+              --identifier sh.sayit.mac.selection \
+              "${service_dir}/SayItSelectionAgent"
+          fi
           ditto "${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle" "${service_dir}/mlx-swift_Cmlx.bundle"
-          ditto "${cli_products}/sayit" "${cli_dir}/sayit"
+          ditto "${BUILT_PRODUCTS_DIR}/SayItCLI.app" "${cli_dir}/SayItCLI.app"
+          ln -s "SayItCLI.app/Contents/MacOS/sayit" "${cli_dir}/sayit"
           ditto "${SRCROOT}/Config/sh.sayit.mac.agent.plist" "${agent_dir}/sh.sayit.mac.agent.plist"
+          ditto "${SRCROOT}/Config/sh.sayit.mac.selection.plist" "${agent_dir}/sh.sayit.mac.selection.plist"
+
+          # Compiled Swift module metadata is only needed by developers linking
+          # against a framework. Removing it from the distributed app also
+          # prevents local source and package-cache paths from leaking.
+          app_dir="${TARGET_BUILD_DIR}/${WRAPPER_NAME}"
+          find "${app_dir}" \
+            -type d \
+            -name '*.swiftmodule' \
+            -prune \
+            -exec rm -rf {} +
+
+          # Embedded code is signed before this post-build phase. If this is a
+          # certificate-signed build, restore those nested signatures after
+          # removing their development metadata; Xcode signs the outer app last.
+          if [[ "${CODE_SIGNING_ALLOWED:-NO}" == "YES" \
+              && -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]]; then
+            find "${app_dir}" \
+              -type f \
+              -name '*.dylib' \
+              -exec /usr/bin/codesign \
+                --force \
+                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
+                ${timestamp_option} \
+                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
+                {} \;
+
+            find "${app_dir}" \
+              -type d \
+              -name '*.framework' \
+              -exec /usr/bin/codesign \
+                --force \
+                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
+                ${timestamp_option} \
+                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
+                {} \;
+
+            find "${app_dir}/Contents" \
+              -type d \
+              -name '*.app' \
+              -exec /usr/bin/codesign \
+                --force \
+                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
+                ${timestamp_option} \
+                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
+                {} \;
+          fi
 
   SayItCoreTests:
     type: bundle.unit-test
@@ -337,6 +452,17 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.http-tests
 
+  SayItUpdateTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItUpdateTests
+      - path: Sources/SayIt/Updates
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.update-tests
+
   SayItUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -359,6 +485,7 @@ schemes:
         SayItProtocolTests: [test]
         SayItBackendTests: [test]
         SayItHTTPTests: [test]
+        SayItUpdateTests: [test]
     run:
       config: Debug
     test:
@@ -368,6 +495,16 @@ schemes:
         - SayItProtocolTests
         - SayItBackendTests
         - SayItHTTPTests
+        - SayItUpdateTests
         - SayItUITests
     archive:
       config: Release
+
+  SayItUpdateTests:
+    build:
+      targets:
+        SayItUpdateTests: [test]
+    test:
+      config: Debug
+      targets:
+        - SayItUpdateTests

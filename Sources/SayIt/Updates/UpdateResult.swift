@@ -1,7 +1,8 @@
 import Foundation
 
-enum UpdateResult: Sendable {
+enum UpdateResult: Equatable, Sendable {
     case unconfigured
+    case noPublishedRelease
     case current
     case available(version: String, url: URL)
 }

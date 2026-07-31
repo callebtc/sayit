@@ -19,7 +19,6 @@ struct PrivacyOnboardingView: View {
                 )
             }
             .labelStyle(.onboardingFeature)
-            .padding(.top, DesignTokens.compactSpacing)
         }
     }
 }

@@ -39,6 +39,8 @@ struct DownloadStatusView: View {
                 Text(message)
                     .font(.callout)
                     .foregroundStyle(.red)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
