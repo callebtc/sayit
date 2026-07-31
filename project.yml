@@ -247,6 +247,7 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSUIElement: true
         NSMicrophoneUsageDescription: Say It uses the microphone only when you choose to record a local voice reference.
+        SayItUpdateAPIURL: "$(SAYIT_UPDATE_API_URL)"
         NSServices:
           - NSMenuItem:
               default: Say It
@@ -451,6 +452,17 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.http-tests
 
+  SayItUpdateTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItUpdateTests
+      - path: Sources/SayIt/Updates
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.update-tests
+
   SayItUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -473,6 +485,7 @@ schemes:
         SayItProtocolTests: [test]
         SayItBackendTests: [test]
         SayItHTTPTests: [test]
+        SayItUpdateTests: [test]
     run:
       config: Debug
     test:
@@ -482,6 +495,16 @@ schemes:
         - SayItProtocolTests
         - SayItBackendTests
         - SayItHTTPTests
+        - SayItUpdateTests
         - SayItUITests
     archive:
       config: Release
+
+  SayItUpdateTests:
+    build:
+      targets:
+        SayItUpdateTests: [test]
+    test:
+      config: Debug
+      targets:
+        - SayItUpdateTests

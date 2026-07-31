@@ -22,6 +22,7 @@ uploads only to Apple's notarization service; it never publishes to GitHub.
 One-time configuration may be stored in .env.release:
   SAYIT_SIGN_IDENTITY='Developer ID Application identity or SHA-1 fingerprint'
   SAYIT_NOTARY_PROFILE='notarytool Keychain profile name'
+  SAYIT_UPDATE_API_URL='GitHub latest-release API URL'
 EOF
 }
 
@@ -86,6 +87,7 @@ fi
 
 : "${SAYIT_SIGN_IDENTITY:?Set SAYIT_SIGN_IDENTITY in .env.release or the environment.}"
 : "${SAYIT_NOTARY_PROFILE:?Set SAYIT_NOTARY_PROFILE in .env.release or the environment.}"
+: "${SAYIT_UPDATE_API_URL:?Set SAYIT_UPDATE_API_URL in .env.release or the environment.}"
 
 if [ "$allow_notarization_upload" != "YES" ]; then
     echo "Apple notarization upload was not explicitly approved." >&2
@@ -126,6 +128,7 @@ fi
 echo "Building the signed release app…"
 SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
 SAYIT_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
+SAYIT_UPDATE_API_URL="$SAYIT_UPDATE_API_URL" \
     "$project_root/Scripts/build-app.sh"
 
 version=$(

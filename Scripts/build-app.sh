@@ -10,6 +10,7 @@ swiftpm_cache="$build_root/SwiftPMCache"
 app_root="$derived_data/Build/Products/Release/SayIt.app"
 sign_identity="${SAYIT_SIGN_IDENTITY:--}"
 disable_secure_timestamp="${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}"
+update_api_url="${SAYIT_UPDATE_API_URL:-}"
 build_jobs="${SAYIT_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}"
 clang_path_map="-ffile-prefix-map=$project_root=."
 swift_path_map="-file-prefix-map $project_root=."
@@ -56,6 +57,7 @@ build() {
         OTHER_CFLAGS="\$(inherited) $clang_path_map" \
         OTHER_CPLUSPLUSFLAGS="\$(inherited) $clang_path_map" \
         OTHER_SWIFT_FLAGS="\$(inherited) $swift_path_map" \
+        SAYIT_UPDATE_API_URL="$update_api_url" \
         "$@" \
         build
 }

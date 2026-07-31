@@ -53,8 +53,9 @@ final class AppState {
     private(set) var httpAPIErrorMessage: String?
     private(set) var apiTokenErrorMessage: String?
     private(set) var oneTimeTokenSecret: String?
-    private(set) var updateStatus = "Up to date"
+    private(set) var updateStatus = "Not checked yet"
     private(set) var availableUpdateURL: URL?
+    private(set) var isCheckingForUpdates = false
     private(set) var clipboardHasNewText = false
     @ObservationIgnored
     private var lastReadChangeCount = NSPasteboard.general.changeCount
@@ -783,8 +784,14 @@ final class AppState {
     }
 
     func checkForUpdates() {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
         updateStatus = "Checking…"
+        availableUpdateURL = nil
         Task {
+            defer {
+                isCheckingForUpdates = false
+            }
             do {
                 let result = try await updateChecker.check(
                     currentVersion: applicationVersion
@@ -794,6 +801,9 @@ final class AppState {
                 case .unconfigured:
                     updateStatus = "Update feed not configured"
                     availableUpdateURL = nil
+                case .noPublishedRelease:
+                    updateStatus = "No published releases yet"
+                    availableUpdateURL = nil
                 case .current:
                     updateStatus = "Up to date"
                     availableUpdateURL = nil
@@ -802,14 +812,14 @@ final class AppState {
                     availableUpdateURL = url
                 }
             } catch {
-                updateStatus = "Couldn’t check for updates"
+                updateStatus = if let error = error as? LocalizedError {
+                    error.errorDescription ?? "Couldn’t check for updates"
+                } else {
+                    "Couldn’t check for updates"
+                }
+                availableUpdateURL = nil
             }
         }
-    }
-
-    func openAvailableUpdate() {
-        guard let availableUpdateURL else { return }
-        NSWorkspace.shared.open(availableUpdateURL)
     }
 
     var applicationDisplayVersion: String {

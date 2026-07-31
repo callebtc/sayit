@@ -58,5 +58,7 @@
 			<string>public.text</string>
 		</dict>
 	</array>
+	<key>SayItUpdateAPIURL</key>
+	<string>$(SAYIT_UPDATE_API_URL)</string>
 </dict>
 </plist>

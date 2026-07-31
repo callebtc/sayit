@@ -122,9 +122,12 @@ contents.
 
 One time only:
 
-1. Copy `.env.release.example` to `.env.release` and set the Developer ID
-   Application identity. A certificate SHA-1 fingerprint avoids ambiguity when
-   Keychain contains multiple certificates with the same display name.
+1. Copy `.env.release.example` to `.env.release`, set the Developer ID
+   Application identity, and set the GitHub latest-release API URL. A
+   certificate SHA-1 fingerprint avoids ambiguity when Keychain contains
+   multiple certificates with the same display name. The update URL is
+   injected only into built app bundles and is not stored in tracked project
+   configuration.
 2. Store App Store Connect notarization credentials in Keychain:
 
    ```sh
