@@ -104,25 +104,43 @@ Status: complete
 
 ### M5 — Route, archive, and regression hardening
 
-Status: complete with one packaging-environment limitation
+Status: complete
 
 - [x] Coalesce audio-configuration notifications.
 - [x] Resume from a stable render-frame anchor with bounded retry/backoff.
-- [x] Replace the failing direct AAC writer with a deterministic staged
-      16-bit PCM MPEG-4 path that does not depend on an optional system encoder.
+- [x] Replace the failing direct AAC writer with a deterministic 16-bit PCM
+      MPEG-4 path that does not depend on an optional system encoder.
 - [x] Add route-change policy and archive format/cleanup tests.
 - [x] Run all Swift tests and repository validation scripts.
 - [x] Compile the complete Swift package in Release configuration.
 - [x] Regenerate the Xcode project successfully.
-- [ ] Package the Release app. The build script could not download its separate
-      Xcode package cache because network escalation was unavailable. This is an
-      environment limitation; compilation and tests use the same pinned package
-      graph and passed offline.
+- [x] Package and ad-hoc sign the Release app after its separate Xcode package
+      cache became available.
 - [x] Update this document with final results and commit IDs.
+
+### M6 — Complexity and storage cleanup
+
+Status: complete
+
+- [x] Remove the obsolete scalar volume-ramp API and tests after sample-level
+      transition ramps became the only production implementation.
+- [x] Remove the unused playback-content revision from the wire format while
+      retaining backward-compatible content-inclusion decoding.
+- [x] Move transcript timing and binary-search behavior out of the SwiftUI view
+      into one tested timeline implementation.
+- [x] Stream both in-memory and disk-backed PCM directly into the temporary MP4
+      archive instead of writing and rereading an intermediate WAV.
+- [x] Remove 244 net lines without removing reliability behavior.
+- [x] Run focused tests, the full package suite, catalog validation, project
+      generation, and the signed Release app build.
 
 ## Final validation
 
-- Full Swift test suite: 190 tests in 43 suites passed.
+- Full post-cleanup Swift test suite: 185 tests in 42 suites passed. The lower
+  count reflects deletion of tests for removed test-only APIs; retained behavior
+  remains covered by the PCM transition and lyrics timeline suites.
+- Focused cleanup suites: 30 protocol, playback, DSP, and lyrics tests passed;
+  12 archive and disk-storage tests passed.
 - Focused final route/archive/storage suite: 32 tests passed, followed by 15
   archive and recovery tests after final naming and container assertions.
 - Model catalog, property list, and entitlements: valid.
@@ -130,14 +148,15 @@ Status: complete with one packaging-environment limitation
   new source and test files.
 - Offline Release compilation: succeeded for all package products, including
   the app and agent executables.
-- Release app packaging: not run to completion because Xcode attempted to
-  create a separate package cache from the network and the approval service was
-  unavailable. No code, test, catalog, or Release compiler failure remains.
+- Release app packaging and ad-hoc signing: succeeded; deep code-signature
+  verification passed.
 
 The M4A archive is now an audio-only MPEG-4 container with 16-bit PCM. This is
 larger than AAC but is deterministic, reopens successfully through
 `AVAudioFile`, preserves the conditioned samples without codec artifacts, and
-works on systems where the optional AAC encoder is unavailable.
+works on systems where the optional AAC encoder is unavailable. Conditioned PCM
+is streamed directly into its temporary MP4 container, eliminating the full
+intermediate WAV and its additional read/write pass.
 
 ## Validation matrix
 
@@ -162,4 +181,5 @@ works on systems where the optional AAC encoder is unavailable.
 | M2 | `9432358` | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
 | M3 | `fa39a20` | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
 | M4 | `ea02de4` | 47 transport, protocol, HTTP, service, and transcript tests passed | complete |
-| M5 | `f72ee5a` | 190 full-suite tests; catalog, project generation, and offline Release compilation passed | complete with packaging limitation |
+| M5 | `f72ee5a` | 190 full-suite tests; catalog, project generation, offline Release compilation, and subsequent app packaging passed | complete |
+| M6 | `0eb3c8e`, `14776bc` | Net 244 lines removed; 185 full-suite tests, focused cleanup suites, catalog validation, project generation, and signed Release app build passed | complete |
