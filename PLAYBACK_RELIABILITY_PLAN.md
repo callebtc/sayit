@@ -162,4 +162,4 @@ works on systems where the optional AAC encoder is unavailable.
 | M2 | `9432358` | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
 | M3 | `fa39a20` | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
 | M4 | `ea02de4` | 47 transport, protocol, HTTP, service, and transcript tests passed | complete |
-| M5 | milestone commit | 190 full-suite tests; catalog, project generation, and offline Release compilation passed | complete with packaging limitation |
+| M5 | `f72ee5a` | 190 full-suite tests; catalog, project generation, and offline Release compilation passed | complete with packaging limitation |
