@@ -340,7 +340,11 @@ struct BackendServiceCommandTests {
             ),
             (ServiceCommand.voicePreview(UUID()), "voice.preview_not_found"),
             (
-                ServiceCommand.saveVoiceCandidate(UUID(), name: "Name"),
+                ServiceCommand.saveVoiceCandidate(
+                    UUID(),
+                    name: "Name",
+                    tuning: VoiceTuning()
+                ),
                 "voice.preview_not_found"
             ),
             (
@@ -350,6 +354,26 @@ struct BackendServiceCommandTests {
             (ServiceCommand.selectVoice(UUID()), "voice.not_found"),
             (
                 ServiceCommand.renameVoice(UUID(), name: "Name"),
+                "voice.not_found"
+            ),
+            (
+                ServiceCommand.updateVoiceTuning(UUID(), VoiceTuning()),
+                "voice.not_found"
+            ),
+            (
+                ServiceCommand.duplicateVoiceProfile(
+                    UUID(),
+                    name: "Name",
+                    tuning: VoiceTuning()
+                ),
+                "voice.not_found"
+            ),
+            (
+                ServiceCommand.previewVoiceProfile(
+                    UUID(),
+                    tuning: VoiceTuning(),
+                    text: "Preview"
+                ),
                 "voice.not_found"
             ),
             (ServiceCommand.deleteVoice(UUID()), "voice.not_found"),
@@ -848,6 +872,18 @@ struct BackendServiceCommandTests {
                     )
                 ),
                 "voice.recording_not_found"
+            ),
+            (
+                ServiceCommand.startVoiceDiscovery(
+                    VoiceDiscoveryRequest(
+                        modelID: fixture.seedModelID,
+                        language: "en",
+                        sampleText: "Sample",
+                        candidateCount: 2,
+                        candidateTunings: [VoiceTuning()]
+                    )
+                ),
+                "voice.invalid_candidate_count"
             )
         ] {
             #expect(
@@ -888,17 +924,176 @@ struct BackendServiceCommandTests {
         )
         #expect(discoveryPreview.contentType == "audio/wav")
         #expect(!discoveryPreview.data.isEmpty)
+
+        let retuning = VoiceTuning(
+            preset: .expressive,
+            parameters: VoiceTuningSpace.defaults(
+                modelType: "qwen3_tts",
+                preset: .expressive
+            )
+        )
+        let rerolledStudio = try voiceStudio(
+            await fixture.service.handle(
+                .init(
+                    command: .regenerateVoiceCandidate(
+                        discoveredCandidate.id,
+                        tuning: retuning
+                    )
+                )
+            )
+        )
+        let rerolledCandidate = try #require(
+            rerolledStudio.candidates.first {
+                $0.id == discoveredCandidate.id
+            }
+        )
+        #expect(rerolledCandidate.tuning == retuning)
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(
+                        command: .regenerateVoiceCandidate(
+                            discoveredCandidate.id,
+                            tuning: VoiceTuning(
+                                parameters: ["temperature": 99]
+                            )
+                        )
+                    )
+                )
+            ).code == "voice.invalid_tuning"
+        )
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(
+                        command: .regenerateVoiceCandidate(
+                            UUID(),
+                            tuning: retuning
+                        )
+                    )
+                )
+            ).code == "voice.preview_not_found"
+        )
         #expect(
             isAccepted(
                 await fixture.service.handle(
                     .init(
                         command: .saveVoiceCandidate(
                             discoveredCandidate.id,
-                            name: "Copper Finch"
+                            name: "Copper Finch",
+                            tuning: rerolledCandidate.tuning
                         )
                     )
                 )
             )
+        )
+
+        let savedProfile = try #require(
+            try voices(
+                await fixture.service.handle(
+                    .init(command: .voices(modelID: fixture.seedModelID))
+                )
+            ).first { $0.displayName == "Copper Finch" }
+        )
+        #expect(savedProfile.tuning == retuning)
+        let profilePreview = try exportedFile(
+            await fixture.service.handle(
+                .init(
+                    command: .previewVoiceProfile(
+                        savedProfile.id,
+                        tuning: retuning,
+                        text: "A quick preview of this voice."
+                    )
+                )
+            )
+        )
+        #expect(profilePreview.contentType == "audio/wav")
+        #expect(!profilePreview.data.isEmpty)
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(
+                        command: .previewVoiceProfile(
+                            savedProfile.id,
+                            tuning: retuning,
+                            text: " "
+                        )
+                    )
+                )
+            ).code == "voice.invalid_sample_text"
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(
+                        command: .updateVoiceTuning(
+                            savedProfile.id,
+                            VoiceTuning(
+                                preset: .faithful,
+                                parameters: VoiceTuningSpace.defaults(
+                                    modelType: "qwen3_tts",
+                                    preset: .faithful
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        #expect(
+            try voices(
+                await fixture.service.handle(
+                    .init(command: .voices(modelID: fixture.seedModelID))
+                )
+            ).first { $0.id == savedProfile.id }?.tuning.preset == .faithful
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(
+                        command: .duplicateVoiceProfile(
+                            savedProfile.id,
+                            name: "Copper Finch Duo",
+                            tuning: retuning
+                        )
+                    )
+                )
+            )
+        )
+        let duplicated = try voices(
+            await fixture.service.handle(
+                .init(command: .voices(modelID: fixture.seedModelID))
+            )
+        )
+        #expect(duplicated.count == 2)
+        #expect(
+            duplicated.first { $0.displayName == "Copper Finch Duo" }?.tuning
+                == retuning
+        )
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(
+                        command: .updateVoiceTuning(
+                            savedProfile.id,
+                            VoiceTuning(parameters: ["temperature": 99])
+                        )
+                    )
+                )
+            ).code == "voice.invalid_tuning"
+        )
+        #expect(
+            try failure(
+                await fixture.service.handle(
+                    .init(
+                        command: .duplicateVoiceProfile(
+                            savedProfile.id,
+                            name: "copper finch",
+                            tuning: retuning
+                        )
+                    )
+                )
+            ).code == "voice.duplicate_name"
         )
         #expect(
             isAccepted(
@@ -950,7 +1145,7 @@ struct BackendServiceCommandTests {
         )
         #expect(
             Set(savedVoices.map(\.displayName))
-                == ["Copper Finch", "Recorded Harbor"]
+                == ["Copper Finch", "Copper Finch Duo", "Recorded Harbor"]
         )
     }
 

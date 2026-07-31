@@ -194,6 +194,75 @@ struct VoiceProfileStoreTests {
         }
     }
 
+    @Test("Tuning updates persist and duplicated profiles stay independent")
+    @MainActor
+    func tuningUpdateAndDuplication() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let saved = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let tuning = VoiceTuning(
+            preset: .expressive,
+            parameters: ["temperature": 0.85]
+        )
+
+        let updated = try store.updateTuning(id: saved.id, tuning: tuning)
+        #expect(updated.tuning == tuning)
+        #expect(updated.updatedAt >= saved.updatedAt)
+
+        let copyTuning = VoiceTuning(
+            preset: .faithful,
+            parameters: ["temperature": 0.45]
+        )
+        let copy = try store.duplicate(
+            id: saved.id,
+            name: "Amber Copy",
+            tuning: copyTuning
+        )
+        #expect(copy.id != saved.id)
+        #expect(copy.tuning == copyTuning)
+        let originalRecord = try #require(store.record(id: saved.id))
+        let copyRecord = try #require(store.record(id: copy.id))
+        let originalReference = try store.referenceURL(for: originalRecord)
+        let copyReference = try store.referenceURL(for: copyRecord)
+        #expect(originalReference != copyReference)
+        #expect(
+            FileManager.default.fileExists(atPath: copyReference.path)
+        )
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        #expect(reloaded.record(id: saved.id)?.tuning == tuning)
+        #expect(reloaded.record(id: copy.id)?.displayName == "Amber Copy")
+
+        try store.delete(id: copy.id)
+        #expect(store.record(id: saved.id) != nil)
+        #expect(
+            FileManager.default.fileExists(atPath: originalReference.path)
+        )
+
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.updateTuning(id: UUID(), tuning: tuning)
+        }
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.duplicate(
+                id: saved.id,
+                name: "amber brook",
+                tuning: tuning
+            )
+        }
+        #expect(throws: ServiceFailure.self) {
+            _ = try store.updateTuning(
+                id: saved.id,
+                tuning: VoiceTuning(parameters: ["temperature": .nan])
+            )
+        }
+    }
+
     @Test("Missing and external profile sources are rejected")
     @MainActor
     func invalidProfileSources() throws {

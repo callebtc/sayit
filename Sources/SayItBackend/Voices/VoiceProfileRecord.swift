@@ -13,7 +13,7 @@ struct VoiceProfileRecord: Codable, Sendable {
     let referenceFilename: String
     let createdAt: Date
     var updatedAt: Date
-    let tuning: VoiceTuning
+    var tuning: VoiceTuning
     let generationSeed: UInt64?
 
     var snapshot: VoiceProfileSnapshot {

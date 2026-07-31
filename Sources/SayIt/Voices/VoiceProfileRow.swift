@@ -8,6 +8,7 @@ struct VoiceProfileRow: View {
     let isModelInstalled: Bool
     let onSelect: () -> Void
     let onTest: () -> Void
+    let onCustomize: () -> Void
     let onRename: (String) -> Void
     let onDelete: () -> Void
 
@@ -21,6 +22,7 @@ struct VoiceProfileRow: View {
         isModelInstalled: Bool,
         onSelect: @escaping () -> Void,
         onTest: @escaping () -> Void,
+        onCustomize: @escaping () -> Void,
         onRename: @escaping (String) -> Void,
         onDelete: @escaping () -> Void
     ) {
@@ -29,6 +31,7 @@ struct VoiceProfileRow: View {
         self.isModelInstalled = isModelInstalled
         self.onSelect = onSelect
         self.onTest = onTest
+        self.onCustomize = onCustomize
         self.onRename = onRename
         self.onDelete = onDelete
         _name = State(initialValue: profile.displayName)
@@ -68,6 +71,11 @@ struct VoiceProfileRow: View {
                         action: onTest
                     )
                     .disabled(!isModelInstalled)
+                    Button(
+                        "Customize…",
+                        systemImage: "slider.horizontal.3",
+                        action: onCustomize
+                    )
                     Button("Rename", action: beginRename)
                     Button(
                         "Delete",

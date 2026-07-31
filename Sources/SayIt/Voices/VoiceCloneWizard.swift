@@ -46,7 +46,7 @@ struct VoiceCloneWizard: View {
         _tuning = State(
             initialValue: VoiceTuning(
                 preset: .natural,
-                parameters: VoiceTuningDefaults.values(
+                parameters: VoiceTuningSpace.defaults(
                     modelType: model.modelType,
                     preset: .natural
                 )
@@ -187,7 +187,7 @@ struct VoiceCloneWizard: View {
                             language = selectedModel.defaultLanguage ?? "en-US"
                             tuning = VoiceTuning(
                                 preset: .natural,
-                                parameters: VoiceTuningDefaults.values(
+                                parameters: VoiceTuningSpace.defaults(
                                     modelType: selectedModel.modelType,
                                     preset: .natural
                                 )

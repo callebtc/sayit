@@ -40,4 +40,28 @@ struct VoiceTuningPolicyTests {
             }
         }
     }
+
+    @Test("Interpolated and randomized space tunings pass validation")
+    func generatedTuningsValidate() throws {
+        let policy = VoiceTuningPolicy()
+        for modelType in [
+            "qwen3_tts", "fish_speech", "chatterbox", "omnivoice"
+        ] {
+            for position in stride(from: 0.0, through: 1.0, by: 0.1) {
+                let tuning = try policy.validate(
+                    VoiceTuningSpace.interpolated(
+                        modelType: modelType,
+                        position: position
+                    ),
+                    modelType: modelType
+                )
+                #expect(!tuning.parameters.isEmpty)
+            }
+            let randomized = try policy.validate(
+                VoiceTuningSpace.randomized(modelType: modelType),
+                modelType: modelType
+            )
+            #expect(!randomized.parameters.isEmpty)
+        }
+    }
 }
