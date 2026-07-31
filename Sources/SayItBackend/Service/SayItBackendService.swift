@@ -2002,7 +2002,6 @@ public final class SayItBackendService: SayItService {
                 spokenChunks: includesPlaybackContent
                     ? playbackContent.spokenChunks
                     : [],
-                contentRevision: playbackContentRevision,
                 includesContent: includesPlaybackContent
             ),
             download: downloadProgress?.serviceSnapshot,

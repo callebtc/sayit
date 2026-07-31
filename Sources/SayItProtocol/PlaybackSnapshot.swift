@@ -11,7 +11,6 @@ public struct PlaybackSnapshot: Codable, Sendable {
     public let amplitudes: [Float]
     public let spokenText: String
     public let spokenChunks: [PlaybackTextChunk]
-    public let contentRevision: UInt64
     public let includesContent: Bool
 
     public init(
@@ -25,7 +24,6 @@ public struct PlaybackSnapshot: Codable, Sendable {
         amplitudes: [Float] = [],
         spokenText: String = "",
         spokenChunks: [PlaybackTextChunk] = [],
-        contentRevision: UInt64 = 0,
         includesContent: Bool = true
     ) {
         self.state = state
@@ -38,7 +36,6 @@ public struct PlaybackSnapshot: Codable, Sendable {
         self.amplitudes = amplitudes
         self.spokenText = spokenText
         self.spokenChunks = spokenChunks
-        self.contentRevision = contentRevision
         self.includesContent = includesContent
     }
 
@@ -53,7 +50,6 @@ public struct PlaybackSnapshot: Codable, Sendable {
         case amplitudes
         case spokenText
         case spokenChunks
-        case contentRevision
         case includesContent
     }
 
@@ -87,10 +83,6 @@ public struct PlaybackSnapshot: Codable, Sendable {
             [PlaybackTextChunk].self,
             forKey: .spokenChunks
         )
-        contentRevision = try container.decodeIfPresent(
-            UInt64.self,
-            forKey: .contentRevision
-        ) ?? 0
         includesContent = try container.decodeIfPresent(
             Bool.self,
             forKey: .includesContent

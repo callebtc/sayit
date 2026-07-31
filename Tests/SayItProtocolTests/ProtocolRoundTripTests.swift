@@ -362,7 +362,6 @@ struct ProtocolRoundTripTests {
         var legacyJSON = try #require(
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
-        legacyJSON["contentRevision"] = nil
         legacyJSON["includesContent"] = nil
         let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
 
@@ -372,7 +371,6 @@ struct ProtocolRoundTripTests {
         )
 
         #expect(decoded.includesContent)
-        #expect(decoded.contentRevision == 0)
         #expect(decoded.spokenText == "Hello")
     }
 }

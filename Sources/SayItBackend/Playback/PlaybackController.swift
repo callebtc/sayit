@@ -10,7 +10,6 @@ import SayItProtocol
 @Observable
 final class PlaybackController: BackendPlaybackControlling {
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
-    static let modelSwitchFadeStepCount = 8
     static let highQualityTimePitchOverlap: Float = 32
     static let schedulingHorizon: TimeInterval = 12
     static let schedulingChunkDuration: TimeInterval = 2
@@ -216,16 +215,6 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func stopForModelSwitch() async {
         await performSmoothStop(duration: Self.modelSwitchFadeDuration)
-    }
-
-    static func modelSwitchFadeVolume(
-        step: Int,
-        stepCount: Int
-    ) -> Float {
-        guard stepCount > 0 else { return 0 }
-        let progress = Float(min(max(step, 0), stepCount))
-            / Float(stepCount)
-        return 1 - progress
     }
 
     private func performSmoothStop(duration: Duration) async {

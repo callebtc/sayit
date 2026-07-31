@@ -24,8 +24,7 @@ struct PlaybackSnapshotApplicationTests {
                         textEnd: 11,
                         audioStart: 0
                     )
-                ],
-                contentRevision: 4
+                ]
             )
         )
 
@@ -35,7 +34,6 @@ struct PlaybackSnapshotApplicationTests {
                 elapsed: 2,
                 generatedDuration: 10,
                 estimatedDuration: 12,
-                contentRevision: 4,
                 includesContent: false
             )
         )

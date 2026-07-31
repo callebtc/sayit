@@ -22,16 +22,10 @@ struct SpeechLyricsView: View {
 
     private struct WordToken: Identifiable {
         let id: Int
-        let offsetRange: Range<Int>
         let blockID: Int
         let text: String
-        let timing: WordTiming
+        let timing: SpeechLyricsTimeline.Timing
         var newlinesBefore: Int = 0
-    }
-
-    private enum WordTiming {
-        case chunk(index: Int, fraction: Double)
-        case proportional(fraction: Double)
     }
 
     private struct Tokenization {
@@ -163,7 +157,7 @@ struct SpeechLyricsView: View {
     }
 
     private var currentWordIndex: Int? {
-        Self.activeWordIndex(
+        SpeechLyricsTimeline.activeWordIndex(
             at: elapsed + 0.08,
             tokenCount: tokens.count
         ) { index in
@@ -339,10 +333,9 @@ struct SpeechLyricsView: View {
                     .reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
                 let token = WordToken(
                     id: index,
-                    offsetRange: offsetRange,
                     blockID: blockID,
                     text: String(text[wordRange]),
-                    timing: Self.wordTiming(
+                    timing: SpeechLyricsTimeline.timing(
                         forOffset: offsetRange.lowerBound,
                         textCount: textCount,
                         chunks: chunks,
@@ -366,18 +359,11 @@ struct SpeechLyricsView: View {
     }
 
     private func startTime(for token: WordToken) -> TimeInterval {
-        switch token.timing {
-        case .chunk(let index, let fraction):
-            guard chunks.indices.contains(index) else { return 0 }
-            let chunk = chunks[index]
-            let end = index + 1 < chunks.count
-                ? chunks[index + 1].audioStart
-                : max(generatedDuration, chunk.audioStart)
-            return chunk.audioStart
-                + fraction * max(end - chunk.audioStart, 0.001)
-        case .proportional(let fraction):
-            return fraction * max(generatedDuration, 0)
-        }
+        SpeechLyricsTimeline.startTime(
+            for: token.timing,
+            chunks: chunks,
+            generatedDuration: generatedDuration
+        )
     }
 
     private static func scrollID(forBlock id: Int) -> String { "block-\(id)" }
@@ -436,111 +422,6 @@ struct SpeechLyricsView: View {
         return lower..<upper
     }
 
-    nonisolated static func resolvedText(
-        in text: String,
-        tokenizedText: String,
-        offsetRange: Range<Int>
-    ) -> String? {
-        guard text == tokenizedText,
-              offsetRange.lowerBound >= 0,
-              offsetRange.upperBound >= offsetRange.lowerBound,
-              let lower = text.index(
-                  text.startIndex,
-                  offsetBy: offsetRange.lowerBound,
-                  limitedBy: text.endIndex
-              ),
-              let upper = text.index(
-                  text.startIndex,
-                  offsetBy: offsetRange.upperBound,
-                  limitedBy: text.endIndex
-              ),
-              lower <= upper else {
-            return nil
-        }
-        return String(text[lower..<upper])
-    }
-
-    nonisolated static func startTime(
-        forWordAt offset: Int,
-        text: String,
-        chunks: [PlaybackTextChunk],
-        generatedDuration: TimeInterval
-    ) -> TimeInterval {
-        guard !chunks.isEmpty,
-              let index = chunks.lastIndex(where: { $0.textStart <= offset }) else {
-            return proportionalTime(offset: offset, text: text, generatedDuration: generatedDuration)
-        }
-        let chunk = chunks[index]
-        let length = max(chunk.textEnd - chunk.textStart, 1)
-        let end = index + 1 < chunks.count
-            ? chunks[index + 1].audioStart
-            : max(generatedDuration, chunk.audioStart)
-        let duration = max(end - chunk.audioStart, 0.001)
-        let fraction = min(
-            max(Double(offset - chunk.textStart) / Double(length), 0),
-            1
-        )
-        return chunk.audioStart + fraction * duration
-    }
-
-    nonisolated static func activeWordIndex(
-        at elapsed: TimeInterval,
-        tokenCount: Int,
-        startTime: (Int) -> TimeInterval
-    ) -> Int? {
-        guard tokenCount > 0 else { return nil }
-        var lowerBound = 0
-        var upperBound = tokenCount
-        while lowerBound < upperBound {
-            let middle = lowerBound + (upperBound - lowerBound) / 2
-            if startTime(middle) <= elapsed {
-                lowerBound = middle + 1
-            } else {
-                upperBound = middle
-            }
-        }
-        return lowerBound > 0 ? lowerBound - 1 : nil
-    }
-
-    private nonisolated static func wordTiming(
-        forOffset offset: Int,
-        textCount: Int,
-        chunks: [PlaybackTextChunk],
-        chunkIndex: inout Int
-    ) -> WordTiming {
-        while chunkIndex + 1 < chunks.count,
-              chunks[chunkIndex + 1].textStart <= offset {
-            chunkIndex += 1
-        }
-        guard chunks.indices.contains(chunkIndex) else {
-            let fraction = textCount > 0
-                ? Double(offset) / Double(textCount)
-                : 0
-            return .proportional(fraction: fraction)
-        }
-        let chunk = chunks[chunkIndex]
-        guard chunk.textStart <= offset, offset <= chunk.textEnd else {
-            let fraction = textCount > 0
-                ? Double(offset) / Double(textCount)
-                : 0
-            return .proportional(fraction: fraction)
-        }
-        let length = max(chunk.textEnd - chunk.textStart, 1)
-        let fraction = min(
-            max(Double(offset - chunk.textStart) / Double(length), 0),
-            1
-        )
-        return .chunk(index: chunkIndex, fraction: fraction)
-    }
-
-    private nonisolated static func proportionalTime(
-        offset: Int,
-        text: String,
-        generatedDuration: TimeInterval
-    ) -> TimeInterval {
-        guard generatedDuration > 0, !text.isEmpty else { return 0 }
-        return Double(offset) / Double(text.count) * generatedDuration
-    }
 }
 
 private struct NewlinesBeforeKey: LayoutValueKey {
