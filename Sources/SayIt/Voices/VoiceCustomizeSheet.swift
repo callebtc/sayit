@@ -70,13 +70,22 @@ struct VoiceCustomizeSheet: View {
                 )
                 HStack(spacing: DesignTokens.standardSpacing) {
                     Button(action: togglePreview) {
-                        Label(
-                            isPlayingThis ? "Stop" : "Preview",
-                            systemImage: isPlayingThis
+                        Image(
+                            systemName: isPlayingThis
                                 ? "stop.fill" : "play.fill"
                         )
                         .contentTransition(.symbolEffect(.replace.offUp))
                     }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(
+                        CircularIconButtonStyle(
+                            size: 30,
+                            prominent: isPlayingThis
+                        )
+                    )
+                    .accessibilityLabel(
+                        isPlayingThis ? "Stop preview" : "Play preview"
+                    )
                     .disabled(
                         isPreviewing || previewTextIsInvalid || !isModelInstalled
                     )
@@ -98,6 +107,8 @@ struct VoiceCustomizeSheet: View {
                     copyName = "\(profile.displayName) Copy"
                     isNamingCopy = true
                 }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
                 .popover(isPresented: $isNamingCopy, arrowEdge: .bottom) {
                     VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
                         TextField("New voice name", text: $copyName)
@@ -114,7 +125,6 @@ struct VoiceCustomizeSheet: View {
                             .foregroundStyle(.secondary)
                             Button("Save", action: saveCopy)
                                 .controlSize(.small)
-                                .buttonStyle(.borderedProminent)
                                 .disabled(copyNameIsInvalid)
                                 .keyboardShortcut(.defaultAction)
                         }
@@ -123,7 +133,8 @@ struct VoiceCustomizeSheet: View {
                 }
                 Spacer()
                 Button("Apply Changes", action: apply)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.borderless)
+                    .font(.callout.weight(.semibold))
                     .disabled(!hasChanges)
             }
         }

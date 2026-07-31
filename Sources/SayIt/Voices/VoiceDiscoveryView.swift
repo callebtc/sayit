@@ -134,14 +134,19 @@ struct VoiceDiscoveryView: View {
             }
 
             HStack(spacing: DesignTokens.standardSpacing) {
-                Button(
-                    candidates.isEmpty
-                        ? "Generate Four Voices"
-                        : "Generate Four More",
-                    systemImage: surpriseMe ? "dice" : "sparkles",
-                    action: generate
-                )
-                .buttonStyle(.borderedProminent)
+                Button(action: generate) {
+                    HStack {
+                        Label(
+                            candidates.isEmpty
+                                ? "Generate Four Voices"
+                                : "Generate Four More",
+                            systemImage: surpriseMe ? "dice" : "sparkles"
+                        )
+                        .font(.callout.weight(.medium))
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.sayItRow)
                 .disabled(isGenerating || sampleTextIsInvalid)
 
                 if isGenerating {

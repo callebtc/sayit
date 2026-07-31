@@ -74,14 +74,18 @@ struct VoiceCandidateCard: View {
                 .buttonStyle(.plain)
                 Spacer()
                 if showsAdjustments {
-                    Button("Re-roll", systemImage: "dice", action: reroll)
-                        .buttonStyle(.borderless)
-                        .font(.callout)
-                        .controlSize(.small)
-                        .disabled(isRerolling || isGenerating)
-                        .accessibilityHint(
-                            "Generates a fresh voice with these settings"
-                        )
+                    Button(
+                        "Re-roll",
+                        systemImage: "dice",
+                        action: reroll
+                    )
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(CircularIconButtonStyle(size: 26))
+                    .disabled(isRerolling || isGenerating)
+                    .help("Re-roll with these settings")
+                    .accessibilityHint(
+                        "Generates a fresh voice with these settings"
+                    )
                 }
             }
 
@@ -142,9 +146,10 @@ struct VoiceCandidateCard: View {
                         isSaved ? "Saved" : "Save Voice",
                         systemImage: isSaved ? "checkmark" : "plus"
                     )
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(isSaved ? .secondary : Color.accentColor)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.sayItInline)
                 .disabled(isSaved || nameIsInvalid)
             }
         }
