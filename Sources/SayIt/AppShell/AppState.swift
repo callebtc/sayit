@@ -906,11 +906,20 @@ final class AppState {
             )
         }
         guard let event = events.last else { return }
-        guard event.id == lastServiceRevision + 1 else {
-            try await reloadServiceSnapshot()
+        guard Self.shouldApplyEvent(
+            id: event.id,
+            after: lastServiceRevision
+        ) else {
             return
         }
         apply(event.snapshot)
+    }
+
+    nonisolated static func shouldApplyEvent(
+        id: UInt64,
+        after revision: UInt64
+    ) -> Bool {
+        id > revision
     }
 
     private func reloadServiceSnapshot() async throws {

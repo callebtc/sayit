@@ -89,17 +89,17 @@ Status: complete
 
 ### M4 — State transport and transcript performance
 
-Status: pending
+Status: complete
 
-- [ ] Move wire decoding and encoding outside the agent main actor.
-- [ ] Separate timeline revisions from static playback-content revisions so
+- [x] Move wire decoding and encoding outside the agent main actor.
+- [x] Separate timeline revisions from static playback-content revisions so
       unchanged text, chunk metadata, and amplitudes are not repeatedly sent.
-- [ ] Accept monotonically newer snapshot IDs without requiring an unnecessary
+- [x] Accept monotonically newer snapshot IDs without requiring an unnecessary
       full reload when intermediate revisions are coalesced.
-- [ ] Precompute transcript word timing and use binary search for the active
+- [x] Precompute transcript word timing and use binary search for the active
       word.
-- [ ] Avoid per-word full-transcript scans and unnecessary animations.
-- [ ] Add protocol compatibility, coalesced-revision, and transcript scaling
+- [x] Avoid per-word full-transcript scans and unnecessary animations.
+- [x] Add protocol compatibility, coalesced-revision, and transcript scaling
       tests.
 
 ### M5 — Route, archive, and regression hardening
@@ -136,6 +136,6 @@ Status: pending
 | M0 | `4cd22de` | Baseline focused build and tests recorded | complete |
 | M1 | `8ddf504` | 33 focused policy, service, and queue tests passed | complete |
 | M2 | `9432358` | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
-| M3 | milestone commit | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
-| M4 | pending | pending | pending |
+| M3 | `fa39a20` | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
+| M4 | milestone commit | 47 transport, protocol, HTTP, service, and transcript tests passed | complete |
 | M5 | pending | pending | pending |

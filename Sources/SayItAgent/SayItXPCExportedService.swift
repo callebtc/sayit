@@ -14,7 +14,7 @@ final class SayItXPCExportedService: NSObject, SayItXPCProtocol {
         _ requestData: Data,
         withReply reply: @escaping @Sendable (Data) -> Void
     ) {
-        Task { @MainActor [backend] in
+        Task { [backend] in
             let response: ServiceResponse
             do {
                 let request = try SayItWireCodec.decode(

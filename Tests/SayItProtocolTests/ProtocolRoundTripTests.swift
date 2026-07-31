@@ -348,4 +348,31 @@ struct ProtocolRoundTripTests {
         #expect(decoded.voicesRevision == 0)
         #expect(decoded.voiceStudio == nil)
     }
+
+    @Test
+    func playbackSnapshotContentMetadataIsBackwardCompatible() throws {
+        let snapshot = PlaybackSnapshot(
+            state: "playing",
+            elapsed: 2,
+            generatedDuration: 5,
+            estimatedDuration: 5,
+            spokenText: "Hello"
+        )
+        let encoded = try SayItWireCodec.encode(snapshot)
+        var legacyJSON = try #require(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacyJSON["contentRevision"] = nil
+        legacyJSON["includesContent"] = nil
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
+
+        let decoded = try SayItWireCodec.decode(
+            PlaybackSnapshot.self,
+            from: legacyData
+        )
+
+        #expect(decoded.includesContent)
+        #expect(decoded.contentRevision == 0)
+        #expect(decoded.spokenText == "Hello")
+    }
 }

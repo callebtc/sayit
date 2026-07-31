@@ -24,7 +24,14 @@ struct SpeechLyricsView: View {
         let id: Int
         let offsetRange: Range<Int>
         let blockID: Int
+        let text: String
+        let timing: WordTiming
         var newlinesBefore: Int = 0
+    }
+
+    private enum WordTiming {
+        case chunk(index: Int, fraction: Double)
+        case proportional(fraction: Double)
     }
 
     private struct Tokenization {
@@ -108,10 +115,14 @@ struct SpeechLyricsView: View {
     }
 
     private var scrollContent: some View {
-        ScrollView {
+        let currentWordIndex = currentWordIndex
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: 6) {
                 ForEach(blocks) { block in
-                    blockView(for: block)
+                    blockView(
+                        for: block,
+                        currentWordIndex: currentWordIndex
+                    )
                 }
             }
             .padding(.vertical, 24)
@@ -120,14 +131,20 @@ struct SpeechLyricsView: View {
     }
 
     @ViewBuilder
-    private func blockView(for block: Block) -> some View {
+    private func blockView(
+        for block: Block,
+        currentWordIndex: Int?
+    ) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             WordsFlowLayout(
                 horizontalSpacing: Self.naturalSpaceWidth,
                 verticalSpacing: 3
             ) {
                 ForEach(block.words) { token in
-                    wordView(for: token)
+                    wordView(
+                        for: token,
+                        currentWordIndex: currentWordIndex
+                    )
                 }
             }
             if showsBlockSeparators, block.id != blocks.last?.id {
@@ -138,24 +155,20 @@ struct SpeechLyricsView: View {
     }
 
     private var currentWord: String {
-        guard let index = currentWordIndex, tokens.indices.contains(index) else { return "" }
-        return Self.resolvedText(
-            in: text,
-            tokenizedText: tokenization.sourceText,
-            offsetRange: tokens[index].offsetRange
-        ) ?? ""
+        guard let index = currentWordIndex,
+              tokens.indices.contains(index) else {
+            return ""
+        }
+        return tokens[index].text
     }
 
     private var currentWordIndex: Int? {
-        guard !tokens.isEmpty else { return nil }
-        var current: Int?
-        for (index, token) in tokens.enumerated() {
-            guard startTime(forOffset: token.offsetRange.lowerBound) <= elapsed + 0.08 else {
-                break
-            }
-            current = index
+        Self.activeWordIndex(
+            at: elapsed + 0.08,
+            tokenCount: tokens.count
+        ) { index in
+            startTime(for: tokens[index])
         }
-        return current
     }
 
     private func follow(_ wordIndex: Int?, proxy: ScrollViewProxy) {
@@ -217,17 +230,15 @@ struct SpeechLyricsView: View {
             .allowsHitTesting(false)
     }
 
-    private func wordView(for token: WordToken) -> some View {
+    private func wordView(
+        for token: WordToken,
+        currentWordIndex: Int?
+    ) -> some View {
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
-        let seekTime = startTime(forOffset: token.offsetRange.lowerBound)
+        let seekTime = startTime(for: token)
         let canSeek = onSeek != nil && seekTime <= generatedDuration
-        let word = Self.resolvedText(
-            in: text,
-            tokenizedText: tokenization.sourceText,
-            offsetRange: token.offsetRange
-        ) ?? ""
-        return Text(word)
+        return Text(token.text)
             .font(.callout)
             .foregroundStyle(wordColor(isCurrent: isCurrent, isPast: isPast))
             .background {
@@ -251,7 +262,6 @@ struct SpeechLyricsView: View {
                 }
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.72), value: isCurrent)
-            .animation(.smooth(duration: 0.35), value: isPast)
             .id(Self.scrollID(forWord: token.id))
             .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
     }
@@ -297,16 +307,47 @@ struct SpeechLyricsView: View {
         var newBlocks: [Block] = []
         var newTokens: [WordToken] = []
         var index = 0
+        var chunkIndex = 0
+        var offsetCursor = text.startIndex
+        var offsetValue = 0
+        let textCount = text.count
         for (blockID, range) in blockRanges.enumerated() {
             var block = Block(id: blockID)
             var previousUpper = range.lowerBound
             for wordRange in Self.wordRanges(in: text, within: range) {
+                let offsetRange: Range<Int>
+                if offsetCursor <= wordRange.lowerBound {
+                    let leadingCount = text.distance(
+                        from: offsetCursor,
+                        to: wordRange.lowerBound
+                    )
+                    let wordCount = text.distance(
+                        from: wordRange.lowerBound,
+                        to: wordRange.upperBound
+                    )
+                    let lowerOffset = offsetValue + leadingCount
+                    offsetRange = lowerOffset..<(lowerOffset + wordCount)
+                    offsetCursor = wordRange.upperBound
+                    offsetValue = offsetRange.upperBound
+                } else {
+                    offsetRange = Self.offsetRange(
+                        for: wordRange,
+                        in: text
+                    )
+                }
                 let newlines = text[previousUpper..<wordRange.lowerBound]
                     .reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
                 let token = WordToken(
                     id: index,
-                    offsetRange: Self.offsetRange(for: wordRange, in: text),
+                    offsetRange: offsetRange,
                     blockID: blockID,
+                    text: String(text[wordRange]),
+                    timing: Self.wordTiming(
+                        forOffset: offsetRange.lowerBound,
+                        textCount: textCount,
+                        chunks: chunks,
+                        chunkIndex: &chunkIndex
+                    ),
                     newlinesBefore: newlines
                 )
                 block.words.append(token)
@@ -324,13 +365,19 @@ struct SpeechLyricsView: View {
         )
     }
 
-    private func startTime(forOffset offset: Int) -> TimeInterval {
-        Self.startTime(
-            forWordAt: offset,
-            text: text,
-            chunks: chunks,
-            generatedDuration: generatedDuration
-        )
+    private func startTime(for token: WordToken) -> TimeInterval {
+        switch token.timing {
+        case .chunk(let index, let fraction):
+            guard chunks.indices.contains(index) else { return 0 }
+            let chunk = chunks[index]
+            let end = index + 1 < chunks.count
+                ? chunks[index + 1].audioStart
+                : max(generatedDuration, chunk.audioStart)
+            return chunk.audioStart
+                + fraction * max(end - chunk.audioStart, 0.001)
+        case .proportional(let fraction):
+            return fraction * max(generatedDuration, 0)
+        }
     }
 
     private static func scrollID(forBlock id: Int) -> String { "block-\(id)" }
@@ -343,25 +390,34 @@ struct SpeechLyricsView: View {
     ) -> [Range<String.Index>] {
         guard !text.isEmpty else { return [] }
         guard !chunks.isEmpty else { return [text.startIndex..<text.endIndex] }
-        return chunks.compactMap { chunk in
+        let textCount = text.count
+        var offsetCursor = 0
+        var indexCursor = text.startIndex
+        var ranges: [Range<String.Index>] = []
+        ranges.reserveCapacity(chunks.count)
+        for chunk in chunks {
             guard chunk.textStart >= 0,
                   chunk.textEnd > chunk.textStart,
-                  chunk.textEnd <= text.count,
+                  chunk.textEnd <= textCount,
+                  chunk.textStart >= offsetCursor,
                   let lower = text.index(
-                    text.startIndex,
-                    offsetBy: chunk.textStart,
+                    indexCursor,
+                    offsetBy: chunk.textStart - offsetCursor,
                     limitedBy: text.endIndex
                   ),
                   let upper = text.index(
-                    text.startIndex,
-                    offsetBy: chunk.textEnd,
+                    lower,
+                    offsetBy: chunk.textEnd - chunk.textStart,
                     limitedBy: text.endIndex
                   ),
                   lower < upper else {
-                return nil
+                continue
             }
-            return lower..<upper
+            ranges.append(lower..<upper)
+            offsetCursor = chunk.textEnd
+            indexCursor = upper
         }
+        return ranges
     }
 
     nonisolated static func wordRanges(
@@ -425,6 +481,56 @@ struct SpeechLyricsView: View {
             1
         )
         return chunk.audioStart + fraction * duration
+    }
+
+    nonisolated static func activeWordIndex(
+        at elapsed: TimeInterval,
+        tokenCount: Int,
+        startTime: (Int) -> TimeInterval
+    ) -> Int? {
+        guard tokenCount > 0 else { return nil }
+        var lowerBound = 0
+        var upperBound = tokenCount
+        while lowerBound < upperBound {
+            let middle = lowerBound + (upperBound - lowerBound) / 2
+            if startTime(middle) <= elapsed {
+                lowerBound = middle + 1
+            } else {
+                upperBound = middle
+            }
+        }
+        return lowerBound > 0 ? lowerBound - 1 : nil
+    }
+
+    private nonisolated static func wordTiming(
+        forOffset offset: Int,
+        textCount: Int,
+        chunks: [PlaybackTextChunk],
+        chunkIndex: inout Int
+    ) -> WordTiming {
+        while chunkIndex + 1 < chunks.count,
+              chunks[chunkIndex + 1].textStart <= offset {
+            chunkIndex += 1
+        }
+        guard chunks.indices.contains(chunkIndex) else {
+            let fraction = textCount > 0
+                ? Double(offset) / Double(textCount)
+                : 0
+            return .proportional(fraction: fraction)
+        }
+        let chunk = chunks[chunkIndex]
+        guard chunk.textStart <= offset, offset <= chunk.textEnd else {
+            let fraction = textCount > 0
+                ? Double(offset) / Double(textCount)
+                : 0
+            return .proportional(fraction: fraction)
+        }
+        let length = max(chunk.textEnd - chunk.textStart, 1)
+        let fraction = min(
+            max(Double(offset - chunk.textStart) / Double(length), 0),
+            1
+        )
+        return .chunk(index: chunkIndex, fraction: fraction)
     }
 
     private nonisolated static func proportionalTime(

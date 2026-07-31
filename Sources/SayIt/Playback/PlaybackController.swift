@@ -33,11 +33,13 @@ final class PlaybackController {
         elapsed = snapshot.elapsed
         generatedDuration = snapshot.generatedDuration
         estimatedDuration = snapshot.estimatedDuration
-        amplitudes = snapshot.amplitudes
-        currentTitle = snapshot.currentTitle
-        modelID = snapshot.modelID.map { ModelID($0) }
-        spokenText = snapshot.spokenText
-        spokenChunks = snapshot.spokenChunks
+        if snapshot.includesContent {
+            amplitudes = snapshot.amplitudes
+            currentTitle = snapshot.currentTitle
+            modelID = snapshot.modelID.map { ModelID($0) }
+            spokenText = snapshot.spokenText
+            spokenChunks = snapshot.spokenChunks
+        }
         if rate != snapshot.rate {
             let handler = commandHandler
             commandHandler = nil

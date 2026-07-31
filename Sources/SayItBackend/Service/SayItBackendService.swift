@@ -53,6 +53,8 @@ public final class SayItBackendService: SayItService {
     private var voiceCloneDraft: VoiceCloneDraft?
     private var lastProgressRevisionDate = Date.distantPast
     private var lastReplayProgressTick: Int?
+    private var lastPlaybackContent: PlaybackContentState?
+    private var playbackContentRevision: UInt64 = 0
     private var isModelTransitionInProgress = false
     private var isShuttingDown = false
     private let serviceVersion: String
@@ -244,7 +246,7 @@ public final class SayItBackendService: SayItService {
     }
 
     public func events(after sequence: UInt64) async -> [ServiceEvent] {
-        let snapshot = makeSnapshot()
+        let snapshot = makeSnapshot(playbackContentAfter: sequence)
         guard snapshot.revision > sequence else { return [] }
         return [
             ServiceEvent(id: snapshot.revision, snapshot: snapshot)
@@ -1938,7 +1940,9 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private func makeSnapshot() -> ServiceSnapshot {
+    private func makeSnapshot(
+        playbackContentAfter sequence: UInt64? = nil
+    ) -> ServiceSnapshot {
         if activeJobID == nil, playback.state == .playing {
             let tick = Int(playback.elapsed * 10)
             if tick != lastReplayProgressTick {
@@ -1954,6 +1958,21 @@ public final class SayItBackendService: SayItService {
             job.progress = playbackProgress
             activeJob = job
         }
+        let playbackContent = PlaybackContentState(
+            currentTitle: playback.currentTitle,
+            modelID: playback.currentModelID,
+            amplitudes: playback.amplitudes,
+            spokenText: playback.spokenText,
+            spokenChunks: playback.spokenChunks
+        )
+        if lastPlaybackContent != playbackContent {
+            lastPlaybackContent = playbackContent
+            revision &+= 1
+            playbackContentRevision = revision
+        }
+        let includesPlaybackContent = sequence.map {
+            playbackContentRevision > $0
+        } ?? true
         return ServiceSnapshot(
             serviceVersion: serviceVersion,
             revision: revision,
@@ -1968,11 +1987,23 @@ public final class SayItBackendService: SayItService {
                 generatedDuration: playback.generatedDuration,
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
-                currentTitle: playback.currentTitle,
-                modelID: playback.currentModelID,
-                amplitudes: playback.amplitudes,
-                spokenText: playback.spokenText,
-                spokenChunks: playback.spokenChunks
+                currentTitle: includesPlaybackContent
+                    ? playbackContent.currentTitle
+                    : "",
+                modelID: includesPlaybackContent
+                    ? playbackContent.modelID
+                    : nil,
+                amplitudes: includesPlaybackContent
+                    ? playbackContent.amplitudes
+                    : [],
+                spokenText: includesPlaybackContent
+                    ? playbackContent.spokenText
+                    : "",
+                spokenChunks: includesPlaybackContent
+                    ? playbackContent.spokenChunks
+                    : [],
+                contentRevision: playbackContentRevision,
+                includesContent: includesPlaybackContent
             ),
             download: downloadProgress?.serviceSnapshot,
             installedModelIDs: installedModelIDs

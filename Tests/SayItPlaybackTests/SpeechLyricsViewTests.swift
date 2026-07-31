@@ -133,4 +133,21 @@ struct SpeechLyricsViewTests {
             ) == nil
         )
     }
+
+    @Test("Active word lookup is logarithmic for long transcripts")
+    func activeWordBinarySearch() {
+        let times = (0..<100_000).map { Double($0) * 0.1 }
+        var lookupCount = 0
+
+        let index = SpeechLyricsView.activeWordIndex(
+            at: 5_432.15,
+            tokenCount: times.count
+        ) { candidate in
+            lookupCount += 1
+            return times[candidate]
+        }
+
+        #expect(index == 54_321)
+        #expect(lookupCount <= 17)
+    }
 }

@@ -34,7 +34,7 @@ struct BackendServiceCommandTests {
                 await fixture.service.handle(
                     .init(command: .events(after: 0))
                 )
-            ).last?.snapshot.revision == started.revision
+            ).last?.snapshot.playback.includesContent == true
         )
 
         let mismatch = await fixture.service.handle(
@@ -45,6 +45,12 @@ struct BackendServiceCommandTests {
         )
 
         await fixture.service.reportServiceError("Transport failed")
+        let failureEvents = try events(
+            await fixture.service.handle(
+                .init(command: .events(after: started.revision))
+            )
+        )
+        #expect(failureEvents.last?.snapshot.playback.includesContent == false)
         let failed = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         )
