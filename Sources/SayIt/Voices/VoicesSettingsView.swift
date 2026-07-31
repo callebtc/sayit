@@ -12,6 +12,7 @@ struct VoicesSettingsView: View {
     @State private var discoveryModel: ModelDescriptor?
     @State private var cloneModel: ModelDescriptor?
     @State private var draggingProfileID: UUID?
+    @State private var customizeProfile: VoiceProfileSnapshot?
 
     var body: some View {
         Form {
@@ -74,6 +75,9 @@ struct VoicesSettingsView: View {
                             },
                             onTest: {
                                 state.previewVoice(profile)
+                            },
+                            onCustomize: {
+                                customizeProfile = profile
                             },
                             onRename: {
                                 state.renameVoice(profile, name: $0)
@@ -155,6 +159,17 @@ struct VoicesSettingsView: View {
         }
         .sheet(item: $cloneModel) {
             VoiceCloneWizard(model: $0)
+        }
+        .sheet(item: $customizeProfile) { profile in
+            if let model = state.models.first(where: {
+                $0.id.rawValue == profile.modelID
+            }) {
+                VoiceCustomizeSheet(
+                    profile: profile,
+                    model: model,
+                    isModelInstalled: state.installedModelIDs.contains(model.id)
+                )
+            }
         }
     }
 

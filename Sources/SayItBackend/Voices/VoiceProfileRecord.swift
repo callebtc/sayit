@@ -14,7 +14,7 @@ struct VoiceProfileRecord: Codable, Sendable {
     let createdAt: Date
     var updatedAt: Date
     var sortOrder: Int
-    let tuning: VoiceTuning
+    var tuning: VoiceTuning
     let generationSeed: UInt64?
 
     init(

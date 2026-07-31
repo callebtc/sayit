@@ -8,6 +8,7 @@ struct VoiceProfileRow: View {
     let isModelInstalled: Bool
     let onSelect: () -> Void
     let onTest: () -> Void
+    let onCustomize: () -> Void
     let onRename: (String) -> Void
     let onDelete: () -> Void
     let makeDragItem: () -> NSItemProvider
@@ -23,6 +24,7 @@ struct VoiceProfileRow: View {
         isModelInstalled: Bool,
         onSelect: @escaping () -> Void,
         onTest: @escaping () -> Void,
+        onCustomize: @escaping () -> Void,
         onRename: @escaping (String) -> Void,
         onDelete: @escaping () -> Void,
         makeDragItem: @escaping () -> NSItemProvider
@@ -32,6 +34,7 @@ struct VoiceProfileRow: View {
         self.isModelInstalled = isModelInstalled
         self.onSelect = onSelect
         self.onTest = onTest
+        self.onCustomize = onCustomize
         self.onRename = onRename
         self.onDelete = onDelete
         self.makeDragItem = makeDragItem
@@ -80,6 +83,11 @@ struct VoiceProfileRow: View {
                     action: onTest
                 )
                 .disabled(!isModelInstalled)
+                Button(
+                    "Customize…",
+                    systemImage: "slider.horizontal.3",
+                    action: onCustomize
+                )
                 Button("Rename", action: beginRename)
                 Button(
                     "Delete",

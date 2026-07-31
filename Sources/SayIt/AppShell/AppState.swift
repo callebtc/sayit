@@ -331,7 +331,8 @@ final class AppState {
         model: ModelDescriptor,
         language: String?,
         text: String,
-        tuning: VoiceTuning
+        tuning: VoiceTuning,
+        candidateTunings: [VoiceTuning]? = nil
     ) {
         perform(
             .startVoiceDiscovery(
@@ -339,7 +340,8 @@ final class AppState {
                     modelID: model.id.rawValue,
                     language: language,
                     sampleText: text,
-                    tuning: tuning
+                    tuning: tuning,
+                    candidateTunings: candidateTunings
                 )
             )
         )
@@ -398,9 +400,28 @@ final class AppState {
 
     func saveVoiceCandidate(
         _ candidate: VoiceCandidateSnapshot,
-        name: String
+        name: String,
+        tuning: VoiceTuning
     ) {
-        perform(.saveVoiceCandidate(candidate.id, name: name))
+        perform(.saveVoiceCandidate(candidate.id, name: name, tuning: tuning))
+    }
+
+    func regenerateVoiceCandidate(
+        _ candidate: VoiceCandidateSnapshot,
+        tuning: VoiceTuning
+    ) async {
+        do {
+            let response = try await send(
+                .regenerateVoiceCandidate(candidate.id, tuning: tuning)
+            )
+            guard case .voiceStudio(let studio) = response else {
+                try requireSuccess(response)
+                return
+            }
+            voiceStudio = studio
+        } catch {
+            presentError(error.localizedDescription)
+        }
     }
 
     func selectVoice(_ profile: VoiceProfileSnapshot) {
@@ -452,6 +473,40 @@ final class AppState {
             }
             return $0.displayName.localizedStandardCompare($1.displayName)
                 == .orderedAscending
+        }
+    }
+
+    func updateVoiceTuning(
+        _ profile: VoiceProfileSnapshot,
+        tuning: VoiceTuning
+    ) {
+        perform(.updateVoiceTuning(profile.id, tuning))
+    }
+
+    func duplicateVoice(
+        _ profile: VoiceProfileSnapshot,
+        name: String,
+        tuning: VoiceTuning
+    ) {
+        perform(.duplicateVoiceProfile(profile.id, name: name, tuning: tuning))
+    }
+
+    func previewVoiceProfile(
+        _ profile: VoiceProfileSnapshot,
+        tuning: VoiceTuning,
+        text: String
+    ) async {
+        do {
+            let response = try await send(
+                .previewVoiceProfile(profile.id, tuning: tuning, text: text)
+            )
+            guard case .file(let file) = response else {
+                try requireSuccess(response)
+                return
+            }
+            try voicePreview.play(data: file.data, id: profile.id)
+        } catch {
+            presentError(error.localizedDescription)
         }
     }
 
