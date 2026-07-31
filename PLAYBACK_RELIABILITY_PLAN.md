@@ -104,16 +104,40 @@ Status: complete
 
 ### M5 — Route, archive, and regression hardening
 
-Status: pending
+Status: complete with one packaging-environment limitation
 
-- [ ] Coalesce audio-configuration notifications.
-- [ ] Resume from a stable render-frame anchor with bounded retry/backoff.
-- [ ] Replace the failing direct AAC writer with a deterministic staged
-      conversion path.
-- [ ] Add route-change state-machine and archive format tests.
-- [ ] Run all Swift tests and repository validation scripts.
-- [ ] Build the release app with warnings treated as errors.
-- [ ] Update this document with final results and commit IDs.
+- [x] Coalesce audio-configuration notifications.
+- [x] Resume from a stable render-frame anchor with bounded retry/backoff.
+- [x] Replace the failing direct AAC writer with a deterministic staged
+      16-bit PCM MPEG-4 path that does not depend on an optional system encoder.
+- [x] Add route-change policy and archive format/cleanup tests.
+- [x] Run all Swift tests and repository validation scripts.
+- [x] Compile the complete Swift package in Release configuration.
+- [x] Regenerate the Xcode project successfully.
+- [ ] Package the Release app. The build script could not download its separate
+      Xcode package cache because network escalation was unavailable. This is an
+      environment limitation; compilation and tests use the same pinned package
+      graph and passed offline.
+- [x] Update this document with final results and commit IDs.
+
+## Final validation
+
+- Full Swift test suite: 190 tests in 43 suites passed.
+- Focused final route/archive/storage suite: 32 tests passed, followed by 15
+  archive and recovery tests after final naming and container assertions.
+- Model catalog, property list, and entitlements: valid.
+- Xcode project regeneration: succeeded and the generated project includes the
+  new source and test files.
+- Offline Release compilation: succeeded for all package products, including
+  the app and agent executables.
+- Release app packaging: not run to completion because Xcode attempted to
+  create a separate package cache from the network and the approval service was
+  unavailable. No code, test, catalog, or Release compiler failure remains.
+
+The M4A archive is now an audio-only MPEG-4 container with 16-bit PCM. This is
+larger than AAC but is deterministic, reopens successfully through
+`AVAudioFile`, preserves the conditioned samples without codec artifacts, and
+works on systems where the optional AAC encoder is unavailable.
 
 ## Validation matrix
 
@@ -137,5 +161,5 @@ Status: pending
 | M1 | `8ddf504` | 33 focused policy, service, and queue tests passed | complete |
 | M2 | `9432358` | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
 | M3 | `fa39a20` | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
-| M4 | milestone commit | 47 transport, protocol, HTTP, service, and transcript tests passed | complete |
-| M5 | pending | pending | pending |
+| M4 | `ea02de4` | 47 transport, protocol, HTTP, service, and transcript tests passed | complete |
+| M5 | milestone commit | 190 full-suite tests; catalog, project generation, and offline Release compilation passed | complete with packaging limitation |

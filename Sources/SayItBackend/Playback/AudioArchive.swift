@@ -19,39 +19,33 @@ actor AudioArchive {
         let format = try monoFormat(sampleRate: sampleRate)
         let filename = "\(requestID.uuidString).m4a"
         let url = directory.appending(path: filename)
-        let stagingURL = directory.appending(
-            path: "\(requestID.uuidString).partial.m4a"
+        let pcmStagingURL = directory.appending(
+            path: "\(requestID.uuidString).partial.wav"
         )
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 64_000,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
+        let m4aStagingURL = directory.appending(
+            path: "\(requestID.uuidString).partial.mp4"
+        )
         let fileManager = FileManager.default
 
-        try? fileManager.removeItem(at: stagingURL)
+        try? fileManager.removeItem(at: pcmStagingURL)
+        try? fileManager.removeItem(at: m4aStagingURL)
         do {
-            let file = try AVAudioFile(
-                forWriting: stagingURL,
-                settings: settings,
-                commonFormat: .pcmFormatFloat32,
-                interleaved: false
+            try stagePCM(
+                samples: samples,
+                format: format,
+                at: pcmStagingURL
             )
-            try write(samples: samples, format: format, to: file)
-            if fileManager.fileExists(atPath: url.path) {
-                _ = try fileManager.replaceItemAt(
-                    url,
-                    withItemAt: stagingURL
-                )
-            } else {
-                try fileManager.moveItem(at: stagingURL, to: url)
-            }
+            try writePCMMP4(
+                source: pcmStagingURL,
+                destination: m4aStagingURL
+            )
+            try install(stagingURL: m4aStagingURL, destinationURL: url)
         } catch {
-            try? fileManager.removeItem(at: stagingURL)
+            try? fileManager.removeItem(at: pcmStagingURL)
+            try? fileManager.removeItem(at: m4aStagingURL)
             throw error
         }
+        try? fileManager.removeItem(at: pcmStagingURL)
 
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         return AudioArchiveResult(
@@ -68,32 +62,33 @@ actor AudioArchive {
         let format = try monoFormat(sampleRate: source.sampleRate)
         let filename = "\(requestID.uuidString).m4a"
         let url = directory.appending(path: filename)
-        let stagingURL = directory.appending(
-            path: "\(requestID.uuidString).partial.m4a"
+        let pcmStagingURL = directory.appending(
+            path: "\(requestID.uuidString).partial.wav"
         )
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: source.sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 64_000,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
+        let m4aStagingURL = directory.appending(
+            path: "\(requestID.uuidString).partial.mp4"
+        )
         let fileManager = FileManager.default
 
-        try? fileManager.removeItem(at: stagingURL)
+        try? fileManager.removeItem(at: pcmStagingURL)
+        try? fileManager.removeItem(at: m4aStagingURL)
         do {
-            let file = try AVAudioFile(
-                forWriting: stagingURL,
-                settings: settings,
-                commonFormat: .pcmFormatFloat32,
-                interleaved: false
+            try stagePCM(
+                source: source,
+                format: format,
+                at: pcmStagingURL
             )
-            try write(source: source, format: format, to: file)
-            try install(stagingURL: stagingURL, destinationURL: url)
+            try writePCMMP4(
+                source: pcmStagingURL,
+                destination: m4aStagingURL
+            )
+            try install(stagingURL: m4aStagingURL, destinationURL: url)
         } catch {
-            try? fileManager.removeItem(at: stagingURL)
+            try? fileManager.removeItem(at: pcmStagingURL)
+            try? fileManager.removeItem(at: m4aStagingURL)
             throw error
         }
+        try? fileManager.removeItem(at: pcmStagingURL)
 
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         return AudioArchiveResult(
@@ -246,5 +241,90 @@ actor AudioArchive {
                 to: destinationURL
             )
         }
+    }
+
+    private func stagePCM(
+        samples: [Float],
+        format: AVAudioFormat,
+        at url: URL
+    ) throws {
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: stagingSettings(for: format),
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        try write(samples: samples, format: format, to: file)
+    }
+
+    private func stagePCM(
+        source: PCMStoreSnapshot,
+        format: AVAudioFormat,
+        at url: URL
+    ) throws {
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: stagingSettings(for: format),
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        try write(source: source, format: format, to: file)
+    }
+
+    private func writePCMMP4(
+        source: URL,
+        destination: URL
+    ) throws {
+        let input = try AVAudioFile(
+            forReading: source,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: input.processingFormat,
+            frameCapacity: AVAudioFrameCount(Self.writeChunkFrameCount)
+        ) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        var output: AVAudioFile? = try AVAudioFile(
+            forWriting: destination,
+            settings: stagingSettings(for: input.processingFormat),
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+
+        while input.framePosition < input.length {
+            let remaining = input.length - input.framePosition
+            let frameCount = AVAudioFrameCount(
+                min(
+                    remaining,
+                    AVAudioFramePosition(Self.writeChunkFrameCount)
+                )
+            )
+            try input.read(into: buffer, frameCount: frameCount)
+            guard buffer.frameLength > 0 else { break }
+            try output?.write(from: buffer)
+        }
+        output = nil
+
+        let verification = try AVAudioFile(forReading: destination)
+        guard verification.length > 0,
+              verification.processingFormat.channelCount > 0 else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+    }
+
+    private func stagingSettings(
+        for format: AVAudioFormat
+    ) -> [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: format.sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false
+        ]
     }
 }

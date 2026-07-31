@@ -27,6 +27,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private let timePitch = AVAudioUnitTimePitch()
     private var timelineTask: Task<Void, Never>?
     private var audioConfigurationTask: Task<Void, Never>?
+    private var audioConfigurationRecoveryTask: Task<Void, Never>?
     private var completionWatchdogTask: Task<Void, Never>?
     private var pcmStore: PCMStore?
     private var frameScheduler: PCMFrameScheduler?
@@ -45,6 +46,8 @@ final class PlaybackController: BackendPlaybackControlling {
     private var amplitudeWindowFrameCount = 1_200
     private var lastNowPlayingTimelineUpdate = Date.distantPast
     private var stopTransitionGeneration = 0
+    private var audioConfigurationRecoveryGeneration = 0
+    private var lastStablePlaybackTime: TimeInterval = 0
     private var playbackMode = PlaybackMode.progressive
     private var performanceByModelID: [
         String: SynthesisPerformanceEstimator
@@ -180,6 +183,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func play() {
+        cancelAudioConfigurationRecovery()
         do {
             try startPlayback()
         } catch {
@@ -189,7 +193,13 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func pause() {
         guard state == .playing else { return }
-        elapsed = currentPlaybackTime()
+        elapsed = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: currentPlaybackTime(),
+            duration: generatedDuration
+        )
+        lastStablePlaybackTime = elapsed
+        cancelAudioConfigurationRecovery()
         player.pause()
         state = .paused
         updateNowPlaying()
@@ -219,6 +229,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func performSmoothStop(duration: Duration) async {
+        cancelAudioConfigurationRecovery()
         stopTransitionGeneration &+= 1
         let generation = stopTransitionGeneration
         requestID = nil
@@ -291,6 +302,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func finishStopping() {
+        cancelAudioConfigurationRecovery()
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
@@ -306,6 +318,7 @@ final class PlaybackController: BackendPlaybackControlling {
         spokenChunks = []
         failureMessage = nil
         elapsed = 0
+        lastStablePlaybackTime = 0
         generatedDuration = 0
         estimatedDuration = 0
         scheduleOffset = 0
@@ -328,12 +341,14 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func seek(to seconds: TimeInterval) {
         guard hasStoredAudio else { return }
+        cancelAudioConfigurationRecovery()
         let target = min(max(seconds, 0), generatedDuration)
         let wasPlaying = state == .playing
 
         do {
             try rescheduleAudio(from: target)
             elapsed = target
+            lastStablePlaybackTime = target
             if wasPlaying {
                 try startPlayback()
             } else if target >= generatedDuration, synthesisIsComplete {
@@ -348,7 +363,12 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func skip(by seconds: TimeInterval) {
-        seek(to: currentPlaybackTime() + seconds)
+        let current = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: currentPlaybackTime(),
+            duration: generatedDuration
+        )
+        seek(to: current + seconds)
     }
 
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult {
@@ -428,6 +448,7 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         failureMessage = nil
         state = .playing
+        lastStablePlaybackTime = elapsed
         scheduleCompletionWatchdog()
         updateNowPlaying()
     }
@@ -674,6 +695,7 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask = nil
         invalidateScheduledAudio()
         elapsed = generatedDuration
+        lastStablePlaybackTime = elapsed
         state = .finished
         updateNowPlaying()
     }
@@ -751,6 +773,7 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func enterBufferingState() {
         elapsed = generatedDuration
+        lastStablePlaybackTime = elapsed
         invalidateScheduledAudio()
         scheduleOffset = elapsed
         state = .buffering
@@ -764,6 +787,7 @@ final class PlaybackController: BackendPlaybackControlling {
                 guard let self else { return }
                 if self.state == .playing {
                     self.elapsed = self.currentPlaybackTime()
+                    self.lastStablePlaybackTime = self.elapsed
                     self.updateNowPlaying(throttleTimeline: true)
                 }
             }
@@ -778,37 +802,103 @@ final class PlaybackController: BackendPlaybackControlling {
                 object: engine
             ) {
                 guard !Task.isCancelled, let self else { return }
-                self.audioConfigurationDidChange()
+                self.scheduleAudioConfigurationRecovery()
             }
         }
     }
 
-    private func audioConfigurationDidChange() {
+    private func scheduleAudioConfigurationRecovery() {
         guard !isReconfiguringAudioGraph,
               configuredSampleRate != nil,
-              hasStoredAudio else {
+              hasStoredAudio,
+              state != .idle,
+              state != .finished else {
             return
         }
         let previousState = state
-        let shouldResume = previousState == .playing
-        let resumeTime = currentPlaybackTime()
-
-        do {
-            invalidateScheduledAudio()
-            configuredSampleRate = nil
-            let format = try monoFormat(sampleRate: sampleRate)
-            try configureAudioGraph(for: format)
-            try rescheduleAudio(from: resumeTime)
-            elapsed = resumeTime
-            if shouldResume {
-                try startPlayback()
-            } else {
-                state = previousState == .failed ? .paused : previousState
-                updateNowPlaying()
+        let resumeTime = AudioRouteRecoveryPolicy.stableAnchor(
+            lastRendered: lastStablePlaybackTime,
+            fallback: elapsed,
+            duration: generatedDuration
+        )
+        audioConfigurationRecoveryGeneration &+= 1
+        let generation = audioConfigurationRecoveryGeneration
+        audioConfigurationRecoveryTask?.cancel()
+        audioConfigurationRecoveryTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(
+                    for: AudioRouteRecoveryPolicy.debounceDelay
+                )
+                var lastError: Error?
+                for delay in AudioRouteRecoveryPolicy.retryDelays {
+                    if delay > .zero {
+                        try await Task.sleep(for: delay)
+                    }
+                    guard let self,
+                          generation
+                            == self.audioConfigurationRecoveryGeneration,
+                          self.hasStoredAudio else {
+                        return
+                    }
+                    do {
+                        try self.recoverAudioConfiguration(
+                            from: resumeTime,
+                            previousState: previousState
+                        )
+                        self.audioConfigurationRecoveryTask = nil
+                        return
+                    } catch {
+                        lastError = error
+                        guard AudioRouteRecoveryPolicy.canRetry(error) else {
+                            break
+                        }
+                    }
+                }
+                guard let self,
+                      generation
+                        == self.audioConfigurationRecoveryGeneration,
+                      let lastError else {
+                    return
+                }
+                self.audioConfigurationRecoveryTask = nil
+                self.reportFailure(lastError)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      generation
+                        == self.audioConfigurationRecoveryGeneration else {
+                    return
+                }
+                self.audioConfigurationRecoveryTask = nil
+                self.reportFailure(error)
             }
-        } catch {
-            reportFailure(error, shouldResume: shouldResume)
         }
+    }
+
+    private func recoverAudioConfiguration(
+        from resumeTime: TimeInterval,
+        previousState: PlaybackState
+    ) throws {
+        invalidateScheduledAudio()
+        configuredSampleRate = nil
+        let format = try monoFormat(sampleRate: sampleRate)
+        try configureAudioGraph(for: format)
+        try rescheduleAudio(from: resumeTime)
+        elapsed = resumeTime
+        lastStablePlaybackTime = resumeTime
+        if previousState == .playing {
+            try startPlayback()
+        } else {
+            state = previousState == .failed ? .paused : previousState
+            updateNowPlaying()
+        }
+    }
+
+    private func cancelAudioConfigurationRecovery() {
+        audioConfigurationRecoveryGeneration &+= 1
+        audioConfigurationRecoveryTask?.cancel()
+        audioConfigurationRecoveryTask = nil
     }
 
     private func monoFormat(sampleRate: Double) throws -> AVAudioFormat {
@@ -868,6 +958,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func reportFailure(_ error: Error, shouldResume: Bool = false) {
+        cancelAudioConfigurationRecovery()
         if shouldResume {
             elapsed = currentPlaybackTime()
         }

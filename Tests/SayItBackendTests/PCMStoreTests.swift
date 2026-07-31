@@ -87,6 +87,36 @@ struct PCMStoreTests {
         #expect(file.length == AVAudioFramePosition(samples.count))
         #expect(file.processingFormat.sampleRate == 24_000)
     }
+
+    @Test("Snapshot streams to a playable M4A")
+    func snapshotM4A() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "PCMStoreTests")
+        defer { fixture.remove() }
+        let store = try PCMStore(
+            sampleRate: 24_000,
+            directory: fixture.root
+        )
+        let samples = (0..<120_000).map { frame in
+            Float(sin(Double(frame) / 20) * 0.1)
+        }
+        try store.append(samples)
+        let archive = AudioArchive(directory: fixture.root)
+
+        let result = try await archive.writeM4A(
+            source: store.snapshot(),
+            requestID: UUID()
+        )
+
+        let file = try AVAudioFile(
+            forReading: fixture.root.appending(path: result.relativePath)
+        )
+        #expect(file.length == AVAudioFramePosition(samples.count))
+        #expect(file.processingFormat.sampleRate == 24_000)
+        let names = try FileManager.default.contentsOfDirectory(
+            atPath: fixture.root.path
+        )
+        #expect(!names.contains { $0.contains(".partial.") })
+    }
 }
 
 @Suite("Bounded PCM frame scheduler")
