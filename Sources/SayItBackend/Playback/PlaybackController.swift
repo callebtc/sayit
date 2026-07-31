@@ -9,7 +9,6 @@ import SayItProtocol
 @MainActor
 @Observable
 final class PlaybackController: BackendPlaybackControlling {
-    private static let baseStartBufferDuration: TimeInterval = 1.2
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
     static let modelSwitchFadeStepCount = 8
     static let highQualityTimePitchOverlap: Float = 32
@@ -17,7 +16,7 @@ final class PlaybackController: BackendPlaybackControlling {
     static func preferredStartBufferDuration(
         for rate: Double
     ) -> TimeInterval {
-        baseStartBufferDuration * max(rate, 1)
+        PlaybackBufferPolicy.progressiveBaseLead * max(rate, 1)
     }
 
     private let engine = AVAudioEngine()
@@ -40,6 +39,10 @@ final class PlaybackController: BackendPlaybackControlling {
     private var amplitudeWindowFrameCount = 1_200
     private var lastNowPlayingTimelineUpdate = Date.distantPast
     private var stopTransitionGeneration = 0
+    private var playbackMode = PlaybackMode.progressive
+    private var performanceByModelID: [
+        String: SynthesisPerformanceEstimator
+    ] = [:]
 
     @ObservationIgnored
     var onFailure: (@MainActor (String) -> Void)?
@@ -55,14 +58,16 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
     var preferredStartBufferDuration: TimeInterval {
-        Self.preferredStartBufferDuration(for: rate)
+        bufferPolicy.preferredSourceLead
     }
     var shouldStartWhenBuffered: Bool {
         guard state == .preparing || state == .buffering else {
             return false
         }
-        return synthesisIsComplete
-            || bufferedDuration >= preferredStartBufferDuration
+        return bufferPolicy.shouldStart(
+            synthesisIsComplete: synthesisIsComplete,
+            bufferedDuration: bufferedDuration
+        )
     }
     var showTitleInNowPlaying = false {
         didSet { updateNowPlaying() }
@@ -151,6 +156,18 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
         spokenChunks.append(chunk)
+    }
+
+    func setPlaybackMode(_ mode: PlaybackMode) {
+        playbackMode = mode
+    }
+
+    func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
+        guard let currentModelID else { return }
+        var estimator = performanceByModelID[currentModelID]
+            ?? SynthesisPerformanceEstimator()
+        estimator.record(metrics)
+        performanceByModelID[currentModelID] = estimator
     }
 
     func play() {
@@ -571,6 +588,16 @@ final class PlaybackController: BackendPlaybackControlling {
             ? currentPlaybackTime()
             : elapsed
         return max(generatedDuration - playbackPosition, 0)
+    }
+
+    private var bufferPolicy: PlaybackBufferPolicy {
+        PlaybackBufferPolicy(
+            mode: playbackMode,
+            rate: rate,
+            estimator: currentModelID.flatMap {
+                performanceByModelID[$0]
+            } ?? SynthesisPerformanceEstimator()
+        )
     }
 
     private func enterBufferingState() {

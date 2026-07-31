@@ -1605,6 +1605,7 @@ public final class SayItBackendService: SayItService {
         playback.rate = validatedPlaybackRate(
             submission.playbackRate ?? settings.playbackRate
         )
+        playback.setPlaybackMode(request.model.playbackMode)
         playback.prepare(
             requestID: request.id,
             title: cleaned.title,
@@ -1678,6 +1679,7 @@ public final class SayItBackendService: SayItService {
                 updateJob(request.id, state: .buffering, progress: 0.2)
             }
         case .metrics(let metrics):
+            playback.observeSynthesisMetrics(metrics)
             await diagnostics.record(
                 DiagnosticEvent(
                     severity: .info,

@@ -41,24 +41,24 @@ voice, model-switching, and Now Playing behavior.
 
 ### M0 — Plan and baseline
 
-Status: in progress
+Status: complete
 
 - [x] Create an isolated worktree and feature branch.
 - [x] Document findings, scope, milestones, and validation.
-- [ ] Commit the plan.
+- [x] Commit the plan.
 
 ### M1 — Adaptive playback policy
 
-Status: pending
+Status: complete
 
-- [ ] Pass `PlaybackMode` into playback preparation.
-- [ ] Honor progressive, buffered, and complete-first start behavior.
-- [ ] Track synthesis real-time factor with a bounded estimator.
-- [ ] Use playback rate and observed generation latency to maintain adaptive
+- [x] Pass `PlaybackMode` into playback preparation.
+- [x] Honor progressive, buffered, and complete-first start behavior.
+- [x] Track synthesis real-time factor with a bounded estimator.
+- [x] Use playback rate and observed generation latency to maintain adaptive
       start and resume watermarks.
-- [ ] Detect unsustainable streaming and defer playback until completion rather
+- [x] Detect unsustainable streaming and defer playback until completion rather
       than repeatedly underrunning.
-- [ ] Add deterministic policy tests covering playback modes, rates, jitter,
+- [x] Add deterministic policy tests covering playback modes, rates, jitter,
       sustainable generation, and slow generation.
 
 ### M2 — Artifact-safe PCM and transitions
@@ -133,8 +133,8 @@ Status: pending
 
 | Milestone | Commit | Validation | Status |
 | --- | --- | --- | --- |
-| M0 | pending | Baseline focused build and tests recorded | in progress |
-| M1 | pending | pending | pending |
+| M0 | `4cd22de` | Baseline focused build and tests recorded | complete |
+| M1 | milestone commit | 33 focused policy, service, and queue tests passed | complete |
 | M2 | pending | pending | pending |
 | M3 | pending | pending | pending |
 | M4 | pending | pending | pending |

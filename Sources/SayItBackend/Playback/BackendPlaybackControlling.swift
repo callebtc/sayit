@@ -28,8 +28,20 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     )
     func setSpokenText(_ text: String)
     func appendSpokenChunk(_ chunk: PlaybackTextChunk)
+    func setPlaybackMode(_ mode: PlaybackMode)
+    func observeSynthesisMetrics(_ metrics: SynthesisMetrics)
     func stopForModelSwitch() async
     func finishBuffering()
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult
     func playFile(at url: URL, title: String, modelID: String?) throws
+}
+
+extension BackendPlaybackControlling {
+    func setPlaybackMode(_ mode: PlaybackMode) {
+        _ = mode
+    }
+
+    func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
+        _ = metrics
+    }
 }
