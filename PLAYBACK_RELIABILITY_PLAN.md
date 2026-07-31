@@ -77,15 +77,15 @@ Status: complete
 
 ### M3 — Bounded storage and scheduling
 
-Status: pending
+Status: complete
 
-- [ ] Introduce an incrementally written temporary PCM store.
-- [ ] Keep only a bounded scheduling horizon in `AVAudioPlayerNode`.
-- [ ] Implement seek and replay scheduling from file segments without creating
+- [x] Introduce an incrementally written temporary PCM store.
+- [x] Keep only a bounded scheduling horizon in `AVAudioPlayerNode`.
+- [x] Implement seek and replay scheduling from file segments without creating
       an array containing the entire remaining recording.
-- [ ] Finalize history/export from the PCM store without retaining the complete
+- [x] Finalize history/export from the PCM store without retaining the complete
       document in memory.
-- [ ] Add bounded-memory, long-stream, seek, cancellation, and cleanup tests.
+- [x] Add bounded-memory, long-stream, seek, cancellation, and cleanup tests.
 
 ### M4 — State transport and transcript performance
 
@@ -135,7 +135,7 @@ Status: pending
 | --- | --- | --- | --- |
 | M0 | `4cd22de` | Baseline focused build and tests recorded | complete |
 | M1 | `8ddf504` | 33 focused policy, service, and queue tests passed | complete |
-| M2 | milestone commit | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
-| M3 | pending | pending | pending |
+| M2 | `9432358` | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
+| M3 | milestone commit | 48 storage, scheduler, DSP, service, and queue tests passed | complete |
 | M4 | pending | pending | pending |
 | M5 | pending | pending | pending |

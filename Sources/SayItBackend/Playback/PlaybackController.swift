@@ -12,6 +12,9 @@ final class PlaybackController: BackendPlaybackControlling {
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
     static let modelSwitchFadeStepCount = 8
     static let highQualityTimePitchOverlap: Float = 32
+    static let schedulingHorizon: TimeInterval = 12
+    static let schedulingChunkDuration: TimeInterval = 2
+    static let fileReadFrameCount = 65_536
 
     static func preferredStartBufferDuration(
         for rate: Double
@@ -25,13 +28,15 @@ final class PlaybackController: BackendPlaybackControlling {
     private var timelineTask: Task<Void, Never>?
     private var audioConfigurationTask: Task<Void, Never>?
     private var completionWatchdogTask: Task<Void, Never>?
-    private var accumulatedSamples: [Float] = []
+    private var pcmStore: PCMStore?
+    private var frameScheduler: PCMFrameScheduler?
     private var sampleRate: Double = 24_000
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
     private var scheduleGeneration = 0
     private var scheduledBufferCount = 0
+    private var shouldFadeInNextScheduledBuffer = false
     private var synthesisIsComplete = false
     private var isReconfiguringAudioGraph = false
     private var amplitudeWindows: [Float] = []
@@ -125,26 +130,28 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func enqueue(_ chunk: AudioChunk) throws {
         guard chunk.requestID == requestID else { return }
-        if !accumulatedSamples.isEmpty,
-           !sampleRatesMatch(sampleRate, chunk.sampleRate) {
+        guard !chunk.samples.isEmpty else {
+            throw PlaybackError.emptyAudio
+        }
+        if let pcmStore,
+           !sampleRatesMatch(pcmStore.sampleRate, chunk.sampleRate) {
             throw PlaybackError.inconsistentSampleRate
         }
-        let buffer = try makeBuffer(
-            samples: chunk.samples,
-            sampleRate: chunk.sampleRate
-        )
-        try prepareAudioGraph(for: buffer.format)
-        try validatePlayerFormat(for: buffer)
-        schedule(buffer)
-
-        if accumulatedSamples.isEmpty {
+        if pcmStore == nil {
             sampleRate = chunk.sampleRate
+            pcmStore = try PCMStore(sampleRate: chunk.sampleRate)
+            frameScheduler = makeFrameScheduler(sampleRate: chunk.sampleRate)
             resetAmplitudeAnalysis(sampleRate: chunk.sampleRate)
         }
 
-        accumulatedSamples.append(contentsOf: chunk.samples)
-        generatedDuration = Double(accumulatedSamples.count) / sampleRate
+        guard let pcmStore else {
+            throw PlaybackError.emptyAudio
+        }
+        try pcmStore.append(chunk.samples)
+        generatedDuration = Double(pcmStore.frameCount) / sampleRate
         appendAmplitudeSamples(chunk.samples)
+        try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+        try scheduleAvailableAudio()
         if state == .preparing || state == .buffering {
             state = .buffering
         }
@@ -216,7 +223,7 @@ final class PlaybackController: BackendPlaybackControlling {
         let generation = stopTransitionGeneration
         requestID = nil
 
-        guard player.isPlaying, !accumulatedSamples.isEmpty else {
+        guard player.isPlaying, hasStoredAudio else {
             finishStopping()
             return
         }
@@ -242,23 +249,26 @@ final class PlaybackController: BackendPlaybackControlling {
         requestedDuration: Duration
     ) throws -> Duration {
         let target = min(max(seconds, 0), generatedDuration)
+        guard let pcmStore else {
+            return .zero
+        }
         let startFrame = min(
-            Int(target * sampleRate),
-            accumulatedSamples.count
+            Int64(target * sampleRate),
+            pcmStore.frameCount
         )
-        guard startFrame < accumulatedSamples.count else {
+        guard startFrame < pcmStore.frameCount else {
             return .zero
         }
         let requestedSeconds = Self.timeInterval(for: requestedDuration)
         let requestedFrames = max(Int(requestedSeconds * sampleRate), 1)
-        let endFrame = min(
-            startFrame + requestedFrames,
-            accumulatedSamples.count
+        let samples = try pcmStore.readFrames(
+            startingAt: startFrame,
+            count: requestedFrames
         )
-        let samples = PCMTransitionRamp.fadeOut(
-            Array(accumulatedSamples[startFrame..<endFrame])
+        let buffer = try makeBuffer(
+            samples: PCMTransitionRamp.fadeOut(samples),
+            sampleRate: sampleRate
         )
-        let buffer = try makeBuffer(samples: samples, sampleRate: sampleRate)
 
         invalidateScheduledAudio()
         scheduleOffset = target
@@ -268,7 +278,7 @@ final class PlaybackController: BackendPlaybackControlling {
             try ensureEngineRunning()
         }
         try validatePlayerFormat(for: buffer)
-        schedule(buffer)
+        player.scheduleBuffer(buffer)
         player.volume = 1
         player.play()
         return .seconds(Double(samples.count) / sampleRate)
@@ -286,7 +296,8 @@ final class PlaybackController: BackendPlaybackControlling {
         invalidateScheduledAudio()
         engine.pause()
         player.volume = 1
-        accumulatedSamples.removeAll(keepingCapacity: false)
+        pcmStore = nil
+        frameScheduler = nil
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil
         currentTitle = ""
@@ -316,7 +327,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func seek(to seconds: TimeInterval) {
-        guard !accumulatedSamples.isEmpty else { return }
+        guard hasStoredAudio else { return }
         let target = min(max(seconds, 0), generatedDuration)
         let wasPlaying = state == .playing
 
@@ -341,12 +352,12 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult {
-        guard let requestID, !accumulatedSamples.isEmpty else {
+        guard let requestID, let pcmStore, pcmStore.frameCount > 0 else {
             throw SynthesisError.generatedNoAudio
         }
+        let snapshot = try pcmStore.snapshot()
         return try await archive.writeM4A(
-            samples: accumulatedSamples,
-            sampleRate: sampleRate,
+            source: snapshot,
             requestID: requestID
         )
     }
@@ -357,52 +368,48 @@ final class PlaybackController: BackendPlaybackControlling {
             commonFormat: .pcmFormatFloat32,
             interleaved: false
         )
-        guard file.length > 0,
-              file.length <= AVAudioFramePosition(UInt32.max),
-              let buffer = AVAudioPCMBuffer(
-                pcmFormat: file.processingFormat,
-                frameCapacity: AVAudioFrameCount(file.length)
-              ) else {
+        guard file.length > 0 else {
             throw PlaybackError.unsupportedAudioFile
         }
-        try file.read(into: buffer)
-        let samples = try monoSamples(from: buffer)
-        let monoBuffer = try makeBuffer(
-            samples: samples,
-            sampleRate: file.processingFormat.sampleRate
-        )
 
         stop()
         requestID = UUID()
         currentTitle = title
         currentModelID = modelID
         sampleRate = file.processingFormat.sampleRate
-        accumulatedSamples = samples
-        generatedDuration = Double(samples.count) / sampleRate
-        estimatedDuration = generatedDuration
-        synthesisIsComplete = true
+        pcmStore = try PCMStore(sampleRate: sampleRate)
+        frameScheduler = makeFrameScheduler(sampleRate: sampleRate)
         resetAmplitudeAnalysis(sampleRate: sampleRate)
-        appendAmplitudeSamples(samples)
 
-        try prepareAudioGraph(for: monoBuffer.format)
-        try validatePlayerFormat(for: monoBuffer)
-        schedule(monoBuffer)
-        try startPlayback()
+        do {
+            try importAudioFile(file)
+            guard hasStoredAudio else {
+                throw PlaybackError.unsupportedAudioFile
+            }
+            generatedDuration = Double(pcmStore?.frameCount ?? 0) / sampleRate
+            estimatedDuration = generatedDuration
+            synthesisIsComplete = true
+            try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+            try scheduleAvailableAudio()
+            try startPlayback()
+        } catch {
+            stop()
+            throw error
+        }
     }
 
     func exportWAV(to destination: URL, using archive: AudioArchive) async throws {
-        guard !accumulatedSamples.isEmpty else {
+        guard let pcmStore, pcmStore.frameCount > 0 else {
             throw SynthesisError.generatedNoAudio
         }
         try await archive.writeWAV(
-            samples: accumulatedSamples,
-            sampleRate: sampleRate,
+            source: pcmStore.snapshot(),
             destination: destination
         )
     }
 
     private func startPlayback() throws {
-        guard !accumulatedSamples.isEmpty else { return }
+        guard hasStoredAudio else { return }
 
         if state == .finished {
             try rescheduleAudio(from: 0)
@@ -551,7 +558,10 @@ final class PlaybackController: BackendPlaybackControlling {
         return samples
     }
 
-    private func schedule(_ buffer: AVAudioPCMBuffer) {
+    private func schedule(
+        _ buffer: AVAudioPCMBuffer,
+        sourceFrameCount: Int64
+    ) {
         let generation = scheduleGeneration
         scheduledBufferCount += 1
         player.scheduleBuffer(
@@ -559,14 +569,27 @@ final class PlaybackController: BackendPlaybackControlling {
             completionCallbackType: .dataPlayedBack
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.scheduledBufferFinished(generation: generation)
+                self?.scheduledBufferFinished(
+                    generation: generation,
+                    frameCount: sourceFrameCount
+                )
             }
         }
     }
 
-    private func scheduledBufferFinished(generation: Int) {
+    private func scheduledBufferFinished(
+        generation: Int,
+        frameCount: Int64
+    ) {
         guard generation == scheduleGeneration else { return }
         scheduledBufferCount = max(scheduledBufferCount - 1, 0)
+        frameScheduler?.didComplete(frameCount: frameCount)
+        do {
+            try scheduleAvailableAudio()
+        } catch {
+            reportFailure(error)
+            return
+        }
         finishPlaybackIfReady()
     }
 
@@ -575,34 +598,60 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask = nil
         scheduleGeneration &+= 1
         scheduledBufferCount = 0
+        if var frameScheduler {
+            frameScheduler.reset(startingAt: frameScheduler.nextFrame)
+            self.frameScheduler = frameScheduler
+        }
         player.stop()
     }
 
     private func rescheduleAudio(from seconds: TimeInterval) throws {
         let target = min(max(seconds, 0), generatedDuration)
         invalidateScheduledAudio()
-        scheduleOffset = target
+        let availableFrameCount = pcmStore?.frameCount ?? 0
         let startFrame = min(
-            Int(target * sampleRate),
-            accumulatedSamples.count
+            Int64((target * sampleRate).rounded(.down)),
+            availableFrameCount
         )
-        guard startFrame < accumulatedSamples.count else { return }
-        let remaining = Array(accumulatedSamples[startFrame...])
-        let buffer = try makeBuffer(
-            samples: PCMTransitionRamp.fadeInHead(
-                remaining,
-                frameCount: transitionFrameCount
-            ),
-            sampleRate: sampleRate
-        )
+        scheduleOffset = Double(startFrame) / sampleRate
+        frameScheduler?.reset(startingAt: startFrame)
+        shouldFadeInNextScheduledBuffer = startFrame < availableFrameCount
+        try scheduleAvailableAudio()
+    }
 
-        if configuredSampleRate == nil {
-            try prepareAudioGraph(for: buffer.format)
-        } else {
-            try ensureEngineRunning()
+    private func scheduleAvailableAudio() throws {
+        guard let pcmStore, var frameScheduler else { return }
+        while let range = frameScheduler.nextRange(
+            availableFrameCount: pcmStore.frameCount
+        ) {
+            var samples = try pcmStore.readFrames(
+                startingAt: range.lowerBound,
+                count: Int(range.count)
+            )
+            guard samples.count == range.count else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            if shouldFadeInNextScheduledBuffer {
+                samples = PCMTransitionRamp.fadeInHead(
+                    samples,
+                    frameCount: transitionFrameCount
+                )
+                shouldFadeInNextScheduledBuffer = false
+            }
+            let buffer = try makeBuffer(
+                samples: samples,
+                sampleRate: sampleRate
+            )
+            if configuredSampleRate == nil {
+                try prepareAudioGraph(for: buffer.format)
+            } else {
+                try ensureEngineRunning()
+            }
+            try validatePlayerFormat(for: buffer)
+            schedule(buffer, sourceFrameCount: Int64(range.count))
+            frameScheduler.didSchedule(range)
         }
-        try validatePlayerFormat(for: buffer)
-        schedule(buffer)
+        self.frameScheduler = frameScheduler
     }
 
     private func currentPlaybackTime() -> TimeInterval {
@@ -630,7 +679,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func finishPlaybackIfReady() {
-        guard !accumulatedSamples.isEmpty,
+        guard hasStoredAudio,
               scheduledBufferCount == 0 else {
             return
         }
@@ -737,7 +786,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private func audioConfigurationDidChange() {
         guard !isReconfiguringAudioGraph,
               configuredSampleRate != nil,
-              !accumulatedSamples.isEmpty else {
+              hasStoredAudio else {
             return
         }
         let previousState = state
@@ -772,6 +821,46 @@ final class PlaybackController: BackendPlaybackControlling {
             throw PlaybackError.audioFormatMismatch
         }
         return format
+    }
+
+    private var hasStoredAudio: Bool {
+        (pcmStore?.frameCount ?? 0) > 0
+    }
+
+    private func makeFrameScheduler(
+        sampleRate: Double,
+        startingAt startFrame: Int64 = 0
+    ) -> PCMFrameScheduler {
+        PCMFrameScheduler(
+            sampleRate: sampleRate,
+            horizonDuration: Self.schedulingHorizon,
+            chunkDuration: Self.schedulingChunkDuration,
+            startingAt: startFrame
+        )
+    }
+
+    private func importAudioFile(_ file: AVAudioFile) throws {
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: file.processingFormat,
+            frameCapacity: AVAudioFrameCount(Self.fileReadFrameCount)
+        ) else {
+            throw PlaybackError.unsupportedAudioFile
+        }
+
+        while file.framePosition < file.length {
+            let remaining = file.length - file.framePosition
+            let frameCount = AVAudioFrameCount(
+                min(
+                    remaining,
+                    AVAudioFramePosition(Self.fileReadFrameCount)
+                )
+            )
+            try file.read(into: buffer, frameCount: frameCount)
+            guard buffer.frameLength > 0 else { break }
+            let samples = try monoSamples(from: buffer)
+            try pcmStore?.append(samples)
+            appendAmplitudeSamples(samples)
+        }
     }
 
     private func sampleRatesMatch(_ lhs: Double, _ rhs: Double) -> Bool {

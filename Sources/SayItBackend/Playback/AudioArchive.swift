@@ -61,6 +61,48 @@ actor AudioArchive {
         )
     }
 
+    func writeM4A(
+        source: PCMStoreSnapshot,
+        requestID: UUID
+    ) throws -> AudioArchiveResult {
+        let format = try monoFormat(sampleRate: source.sampleRate)
+        let filename = "\(requestID.uuidString).m4a"
+        let url = directory.appending(path: filename)
+        let stagingURL = directory.appending(
+            path: "\(requestID.uuidString).partial.m4a"
+        )
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: source.sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 64_000,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        let fileManager = FileManager.default
+
+        try? fileManager.removeItem(at: stagingURL)
+        do {
+            let file = try AVAudioFile(
+                forWriting: stagingURL,
+                settings: settings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            )
+            try write(source: source, format: format, to: file)
+            try install(stagingURL: stagingURL, destinationURL: url)
+        } catch {
+            try? fileManager.removeItem(at: stagingURL)
+            throw error
+        }
+
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        return AudioArchiveResult(
+            relativePath: filename,
+            byteCount: Int64(size),
+            duration: Double(source.frameCount) / source.sampleRate
+        )
+    }
+
     func writeWAV(
         samples: [Float],
         sampleRate: Double,
@@ -72,6 +114,18 @@ actor AudioArchive {
             settings: format.settings
         )
         try write(samples: samples, format: format, to: file)
+    }
+
+    func writeWAV(
+        source: PCMStoreSnapshot,
+        destination: URL
+    ) throws {
+        let format = try monoFormat(sampleRate: source.sampleRate)
+        let file = try AVAudioFile(
+            forWriting: destination,
+            settings: format.settings
+        )
+        try write(source: source, format: format, to: file)
     }
 
     func convertToWAV(source: URL, destination: URL) throws {
@@ -150,6 +204,47 @@ actor AudioArchive {
             }
             try file.write(from: buffer)
             offset += frameCount
+        }
+    }
+
+    private func write(
+        source: PCMStoreSnapshot,
+        format: AVAudioFormat,
+        to file: AVAudioFile
+    ) throws {
+        guard source.frameCount > 0,
+              source.sampleRate.isFinite,
+              source.sampleRate > 0 else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        var offset: Int64 = 0
+        while offset < source.frameCount {
+            let frameCount = min(
+                Self.writeChunkFrameCount,
+                Int(source.frameCount - offset)
+            )
+            let samples = try source.readFrames(
+                startingAt: offset,
+                count: frameCount
+            )
+            try write(samples: samples, format: format, to: file)
+            offset += Int64(samples.count)
+        }
+    }
+
+    private func install(stagingURL: URL, destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            _ = try fileManager.replaceItemAt(
+                destinationURL,
+                withItemAt: stagingURL
+            )
+        } else {
+            try fileManager.moveItem(
+                at: stagingURL,
+                to: destinationURL
+            )
         }
     }
 }
