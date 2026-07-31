@@ -1123,6 +1123,7 @@ private final class ServiceFixture {
             referenceFilename: "reference.wav",
             createdAt: now,
             updatedAt: now,
+            sortOrder: 0,
             tuning: VoiceTuning(),
             generationSeed: nil
         )

@@ -156,7 +156,7 @@ struct VoiceProfileStoreTests {
         )
 
         #expect(
-            store.snapshots.map(\.id) == [third.id, second.id, first.id]
+            store.snapshots.map(\.id) == [second.id, third.id, first.id]
         )
         #expect(
             Set(store.records(modelID: "model-a").map(\.id))
@@ -192,6 +192,96 @@ struct VoiceProfileStoreTests {
         #expect(throws: ServiceFailure.self) {
             _ = try store.rename(id: UUID(), name: "Missing")
         }
+    }
+
+    @Test("Reordering persists and rejects mismatched voice lists")
+    @MainActor
+    func profileReordering() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let first = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let second = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Silver Lark"
+        )
+        let third = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Velvet Finch"
+        )
+        let other = try store.saveGenerated(
+            makeDraft(directories: directories, modelID: "other-model"),
+            name: "Cobalt Wren"
+        )
+
+        try store.reorder(
+            modelID: "omnivoice",
+            orderedIDs: [third.id, first.id, second.id]
+        )
+        #expect(
+            store.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+        #expect(store.record(id: first.id)?.sortOrder == 1)
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        #expect(
+            reloaded.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(modelID: "omnivoice", orderedIDs: [first.id])
+        }
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(
+                modelID: "omnivoice",
+                orderedIDs: [first.id, second.id, other.id]
+            )
+        }
+        #expect(throws: ServiceFailure.self) {
+            try store.reorder(modelID: "../escape", orderedIDs: [])
+        }
+        #expect(
+            store.snapshots.map(\.id)
+                == [third.id, first.id, second.id, other.id]
+        )
+    }
+
+    @Test("Profiles saved before sort order existed decode with defaults")
+    @MainActor
+    func legacyProfilesDecodeWithoutSortOrder() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItVoiceTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let saved = try store.saveGenerated(
+            makeDraft(directories: directories),
+            name: "Amber Brook"
+        )
+        let metadata = directories.voiceProfiles
+            .appending(path: "omnivoice")
+            .appending(path: saved.id.uuidString)
+            .appending(path: "profile.json")
+        var json = try #require(
+            JSONSerialization.jsonObject(
+                with: Data(contentsOf: metadata)
+            ) as? [String: Any]
+        )
+        json["sortOrder"] = nil
+        try JSONSerialization.data(withJSONObject: json)
+            .write(to: metadata)
+
+        let reloaded = VoiceProfileStore(directories: directories)
+        let record = try #require(reloaded.record(id: saved.id))
+        #expect(record.sortOrder == 0)
+        #expect(reloaded.snapshots.map(\.id) == [saved.id])
     }
 
     @Test("Missing and external profile sources are rejected")

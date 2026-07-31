@@ -295,71 +295,130 @@ struct VoiceCloneWizard: View {
                 }
                 .sayItCard()
 
-                VStack(spacing: DesignTokens.standardSpacing) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(
-                            recorder.duration.formatted(
-                                .number.precision(.fractionLength(1))
-                            ) + " s"
-                        )
-                        .font(.title3.monospacedDigit().weight(.medium))
-                        .contentTransition(
-                            .numericText(value: recorder.duration.rounded())
-                        )
-                        .animation(
-                            DesignTokens.quickAnimation,
-                            value: recorder.duration.rounded()
-                        )
-                        Spacer()
-                        Text(targetDurationText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    VoiceLevelMeter(level: recorder.level, peak: recorder.peak)
-
-                    ZStack {
-                        recordButton
-                        HStack {
-                            Spacer()
-                            if showsRecordingPlayback, let referenceURL {
-                                Button {
-                                    play(url: referenceURL)
-                                } label: {
-                                    Image(
-                                        systemName: state.voicePreview.isPlaying
-                                            ? "stop.fill"
-                                            : "play.fill"
-                                    )
-                                    .contentTransition(.symbolEffect(.replace.offUp))
-                                }
-                                .buttonStyle(CircularIconButtonStyle(size: 32))
-                                .accessibilityLabel(
-                                    state.voicePreview.isPlaying
-                                        ? "Stop recording playback"
-                                        : "Play recording"
-                                )
-                                .transition(
-                                    .opacity.combined(with: .scale(scale: 0.6))
-                                )
-                            }
-                        }
-                    }
-                    .frame(height: 54)
-                    .animation(
-                        DesignTokens.springAnimation,
-                        value: showsRecordingPlayback
-                    )
-                }
-                .sayItCard()
+                recordingCard
 
                 microphoneStatusCard
-
-                statusMessages
             }
             .padding(DesignTokens.generousSpacing)
         }
         .scrollIndicators(.never)
+    }
+
+    private var recordingCard: some View {
+        VStack(spacing: DesignTokens.generousSpacing) {
+            Text("RECORD")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 2) {
+                Text(durationText)
+                    .font(.title.monospacedDigit().weight(.medium))
+                    .contentTransition(
+                        .numericText(value: recorder.duration.rounded())
+                    )
+                    .animation(
+                        DesignTokens.quickAnimation,
+                        value: recorder.duration.rounded()
+                    )
+                Text(targetDurationText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VoiceLevelMeter(level: recorder.level, peak: recorder.peak)
+
+            HStack(spacing: DesignTokens.generousSpacing) {
+                ZStack {
+                    if showsRecordingPlayback, let referenceURL {
+                        Button {
+                            play(url: referenceURL)
+                        } label: {
+                            Image(
+                                systemName: state.voicePreview.isPlaying
+                                    ? "stop.fill"
+                                    : "play.fill"
+                            )
+                            .contentTransition(.symbolEffect(.replace.offUp))
+                        }
+                        .buttonStyle(CircularIconButtonStyle(size: 32))
+                        .help(
+                            state.voicePreview.isPlaying
+                                ? "Stop playback"
+                                : "Play recording"
+                        )
+                        .accessibilityLabel(
+                            state.voicePreview.isPlaying
+                                ? "Stop recording playback"
+                                : "Play recording"
+                        )
+                        .transition(
+                            .opacity.combined(with: .scale(scale: 0.6))
+                        )
+                    }
+                }
+                .frame(width: 32, height: 32)
+
+                recordButton
+
+                Color.clear
+                    .frame(width: 32, height: 32)
+            }
+            .frame(maxWidth: .infinity)
+            .animation(
+                DesignTokens.springAnimation,
+                value: showsRecordingPlayback
+            )
+
+            recordingStatus
+                .frame(maxWidth: .infinity)
+                .animation(DesignTokens.smoothAnimation, value: statusKey)
+        }
+        .sayItCard()
+    }
+
+    private var durationText: String {
+        let duration = recorder.duration
+        let minutes = Int(duration) / 60
+        let seconds = duration.truncatingRemainder(dividingBy: 60)
+        return String(format: "%02d:%04.1f", minutes, seconds)
+    }
+
+    private var statusKey: Int {
+        if analysis != nil { return 1 }
+        if recordingError != nil { return 2 }
+        return recorder.isRecording ? 3 : 0
+    }
+
+    @ViewBuilder
+    private var recordingStatus: some View {
+        if let analysis {
+            Label(
+                "Ready: \(analysis.duration.formatted(.number.precision(.fractionLength(1)))) seconds of usable audio",
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(.callout)
+            .foregroundStyle(.green)
+            .transition(.opacity)
+            .accessibilityLabel("Recording accepted")
+        } else if let recordingError {
+            Label(recordingError, systemImage: "exclamationmark.triangle")
+                .font(.callout)
+                .foregroundStyle(.red)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .transition(.opacity)
+                .accessibilityLabel("Recording problem: \(recordingError)")
+        } else {
+            Text(
+                recorder.isRecording
+                    ? "Recording — read the passage aloud, then stop."
+                    : "Press the button and read the passage aloud."
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .transition(.opacity)
+        }
     }
 
     private var recordButton: some View {
@@ -394,28 +453,6 @@ struct VoiceCloneWizard: View {
         .accessibilityLabel(
             recorder.isRecording ? "Stop recording" : "Start recording"
         )
-    }
-
-    @ViewBuilder
-    private var statusMessages: some View {
-        if let analysis {
-            Label(
-                "Ready: \(analysis.duration.formatted(.number.precision(.fractionLength(1)))) seconds of usable audio",
-                systemImage: "checkmark.circle.fill"
-            )
-            .font(.callout)
-            .foregroundStyle(.green)
-            .transition(.opacity.combined(with: .move(edge: .top)))
-            .accessibilityLabel("Recording accepted")
-        }
-        if let recordingError {
-            Label(recordingError, systemImage: "exclamationmark.triangle")
-                .font(.callout)
-                .foregroundStyle(.red)
-                .lineLimit(2)
-                .transition(.opacity)
-                .accessibilityLabel("Recording problem: \(recordingError)")
-        }
     }
 
     @ViewBuilder

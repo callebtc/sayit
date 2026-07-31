@@ -412,6 +412,49 @@ final class AppState {
         perform(.renameVoice(profile.id, name: name))
     }
 
+    func reorderVoices(modelID: String, orderedIDs: [UUID]) {
+        applyVoiceOrder(modelID: modelID, orderedIDs: orderedIDs)
+        perform(.reorderVoices(modelID: modelID, orderedIDs: orderedIDs))
+    }
+
+    private func applyVoiceOrder(modelID: String, orderedIDs: [UUID]) {
+        let positions = Dictionary(
+            uniqueKeysWithValues: orderedIDs.enumerated().map { ($1, $0) }
+        )
+        voiceProfiles = voiceProfiles.map { profile in
+            guard profile.modelID == modelID,
+                  let position = positions[profile.id],
+                  profile.sortOrder != position else {
+                return profile
+            }
+            return VoiceProfileSnapshot(
+                id: profile.id,
+                modelID: profile.modelID,
+                displayName: profile.displayName,
+                origin: profile.origin,
+                language: profile.language,
+                duration: profile.duration,
+                createdAt: profile.createdAt,
+                updatedAt: profile.updatedAt,
+                sortOrder: position,
+                tuning: profile.tuning
+            )
+        }
+        voiceProfiles.sort {
+            if $0.modelID != $1.modelID {
+                return $0.modelID < $1.modelID
+            }
+            if $0.sortOrder != $1.sortOrder {
+                return $0.sortOrder < $1.sortOrder
+            }
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt < $1.createdAt
+            }
+            return $0.displayName.localizedStandardCompare($1.displayName)
+                == .orderedAscending
+        }
+    }
+
     func deleteVoice(_ profile: VoiceProfileSnapshot) {
         voicePreview.stop()
         perform(.deleteVoice(profile.id))

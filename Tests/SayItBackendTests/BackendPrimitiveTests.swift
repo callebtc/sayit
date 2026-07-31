@@ -148,6 +148,7 @@ struct BackendPrimitiveTests {
             referenceFilename: "reference.wav",
             createdAt: created,
             updatedAt: updated,
+            sortOrder: 3,
             tuning: VoiceTuning(preset: .expressive),
             generationSeed: 42
         )
@@ -156,6 +157,7 @@ struct BackendPrimitiveTests {
         #expect(record.snapshot.displayName == "Silver Finch")
         #expect(record.snapshot.createdAt == created)
         #expect(record.snapshot.updatedAt == updated)
+        #expect(record.snapshot.sortOrder == 3)
         #expect(record.snapshot.origin == .recordedClone)
     }
 }

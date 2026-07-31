@@ -28,6 +28,7 @@ public enum ServiceCommand: Codable, Sendable {
     case saveVoiceClone(UUID, name: String)
     case selectVoice(UUID)
     case renameVoice(UUID, name: String)
+    case reorderVoices(modelID: String, orderedIDs: [UUID])
     case deleteVoice(UUID)
     case addCommunityModel(
         repository: String,

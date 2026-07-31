@@ -17,12 +17,18 @@ final class VoiceProfileStore {
         recordsByID.values
             .map(\.snapshot)
             .sorted {
-                if $0.modelID == $1.modelID {
-                    $0.displayName.localizedStandardCompare($1.displayName)
-                        == .orderedAscending
-                } else {
-                    $0.modelID < $1.modelID
+                if $0.modelID != $1.modelID {
+                    return $0.modelID < $1.modelID
                 }
+                if $0.sortOrder != $1.sortOrder {
+                    return $0.sortOrder < $1.sortOrder
+                }
+                if $0.createdAt != $1.createdAt {
+                    return $0.createdAt < $1.createdAt
+                }
+                return $0.displayName.localizedStandardCompare(
+                    $1.displayName
+                ) == .orderedAscending
             }
     }
 
@@ -137,6 +143,7 @@ final class VoiceProfileStore {
                 referenceFilename: "reference.wav",
                 createdAt: now,
                 updatedAt: now,
+                sortOrder: nextSortOrder(modelID: draft.modelID),
                 tuning: draft.tuning,
                 generationSeed: draft.generationSeed
             )
@@ -199,6 +206,7 @@ final class VoiceProfileStore {
                 referenceFilename: "reference.wav",
                 createdAt: now,
                 updatedAt: now,
+                sortOrder: nextSortOrder(modelID: draft.modelID),
                 tuning: draft.tuning,
                 generationSeed: nil
             )
@@ -232,6 +240,29 @@ final class VoiceProfileStore {
         return record.snapshot
     }
 
+    func reorder(modelID: String, orderedIDs: [UUID]) throws {
+        let existing = recordsByID.values.filter { $0.modelID == modelID }
+        guard isSafeModelID(modelID),
+              orderedIDs.count == existing.count,
+              Set(orderedIDs) == Set(existing.map(\.id)) else {
+            throw ServiceFailure(
+                code: "voice.invalid_reorder",
+                message: "The voice order does not match the saved voices."
+            )
+        }
+        for (index, id) in orderedIDs.enumerated() {
+            guard var record = recordsByID[id], record.sortOrder != index else {
+                continue
+            }
+            record.sortOrder = index
+            try write(
+                record,
+                to: profileDirectory(modelID: record.modelID, id: id)
+            )
+            recordsByID[id] = record
+        }
+    }
+
     func delete(id: UUID) throws {
         guard let record = recordsByID[id] else {
             throw ServiceFailure(
@@ -259,6 +290,12 @@ final class VoiceProfileStore {
             return
         }
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func nextSortOrder(modelID: String) -> Int {
+        let orders = recordsByID.values.filter { $0.modelID == modelID }
+            .map(\.sortOrder)
+        return (orders.max() ?? -1) + 1
     }
 
     private func validated(

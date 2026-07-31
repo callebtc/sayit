@@ -28,7 +28,7 @@ struct ProtocolRoundTripTests {
             from: SayItWireCodec.encode(request)
         )
         #expect(decodedRequest == request)
-        #expect(SayItProtocolVersion.current == 5)
+        #expect(SayItProtocolVersion.current == 6)
     }
 
     @Test
@@ -245,6 +245,26 @@ struct ProtocolRoundTripTests {
                 profiles: [qwen, omni]
             )
         }
+    }
+
+    @Test
+    func voiceReorderCommandRoundTripsThroughJSON() throws {
+        let orderedIDs = [UUID(), UUID(), UUID()]
+        let request = ServiceRequest(
+            command: .reorderVoices(modelID: "qwen3_tts", orderedIDs: orderedIDs)
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            ServiceRequest.self,
+            from: SayItWireCodec.encode(request)
+        )
+        guard case .reorderVoices(let modelID, let decodedIDs) = decoded.command
+        else {
+            Issue.record("Expected a reorder command")
+            return
+        }
+        #expect(modelID == "qwen3_tts")
+        #expect(decodedIDs == orderedIDs)
     }
 
     private func voiceProfile(
