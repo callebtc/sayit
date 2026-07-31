@@ -63,17 +63,17 @@ Status: complete
 
 ### M2 — Artifact-safe PCM and transitions
 
-Status: pending
+Status: complete
 
-- [ ] Add a pure, testable PCM conditioner for finite-value validation, peak
+- [x] Add a pure, testable PCM conditioner for finite-value validation, peak
       safety, DC correction, logical-boundary crossfades, and explicit-silence
       ramps.
-- [ ] Preserve contiguous streaming fragments without crossfading them.
-- [ ] Add short ramps for seek, buffering recovery, stop, and model switching.
-- [ ] Remove the early 50 ms completion cutoff and use buffer completion plus a
+- [x] Preserve contiguous streaming fragments without crossfading them.
+- [x] Add short ramps for seek, buffering recovery, stop, and model switching.
+- [x] Remove the early 50 ms completion cutoff and use buffer completion plus a
       delayed watchdog.
-- [ ] Ensure the archive receives the same conditioned stream as playback.
-- [ ] Add discontinuity, duration, clipping, and transition tests.
+- [x] Ensure the archive receives the same conditioned stream as playback.
+- [x] Add discontinuity, duration, clipping, and transition tests.
 
 ### M3 — Bounded storage and scheduling
 
@@ -134,8 +134,8 @@ Status: pending
 | Milestone | Commit | Validation | Status |
 | --- | --- | --- | --- |
 | M0 | `4cd22de` | Baseline focused build and tests recorded | complete |
-| M1 | milestone commit | 33 focused policy, service, and queue tests passed | complete |
-| M2 | pending | pending | pending |
+| M1 | `8ddf504` | 33 focused policy, service, and queue tests passed | complete |
+| M2 | milestone commit | 34 DSP, synthesis, transition, service, and queue tests passed | complete |
 | M3 | pending | pending | pending |
 | M4 | pending | pending | pending |
 | M5 | pending | pending | pending |

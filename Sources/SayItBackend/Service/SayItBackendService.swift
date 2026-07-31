@@ -1669,7 +1669,7 @@ public final class SayItBackendService: SayItService {
         case .audio(let chunk):
             flushPendingSpokenChunk()
             try playback.enqueue(chunk)
-            spokenAudioCursor += Double(chunk.samples.count) / chunk.sampleRate
+            spokenAudioCursor = playback.generatedDuration
             if playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
@@ -1776,7 +1776,7 @@ public final class SayItBackendService: SayItService {
         if forModelSwitch {
             await playback.stopForModelSwitch()
         } else {
-            playback.stop()
+            await playback.stopSmoothly()
         }
         if let request, request.source != .preview {
             try? history.markIncomplete(id: request.id, state: .canceled)

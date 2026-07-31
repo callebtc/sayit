@@ -30,6 +30,7 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     func appendSpokenChunk(_ chunk: PlaybackTextChunk)
     func setPlaybackMode(_ mode: PlaybackMode)
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics)
+    func stopSmoothly() async
     func stopForModelSwitch() async
     func finishBuffering()
     func archive(using archive: AudioArchive) async throws -> AudioArchiveResult
@@ -43,5 +44,9 @@ extension BackendPlaybackControlling {
 
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
         _ = metrics
+    }
+
+    func stopSmoothly() async {
+        stop()
     }
 }

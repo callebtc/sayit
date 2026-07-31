@@ -24,6 +24,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private let timePitch = AVAudioUnitTimePitch()
     private var timelineTask: Task<Void, Never>?
     private var audioConfigurationTask: Task<Void, Never>?
+    private var completionWatchdogTask: Task<Void, Never>?
     private var accumulatedSamples: [Float] = []
     private var sampleRate: Double = 24_000
     private var scheduleOffset: TimeInterval = 0
@@ -75,6 +76,7 @@ final class PlaybackController: BackendPlaybackControlling {
     var rate: Double = 1 {
         didSet {
             timePitch.rate = Float(rate)
+            scheduleCompletionWatchdog()
             updateNowPlaying()
         }
     }
@@ -191,37 +193,12 @@ final class PlaybackController: BackendPlaybackControlling {
         finishStopping()
     }
 
+    func stopSmoothly() async {
+        await performSmoothStop(duration: .milliseconds(12))
+    }
+
     func stopForModelSwitch() async {
-        stopTransitionGeneration &+= 1
-        let generation = stopTransitionGeneration
-
-        // Reject any late synthesis chunks as soon as the transition starts,
-        // while allowing already-scheduled audio to fade out briefly.
-        requestID = nil
-        guard player.isPlaying else {
-            finishStopping()
-            return
-        }
-
-        let initialVolume = player.volume
-        let stepDuration = Self.modelSwitchFadeDuration
-            / Self.modelSwitchFadeStepCount
-        for step in 1...Self.modelSwitchFadeStepCount {
-            do {
-                try await Task.sleep(for: stepDuration)
-            } catch {
-                guard generation == stopTransitionGeneration else { return }
-                finishStopping()
-                return
-            }
-            guard generation == stopTransitionGeneration else { return }
-            player.volume = initialVolume
-                * Self.modelSwitchFadeVolume(
-                    step: step,
-                    stepCount: Self.modelSwitchFadeStepCount
-                )
-        }
-        finishStopping()
+        await performSmoothStop(duration: Self.modelSwitchFadeDuration)
     }
 
     static func modelSwitchFadeVolume(
@@ -234,7 +211,78 @@ final class PlaybackController: BackendPlaybackControlling {
         return 1 - progress
     }
 
+    private func performSmoothStop(duration: Duration) async {
+        stopTransitionGeneration &+= 1
+        let generation = stopTransitionGeneration
+        requestID = nil
+
+        guard player.isPlaying, !accumulatedSamples.isEmpty else {
+            finishStopping()
+            return
+        }
+
+        do {
+            let actualDuration = try scheduleFadeOut(
+                from: currentPlaybackTime(),
+                requestedDuration: duration
+            )
+            state = .paused
+            try await Task.sleep(for: actualDuration)
+        } catch {
+            guard generation == stopTransitionGeneration else { return }
+            finishStopping()
+            return
+        }
+        guard generation == stopTransitionGeneration else { return }
+        finishStopping()
+    }
+
+    private func scheduleFadeOut(
+        from seconds: TimeInterval,
+        requestedDuration: Duration
+    ) throws -> Duration {
+        let target = min(max(seconds, 0), generatedDuration)
+        let startFrame = min(
+            Int(target * sampleRate),
+            accumulatedSamples.count
+        )
+        guard startFrame < accumulatedSamples.count else {
+            return .zero
+        }
+        let requestedSeconds = Self.timeInterval(for: requestedDuration)
+        let requestedFrames = max(Int(requestedSeconds * sampleRate), 1)
+        let endFrame = min(
+            startFrame + requestedFrames,
+            accumulatedSamples.count
+        )
+        let samples = PCMTransitionRamp.fadeOut(
+            Array(accumulatedSamples[startFrame..<endFrame])
+        )
+        let buffer = try makeBuffer(samples: samples, sampleRate: sampleRate)
+
+        invalidateScheduledAudio()
+        scheduleOffset = target
+        if configuredSampleRate == nil {
+            try prepareAudioGraph(for: buffer.format)
+        } else {
+            try ensureEngineRunning()
+        }
+        try validatePlayerFormat(for: buffer)
+        schedule(buffer)
+        player.volume = 1
+        player.play()
+        return .seconds(Double(samples.count) / sampleRate)
+    }
+
+    private static func timeInterval(for duration: Duration) -> TimeInterval {
+        let components = duration.components
+        return Double(components.seconds)
+            + Double(components.attoseconds) / 1e18
+    }
+
     private func finishStopping() {
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         invalidateScheduledAudio()
         engine.pause()
         player.volume = 1
@@ -262,6 +310,7 @@ final class PlaybackController: BackendPlaybackControlling {
             play()
         } else {
             finishPlaybackIfReady()
+            scheduleCompletionWatchdog()
         }
         updateNowPlaying()
     }
@@ -372,6 +421,7 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         failureMessage = nil
         state = .playing
+        scheduleCompletionWatchdog()
         updateNowPlaying()
     }
 
@@ -521,6 +571,8 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func invalidateScheduledAudio() {
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         scheduleGeneration &+= 1
         scheduledBufferCount = 0
         player.stop()
@@ -535,8 +587,12 @@ final class PlaybackController: BackendPlaybackControlling {
             accumulatedSamples.count
         )
         guard startFrame < accumulatedSamples.count else { return }
+        let remaining = Array(accumulatedSamples[startFrame...])
         let buffer = try makeBuffer(
-            samples: Array(accumulatedSamples[startFrame...]),
+            samples: PCMTransitionRamp.fadeInHead(
+                remaining,
+                frameCount: transitionFrameCount
+            ),
             sampleRate: sampleRate
         )
 
@@ -565,6 +621,8 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func completePlayback() {
         guard state != .finished else { return }
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         invalidateScheduledAudio()
         elapsed = generatedDuration
         state = .finished
@@ -600,6 +658,48 @@ final class PlaybackController: BackendPlaybackControlling {
         )
     }
 
+    private var transitionFrameCount: Int {
+        max(
+            Int((sampleRate * PCMStreamConditioner.boundaryDuration).rounded()),
+            1
+        )
+    }
+
+    private func scheduleCompletionWatchdog() {
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
+        guard synthesisIsComplete,
+              state == .playing,
+              generatedDuration > 0 else {
+            return
+        }
+        let remaining = max(
+            generatedDuration - currentPlaybackTime(),
+            0
+        )
+        let delay = remaining / max(rate, 0.1) + 0.75
+        let generation = scheduleGeneration
+        completionWatchdogTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            guard let self,
+                  generation == self.scheduleGeneration,
+                  self.state == .playing else {
+                return
+            }
+            self.elapsed = self.currentPlaybackTime()
+            let frameTolerance = 1 / max(self.sampleRate, 1)
+            if self.elapsed >= self.generatedDuration - frameTolerance {
+                self.completePlayback()
+            } else {
+                self.scheduleCompletionWatchdog()
+            }
+        }
+    }
+
     private func enterBufferingState() {
         elapsed = generatedDuration
         invalidateScheduledAudio()
@@ -615,12 +715,7 @@ final class PlaybackController: BackendPlaybackControlling {
                 guard let self else { return }
                 if self.state == .playing {
                     self.elapsed = self.currentPlaybackTime()
-                    if self.synthesisIsComplete,
-                       self.elapsed >= self.generatedDuration - 0.05 {
-                        self.completePlayback()
-                    } else {
-                        self.updateNowPlaying(throttleTimeline: true)
-                    }
+                    self.updateNowPlaying(throttleTimeline: true)
                 }
             }
         }
