@@ -65,6 +65,7 @@
 		1EF5F2DAFB45053DAAE3909A /* ModelDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750990410DAB9D60949EB46 /* ModelDescriptor.swift */; };
 		2002F93C6ECAEBEEE465DB9E /* BackendSettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */; };
 		2132BD3904587DAA3F093A71 /* ModelDownloadProgress+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */; };
+		227C33C4A2279F0D8D3CDCBC /* CommandLineInstallController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E06D692230E118EA04CC2F5E /* CommandLineInstallController.swift */; };
 		22B295F9AD2362B159941CB4 /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */; };
 		22C12D8531FD1643C9832746 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C7BD0F9B492F9F5ABFAB7F98 /* Security.framework */; };
 		22DC722BCC81C0369F7F13CE /* BackendServiceCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E35626CDDF11816B4A32DE6A /* BackendServiceCommandTests.swift */; };
@@ -1098,6 +1099,7 @@
 		E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsSettingsView.swift; sourceTree = "<group>"; };
 		E040A087E3EC6D988C26DD00 /* SelectedTextReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectedTextReaderTests.swift; sourceTree = "<group>"; };
 		E052AB297B6730E47BF28A4D /* VoiceCloneRequirements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneRequirements.swift; sourceTree = "<group>"; };
+		E06D692230E118EA04CC2F5E /* CommandLineInstallController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandLineInstallController.swift; sourceTree = "<group>"; };
 		E0A48A60CD4D89DFA933338B /* TestBundleToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestBundleToken.swift; sourceTree = "<group>"; };
 		E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundServiceController.swift; sourceTree = "<group>"; };
@@ -2043,6 +2045,7 @@
 				94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */,
 				6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */,
 				E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */,
+				E06D692230E118EA04CC2F5E /* CommandLineInstallController.swift */,
 				C93B7EC837D3B6837807659B /* DevelopmentServiceLauncher.swift */,
 				B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */,
 				73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */,
@@ -2939,6 +2942,7 @@
 				CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */,
 				8031E3C162346A93D6DC988C /* BackendMigrationCoordinator.swift in Sources */,
 				C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */,
+				227C33C4A2279F0D8D3CDCBC /* CommandLineInstallController.swift in Sources */,
 				80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */,
 				4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */,
 				93812F9599DADD007EA48C99 /* DevelopmentSelectionServiceLauncher.swift in Sources */,

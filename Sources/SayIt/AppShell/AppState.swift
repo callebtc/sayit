@@ -17,6 +17,7 @@ final class AppState {
     let launchAtLogin = LaunchAtLoginController()
     let backgroundService = BackgroundServiceController()
     let selectionService = SelectionServiceController()
+    let commandLineInstaller = CommandLineInstallController()
     let voicePreview = VoicePreviewPlayer()
 
     private let client = SayItXPCClient()
