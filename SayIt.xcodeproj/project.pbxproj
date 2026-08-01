@@ -35,6 +35,7 @@
 		0B86C452FDF118DF4A2F663B /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
 		0B92349141E9FE818E7E82D7 /* SelectionXPCClientError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EA89207CD21E6E529CB681 /* SelectionXPCClientError.swift */; };
 		0C7EBC1DACDEBFA00133A526 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		0CE99A20A6A2265C0B6BC6B2 /* VoiceCloneRecordingPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCBC7DC167513152EA2FCC1 /* VoiceCloneRecordingPrompt.swift */; };
 		0D22DE3D02F037A17D6F11E2 /* VoiceCloneWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C18D316474D0C21D880BE963 /* VoiceCloneWizard.swift */; };
 		0D37C43D49AD6A65885DBCDF /* SpeechLyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A98DA8493CC9B3FB3C6BAD7 /* SpeechLyricsView.swift */; };
 		0D57BE565C95A79F2C895D50 /* SpeechChunk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B825339FFDAD336D58CA0052 /* SpeechChunk.swift */; };
@@ -140,6 +141,7 @@
 		500B2120BC57AC30D4324BD5 /* APITokenScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA18E0AFEFF10C13815F3D6D /* APITokenScope.swift */; };
 		50244FCCBD1BBD99069B10F4 /* VoiceTuningPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42906742AE99316BD670BB7E /* VoiceTuningPreset.swift */; };
 		50F000C6F5AC706BD4EBD9E1 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A47804F46DFB604995541E6 /* AppSettings.swift */; };
+		51127FFBC1F50184CAD5A540 /* VoiceReferenceFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */; };
 		51A0401365D51889E07375E6 /* ModelManagerError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F70E0C325CC84370C425EF07 /* ModelManagerError.swift */; };
 		51C0584024264406E5670233 /* MenuBarRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8077FB8567737F537A02DE3B /* MenuBarRootView.swift */; };
 		52502DAC4AEAFB4BD4596A9D /* openapi-generator-config.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 2996022F566B1CA2CFAB59AD /* openapi-generator-config.yaml */; };
@@ -902,6 +904,7 @@
 		56631767F22E065003A55DA8 /* HistoryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryRowView.swift; sourceTree = "<group>"; };
 		56AEFBFB440C0388E52C0DEC /* VoiceStudioSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceStudioSnapshot.swift; sourceTree = "<group>"; };
 		575B1BE275B2F840E61C8252 /* SayItHTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItHTTPServer.swift; sourceTree = "<group>"; };
+		5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReferenceFormat.swift; sourceTree = "<group>"; };
 		5842EBC765548471AD55DED2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		5893C6A2226C5DB7DD366D9A /* VoiceProfileSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfileSnapshot.swift; sourceTree = "<group>"; };
 		5A9B554D989BDC946BCBA1C6 /* DevelopmentSelectionServiceLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSelectionServiceLauncher.swift; sourceTree = "<group>"; };
@@ -912,6 +915,7 @@
 		5DC20994C0FBDFBF9945C121 /* VoiceReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReference.swift; sourceTree = "<group>"; };
 		5DDBBC444E81871E8DC37224 /* GeneratedVoiceSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedVoiceSample.swift; sourceTree = "<group>"; };
 		5ECC60D4BFEEA6F9A9569EBE /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
+		5FCBC7DC167513152EA2FCC1 /* VoiceCloneRecordingPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneRecordingPrompt.swift; sourceTree = "<group>"; };
 		6030AC42D5609C7FE1624815 /* WindowActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowActivator.swift; sourceTree = "<group>"; };
 		60CD41EA706FD7F0233FC5E3 /* PlaybackMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackMode.swift; sourceTree = "<group>"; };
 		61809FAC6AB3B4223A714878 /* VoiceTuningSpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTuningSpace.swift; sourceTree = "<group>"; };
@@ -1398,6 +1402,7 @@
 				D2D23D58A8E035AA7F530EBA /* VoiceRecordingAnalysis.swift */,
 				42BFC2964BF2ABF447564986 /* VoiceRecordingError.swift */,
 				CF3BE6ACF9AE86C8F17B156D /* VoiceRecordingProcessor.swift */,
+				5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */,
 			);
 			path = Voices;
 			sourceTree = "<group>";
@@ -1666,6 +1671,7 @@
 			children = (
 				1F6D46E06272DBBA7E296DBA /* VoiceCandidateCard.swift */,
 				8CBD5EE3B9314A3F3CA68216 /* VoiceClonePassage.swift */,
+				5FCBC7DC167513152EA2FCC1 /* VoiceCloneRecordingPrompt.swift */,
 				C18D316474D0C21D880BE963 /* VoiceCloneWizard.swift */,
 				DA60588FF7DFF98E2DFD377B /* VoiceCustomizeSheet.swift */,
 				A42DE1A1821373642D9C83EC /* VoiceDiscoveryView.swift */,
@@ -2838,6 +2844,7 @@
 				6C9383ACB1F0BB34CD533B11 /* VoiceRecordingError.swift in Sources */,
 				79790514FDB5C4DCCC8B8EF6 /* VoiceRecordingProcessor.swift in Sources */,
 				0ABBF6D2B19B6666B372E308 /* VoiceReference.swift in Sources */,
+				51127FFBC1F50184CAD5A540 /* VoiceReferenceFormat.swift in Sources */,
 				DD9403AC760E9C7AC4F7B641 /* VoiceSynthesisMode.swift in Sources */,
 				F8EFA8F17C742AD24FDE1FA1 /* VoiceSynthesisTuning.swift in Sources */,
 			);
@@ -3026,6 +3033,7 @@
 				74104E6B15D75A7822590DD1 /* UpdateResult.swift in Sources */,
 				9B9A58939E5B0BA96CDE5E67 /* VoiceCandidateCard.swift in Sources */,
 				9319C72701DD32A09AB34E0C /* VoiceClonePassage.swift in Sources */,
+				0CE99A20A6A2265C0B6BC6B2 /* VoiceCloneRecordingPrompt.swift in Sources */,
 				0D22DE3D02F037A17D6F11E2 /* VoiceCloneWizard.swift in Sources */,
 				0B5ECAFD3F15F86699770E53 /* VoiceCustomizeSheet.swift in Sources */,
 				236490D4798E39D6859E56B7 /* VoiceDiscoveryView.swift in Sources */,

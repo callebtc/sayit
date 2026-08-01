@@ -7,13 +7,14 @@ public enum VoiceRecordingError: LocalizedError, Equatable, Sendable {
     case clipped
     case nonFinite
     case outOfRange
+    case notProcessed
     case tooShort(minimum: TimeInterval)
     case tooLong(maximum: TimeInterval)
 
     public var errorDescription: String? {
         switch self {
         case .unreadable:
-            "The recording could not be read. Record the passage again."
+            "The recording could not be read. Record again."
         case .noAudioDevice:
             "No microphone is available. Connect or enable an input device, then try again."
         case .silent:
@@ -24,6 +25,8 @@ public enum VoiceRecordingError: LocalizedError, Equatable, Sendable {
             "The recording contains invalid audio. Reconnect the microphone and record again."
         case .outOfRange:
             "The recording format is outside the supported range. Choose a standard microphone input and record again."
+        case .notProcessed:
+            "The recording was not prepared correctly. Record again."
         case .tooShort(let minimum):
             "Keep speaking for at least \(minimum.formatted(.number.precision(.fractionLength(0)))) seconds."
         case .tooLong(let maximum):

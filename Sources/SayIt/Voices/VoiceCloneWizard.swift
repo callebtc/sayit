@@ -284,14 +284,14 @@ struct VoiceCloneWizard: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
                 VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
-                    Text("READ ALOUD")
+                    Text(recordingPrompt.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(passage)
+                    Text(recordingPrompt.text)
                         .font(.body)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel("Passage to record")
+                        .accessibilityLabel(recordingPrompt.accessibilityLabel)
                 }
                 .sayItCard()
 
@@ -412,8 +412,8 @@ struct VoiceCloneWizard: View {
         } else {
             Text(
                 recorder.isRecording
-                    ? "Recording — read the passage aloud, then stop."
-                    : "Press the button and read the passage aloud."
+                    ? recordingPrompt.activeInstruction
+                    : recordingPrompt.idleInstruction
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -757,6 +757,13 @@ struct VoiceCloneWizard: View {
         )
     }
 
+    private var recordingPrompt: VoiceCloneRecordingPrompt {
+        VoiceCloneRecordingPrompt(
+            passage: passage,
+            transcriptRequired: requirements?.transcriptRequired ?? true
+        )
+    }
+
     private var targetDurationText: String {
         guard let requirements else { return "" }
         return "Aim for \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) seconds"
@@ -881,9 +888,9 @@ struct VoiceCloneWizard: View {
     }
 
     private var targetSampleRate: Double {
-        selectedModel.modelType.lowercased() == "fish_speech"
-            ? 44_100
-            : 24_000
+        VoiceReferenceFormat.sampleRate(
+            forModelType: selectedModel.modelType
+        )
     }
 
     private func draftReferenceURL(
@@ -917,7 +924,7 @@ struct VoiceCloneWizard: View {
             recordingID: recordingID,
             modelID: selectedModel.id.rawValue,
             language: language,
-            transcript: passage,
+            transcript: recordingPrompt.transcript,
             tuning: tuning
         )
         if await state.startVoiceClone(request) {

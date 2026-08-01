@@ -1230,6 +1230,60 @@ struct BackendServiceCommandTests {
         )
     }
 
+    @Test("Chatterbox clones do not condition on or retain a transcript")
+    func chatterboxCloneOmitsTranscript() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        let modelID = "chatterbox-fp16"
+        try fixture.seedInstallation(modelID: modelID)
+        await fixture.service.start()
+
+        let recordingID = UUID()
+        try await fixture.seedRecording(id: recordingID, duration: 8)
+        let clone = try voiceStudio(
+            await fixture.service.handle(
+                .init(
+                    command: .startVoiceClone(
+                        VoiceCloneRequest(
+                            recordingID: recordingID,
+                            modelID: modelID,
+                            language: "en",
+                            transcript: "This text must not be retained.",
+                            tuning: VoiceTuning()
+                        )
+                    )
+                )
+            )
+        )
+        #expect(clone.state == .generating)
+        try await waitForVoiceStudioState(.ready, service: fixture.service)
+        let referenceTranscripts = await fixture.synthesizer
+            .referenceTranscripts
+        #expect(referenceTranscripts.count == 3)
+        #expect(referenceTranscripts.allSatisfy { $0 == nil })
+
+        let ready = try #require(
+            try snapshot(
+                await fixture.service.handle(.init(command: .snapshot))
+            ).voiceStudio
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(
+                        command: .saveVoiceClone(
+                            ready.id,
+                            name: "Natural Harbor"
+                        )
+                    )
+                )
+            )
+        )
+        let store = VoiceProfileStore(directories: fixture.directories)
+        let record = try #require(store.records(modelID: modelID).first)
+        #expect(record.transcript == nil)
+    }
+
     @Test("Uploaded local models integrate, select, and remove")
     func uploadedLocalModelLifecycle() async throws {
         let fixture = try ServiceFixture()
@@ -1369,10 +1423,18 @@ private final class ServiceFixture {
                 ) * 0.15
             )
         }
+        let rawURL = directory.appending(path: "raw.wav")
         try await AudioArchive(directory: directories.voiceDrafts).writeWAV(
             samples: samples,
             sampleRate: sampleRate,
-            destination: directory.appending(path: "reference.wav")
+            destination: rawURL
+        )
+        _ = try VoiceRecordingProcessor().process(
+            source: rawURL,
+            destination: directory.appending(path: "reference.wav"),
+            targetSampleRate: sampleRate,
+            minimumDuration: 0,
+            maximumDuration: 60
         )
     }
 
@@ -1450,6 +1512,7 @@ private final class ServiceFixture {
 
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
+    private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
 
@@ -1517,9 +1580,10 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         language _: String?,
         tuning _: VoiceSynthesisTuning,
         seed _: UInt64,
-        reference _: VoiceReference?
+        reference: VoiceReference?
     ) async throws -> GeneratedVoiceSample {
-        GeneratedVoiceSample(
+        referenceTranscripts.append(reference?.transcript)
+        return GeneratedVoiceSample(
             samples: (0..<2_400).map { frame in
                 Float(
                     sin(2 * .pi * 220 * Double(frame) / 24_000) * 0.1

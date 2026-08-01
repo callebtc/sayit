@@ -763,10 +763,12 @@ public final class SayItBackendService: SayItService {
         let referenceURL = directory.appending(path: "clone-reference.wav")
         let analysis: VoiceRecordingAnalysis
         do {
-            analysis = try VoiceRecordingProcessor().process(
+            analysis = try VoiceRecordingProcessor().validateProcessedReference(
                 source: source,
                 destination: referenceURL,
-                targetSampleRate: targetReferenceSampleRate(for: model),
+                targetSampleRate: VoiceReferenceFormat.sampleRate(
+                    forModelType: model.modelType
+                ),
                 minimumDuration: requirements.minimumDuration,
                 maximumDuration: requirements.maximumDuration
             )
@@ -777,15 +779,15 @@ public final class SayItBackendService: SayItService {
                 message: error.localizedDescription
             )
         }
-        let conditioningTranscript = model.modelType.lowercased() == "chatterbox"
-            ? nil
-            : transcript
+        let conditioningTranscript = requirements.transcriptRequired
+            ? transcript
+            : nil
         voiceCloneDraft = VoiceCloneDraft(
             sessionID: sessionID,
             recordingID: request.recordingID,
             modelID: model.id.rawValue,
             language: request.language,
-            transcript: transcript.nilIfEmpty,
+            transcript: conditioningTranscript?.nilIfEmpty,
             duration: analysis.duration,
             tuning: tuning,
             referenceURL: referenceURL
@@ -1196,12 +1198,6 @@ public final class SayItBackendService: SayItService {
         discardVoiceStudio(removeCloneRecording: true)
         revision &+= 1
         return profile
-    }
-
-    private func targetReferenceSampleRate(
-        for model: ModelDescriptor
-    ) -> Double {
-        model.modelType.lowercased() == "fish_speech" ? 44_100 : 24_000
     }
 
     private func clonePreviewTexts(language: String?) -> [String] {
