@@ -14,6 +14,8 @@ struct SpeechLyricsView: View {
     @State private var autoFollow = true
     @State private var lastScrolledWord = -1
     @State private var scrollMetrics = ScrollMetrics()
+    @State private var isProgrammaticScroll = false
+    @State private var programmaticScrollTask: Task<Void, Never>?
 
     private struct Block: Identifiable {
         let id: Int
@@ -80,7 +82,9 @@ struct SpeechLyricsView: View {
                     }
                 )
                 .onScrollPhaseChange { _, phase in
-                    if phase == .interacting || phase == .tracking {
+                    guard !isProgrammaticScroll else { return }
+                    if phase == .interacting || phase == .tracking
+                        || phase == .animating || phase == .decelerating {
                         withAnimation(DesignTokens.quickAnimation) {
                             autoFollow = false
                         }
@@ -175,11 +179,18 @@ struct SpeechLyricsView: View {
         let jumped = lastScrolledWord < 0 || abs(wordIndex - lastScrolledWord) > 4
         let blockChanged = blockID != lastBlockID
         guard jumped || blockChanged || wordIndex - lastScrolledWord >= 2 else { return }
+        isProgrammaticScroll = true
+        programmaticScrollTask?.cancel()
         withAnimation(.smooth(duration: 0.55)) {
-            if blockChanged || jumped, let blockID {
-                proxy.scrollTo(Self.scrollID(forBlock: blockID), anchor: UnitPoint(x: 0.5, y: 0.3))
-            }
-            proxy.scrollTo(Self.scrollID(forWord: wordIndex), anchor: UnitPoint(x: 0.5, y: 0.42))
+            proxy.scrollTo(
+                Self.scrollID(forWord: wordIndex),
+                anchor: UnitPoint(x: 0.5, y: 0.42)
+            )
+        }
+        programmaticScrollTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+            isProgrammaticScroll = false
         }
         lastScrolledWord = wordIndex
     }
@@ -232,10 +243,13 @@ struct SpeechLyricsView: View {
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
         let seekTime = startTime(for: token)
-        let canSeek = onSeek != nil && seekTime <= generatedDuration
+        let isProcessed = seekTime <= generatedDuration
+        let canSeek = onSeek != nil && isProcessed
         return Text(token.text)
             .font(.callout)
-            .foregroundStyle(wordColor(isCurrent: isCurrent, isPast: isPast))
+            .foregroundStyle(
+                wordColor(isCurrent: isCurrent, isPast: isPast, isProcessed: isProcessed)
+            )
             .background {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.accentColor.opacity(isCurrent ? 0.13 : 0))
@@ -261,9 +275,14 @@ struct SpeechLyricsView: View {
             .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
     }
 
-    private func wordColor(isCurrent: Bool, isPast: Bool) -> Color {
+    private func wordColor(
+        isCurrent: Bool,
+        isPast: Bool,
+        isProcessed: Bool
+    ) -> Color {
         if isCurrent { return .accentColor }
-        return isPast ? .primary.opacity(0.9) : .primary.opacity(0.45)
+        if isPast { return .primary.opacity(0.9) }
+        return isProcessed ? .primary.opacity(0.45) : .primary.opacity(0.22)
     }
 
     private struct ChunkMarkerView: View {
