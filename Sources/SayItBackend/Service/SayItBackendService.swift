@@ -1687,6 +1687,15 @@ public final class SayItBackendService: SayItService {
             }
         case .metrics(let metrics):
             playback.observeSynthesisMetrics(metrics)
+            if playback.shouldStartWhenBuffered {
+                playback.play()
+                statusText = "Playing"
+                updateJob(
+                    request.id,
+                    state: .playing,
+                    progress: playbackProgress
+                )
+            }
             await diagnostics.record(
                 DiagnosticEvent(
                     severity: .info,

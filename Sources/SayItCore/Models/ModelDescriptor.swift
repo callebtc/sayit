@@ -21,6 +21,7 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
     public let hardwareTier: HardwareTier
     public let license: ModelLicense
     public let stability: ModelStability
+    public let experience: ModelExperience?
     public let testedMLXAudioVersion: String
     public let testedDate: String
 
@@ -46,7 +47,8 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
         license: ModelLicense,
         stability: ModelStability,
         testedMLXAudioVersion: String,
-        testedDate: String
+        testedDate: String,
+        experience: ModelExperience? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -68,6 +70,7 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
         self.hardwareTier = hardwareTier
         self.license = license
         self.stability = stability
+        self.experience = experience
         self.testedMLXAudioVersion = testedMLXAudioVersion
         self.testedDate = testedDate
     }

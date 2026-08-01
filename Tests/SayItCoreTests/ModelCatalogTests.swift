@@ -16,6 +16,48 @@ struct ModelCatalogTests {
         })
     }
 
+    @Test("Only Kokoro and Qwen are recommended")
+    func recommendedModelsAndRanking() throws {
+        let models = try ModelCatalogLoader().bundledCatalog().models
+        let recommended = models
+            .filter { $0.stability == .recommended }
+            .sorted {
+                ($0.experience?.recommendationRank ?? .max)
+                    < ($1.experience?.recommendationRank ?? .max)
+            }
+
+        #expect(recommended.map(\.id.rawValue) == [
+            "kokoro-bf16",
+            "qwen3-06b-base-8bit",
+        ])
+
+        let ranked = models
+            .compactMap { model in
+                model.experience.map { ($0.recommendationRank, model.id) }
+            }
+            .sorted { $0.0 < $1.0 }
+        #expect(ranked.prefix(3).map { $0.1.rawValue } == [
+            "kokoro-bf16",
+            "qwen3-06b-base-8bit",
+            "pocket-tts",
+        ])
+    }
+
+    @Test("Legacy unsupported downloads remain unavailable")
+    func legacyUnsupportedModels() throws {
+        let models = Dictionary(
+            uniqueKeysWithValues: try ModelCatalogLoader()
+                .bundledCatalog()
+                .models
+                .map { ($0.id.rawValue, $0) }
+        )
+
+        for id in ["omnivoice", "moss-tts", "marvis-250m-8bit"] {
+            #expect(models[id]?.stability == .unavailable)
+            #expect(models[id]?.isSelectable == false)
+        }
+    }
+
     @Test("Reference-only models cannot be selected")
     func gatesReferenceAudioModels() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()

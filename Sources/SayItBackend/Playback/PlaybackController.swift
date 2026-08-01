@@ -74,7 +74,11 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         return bufferPolicy.shouldStart(
             synthesisIsComplete: synthesisIsComplete,
-            bufferedDuration: bufferedDuration
+            bufferedDuration: bufferedDuration,
+            estimatedRemainingDuration: max(
+                estimatedDuration - generatedDuration,
+                0
+            )
         )
     }
     var showTitleInNowPlaying = false {
@@ -317,6 +321,7 @@ final class PlaybackController: BackendPlaybackControlling {
         estimatedDuration = 0
         scheduleOffset = 0
         synthesisIsComplete = false
+        configuredSampleRate = nil
         state = .idle
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }

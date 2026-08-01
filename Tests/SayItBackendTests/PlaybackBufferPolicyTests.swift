@@ -41,6 +41,63 @@ struct PlaybackBufferPolicyTests {
         )
     }
 
+    @Test("Adaptive playback waits for a measured generation rate")
+    func adaptiveWaitsForMeasurement() {
+        let unmeasured = policy(.adaptive)
+        #expect(!unmeasured.streamingIsSustainable)
+        #expect(
+            !unmeasured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 100
+            )
+        )
+
+        var estimator = SynthesisPerformanceEstimator()
+        estimator.record(
+            SynthesisMetrics(
+                chunkIndex: 0,
+                generationDuration: 1,
+                audioDuration: 4
+            )
+        )
+        let measured = policy(.adaptive, estimator: estimator)
+        #expect(measured.streamingIsSustainable)
+        #expect(
+            measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 4
+            )
+        )
+    }
+
+    @Test("Adaptive playback builds enough lead for a slow model")
+    func adaptiveSlowModelLead() {
+        var estimator = SynthesisPerformanceEstimator()
+        estimator.record(
+            SynthesisMetrics(
+                chunkIndex: 0,
+                generationDuration: 8,
+                audioDuration: 4
+            )
+        )
+        let measured = policy(.adaptive, estimator: estimator)
+
+        #expect(
+            !measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 6.39,
+                estimatedRemainingDuration: 6
+            )
+        )
+        #expect(
+            measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 6.41,
+                estimatedRemainingDuration: 6
+            )
+        )
+    }
+
     @Test("Known-sustainable generation starts with minimal buffer")
     func observedLatency() {
         var estimator = SynthesisPerformanceEstimator()

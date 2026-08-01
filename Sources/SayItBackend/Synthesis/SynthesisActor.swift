@@ -11,6 +11,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let orpheusChunker = TextChunker(
+        targetCharacterCount: 180,
+        hardCharacterLimit: 280
+    )
     private static let operationGate = SynthesisOperationGate()
 
     private struct ActiveOperation: Sendable {
@@ -711,6 +715,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         }
 
         switch request.model.modelType.lowercased() {
+        case "orpheus", "orpheus_tts":
+            return Self.orpheusChunker.chunks(
+                for: request.cleanedText.text
+            )
         case "kokoro", "kokoro_tts":
             let language = request.language
                 ?? request.voice.flatMap(

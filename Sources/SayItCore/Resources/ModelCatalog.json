@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-01",
+  "generatedAt": "2026-08-02",
   "dependencies": [
     {
       "id": "kitten-tts-g2p",
@@ -138,6 +138,12 @@
         "requiresAcceptance": false
       },
       "stability": "recommended",
+      "experience": {
+        "recommendationRank": 1,
+        "size": "small",
+        "speed": "medium-fast",
+        "note": "Best balance of size, speed, and quality."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -179,7 +185,13 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 4,
+        "size": "small",
+        "speed": "slow",
+        "note": "Slow generation with lower voice quality."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -216,7 +228,13 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 3,
+        "size": "small",
+        "speed": "medium-fast",
+        "note": "Good quality with occasional audio artifacts."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -253,7 +271,13 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 8,
+        "size": "small",
+        "speed": "fast",
+        "note": "Playback compatibility is still being evaluated."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -299,7 +323,13 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "experimental",
+      "stability": "recommended",
+      "experience": {
+        "recommendationRank": 2,
+        "size": "medium",
+        "speed": "medium",
+        "note": "Unlimited generated voices and voice cloning."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -346,6 +376,12 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 5,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Slow generation and voices may sound unnatural."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -475,6 +511,12 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 9,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Japanese voice design; playback compatibility is still being evaluated."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -512,6 +554,12 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 6,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Glitch-prone output that can sound unstable."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },
@@ -537,7 +585,7 @@
         "languageSelection": false,
         "requiresReferenceAudio": false
       },
-      "playbackMode": "buffered",
+      "playbackMode": "adaptive",
       "files": [],
       "estimatedDiskBytes": 6700000000,
       "estimatedPeakMemoryBytes": 10000000000,
@@ -549,6 +597,12 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 7,
+        "size": "large",
+        "speed": "slow",
+        "note": "Good voice quality, but slow and occasionally glitchy."
+      },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
     },

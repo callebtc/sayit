@@ -31,6 +31,11 @@ struct ModelRowView: View {
                 Text(modelSummary)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                if let note = model.experience?.note {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 HStack {
                     Text(
                         state.downloadByteCount(for: model),
@@ -230,6 +235,10 @@ struct ModelRowView: View {
         let languages = languageCount == 1
             ? model.languages[0].uppercased()
             : "\(languageCount) languages"
+        if let experience = model.experience {
+            return "\(experience.size.displayName) model · "
+                + "\(experience.speed.displayName) · \(languages)"
+        }
         return "\(model.family) · \(model.quantization) · \(languages)"
     }
 
