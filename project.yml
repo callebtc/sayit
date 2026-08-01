@@ -422,6 +422,18 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.protocol-tests
 
+  SayItSelectionAgentTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItSelectionAgentTests
+    dependencies:
+      - target: SayItXPC
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.selection-agent-tests
+
   SayItBackendTests:
     type: bundle.unit-test
     platform: macOS
@@ -483,6 +495,7 @@ schemes:
         SayIt: all
         SayItCoreTests: [test]
         SayItProtocolTests: [test]
+        SayItSelectionAgentTests: [test]
         SayItBackendTests: [test]
         SayItHTTPTests: [test]
         SayItUpdateTests: [test]
@@ -493,6 +506,7 @@ schemes:
       targets:
         - SayItCoreTests
         - SayItProtocolTests
+        - SayItSelectionAgentTests
         - SayItBackendTests
         - SayItHTTPTests
         - SayItUpdateTests

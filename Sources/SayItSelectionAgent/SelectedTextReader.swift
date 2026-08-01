@@ -2,9 +2,16 @@ import AppKit
 import ApplicationServices
 import Foundation
 import SayItProtocol
+import SayItXPC
 
 struct SelectedTextReader {
     static let maximumCharacters = 1_000_000
+
+    private static let retryDelays: [Duration] = [
+        .zero,
+        .milliseconds(80),
+        .milliseconds(160)
+    ]
 
     var isAuthorized: Bool {
         AXIsProcessTrustedWithOptions(nil)
@@ -17,46 +24,71 @@ struct SelectedTextReader {
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    func selectedText() -> SelectionServiceResponse {
+    func selectedText() async -> SelectionServiceResponse {
         guard isAuthorized else {
             return .authorizationRequired
         }
 
-        guard let application = frontmostApplicationElement() else {
+        guard let processIdentifier = NSWorkspace.shared.frontmostApplication?
+            .processIdentifier else {
             return .unavailable
         }
-        AXUIElementSetMessagingTimeout(application, 1.5)
 
-        guard let focusedElement = elementAttribute(
-            kAXFocusedUIElementAttribute,
-            from: application
-        ) else {
-            return .noSelection
-        }
+        for delay in Self.retryDelays {
+            if delay != .zero {
+                try? await Task.sleep(for: delay)
+            }
+            guard NSWorkspace.shared.frontmostApplication?
+                .processIdentifier == processIdentifier else {
+                return .unavailable
+            }
 
-        var currentElement: AXUIElement? = focusedElement
-        for _ in 0..<8 {
-            guard let element = currentElement else { break }
-            if let response = selectedText(in: element) {
+            let response = selectedText(
+                inApplication: AXUIElementCreateApplication(processIdentifier)
+            )
+            if response != .noSelection {
                 return response
             }
-            currentElement = elementAttribute(
-                kAXParentAttribute,
-                from: element
-            )
         }
         return .noSelection
     }
 
-    private func frontmostApplicationElement() -> AXUIElement? {
-        if let processIdentifier = NSWorkspace.shared.frontmostApplication?
-            .processIdentifier {
-            return AXUIElementCreateApplication(processIdentifier)
-        }
+    private func selectedText(
+        inApplication application: AXUIElement
+    ) -> SelectionServiceResponse {
+        AXUIElementSetMessagingTimeout(application, 1.5)
+        activateAccessibility(for: application)
 
-        return elementAttribute(
-            kAXFocusedApplicationAttribute,
-            from: AXUIElementCreateSystemWide()
+        let focusedElement = elementAttribute(
+            kAXFocusedUIElementAttribute,
+            from: application
+        ) ?? application
+
+        return firstValueAlongAncestorChain(
+            from: focusedElement,
+            value: selectedText(in:),
+            parent: {
+                elementAttribute(kAXParentAttribute, from: $0)
+            }
+        ) ?? .noSelection
+    }
+
+    private func activateAccessibility(for application: AXUIElement) {
+        // Electron intentionally keeps its web accessibility tree disabled
+        // until assistive software opts in through this custom attribute.
+        AXUIElementSetAttributeValue(
+            application,
+            "AXManualAccessibility" as CFString,
+            kCFBooleanTrue
+        )
+
+        // Chromium enables its native accessibility APIs when an assistive
+        // client asks for the application role.
+        var role: CFTypeRef?
+        AXUIElementCopyAttributeValue(
+            application,
+            kAXRoleAttribute as CFString,
+            &role
         )
     }
 

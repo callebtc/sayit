@@ -200,6 +200,13 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "SayItSelectionAgentTests",
+            dependencies: ["SayItXPC"],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
+            ]
+        ),
+        .testTarget(
             name: "SayItBackendTests",
             dependencies: ["SayItBackend", "SayItProtocol"],
             swiftSettings: [
