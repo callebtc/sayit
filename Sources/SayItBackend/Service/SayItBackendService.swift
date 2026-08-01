@@ -2026,7 +2026,8 @@ public final class SayItBackendService: SayItService {
             }
             return TextSourcePayload(
                 source: submission.source.triggerSource,
-                html: data
+                html: data,
+                plainText: submission.text
             )
         case .richText:
             guard let data = submission.representationData else {

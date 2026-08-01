@@ -26,6 +26,99 @@ struct TextCleanerTests {
         #expect(result.cleanupSummary.sourceFormat == "HTML")
     }
 
+    @Test("Browser plain text preserves paragraphs when clipboard HTML loses them")
+    func prefersBrowserPlainText() async throws {
+        let html = Data(
+            "<article><span>First sentence.</span><span>Like this.</span></article>".utf8
+        )
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(
+                source: .clipboard,
+                html: html,
+                plainText: "First sentence.\n\nLike this."
+            )
+        )
+
+        #expect(result.text == "First sentence.\n\nLike this.")
+        #expect(result.cleanupSummary.sourceFormat == "Plain text")
+    }
+
+    @Test("HTML preserves semantic block, list, and table boundaries")
+    func preservesHTMLBoundaries() async throws {
+        let html = """
+        <main>
+          <h1>Article title</h1>
+          <p>First paragraph.</p>
+          <figure><figcaption>A useful caption.</figcaption></figure>
+          <ul><li>First item</li><li>Second item</li></ul>
+          <table><tr><td>Left cell</td><td>Right cell</td></tr></table>
+          <p>Final paragraph.</p>
+        </main>
+        """
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(
+                source: .http,
+                html: Data(html.utf8)
+            )
+        )
+
+        #expect(result.text.contains("Article title\n\nFirst paragraph."))
+        #expect(result.text.contains("First item\nSecond item"))
+        #expect(result.text.contains("Left cell Right cell"))
+        #expect(result.text.contains("A useful caption.\n\nFirst item"))
+        #expect(result.text.hasSuffix("Final paragraph."))
+    }
+
+    @Test("Website whitespace and missing sentence spaces are repaired")
+    func repairsWebsiteTextArtifacts() async throws {
+        let input = """
+        First\u{00A0}sentence.\u{2029}Second soft\u{00AD}hyphen sentence.\u{FFFC}Third sentence!Next one?Final one.\u{2028}Last line.
+        """
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(
+            result.text
+                == "First sentence.\n\nSecond softhyphen sentence. Third sentence! Next one? Final one.\nLast line."
+        )
+    }
+
+    @Test("Sentence repair leaves URLs, versions, and initials unchanged")
+    func preservesPunctuationWithoutSentenceBoundaries() async throws {
+        let input = "Visit https://example.test/path?q=value. Version 2.1 and U.S.A. stay intact."
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+
+        #expect(result.text == input)
+    }
+
+    @Test("HTML inline markup does not split words")
+    func preservesWordsAcrossInlineHTML() async throws {
+        let html = Data("<p>A read<em>able</em> result.</p>".utf8)
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, html: html)
+        )
+
+        #expect(result.text == "A readable result.")
+    }
+
+    @Test("Raw HTML is parsed when its plain fallback mirrors the markup")
+    func parsesMirroredRawHTML() async throws {
+        let source = "<span>Hello <strong>world.</strong></span>"
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(
+                source: .http,
+                html: Data(source.utf8),
+                plainText: source
+            )
+        )
+
+        #expect(result.text == "Hello world.")
+        #expect(result.cleanupSummary.sourceFormat == "HTML")
+    }
+
     @Test("Markdown removes front matter, code fences, syntax, and URLs")
     func cleansMarkdown() async throws {
         let markdown = """
