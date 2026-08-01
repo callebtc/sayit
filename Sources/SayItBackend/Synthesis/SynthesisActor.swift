@@ -373,7 +373,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             continuation.yield(
                 .chunkStarted(
                     index: completedChunkCount,
-                    text: chunk.text
+                    chunk: chunk
                 )
             )
 

@@ -15,36 +15,35 @@ public struct TextChunker: Sendable {
     }
 
     public func chunks(for text: String) -> [SpeechChunk] {
-        let paragraphs = text.components(separatedBy: "\n\n")
         var output: [SpeechChunk] = []
-        var buffer = ""
-        var bufferStartsParagraph = true
+        var buffer: SpeechChunk?
 
         func flush() {
-            let value = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty else { return }
+            guard let chunk = buffer else { return }
             output.append(
-                SpeechChunk(
-                    id: output.count,
-                    text: value,
-                    startsParagraph: bufferStartsParagraph
+                chunk.reidentified(
+                    as: output.count,
+                    startsParagraph: chunk.startsParagraph
                 )
             )
-            buffer = ""
+            buffer = nil
         }
 
-        for paragraph in paragraphs {
-            let sentences = sentences(in: paragraph)
+        for paragraph in paragraphs(in: text) {
+            let sentences = sentences(
+                in: text,
+                within: paragraph.range,
+                sourceOffset: paragraph.sourceOffset
+            )
             var isFirstSentence = true
 
             for sentence in sentences {
-                if sentence.count > hardCharacterLimit {
+                if sentence.text.count > hardCharacterLimit {
                     flush()
                     for piece in splitOversized(sentence) {
                         output.append(
-                            SpeechChunk(
-                                id: output.count,
-                                text: piece,
+                            piece.reidentified(
+                                as: output.count,
                                 startsParagraph: isFirstSentence
                             )
                         )
@@ -53,20 +52,23 @@ public struct TextChunker: Sendable {
                     continue
                 }
 
-                let separator = buffer.isEmpty ? "" : " "
-                if !buffer.isEmpty,
-                   buffer.count + separator.count + sentence.count > targetCharacterCount {
+                if let buffer,
+                   buffer.text.count + 1 + sentence.text.count
+                    > targetCharacterCount {
                     flush()
-                    bufferStartsParagraph = isFirstSentence
-                } else if buffer.isEmpty {
-                    bufferStartsParagraph = isFirstSentence
                 }
-                buffer += (buffer.isEmpty ? "" : " ") + sentence
+                if let current = buffer {
+                    buffer = joining(current, sentence)
+                } else {
+                    buffer = sentence.reidentified(
+                        as: 0,
+                        startsParagraph: isFirstSentence
+                    )
+                }
                 isFirstSentence = false
             }
             flush()
         }
-        flush()
         return output
     }
 
@@ -77,12 +79,11 @@ public struct TextChunker: Sendable {
         var output: [SpeechChunk] = []
 
         for chunk in chunks(for: text) {
-            let pieces = try fittingPieces(for: chunk.text, fits: fits)
+            let pieces = try fittingPieces(for: chunk, fits: fits)
             for (index, piece) in pieces.enumerated() {
                 output.append(
-                    SpeechChunk(
-                        id: output.count,
-                        text: piece,
+                    piece.reidentified(
+                        as: output.count,
                         startsParagraph: index == 0 && chunk.startsParagraph
                     )
                 )
@@ -96,47 +97,114 @@ public struct TextChunker: Sendable {
         let pieces = splitNearMiddle(chunk.text)
         guard pieces.count > 1 else { return [chunk] }
 
-        return pieces.enumerated().map { index, text in
-            SpeechChunk(
+        return pieces.enumerated().map { index, textRange in
+            chunk.slice(
                 id: index,
-                text: text,
+                textRange: textRange,
                 startsParagraph: index == 0 && chunk.startsParagraph
             )
         }
     }
 
-    private func sentences(in text: String) -> [String] {
-        let tokenizer = NLTokenizer(unit: .sentence)
-        tokenizer.string = text
-        var output: [String] = []
-        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
-            let sentence = text[range].trimmingCharacters(in: .whitespacesAndNewlines)
-            if !sentence.isEmpty {
-                output.append(sentence)
-            }
-            return true
+    private func paragraphs(
+        in text: String
+    ) -> [(range: Range<String.Index>, sourceOffset: Int)] {
+        var output: [(
+            range: Range<String.Index>,
+            sourceOffset: Int
+        )] = []
+        var cursor = text.startIndex
+        var sourceOffset = 0
+        while cursor < text.endIndex,
+              let separator = text.range(
+                of: "\n\n",
+                range: cursor..<text.endIndex
+              ) {
+            let range = cursor..<separator.lowerBound
+            output.append((range, sourceOffset))
+            sourceOffset += text.distance(
+                from: cursor,
+                to: separator.upperBound
+            )
+            cursor = separator.upperBound
         }
-        if output.isEmpty {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? [] : [trimmed]
-        }
+        output.append((cursor..<text.endIndex, sourceOffset))
         return output
     }
 
+    private func sentences(
+        in source: String,
+        within sourceRange: Range<String.Index>,
+        sourceOffset: Int
+    ) -> [SpeechChunk] {
+        let text = String(source[sourceRange])
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        var output: [SpeechChunk] = []
+        var indexCursor = text.startIndex
+        var offsetCursor = sourceOffset
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            if let trimmed = trimmedRange(in: text, within: range) {
+                let lowerOffset = offsetCursor + text.distance(
+                    from: indexCursor,
+                    to: trimmed.lowerBound
+                )
+                let upperOffset = lowerOffset + text.distance(
+                    from: trimmed.lowerBound,
+                    to: trimmed.upperBound
+                )
+                output.append(
+                    SpeechChunk(
+                        id: output.count,
+                        text: String(text[trimmed]),
+                        startsParagraph: output.isEmpty,
+                        sourceRange: lowerOffset..<upperOffset
+                    )
+                )
+                indexCursor = trimmed.upperBound
+                offsetCursor = upperOffset
+            }
+            return true
+        }
+        guard output.isEmpty,
+              let trimmed = trimmedRange(
+                in: text,
+                within: text.startIndex..<text.endIndex
+              ) else {
+            return output
+        }
+        let lowerOffset = sourceOffset + text.distance(
+            from: text.startIndex,
+            to: trimmed.lowerBound
+        )
+        let upperOffset = sourceOffset + text.distance(
+            from: text.startIndex,
+            to: trimmed.upperBound
+        )
+        return [
+            SpeechChunk(
+                id: 0,
+                text: String(text[trimmed]),
+                startsParagraph: true,
+                sourceRange: lowerOffset..<upperOffset
+            )
+        ]
+    }
+
     private func fittingPieces(
-        for text: String,
+        for chunk: SpeechChunk,
         fits: (String) throws -> Bool
-    ) rethrows -> [String] {
-        var output: [String] = []
-        var pending = [text]
+    ) rethrows -> [SpeechChunk] {
+        var output: [SpeechChunk] = []
+        var pending = [chunk]
 
         while let candidate = pending.popLast() {
-            if try fits(candidate) {
+            if try fits(candidate.text) {
                 output.append(candidate)
                 continue
             }
 
-            let pieces = splitNearMiddle(candidate)
+            let pieces = subchunks(of: candidate)
             guard pieces.count > 1 else {
                 output.append(candidate)
                 continue
@@ -147,40 +215,69 @@ public struct TextChunker: Sendable {
         return output
     }
 
-    private func splitOversized(_ text: String) -> [String] {
-        var output: [String] = []
-        var remainder = text[...]
+    private func splitOversized(_ chunk: SpeechChunk) -> [SpeechChunk] {
+        var output: [SpeechChunk] = []
+        var remainder = chunk.text.startIndex..<chunk.text.endIndex
 
-        while remainder.count > hardCharacterLimit {
-            let proposedEnd = remainder.index(
-                remainder.startIndex,
+        while chunk.text.distance(
+            from: remainder.lowerBound,
+            to: remainder.upperBound
+        ) > hardCharacterLimit {
+            let proposedEnd = chunk.text.index(
+                remainder.lowerBound,
                 offsetBy: hardCharacterLimit
             )
-            let searchRange = remainder.startIndex..<proposedEnd
-            let boundaryIndex = remainder[searchRange].lastIndex(where: {
+            let searchRange = remainder.lowerBound..<proposedEnd
+            let boundaryIndex = chunk.text[searchRange].lastIndex(where: {
                 $0.isWhitespace || $0 == "," || $0 == ";"
             })
             let breakIndex = boundaryIndex.map {
-                remainder.index(after: $0)
+                chunk.text.index(after: $0)
             } ?? proposedEnd
-            let piece = remainder[..<breakIndex]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !piece.isEmpty {
-                output.append(piece)
+            if let pieceRange = trimmedRange(
+                in: chunk.text,
+                within: remainder.lowerBound..<breakIndex
+            ) {
+                output.append(
+                    chunk.slice(
+                        id: output.count,
+                        textRange: pieceRange,
+                        startsParagraph: output.isEmpty
+                            && chunk.startsParagraph
+                    )
+                )
             }
-            remainder = remainder[breakIndex...]
-                .drop(while: \.isWhitespace)
+            remainder = breakIndex..<remainder.upperBound
+            while remainder.lowerBound < remainder.upperBound,
+                  chunk.text[remainder.lowerBound].isWhitespace {
+                remainder = chunk.text.index(
+                    after: remainder.lowerBound
+                )..<remainder.upperBound
+            }
         }
 
-        let final = remainder.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !final.isEmpty {
-            output.append(final)
+        if let finalRange = trimmedRange(
+            in: chunk.text,
+            within: remainder
+        ) {
+            output.append(
+                chunk.slice(
+                    id: output.count,
+                    textRange: finalRange,
+                    startsParagraph: output.isEmpty
+                        && chunk.startsParagraph
+                )
+            )
         }
         return output
     }
 
-    private func splitNearMiddle(_ text: String) -> [String] {
-        guard text.count > 1 else { return [text] }
+    private func splitNearMiddle(
+        _ text: String
+    ) -> [Range<String.Index>] {
+        guard text.count > 1 else {
+            return [text.startIndex..<text.endIndex]
+        }
 
         let characterCount = text.count
         let midpointOffset = characterCount / 2
@@ -212,12 +309,48 @@ public struct TextChunker: Sendable {
             )
             ?? text.index(text.startIndex, offsetBy: midpointOffset)
 
-        let left = text[..<splitIndex]
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let right = text[splitIndex...]
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !left.isEmpty, !right.isEmpty else { return [text] }
+        guard let left = trimmedRange(
+            in: text,
+            within: text.startIndex..<splitIndex
+        ),
+        let right = trimmedRange(
+            in: text,
+            within: splitIndex..<text.endIndex
+        ) else {
+            return [text.startIndex..<text.endIndex]
+        }
         return [left, right]
+    }
+
+    private func joining(
+        _ first: SpeechChunk,
+        _ second: SpeechChunk
+    ) -> SpeechChunk {
+        SpeechChunk(
+            id: first.id,
+            text: first.text + " " + second.text,
+            startsParagraph: first.startsParagraph,
+            sourceBoundaryOffsets: first.sourceBoundaryOffsets
+                + [second.sourceRange.lowerBound]
+                + Array(second.sourceBoundaryOffsets.dropFirst())
+        )
+    }
+
+    private func trimmedRange(
+        in text: String,
+        within range: Range<String.Index>
+    ) -> Range<String.Index>? {
+        var lower = range.lowerBound
+        var upper = range.upperBound
+        while lower < upper, text[lower].isWhitespace {
+            lower = text.index(after: lower)
+        }
+        while lower < upper {
+            let candidate = text.index(before: upper)
+            guard text[candidate].isWhitespace else { break }
+            upper = candidate
+        }
+        return lower < upper ? lower..<upper : nil
     }
 
     private func nearestBoundary(

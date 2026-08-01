@@ -1,4 +1,5 @@
 import Foundation
+import SayItCore
 import SayItProtocol
 import Testing
 @testable import SayIt
@@ -29,6 +30,78 @@ struct SpeechLyricsViewTests {
         let blocks = SpeechLyricsView.blockRanges(in: text, chunks: [])
         #expect(blocks.count == 1)
         #expect(blocks.first == text.startIndex..<text.endIndex)
+    }
+
+    @Test("Chunker ranges keep multiline lyrics complete")
+    func multilineChunksRemainComplete() {
+        let text = """
+        Intro sentence.
+
+        Verse line one
+        Verse line two
+
+        Outro sentence.
+        """
+        let chunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: text).enumerated().map { index, chunk in
+            PlaybackTextChunk(
+                textStart: chunk.sourceRange.lowerBound,
+                textEnd: chunk.sourceRange.upperBound,
+                audioStart: Double(index) * 2
+            )
+        }
+        let blocks = SpeechLyricsView.blockRanges(in: text, chunks: chunks)
+        let renderedWords = blocks.flatMap {
+            text[$0].split(whereSeparator: \.isWhitespace)
+        }
+
+        #expect(renderedWords == text.split(whereSeparator: \.isWhitespace))
+    }
+
+    @Test("Partial timing metadata keeps future lyrics visible and pending")
+    func partialTimingKeepsFutureLyricsPending() {
+        let text = "one two three four"
+        let chunks = [
+            PlaybackTextChunk(textStart: 0, textEnd: 7, audioStart: 0)
+        ]
+        let blocks = SpeechLyricsView.blockRanges(in: text, chunks: chunks)
+        let words = SpeechLyricsView.wordRanges(
+            in: text,
+            within: text.startIndex..<text.endIndex
+        )
+        var chunkIndex = 0
+        let times = words.map { range in
+            let offset = text.distance(
+                from: text.startIndex,
+                to: range.lowerBound
+            )
+            return SpeechLyricsTimeline.startTime(
+                for: SpeechLyricsTimeline.timing(
+                    forOffset: offset,
+                    textCount: text.count,
+                    chunks: chunks,
+                    chunkIndex: &chunkIndex
+                ),
+                chunks: chunks,
+                generatedDuration: 2
+            )
+        }
+
+        #expect(blocks == [text.startIndex..<text.endIndex])
+        #expect(words.count == 4)
+        #expect(times[0].isFinite)
+        #expect(times[1].isFinite)
+        #expect(times[2] == .infinity)
+        #expect(times[3] == .infinity)
+        #expect(
+            SpeechLyricsTimeline.activeWordIndex(
+                at: 100,
+                tokenCount: times.count,
+                startTime: { times[$0] }
+            ) == 1
+        )
     }
 
     @Test("Word start times interpolate monotonically within a chunk")

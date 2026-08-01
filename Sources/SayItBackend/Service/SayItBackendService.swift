@@ -1617,15 +1617,15 @@ public final class SayItBackendService: SayItService {
             modelID: request.model.id.rawValue
         )
         playback.setSpokenText(cleaned.text)
-        activeSpokenText = cleaned.text
+        spokenTextCharacterCount = cleaned.characterCount
+        lastRecordedTextEnd = 0
         if submission.source != .preview {
             playbackContext = PlaybackContext(
                 text: cleaned.text,
                 language: request.language
             )
         }
-        spokenTextCursor = cleaned.text.startIndex
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         spokenAudioCursor = 0
         updateJob(id, state: .preparing, progress: 0.08)
         statusText = "Preparing speech"
@@ -1666,8 +1666,8 @@ public final class SayItBackendService: SayItService {
         case .creatingArticleVoice:
             statusText = "Creating an article voice"
             updateJob(request.id, state: .synthesizing, progress: 0.12)
-        case .chunkStarted(_, let text):
-            registerSpokenChunk(text)
+        case .chunkStarted(_, let chunk):
+            registerSpokenChunk(chunk)
         case .audio(let chunk):
             flushPendingSpokenChunk()
             try playback.enqueue(chunk)
@@ -1901,43 +1901,36 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private var activeSpokenText: String?
     private var playbackContext: PlaybackContext?
-    private var spokenTextCursor: String.Index?
-    private var pendingSpokenChunkRange: Range<String.Index>?
+    private var spokenTextCharacterCount = 0
+    private var lastRecordedTextEnd = 0
+    private var pendingSpokenSourceRange: Range<Int>?
     private var spokenAudioCursor: TimeInterval = 0
 
-    private func registerSpokenChunk(_ chunkText: String) {
-        guard let fullText = activeSpokenText else { return }
-        let cursor = spokenTextCursor ?? fullText.startIndex
-        var range = fullText.range(of: chunkText, range: cursor..<fullText.endIndex)
-        if range == nil {
-            range = fullText.range(of: chunkText)
+    private func registerSpokenChunk(_ chunk: SpeechChunk) {
+        let range = chunk.sourceRange
+        guard range.lowerBound >= lastRecordedTextEnd,
+              range.upperBound <= spokenTextCharacterCount,
+              !range.isEmpty else {
+            pendingSpokenSourceRange = nil
+            return
         }
-        guard let found = range else { return }
-        pendingSpokenChunkRange = found
-        spokenTextCursor = found.upperBound
+        pendingSpokenSourceRange = range
     }
 
     private func flushPendingSpokenChunk() {
-        guard let fullText = activeSpokenText,
-              let range = pendingSpokenChunkRange else {
+        guard let range = pendingSpokenSourceRange else {
             return
         }
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         playback.appendSpokenChunk(
             PlaybackTextChunk(
-                textStart: fullText.distance(
-                    from: fullText.startIndex,
-                    to: range.lowerBound
-                ),
-                textEnd: fullText.distance(
-                    from: fullText.startIndex,
-                    to: range.upperBound
-                ),
+                textStart: range.lowerBound,
+                textEnd: range.upperBound,
                 audioStart: spokenAudioCursor
             )
         )
+        lastRecordedTextEnd = range.upperBound
     }
 
     private func makeSnapshot(
@@ -2462,13 +2455,13 @@ public final class SayItBackendService: SayItService {
             modelID: item.modelID.rawValue
         )
         playback.setSpokenText(item.cleanedText)
-        activeSpokenText = item.cleanedText
+        spokenTextCharacterCount = item.cleanedText.count
+        lastRecordedTextEnd = 0
         playbackContext = PlaybackContext(
             text: item.cleanedText,
             language: item.language
         )
-        spokenTextCursor = item.cleanedText.startIndex
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         spokenAudioCursor = 0
         errorMessage = nil
         statusText = "Playing"

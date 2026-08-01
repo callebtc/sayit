@@ -308,6 +308,62 @@ struct BackendServiceCommandTests {
         #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
     }
 
+    @Test("Synthesis forwards multiline source ranges without rematching text")
+    func synthesisForwardsMultilineSourceRanges() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let text = """
+        Intro sentence.
+
+        Verse line one
+        Verse line two
+
+        Outro sentence.
+        """
+
+        _ = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: text,
+                            source: .preview,
+                            modelID: fixture.seedModelID,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        for _ in 0..<300 {
+            guard fixture.playback.spokenChunks.count < 3 else { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let ranges = fixture.playback.spokenChunks.map {
+            $0.textStart..<$0.textEnd
+        }
+        let spokenWords = ranges.flatMap { range in
+            let lower = text.index(
+                text.startIndex,
+                offsetBy: range.lowerBound
+            )
+            let upper = text.index(lower, offsetBy: range.count)
+            return text[lower..<upper]
+                .split(whereSeparator: \.isWhitespace)
+        }
+        #expect(ranges.count == 3)
+        #expect(spokenWords == text.split(whereSeparator: \.isWhitespace))
+        #expect(
+            fixture.playback.spokenChunks.map(\.audioStart)
+                == [0, 1, 2]
+        )
+
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
     @Test("Model, voice studio, and token validation return stable failures")
     func modelVoiceAndTokenFailures() async throws {
         let fixture = try ServiceFixture()
@@ -1220,7 +1276,10 @@ private final class ServiceFixture {
     private(set) var profileID: UUID?
     private(set) var historyID: UUID?
 
-    init(seedVoiceAndHistory: Bool = false) throws {
+    init(
+        seedVoiceAndHistory: Bool = false,
+        synthesizesAudio: Bool = false
+    ) throws {
         root = FileManager.default.temporaryDirectory.appending(
             path: "SayItServiceTests-\(UUID().uuidString)",
             directoryHint: .isDirectory
@@ -1236,7 +1295,9 @@ private final class ServiceFixture {
             historyID = try Self.seedHistory(directories: directories)
         }
         playback = RecordingBackendPlayback()
-        synthesizer = DeterministicSynthesizer()
+        synthesizer = DeterministicSynthesizer(
+            synthesizesAudio: synthesizesAudio
+        )
         service = try SayItBackendService(
             directories: directories,
             serviceVersion: "test-version",
@@ -1371,14 +1432,48 @@ private final class ServiceFixture {
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
     private(set) var unloadCount = 0
+    private let synthesizesAudio: Bool
+
+    init(synthesizesAudio: Bool = false) {
+        self.synthesizesAudio = synthesizesAudio
+    }
 
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
         requestedModelIDs.append(request.model.id.rawValue)
+        guard synthesizesAudio else {
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.loadingModel(request.model.id))
+                continuation.finish(
+                    throwing: SynthesisError.modelNotInstalled
+                )
+            }
+        }
+        let chunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: request.cleanedText.text)
         return AsyncThrowingStream { continuation in
-            continuation.yield(.loadingModel(request.model.id))
-            continuation.finish(throwing: SynthesisError.modelNotInstalled)
+            continuation.yield(.modelLoaded(request.model.id))
+            for (index, chunk) in chunks.enumerated() {
+                continuation.yield(
+                    .chunkStarted(index: index, chunk: chunk)
+                )
+                continuation.yield(
+                    .audio(
+                        AudioChunk(
+                            requestID: request.id,
+                            index: index,
+                            samples: [0.1],
+                            sampleRate: 1,
+                            startsParagraph: chunk.startsParagraph
+                        )
+                    )
+                )
+            }
+            continuation.yield(.completed)
+            continuation.finish()
         }
     }
 

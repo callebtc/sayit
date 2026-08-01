@@ -157,7 +157,8 @@ struct SpeechLyricsView: View {
     }
 
     private var currentWordIndex: Int? {
-        SpeechLyricsTimeline.activeWordIndex(
+        guard generatedDuration > 0 else { return nil }
+        return SpeechLyricsTimeline.activeWordIndex(
             at: elapsed + 0.08,
             tokenCount: tokens.count
         ) { index in
@@ -379,31 +380,32 @@ struct SpeechLyricsView: View {
         let textCount = text.count
         var offsetCursor = 0
         var indexCursor = text.startIndex
-        var ranges: [Range<String.Index>] = []
-        ranges.reserveCapacity(chunks.count)
+        var boundaries = [text.startIndex]
+        boundaries.reserveCapacity(chunks.count + 1)
         for chunk in chunks {
             guard chunk.textStart >= 0,
                   chunk.textEnd > chunk.textStart,
                   chunk.textEnd <= textCount,
                   chunk.textStart >= offsetCursor,
-                  let lower = text.index(
+                  let boundary = text.index(
                     indexCursor,
                     offsetBy: chunk.textStart - offsetCursor,
                     limitedBy: text.endIndex
-                  ),
-                  let upper = text.index(
-                    lower,
-                    offsetBy: chunk.textEnd - chunk.textStart,
-                    limitedBy: text.endIndex
-                  ),
-                  lower < upper else {
+                  ) else {
                 continue
             }
-            ranges.append(lower..<upper)
-            offsetCursor = chunk.textEnd
-            indexCursor = upper
+            if boundary > boundaries[boundaries.count - 1] {
+                boundaries.append(boundary)
+            }
+            offsetCursor = chunk.textStart
+            indexCursor = boundary
         }
-        return ranges
+        if boundaries[boundaries.count - 1] < text.endIndex {
+            boundaries.append(text.endIndex)
+        }
+        return zip(boundaries, boundaries.dropFirst()).map {
+            $0.0..<$0.1
+        }
     }
 
     nonisolated static func wordRanges(
