@@ -4,6 +4,7 @@ import SayItCore
 struct PlaybackBufferPolicy: Sendable {
     static let progressiveBaseLead: TimeInterval = 1.2
     static let bufferedBaseLead: TimeInterval = 2.5
+    static let minimumSustainableStartBuffer: TimeInterval = 0.15
     static let generationSafetyMargin: TimeInterval = 0.4
     static let sustainableLoadLimit = 0.92
 
@@ -44,6 +45,9 @@ struct PlaybackBufferPolicy: Sendable {
             return true
         }
         guard streamingIsSustainable else { return false }
+        if estimator.hasObservations {
+            return bufferedDuration >= Self.minimumSustainableStartBuffer
+        }
         return bufferedDuration >= preferredSourceLead
     }
 }

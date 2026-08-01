@@ -38,6 +38,9 @@ struct MenuBarRootView: View {
                     chunks: state.playback.spokenChunks,
                     elapsed: state.playback.elapsed,
                     generatedDuration: state.playback.generatedDuration,
+                    showsHighlight: state.playback.state == .playing
+                        || state.playback.state == .paused
+                        || state.playback.state == .finished,
                     showsBlockSeparators:
                         state.settings.showLyricsBlockSeparators,
                     onSeek: state.playback.seek

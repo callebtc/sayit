@@ -7,6 +7,7 @@ struct SpeechLyricsView: View {
     let chunks: [PlaybackTextChunk]
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
+    var showsHighlight = true
     var showsBlockSeparators = false
     var onSeek: ((TimeInterval) -> Void)?
 
@@ -161,7 +162,7 @@ struct SpeechLyricsView: View {
     }
 
     private var currentWordIndex: Int? {
-        guard generatedDuration > 0 else { return nil }
+        guard showsHighlight, generatedDuration > 0 else { return nil }
         return SpeechLyricsTimeline.activeWordIndex(
             at: elapsed + 0.08,
             tokenCount: tokens.count
