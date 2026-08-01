@@ -6,6 +6,7 @@ struct ModelsSettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var searchText = ""
     @State private var isExperimentalExpanded = false
+    @State private var isUnsupportedExpanded = false
     @State private var isShowingCommunityModelSheet = false
 
     var body: some View {
@@ -47,36 +48,41 @@ struct ModelsSettingsView: View {
                             }
                         }
                     } else {
-                        Section {
-                            ModelDisclosureRow(
-                                isExpanded: $isExperimentalExpanded,
-                                count: experimentalModels.count
-                            )
-                            if isExperimentalExpanded {
-                                ForEach(experimentalModels) { model in
-                                    ModelRowView(model: model)
-                                        .transition(
-                                            .opacity.combined(
-                                                with: .move(edge: .top)
-                                            )
-                                        )
-                                }
-                            }
-                        }
+                        CollapsibleModelSection(
+                            isExpanded: $isExperimentalExpanded,
+                            models: experimentalModels,
+                            title: "Experimental models",
+                            detail: "May be slow, glitchy, or produce lower-quality speech",
+                            tint: .orange
+                        )
                     }
                 }
 
                 if !unsupportedModels.isEmpty {
-                    Section("Not supported") {
-                        ForEach(unsupportedModels) { model in
-                            ModelRowView(model: model)
+                    if isSearching {
+                        Section("Not supported") {
+                            ForEach(unsupportedModels) { model in
+                                ModelRowView(model: model)
+                            }
                         }
+                    } else {
+                        CollapsibleModelSection(
+                            isExpanded: $isUnsupportedExpanded,
+                            models: unsupportedModels,
+                            title: "Not supported",
+                            detail: "Models that cannot run in this version",
+                            tint: .gray
+                        )
                     }
                 }
             }
             .animation(
                 reduceMotion ? nil : DesignTokens.smoothAnimation,
                 value: isExperimentalExpanded
+            )
+            .animation(
+                reduceMotion ? nil : DesignTokens.smoothAnimation,
+                value: isUnsupportedExpanded
             )
             .overlay {
                 if matchingModels.isEmpty {

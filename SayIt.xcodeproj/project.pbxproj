@@ -27,6 +27,7 @@
 		08E0D54EA40A2A9DBCE513F7 /* UpdateResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C640391D6C6DECE4012194E /* UpdateResult.swift */; };
 		0922BE8F5F7353F975466383 /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
 		0933C3DB1F15CB642A263B79 /* HistoryItemSnapshot+ServiceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13E5BA1B40745372B9772E /* HistoryItemSnapshot+ServiceSnapshot.swift */; };
+		095FA761C9C243B77733CAD1 /* CollapsibleModelSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3227F84E9C088DB4478DC861 /* CollapsibleModelSection.swift */; };
 		09E94756EA98F9506DD13C52 /* DiagnosticCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A092AE8477F880752CF985 /* DiagnosticCategory.swift */; };
 		0A00DCDC6CC2981A2DF8C523 /* ModelID.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB04A144E7B0EC58078BD43A /* ModelID.swift */; };
 		0A2D669D9D8BCA189C6ECF28 /* SayItHTTPServer+VoiceRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E46C278E2A69A51F79DE353 /* SayItHTTPServer+VoiceRoutes.swift */; };
@@ -846,6 +847,7 @@
 		305232C320E9BF2C82FCF35C /* VoiceSynthesisMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSynthesisMode.swift; sourceTree = "<group>"; };
 		3083E18F1B28B31D261C1F00 /* SelectionServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceController.swift; sourceTree = "<group>"; };
 		3143D35E528697F33A92BD89 /* StopCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCommand.swift; sourceTree = "<group>"; };
+		3227F84E9C088DB4478DC861 /* CollapsibleModelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollapsibleModelSection.swift; sourceTree = "<group>"; };
 		336FF814DDD5418256DAC78D /* PCMStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMStore.swift; sourceTree = "<group>"; };
 		33B872F10E4B1D9A5C988561 /* SkipCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipCommand.swift; sourceTree = "<group>"; };
 		33C679C3BD54B83C5BCE6E2E /* ModelArchiveImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveImporter.swift; sourceTree = "<group>"; };
@@ -1475,6 +1477,7 @@
 			children = (
 				8E05E5EF26C5160EA80CBEC7 /* AboutSettingsView.swift */,
 				C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */,
+				3227F84E9C088DB4478DC861 /* CollapsibleModelSection.swift */,
 				48D55330E6962E057802D765 /* CommunityModelSheet.swift */,
 				E00DC35EB6F7B9CA262D9591 /* DiagnosticsSettingsView.swift */,
 				6DD8B7FE7FADB3FA2DEA3D88 /* GeneralSettingsView.swift */,
@@ -2978,6 +2981,7 @@
 				CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */,
 				8031E3C162346A93D6DC988C /* BackendMigrationCoordinator.swift in Sources */,
 				C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */,
+				095FA761C9C243B77733CAD1 /* CollapsibleModelSection.swift in Sources */,
 				227C33C4A2279F0D8D3CDCBC /* CommandLineInstallController.swift in Sources */,
 				80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */,
 				4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */,

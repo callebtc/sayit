@@ -4,6 +4,9 @@ struct ModelDisclosureRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isExpanded: Bool
     let count: Int
+    let title: String
+    let detail: String
+    let tint: Color
 
     var body: some View {
         Button(action: toggle) {
@@ -11,13 +14,11 @@ struct ModelDisclosureRow: View {
                 voiceMark
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Experimental models")
+                    Text(title)
                         .fontWeight(.semibold)
-                    Text(
-                        "May be slow, glitchy, or produce lower-quality speech"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: DesignTokens.standardSpacing)
@@ -36,7 +37,7 @@ struct ModelDisclosureRow: View {
             .padding(.vertical, 3)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Experimental models")
+        .accessibilityLabel(title)
         .accessibilityValue(
             isExpanded
                 ? "Expanded, \(count) models"
@@ -44,8 +45,8 @@ struct ModelDisclosureRow: View {
         )
         .accessibilityHint(
             isExpanded
-                ? "Collapses the experimental model list"
-                : "Shows the experimental model list"
+                ? "Collapses the \(title.lowercased()) list"
+                : "Shows the \(title.lowercased()) list"
         )
         .animation(
             reduceMotion ? nil : DesignTokens.springAnimation,
@@ -57,7 +58,7 @@ struct ModelDisclosureRow: View {
         HStack(alignment: .center, spacing: 2) {
             ForEach(0..<3, id: \.self) { index in
                 Capsule()
-                    .fill(.orange.gradient)
+                    .fill(tint.gradient)
                     .frame(
                         width: 2.5,
                         height: barHeight(at: index)
@@ -65,7 +66,7 @@ struct ModelDisclosureRow: View {
             }
         }
         .frame(width: 28, height: 28)
-        .background(.orange.opacity(0.1), in: .circle)
+        .background(tint.opacity(0.1), in: .circle)
         .accessibilityHidden(true)
     }
 
