@@ -87,6 +87,11 @@ final class PlaybackController: BackendPlaybackControlling {
             updateNowPlaying()
         }
     }
+    var volume: Double = 1 {
+        didSet {
+            player.volume = Float(volume)
+        }
+    }
     var backwardSkipInterval: TimeInterval = 15 {
         didSet {
             MPRemoteCommandCenter.shared()
@@ -279,7 +284,7 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         try validatePlayerFormat(for: buffer)
         player.scheduleBuffer(buffer)
-        player.volume = 1
+        player.volume = Float(volume)
         player.play()
         return .seconds(Double(samples.count) / sampleRate)
     }
@@ -296,7 +301,7 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask = nil
         invalidateScheduledAudio()
         engine.pause()
-        player.volume = 1
+        player.volume = Float(volume)
         pcmStore = nil
         frameScheduler = nil
         resetAmplitudeAnalysis(sampleRate: sampleRate)

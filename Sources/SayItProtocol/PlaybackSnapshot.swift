@@ -6,6 +6,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
     public let generatedDuration: TimeInterval
     public let estimatedDuration: TimeInterval
     public let rate: Double
+    public let volume: Double
     public let currentTitle: String
     public let modelID: String?
     public let amplitudes: [Float]
@@ -19,6 +20,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         generatedDuration: TimeInterval = 0,
         estimatedDuration: TimeInterval = 0,
         rate: Double = 1,
+        volume: Double = 1,
         currentTitle: String = "",
         modelID: String? = nil,
         amplitudes: [Float] = [],
@@ -31,6 +33,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         self.generatedDuration = generatedDuration
         self.estimatedDuration = estimatedDuration
         self.rate = rate
+        self.volume = volume
         self.currentTitle = currentTitle
         self.modelID = modelID
         self.amplitudes = amplitudes
@@ -45,6 +48,7 @@ public struct PlaybackSnapshot: Codable, Sendable {
         case generatedDuration
         case estimatedDuration
         case rate
+        case volume
         case currentTitle
         case modelID
         case amplitudes
@@ -66,6 +70,8 @@ public struct PlaybackSnapshot: Codable, Sendable {
             forKey: .estimatedDuration
         )
         rate = try container.decode(Double.self, forKey: .rate)
+        volume = try container.decodeIfPresent(Double.self, forKey: .volume)
+            ?? 1
         currentTitle = try container.decode(
             String.self,
             forKey: .currentTitle

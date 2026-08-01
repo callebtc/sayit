@@ -16,6 +16,7 @@ final class AppSettings {
         static let voicePreviewSample = "voicePreviewSample"
         static let speakingPace = "speakingPace"
         static let playbackRate = "playbackRate"
+        static let volume = "volume"
         static let rewindInterval = "rewindInterval"
         static let forwardInterval = "forwardInterval"
         static let showNowPlayingTitles = "showNowPlayingTitles"
@@ -104,6 +105,12 @@ final class AppSettings {
     var playbackRate: Double {
         didSet {
             defaults.set(playbackRate, forKey: Key.playbackRate)
+            notifyBackendChange()
+        }
+    }
+    var volume: Double {
+        didSet {
+            defaults.set(volume, forKey: Key.volume)
             notifyBackendChange()
         }
     }
@@ -295,6 +302,8 @@ final class AppSettings {
         ) ?? .natural
         let storedRate = defaults.double(forKey: Key.playbackRate)
         playbackRate = storedRate == 0 ? 1 : storedRate
+        let storedVolume = defaults.double(forKey: Key.volume)
+        volume = storedVolume == 0 ? 1 : storedVolume
         let storedRewind = defaults.double(forKey: Key.rewindInterval)
         rewindInterval = storedRewind == 0 ? 15 : storedRewind
         let storedForward = defaults.double(forKey: Key.forwardInterval)
@@ -399,6 +408,7 @@ final class AppSettings {
             voiceDescription: voiceDescription,
             speakingPace: speakingPace.rawValue,
             playbackRate: playbackRate,
+            volume: volume,
             rewindInterval: rewindInterval,
             forwardInterval: forwardInterval,
             showNowPlayingTitles: showNowPlayingTitles,
@@ -430,6 +440,7 @@ final class AppSettings {
         speakingPace = SpeakingPace(rawValue: snapshot.speakingPace)
             ?? .natural
         playbackRate = snapshot.playbackRate
+        volume = snapshot.volume
         rewindInterval = snapshot.rewindInterval
         forwardInterval = snapshot.forwardInterval
         showNowPlayingTitles = snapshot.showNowPlayingTitles

@@ -17,6 +17,7 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     var shouldStartWhenBuffered: Bool { get }
     var showTitleInNowPlaying: Bool { get set }
     var rate: Double { get set }
+    var volume: Double { get set }
     var backwardSkipInterval: TimeInterval { get set }
     var forwardSkipInterval: TimeInterval { get set }
 

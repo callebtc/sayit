@@ -343,6 +343,9 @@ public final class SayItBackendService: SayItService {
         case .setPlaybackRate(let rate):
             try await setPlaybackRate(rate)
             return .accepted
+        case .setVolume(let volume):
+            try await setVolume(volume)
+            return .accepted
         case .models:
             return .models(models.map(\.serviceSnapshot))
         case .selectModel(let id):
@@ -1981,6 +1984,7 @@ public final class SayItBackendService: SayItService {
                 generatedDuration: playback.generatedDuration,
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
+                volume: playback.volume,
                 currentTitle: includesPlaybackContent
                     ? playbackContent.currentTitle
                     : "",
@@ -2065,6 +2069,21 @@ public final class SayItBackendService: SayItService {
         playback.rate = validated
         var settings = settingsStore.value
         settings.playbackRate = validated
+        try settingsStore.update(settings)
+        revision &+= 1
+    }
+
+    private func setVolume(_ volume: Double) async throws {
+        let validated = validatedVolume(volume)
+        guard validated == volume else {
+            throw ServiceFailure(
+                code: "playback.invalid_volume",
+                message: "Volume must be between 0.2 and 2."
+            )
+        }
+        playback.volume = validated
+        var settings = settingsStore.value
+        settings.volume = validated
         try settingsStore.update(settings)
         revision &+= 1
     }
@@ -2642,6 +2661,12 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
+        guard (0.2...2).contains(settings.volume) else {
+            throw ServiceFailure(
+                code: "settings.invalid_volume",
+                message: "Volume must be between 0.2 and 2."
+            )
+        }
         guard (1...5_000).contains(settings.chunkCharacterTarget) else {
             throw ServiceFailure(
                 code: "settings.invalid_chunk_size",
@@ -2698,6 +2723,7 @@ public final class SayItBackendService: SayItService {
 
     private func applyPlaybackSettings(_ settings: BackendSettingsSnapshot) {
         playback.rate = settings.playbackRate
+        playback.volume = settings.volume
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
@@ -2805,6 +2831,10 @@ public final class SayItBackendService: SayItService {
 
     private func validatedPlaybackRate(_ value: Double) -> Double {
         min(max(value, 0.5), 2)
+    }
+
+    private func validatedVolume(_ value: Double) -> Double {
+        min(max(value, 0.2), 2)
     }
 
     private func nonEmpty(_ value: String) -> String? {
