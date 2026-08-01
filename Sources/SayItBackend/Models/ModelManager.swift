@@ -62,7 +62,8 @@ actor ModelManager: ModelManaging {
         guard model.isSelectable else {
             throw ModelManagerError.modelUnavailable
         }
-        if rawInstallation(for: model) != nil {
+        let hasInstalledSnapshot = rawInstallation(for: model) != nil
+        if hasInstalledSnapshot, installation(for: model) != nil {
             let staleStaging = directories.downloads.appending(
                 path: "\(model.id.rawValue)-\(model.revision).partial",
                 directoryHint: .isDirectory
@@ -73,7 +74,14 @@ actor ModelManager: ModelManaging {
 
         activeInstallID = id
         let task = Task {
-            try await self.performInstall(model, progress: progress)
+            if hasInstalledSnapshot {
+                try await self.performDependencyRepair(
+                    model,
+                    progress: progress
+                )
+            } else {
+                try await self.performInstall(model, progress: progress)
+            }
         }
         activeInstallTask = task
         defer {
@@ -280,21 +288,17 @@ actor ModelManager: ModelManaging {
                     path: file.path
                 )
                 let resumeURL = destination.appendingPathExtension("resume")
-                let delegate = ModelFileDownloadDelegate(
-                    modelID: model.id,
-                    baseCompletedBytes: completedBytes,
-                    totalModelBytes: totalBytes,
-                    progress: progress
-                )
                 let downloadedFile = destination.appendingPathExtension(
                     "download"
                 )
-                let response = try await delegate.download(
-                    using: session,
-                    request: try await authorizedRequest(url: remoteURL),
-                    resumeData: try? Data(contentsOf: resumeURL),
+                let response = try await downloadFile(
+                    for: model.id,
+                    from: remoteURL,
                     to: downloadedFile,
-                    resumeDataURL: resumeURL
+                    resumeDataURL: resumeURL,
+                    completedBytes: completedBytes,
+                    totalBytes: totalBytes,
+                    progress: progress
                 )
                 guard let http = response as? HTTPURLResponse,
                       (200..<300).contains(http.statusCode) else {
@@ -356,21 +360,17 @@ actor ModelManager: ModelManaging {
                     let resumeURL = destination.appendingPathExtension(
                         "resume"
                     )
-                    let delegate = ModelFileDownloadDelegate(
-                        modelID: model.id,
-                        baseCompletedBytes: completedBytes,
-                        totalModelBytes: totalBytes,
-                        progress: progress
-                    )
                     let downloadedFile = destination.appendingPathExtension(
                         "download"
                     )
-                    let response = try await delegate.download(
-                        using: session,
-                        request: try await authorizedRequest(url: remoteURL),
-                        resumeData: try? Data(contentsOf: resumeURL),
+                    let response = try await downloadFile(
+                        for: model.id,
+                        from: remoteURL,
                         to: downloadedFile,
-                        resumeDataURL: resumeURL
+                        resumeDataURL: resumeURL,
+                        completedBytes: completedBytes,
+                        totalBytes: totalBytes,
+                        progress: progress
                     )
                     guard let http = response as? HTTPURLResponse,
                           (200..<300).contains(http.statusCode) else {
@@ -444,6 +444,12 @@ actor ModelManager: ModelManaging {
                     }
                 }
             }
+            for dependency in dependencies {
+                try materializeCompatibilityFiles(
+                    for: dependency,
+                    modelDirectory: staging
+                )
+            }
             try? FileManager.default.removeItem(
                 at: staging.appending(path: "__dependencies")
             )
@@ -489,6 +495,154 @@ actor ModelManager: ModelManaging {
         } catch is CancellationError {
             throw CancellationError()
         }
+    }
+
+    private func performDependencyRepair(
+        _ model: ModelDescriptor,
+        progress: @escaping ProgressHandler
+    ) async throws {
+        let dependencies = dependencies(for: model)
+        guard !dependencies.isEmpty else {
+            throw ModelManagerError.incompleteSnapshot
+        }
+        let totalBytes = dependencies.reduce(Int64(0)) {
+            $0 + $1.files.reduce(Int64(0)) { $0 + $1.byteCount }
+        }
+        try preflight(requiredBytes: totalBytes)
+        let staging = directories.downloads.appending(
+            path: "\(model.id.rawValue)-\(model.revision).dependencies.partial",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(
+            at: staging,
+            withIntermediateDirectories: true
+        )
+
+        var completedBytes = dependencies.reduce(Int64(0)) { total, dependency in
+            let installed = dependencyDestination(dependency)
+            if dependencyIsValid(dependency, at: installed) {
+                return total + dependency.files.reduce(Int64(0)) {
+                    $0 + $1.byteCount
+                }
+            }
+            return total + existingVerifiedBytes(
+                in: staging.appending(path: dependency.id),
+                files: dependency.files
+            )
+        }
+        await progress(
+            ModelDownloadProgress(
+                modelID: model.id,
+                state: .downloading,
+                completedBytes: completedBytes,
+                totalBytes: totalBytes,
+                bytesPerSecond: 0
+            )
+        )
+
+        for dependency in dependencies {
+            try Task.checkCancellation()
+            let installed = dependencyDestination(dependency)
+            if dependencyIsValid(dependency, at: installed) {
+                continue
+            }
+            let dependencyStaging = staging.appending(path: dependency.id)
+            try FileManager.default.createDirectory(
+                at: dependencyStaging,
+                withIntermediateDirectories: true
+            )
+            for file in dependency.files {
+                let destination = dependencyStaging.appending(path: file.path)
+                if isValidExistingFile(destination, descriptor: file) {
+                    continue
+                }
+                try FileManager.default.createDirectory(
+                    at: destination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                let remoteURL = try downloadURL(
+                    repository: dependency.repository,
+                    revision: dependency.revision,
+                    path: file.path
+                )
+                let resumeURL = destination.appendingPathExtension("resume")
+                let downloadedFile = destination.appendingPathExtension(
+                    "download"
+                )
+                let response = try await downloadFile(
+                    for: model.id,
+                    from: remoteURL,
+                    to: downloadedFile,
+                    resumeDataURL: resumeURL,
+                    completedBytes: completedBytes,
+                    totalBytes: totalBytes,
+                    progress: progress
+                )
+                guard isSuccessful(response) else {
+                    throw ModelManagerError.invalidResponse
+                }
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.moveItem(
+                    at: downloadedFile,
+                    to: destination
+                )
+                try? FileManager.default.removeItem(at: resumeURL)
+                try verify(destination, descriptor: file)
+                completedBytes += file.byteCount
+            }
+            guard dependencyIsValid(dependency, at: dependencyStaging) else {
+                throw ModelManagerError.incompleteSnapshot
+            }
+            try FileManager.default.createDirectory(
+                at: installed.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: installed.path) {
+                try FileManager.default.removeItem(at: installed)
+            }
+            try FileManager.default.moveItem(
+                at: dependencyStaging,
+                to: installed
+            )
+            if dependency.id == "kitten-tts-g2p" {
+                let source = installed.appending(path: "us_bart_config.json")
+                let compatibilityConfig = installed.appending(path: "config.json")
+                if !FileManager.default.fileExists(
+                    atPath: compatibilityConfig.path
+                ) {
+                    try FileManager.default.copyItem(
+                        at: source,
+                        to: compatibilityConfig
+                    )
+                }
+            }
+        }
+
+        guard let installation = rawInstallation(for: model) else {
+            throw ModelManagerError.incompleteSnapshot
+        }
+        let modelDirectory = directories.models.appending(
+            path: installation.relativePath
+        )
+        for dependency in dependencies {
+            try materializeCompatibilityFiles(
+                for: dependency,
+                modelDirectory: modelDirectory
+            )
+        }
+
+        try? FileManager.default.removeItem(at: staging)
+        await progress(
+            ModelDownloadProgress(
+                modelID: model.id,
+                state: .installed,
+                completedBytes: totalBytes,
+                totalBytes: totalBytes,
+                bytesPerSecond: 0
+            )
+        )
     }
 
     private func persistCustomModels() throws {
@@ -566,6 +720,69 @@ actor ModelManager: ModelManaging {
             throw ModelManagerError.invalidDownloadURL
         }
         return url
+    }
+
+    private func downloadFile(
+        for modelID: ModelID,
+        from remoteURL: URL,
+        to downloadedFile: URL,
+        resumeDataURL: URL,
+        completedBytes: Int64,
+        totalBytes: Int64,
+        progress: @escaping ProgressHandler
+    ) async throws -> URLResponse {
+        let request = try await authorizedRequest(url: remoteURL)
+        let resumeData = try? Data(contentsOf: resumeDataURL)
+        if let resumeData {
+            let delegate = ModelFileDownloadDelegate(
+                modelID: modelID,
+                baseCompletedBytes: completedBytes,
+                totalModelBytes: totalBytes,
+                progress: progress
+            )
+            do {
+                let response = try await delegate.download(
+                    using: session,
+                    request: request,
+                    resumeData: resumeData,
+                    to: downloadedFile,
+                    resumeDataURL: resumeDataURL
+                )
+                if isSuccessful(response) {
+                    return response
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // A failed resume gets one clean attempt below. If that also
+                // fails, its new resume data remains available to the user.
+            }
+
+            // URLSession resume data captures the redirected, short-lived Hub
+            // download URL. Once that URL expires, retry from the stable model
+            // URL instead of replaying the same rejected resume data forever.
+            try? FileManager.default.removeItem(at: resumeDataURL)
+            try? FileManager.default.removeItem(at: downloadedFile)
+        }
+
+        let delegate = ModelFileDownloadDelegate(
+            modelID: modelID,
+            baseCompletedBytes: completedBytes,
+            totalModelBytes: totalBytes,
+            progress: progress
+        )
+        return try await delegate.download(
+            using: session,
+            request: request,
+            resumeData: nil,
+            to: downloadedFile,
+            resumeDataURL: resumeDataURL
+        )
+    }
+
+    private func isSuccessful(_ response: URLResponse) -> Bool {
+        guard let http = response as? HTTPURLResponse else { return false }
+        return (200..<300).contains(http.statusCode)
     }
 
     private func dependencies(
@@ -662,9 +879,10 @@ actor ModelManager: ModelManaging {
             return
         }
         guard SupportedModelTypes.all.contains(declaredType),
-              declaredType == model.modelType.lowercased()
-                || model.modelType.lowercased().contains(declaredType)
-                || declaredType.contains(model.modelType.lowercased()) else {
+              SupportedModelTypes.areCompatible(
+                  model.modelType,
+                  declaredType
+              ) else {
             throw ModelManagerError.modelUnavailable
         }
     }
@@ -673,9 +891,12 @@ actor ModelManager: ModelManaging {
         guard let installation = rawInstallation(for: model) else {
             return nil
         }
-        if requiresManagedDependencies(model),
-           installation.dependenciesVerifiedAt == nil {
-            return nil
+        if requiresManagedDependencies(model) {
+            guard installation.dependenciesVerifiedAt != nil,
+                  installation.dependenciesFingerprint
+                    == dependencyFingerprint(for: model) else {
+                return nil
+            }
         }
         return installation
     }
@@ -709,6 +930,7 @@ actor ModelManager: ModelManaging {
             installedBytes: installation.installedBytes,
             verifiedAt: installation.verifiedAt,
             dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: dependencyFingerprint(for: model),
             relativePath: installation.relativePath
         )
         let metadata = try JSONEncoder.sayIt.encode(updated)
@@ -723,9 +945,36 @@ actor ModelManager: ModelManaging {
     private func requiresManagedDependencies(
         _ model: ModelDescriptor
     ) -> Bool {
-        ["kokoro", "kokoro_tts", "kitten", "kitten_tts"].contains(
-            model.modelType.lowercased()
+        !dependencies(for: model).isEmpty
+    }
+
+    private func dependencyFingerprint(for model: ModelDescriptor) -> String? {
+        ModelCatalog.dependencyFingerprint(
+            modelType: model.modelType,
+            dependencies: dependencyList
         )
+    }
+
+    private func materializeCompatibilityFiles(
+        for dependency: ModelDependencyDescriptor,
+        modelDirectory: URL
+    ) throws {
+        guard dependency.id == "chatterbox-default-conditioning",
+              let descriptor = dependency.files.first else {
+            return
+        }
+        let source = dependencyDestination(dependency).appending(
+            path: descriptor.path
+        )
+        let destination = modelDirectory.appending(path: descriptor.path)
+        if isValidExistingFile(destination, descriptor: descriptor) {
+            return
+        }
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: source, to: destination)
+        try verify(destination, descriptor: descriptor)
     }
 
     private func existingVerifiedBytes(

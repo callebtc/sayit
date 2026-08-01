@@ -92,4 +92,23 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
             false
         }
     }
+
+    public func inferredLanguage(forPresetVoice voice: String?) -> String? {
+        guard ["kokoro", "kokoro_tts"].contains(modelType.lowercased()),
+              let prefix = voice?.first else {
+            return nil
+        }
+        let languageByPrefix: [Character: String] = [
+            "a": "en-US",
+            "b": "en-GB",
+            "e": "es",
+            "f": "fr",
+            "h": "hi",
+            "i": "it",
+            "j": "ja",
+            "p": "pt",
+            "z": "cmn"
+        ]
+        return languageByPrefix[prefix]
+    }
 }

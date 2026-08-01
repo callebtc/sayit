@@ -305,24 +305,7 @@ final class AppState {
         _ voice: String,
         model: ModelDescriptor
     ) {
-        guard ["kokoro", "kokoro_tts"].contains(
-            model.modelType.lowercased()
-        ),
-        let prefix = voice.first else {
-            return
-        }
-        let languageByPrefix: [Character: String] = [
-            "a": "en-US",
-            "b": "en-GB",
-            "e": "es",
-            "f": "fr",
-            "h": "hi",
-            "i": "it",
-            "j": "ja",
-            "p": "pt",
-            "z": "cmn"
-        ]
-        if let language = languageByPrefix[prefix] {
+        if let language = model.inferredLanguage(forPresetVoice: voice) {
             settings.activeLanguage = language
         }
     }

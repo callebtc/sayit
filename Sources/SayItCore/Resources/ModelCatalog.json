@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-29",
+  "generatedAt": "2026-08-01",
   "dependencies": [
     {
       "id": "kitten-tts-g2p",
@@ -38,6 +38,55 @@
       "files": [
         {"path": "config.json", "byteCount": 817, "sha256": null},
         {"path": "model.safetensors", "byteCount": 82635688, "sha256": "ba965cc26804861252459556f40fdf8a643b7bf6f0e5d9565674b6a2c2ec3e38"}
+      ]
+    },
+    {
+      "id": "irodori-text-tokenizer",
+      "modelTypes": ["irodori_tts", "irodori"],
+      "repository": "llm-jp/llm-jp-3-150m",
+      "revision": "b112feef602fff752e4dac4c30af6a2c2fa41c7a",
+      "targetSubdirectory": "llm-jp_llm-jp-3-150m",
+      "files": [
+        {"path": "config.json", "byteCount": 680, "sha256": null},
+        {"path": "generation_config.json", "byteCount": 111, "sha256": null},
+        {"path": "special_tokens_map.json", "byteCount": 237, "sha256": null},
+        {"path": "tokenizer.json", "byteCount": 6416433, "sha256": null},
+        {"path": "tokenizer_config.json", "byteCount": 494, "sha256": null}
+      ]
+    },
+    {
+      "id": "qwen3-snac-codec",
+      "modelTypes": [
+        "qwen3", "qwen", "llama_tts", "llama3_tts", "llama3", "llama",
+        "orpheus", "orpheus_tts"
+      ],
+      "repository": "mlx-community/snac_24khz",
+      "revision": "556af1cd3b1c5f2d294f6aa9bb886245d7b716ac",
+      "targetSubdirectory": "mlx-community_snac_24khz",
+      "files": [
+        {"path": "config.json", "byteCount": 300, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 79404951, "sha256": "e61ae2f638f56ee07a37592cd5a6a9e7d642560ddc78a76ee4a7f96d6922f1be"}
+      ]
+    },
+    {
+      "id": "chatterbox-s3-tokenizer",
+      "modelTypes": ["chatterbox", "chatterbox_tts", "chatterbox_turbo"],
+      "repository": "mlx-community/S3TokenizerV2",
+      "revision": "e0c9886f0e1c35ae85b1f27277416fb19fc72bec",
+      "targetSubdirectory": "mlx-community_S3TokenizerV2",
+      "files": [
+        {"path": "config.json", "byteCount": 126, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 494868984, "sha256": "928726bc1f206a613d36b8f49e297eae9c5593a21bf9b92ddfe2c23f85eb92cc"}
+      ]
+    },
+    {
+      "id": "chatterbox-default-conditioning",
+      "modelTypes": ["chatterbox", "chatterbox_tts", "chatterbox_turbo"],
+      "repository": "mlx-community/chatterbox-fp16",
+      "revision": "4923fcca09086356aeab5191a2348c5a17a23694",
+      "targetSubdirectory": "mlx-community_chatterbox-fp16-default-conditioning",
+      "files": [
+        {"path": "conds.safetensors", "byteCount": 105316, "sha256": "709e5a7fa80e010a011c8244f553853aed7a49c106fff54008fbd89a0f5a6148"}
       ]
     }
   ],
@@ -90,7 +139,7 @@
       },
       "stability": "recommended",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "kitten-mini-08",
@@ -132,7 +181,7 @@
       },
       "stability": "stable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "pocket-tts",
@@ -169,7 +218,7 @@
       },
       "stability": "stable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "soprano-11-bf16",
@@ -206,7 +255,7 @@
       },
       "stability": "stable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "qwen3-06b-base-8bit",
@@ -222,7 +271,7 @@
       "defaultVoice": null,
       "defaultLanguage": "en",
       "capabilities": {
-        "presetVoices": true,
+        "presetVoices": false,
         "voiceDescription": false,
         "voiceCloning": true,
         "streaming": true,
@@ -241,7 +290,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1100000000,
+      "estimatedDiskBytes": 2000000000,
       "estimatedPeakMemoryBytes": 4700000000,
       "hardwareTier": "high",
       "license": {
@@ -252,7 +301,7 @@
       },
       "stability": "experimental",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "chatterbox-fp16",
@@ -287,7 +336,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1900000000,
+      "estimatedDiskBytes": 3200000000,
       "estimatedPeakMemoryBytes": 4500000000,
       "hardwareTier": "high",
       "license": {
@@ -298,7 +347,7 @@
       },
       "stability": "experimental",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "omnivoice",
@@ -333,7 +382,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 2700000000,
+      "estimatedDiskBytes": 3100000000,
       "estimatedPeakMemoryBytes": 6000000000,
       "hardwareTier": "high",
       "license": {
@@ -342,9 +391,9 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "fish-s2-pro-8bit",
@@ -390,7 +439,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "irodori-v3-8bit",
@@ -427,7 +476,7 @@
       },
       "stability": "experimental",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "vyvo-en-4bit",
@@ -453,7 +502,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1200000000,
+      "estimatedDiskBytes": 1300000000,
       "estimatedPeakMemoryBytes": 4500000000,
       "hardwareTier": "high",
       "license": {
@@ -464,7 +513,7 @@
       },
       "stability": "experimental",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "orpheus-3b-bf16",
@@ -490,7 +539,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 6200000000,
+      "estimatedDiskBytes": 6700000000,
       "estimatedPeakMemoryBytes": 10000000000,
       "hardwareTier": "high",
       "license": {
@@ -501,7 +550,7 @@
       },
       "stability": "experimental",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "moss-tts",
@@ -527,7 +576,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 5000000000,
+      "estimatedDiskBytes": 23000000000,
       "estimatedPeakMemoryBytes": 9000000000,
       "hardwareTier": "high",
       "license": {
@@ -536,9 +585,9 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "marvis-250m-8bit",
@@ -550,11 +599,11 @@
       "parameterCount": "250M",
       "quantization": "8-bit",
       "languages": ["en"],
-      "voices": ["conversational"],
-      "defaultVoice": "conversational",
+      "voices": [],
+      "defaultVoice": null,
       "defaultLanguage": "en",
       "capabilities": {
-        "presetVoices": true,
+        "presetVoices": false,
         "voiceDescription": false,
         "voiceCloning": false,
         "streaming": true,
@@ -573,9 +622,9 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "index-tts",
@@ -612,7 +661,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "echo-base",
@@ -649,7 +698,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "moss-nano-100m",
@@ -686,7 +735,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     }
   ]
 }

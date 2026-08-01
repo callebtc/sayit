@@ -6,6 +6,13 @@ import Testing
 
 @Suite("Model manager", .serialized)
 struct ModelManagerTests {
+    @Test("Upstream architecture aliases match their Say It model family")
+    func compatibleUpstreamArchitectureAliases() {
+        #expect(SupportedModelTypes.areCompatible("orpheus", "llama"))
+        #expect(SupportedModelTypes.areCompatible("moss_tts", "moss_tts_delay"))
+        #expect(!SupportedModelTypes.areCompatible("orpheus", "qwen3"))
+    }
+
     @Test("A complete staged snapshot installs, reports progress, and removes")
     func stagedInstallLifecycle() async throws {
         let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
@@ -281,6 +288,76 @@ struct ModelManagerTests {
         }
     }
 
+    @Test("A newer catalog repairs dependencies without replacing the model")
+    func newerCatalogRepairsDependencies() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+        defer { fixture.remove() }
+        let dependencyData = Data(#"{"codec":true}"#.utf8)
+        let dependency = ModelDependencyDescriptor(
+            id: "test-codec",
+            modelTypes: ["qwen3"],
+            repository: "owner/dependency",
+            revision: "dep-revision",
+            targetSubdirectory: "owner_dependency",
+            files: [
+                .init(
+                    path: "config.json",
+                    byteCount: Int64(dependencyData.count),
+                    sha256: nil
+                )
+            ]
+        )
+        let model = makeModel(
+            id: "dependency-migration",
+            revision: "model-revision",
+            modelType: "qwen3"
+        )
+        let relativePath = "dependency-migration/model-revision"
+        let modelDirectory = fixture.directories.models.appending(
+            path: relativePath
+        )
+        try FileManager.default.createDirectory(
+            at: modelDirectory,
+            withIntermediateDirectories: true
+        )
+        let installation = ModelInstallation(
+            modelID: model.id,
+            revision: model.revision,
+            installedBytes: 1,
+            verifiedAt: .distantPast,
+            dependenciesVerifiedAt: .distantPast,
+            relativePath: relativePath
+        )
+        try JSONEncoder.sayIt.encode(installation).write(
+            to: modelDirectory.appending(path: "installation.json")
+        )
+        let dependencyDirectory = fixture.directories.hubCache
+            .appending(path: "mlx-audio/owner_dependency")
+        try FileManager.default.createDirectory(
+            at: dependencyDirectory,
+            withIntermediateDirectories: true
+        )
+        try dependencyData.write(
+            to: dependencyDirectory.appending(path: "config.json")
+        )
+
+        let manager = ModelManager(
+            catalog: makeCatalog(
+                models: [model],
+                dependencies: [dependency],
+                generatedAt: "2026-08-01"
+            ),
+            directories: fixture.directories,
+            activeModelID: ModelID("active")
+        )
+        #expect(await manager.installedModelIDs().isEmpty)
+
+        try await manager.install(model.id)
+        #expect(await manager.installedModelIDs().isEmpty)
+        try await manager.markDependenciesVerified(model.id)
+        #expect(await manager.installedModelIDs() == [model.id])
+    }
+
     @Test("Local imports persist custom descriptors and can be replaced")
     func localImportAndCustomModelPersistence() async throws {
         let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
@@ -350,11 +427,12 @@ private actor ProgressRecorder {
 
 private func makeCatalog(
     models: [ModelDescriptor],
-    dependencies: [ModelDependencyDescriptor] = []
+    dependencies: [ModelDependencyDescriptor] = [],
+    generatedAt: String = "test"
 ) -> ModelCatalog {
     ModelCatalog(
         schemaVersion: 1,
-        generatedAt: "test",
+        generatedAt: generatedAt,
         dependencies: dependencies,
         models: models
     )

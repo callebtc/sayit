@@ -64,6 +64,22 @@ struct ModelCatalogTests {
         #expect(supportedIDs == [ModelID("kokoro-bf16")])
     }
 
+    @Test("Kokoro preset prefixes select their matching language")
+    func kokoroPresetLanguages() throws {
+        let model = try #require(
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("kokoro-bf16")
+            }
+        )
+
+        #expect(model.inferredLanguage(forPresetVoice: "af_heart") == "en-US")
+        #expect(model.inferredLanguage(forPresetVoice: "bm_george") == "en-GB")
+        #expect(model.inferredLanguage(forPresetVoice: "ef_dora") == "es")
+        #expect(model.inferredLanguage(forPresetVoice: "ff_siwis") == "fr")
+        #expect(model.inferredLanguage(forPresetVoice: "jf_alpha") == "ja")
+        #expect(model.inferredLanguage(forPresetVoice: "zm_yunxi") == "cmn")
+    }
+
     @Test("Generated and cloned voice capabilities are explicitly routed")
     func voiceCapabilities() throws {
         let models = Dictionary(

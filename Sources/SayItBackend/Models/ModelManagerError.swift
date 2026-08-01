@@ -18,7 +18,7 @@ enum ModelManagerError: LocalizedError {
         case .modelNotFound:
             "The model is not in the Say It catalog."
         case .modelUnavailable:
-            "This model requires voice profiles, which are not available yet."
+            "This model is not supported by this version of Say It."
         case .anotherDownloadIsActive:
             "Another model download is already active."
         case .insufficientDiskSpace(let required):

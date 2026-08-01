@@ -24,6 +24,8 @@ struct ModelRowView: View {
                         SayItBadge(title: "Recommended")
                     } else if model.stability == .experimental {
                         SayItBadge(title: "Experimental", tint: .orange)
+                    } else if model.stability == .unavailable {
+                        SayItBadge(title: "Unavailable", tint: .secondary)
                     }
                 }
                 Text(modelSummary)
@@ -54,12 +56,17 @@ struct ModelRowView: View {
 
             Spacer()
 
-            if model.capabilities.requiresReferenceAudio {
-                Text("Requires voice profiles")
+            if !model.isSelectable
+                && !state.installedModelIDs.contains(model.id) {
+                Text("Unavailable in this version")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else if state.installedModelIDs.contains(model.id) {
-                if state.settings.activeModelID == model.id {
+                if !model.isSelectable {
+                    Text("Unavailable in this version")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else if state.settings.activeModelID == model.id {
                     Label("Selected", systemImage: "checkmark")
                         .foregroundStyle(.secondary)
                 } else {
@@ -201,17 +208,17 @@ struct ModelRowView: View {
     }
 
     private var statusSymbol: String {
-        if state.installedModelIDs.contains(model.id) {
-            "checkmark.circle.fill"
-        } else if model.capabilities.requiresReferenceAudio {
+        if !model.isSelectable {
             "lock.circle"
+        } else if state.installedModelIDs.contains(model.id) {
+            "checkmark.circle.fill"
         } else {
             "arrow.down.circle"
         }
     }
 
     private var statusColor: Color {
-        if state.installedModelIDs.contains(model.id) {
+        if model.isSelectable && state.installedModelIDs.contains(model.id) {
             .green
         } else {
             .secondary

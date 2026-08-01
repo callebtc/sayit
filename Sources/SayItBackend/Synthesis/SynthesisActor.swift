@@ -583,11 +583,26 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let textProcessor = makeTextProcessor(for: model)
         let candidate: SpeechGenerationModel
         do {
-            candidate = try await TTS.loadModel(
-                modelRepo: modelURL.path,
-                modelType: model.modelType,
-                textProcessor: textProcessor
-            )
+            switch model.modelType.lowercased() {
+            case "kitten", "kitten_tts":
+                try KittenVoiceArchiveConverter.prepareVoices(in: modelURL)
+                candidate = try await TTS.loadModel(
+                    modelRepo: modelURL.path,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
+            case "soprano", "soprano_tts":
+                candidate = try await SopranoModel.fromModelDirectory(
+                    modelURL,
+                    repo: model.repository
+                )
+            default:
+                candidate = try await TTS.loadModel(
+                    modelRepo: modelURL.path,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
+            }
         } catch {
             Stream.gpu.synchronize()
             Memory.clearCache()

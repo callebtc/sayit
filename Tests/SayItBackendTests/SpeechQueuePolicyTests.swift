@@ -593,6 +593,7 @@ struct SpeechQueuePolicyTests {
             installedBytes: model.estimatedDiskBytes,
             verifiedAt: .now,
             dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
             relativePath: relativePath
         )
         try JSONEncoder.sayIt.encode(installation).write(

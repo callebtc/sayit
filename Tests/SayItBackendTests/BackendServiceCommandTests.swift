@@ -888,6 +888,19 @@ struct BackendServiceCommandTests {
         #expect(loadFailure == "synthesis.failed")
         #expect(fixture.playback.rate == 1.25)
         #expect(fixture.playback.spokenText == "Valid preset reaches model loading.")
+
+        let localizedLoadFailure = try await terminalErrorCode(
+            for: SpeechSubmission(
+                text: "Japanese preset reaches model loading.",
+                source: .frontend,
+                modelID: "kokoro-bf16",
+                voiceSelection: .preset("jf_alpha"),
+                permitsLongText: true
+            ),
+            service: fixture.service
+        )
+        #expect(localizedLoadFailure == "synthesis.failed")
+        #expect(await fixture.synthesizer.requestedLanguages.last == "ja")
     }
 
     @Test("Installed models validate and complete voice-studio workflows")
@@ -1420,8 +1433,9 @@ private final class ServiceFixture {
     }
 
     func seedInstallation(modelID: String) throws {
+        let catalog = try ModelCatalogLoader().bundledCatalog()
         let model = try #require(
-            ModelCatalogLoader().bundledCatalog().models.first {
+            catalog.models.first {
                 $0.id.rawValue == modelID
             }
         )
@@ -1440,6 +1454,7 @@ private final class ServiceFixture {
             installedBytes: model.estimatedDiskBytes,
             verifiedAt: .now,
             dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
             relativePath: relativePath
         )
         try JSONEncoder.sayIt.encode(installation).write(
@@ -1548,6 +1563,7 @@ private final class ServiceFixture {
 
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
+    private(set) var requestedLanguages: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
@@ -1560,6 +1576,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
         requestedModelIDs.append(request.model.id.rawValue)
+        requestedLanguages.append(request.language)
         guard synthesizesAudio else {
             return AsyncThrowingStream { continuation in
                 continuation.yield(.loadingModel(request.model.id))

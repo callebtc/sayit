@@ -154,11 +154,14 @@ public final class SayItBackendService: SayItService {
                 try await modelManager.select(first.id)
                 var settings = settingsStore.value
                 settings.activeModelID = first.id.rawValue
-                settings.activeVoice = legacyVoice(
+                let activeVoice = legacyVoice(
                     for: settings.voiceSelections[first.id.rawValue],
                     fallback: first.defaultVoice
                 )
-                settings.activeLanguage = first.defaultLanguage ?? ""
+                settings.activeVoice = activeVoice
+                settings.activeLanguage = first.inferredLanguage(
+                    forPresetVoice: activeVoice
+                ) ?? first.defaultLanguage ?? ""
                 try settingsStore.update(settings)
             } catch {
                 recordFailure(error.localizedDescription)
@@ -1586,7 +1589,9 @@ public final class SayItBackendService: SayItService {
             cleanedText: cleaned,
             model: model,
             voice: resolvedVoice.preset,
-            language: submission.language ?? nonEmpty(settings.activeLanguage)
+            language: submission.language
+                ?? model.inferredLanguage(forPresetVoice: resolvedVoice.preset)
+                ?? nonEmpty(settings.activeLanguage)
                 ?? model.defaultLanguage,
             voiceDescription: submission.voiceDescription
                 ?? nonEmpty(settings.voiceDescription),
@@ -2100,11 +2105,14 @@ public final class SayItBackendService: SayItService {
         }
         var settings = settingsStore.value
         settings.activeModelID = id.rawValue
-        settings.activeVoice = legacyVoice(
+        let activeVoice = legacyVoice(
             for: settings.voiceSelections[id.rawValue],
             fallback: model.defaultVoice
         )
-        settings.activeLanguage = model.defaultLanguage ?? ""
+        settings.activeVoice = activeVoice
+        settings.activeLanguage = model.inferredLanguage(
+            forPresetVoice: activeVoice
+        ) ?? model.defaultLanguage ?? ""
         try await enqueueModelTransition(to: id, settings: settings)
     }
 
@@ -2395,11 +2403,14 @@ public final class SayItBackendService: SayItService {
             }
             var settings = settingsStore.value
             settings.activeModelID = replacement.id.rawValue
-            settings.activeVoice = legacyVoice(
+            let activeVoice = legacyVoice(
                 for: settings.voiceSelections[replacement.id.rawValue],
                 fallback: replacement.defaultVoice
             )
-            settings.activeLanguage = replacement.defaultLanguage ?? ""
+            settings.activeVoice = activeVoice
+            settings.activeLanguage = replacement.inferredLanguage(
+                forPresetVoice: activeVoice
+            ) ?? replacement.defaultLanguage ?? ""
             try await enqueueModelTransition(
                 to: replacement.id,
                 settings: settings
