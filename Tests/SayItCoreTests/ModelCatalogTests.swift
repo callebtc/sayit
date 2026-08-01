@@ -23,7 +23,13 @@ struct ModelCatalogTests {
             $0.capabilities.requiresReferenceAudio
         }
 
-        #expect(gated.count == 3)
+        #expect(gated.count == 4)
+        #expect(gated.map(\.id.rawValue).sorted() == [
+            "echo-base",
+            "fish-s2-pro-8bit",
+            "index-tts",
+            "moss-nano-100m",
+        ])
         #expect(gated.allSatisfy { !$0.isSelectable })
     }
 

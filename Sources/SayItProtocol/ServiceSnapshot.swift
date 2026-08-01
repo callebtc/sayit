@@ -11,6 +11,7 @@ public struct ServiceSnapshot: Codable, Sendable {
     public let queuedJobs: [SpeechJob]
     public let playback: PlaybackSnapshot
     public let download: DownloadSnapshot?
+    public let modelInstallError: ModelInstallErrorSnapshot?
     public let installedModelIDs: [String]
     public let settings: BackendSettingsSnapshot
     public let modelsRevision: UInt64
@@ -30,6 +31,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         queuedJobs: [SpeechJob],
         playback: PlaybackSnapshot,
         download: DownloadSnapshot?,
+        modelInstallError: ModelInstallErrorSnapshot? = nil,
         installedModelIDs: [String],
         settings: BackendSettingsSnapshot,
         modelsRevision: UInt64,
@@ -48,6 +50,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         self.queuedJobs = queuedJobs
         self.playback = playback
         self.download = download
+        self.modelInstallError = modelInstallError
         self.installedModelIDs = installedModelIDs
         self.settings = settings
         self.modelsRevision = modelsRevision
@@ -68,6 +71,7 @@ public struct ServiceSnapshot: Codable, Sendable {
         case queuedJobs
         case playback
         case download
+        case modelInstallError
         case installedModelIDs
         case settings
         case modelsRevision
@@ -112,6 +116,10 @@ public struct ServiceSnapshot: Codable, Sendable {
         download = try container.decodeIfPresent(
             DownloadSnapshot.self,
             forKey: .download
+        )
+        modelInstallError = try container.decodeIfPresent(
+            ModelInstallErrorSnapshot.self,
+            forKey: .modelInstallError
         )
         installedModelIDs = try container.decode(
             [String].self,

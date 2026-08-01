@@ -352,7 +352,7 @@
       "family": "Fish Audio",
       "repository": "mlx-community/fish-audio-s2-pro-8bit",
       "revision": "c8d4481b3f7cbfe64d855c8b7cda7739502fc3ff",
-      "modelType": "fish_speech",
+      "modelType": "fish_qwen3_omni",
       "parameterCount": "4B",
       "quantization": "8-bit",
       "languages": ["en", "zh", "ja", "ko"],
@@ -366,7 +366,7 @@
         "streaming": true,
         "longForm": true,
         "languageSelection": true,
-        "requiresReferenceAudio": false,
+        "requiresReferenceAudio": true,
         "voiceDiscovery": true,
         "randomVoiceSampling": true,
         "voiceCloneRequirements": {
@@ -388,7 +388,7 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-07-29"
     },

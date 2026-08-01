@@ -30,6 +30,7 @@ public final class SayItBackendService: SayItService {
     private var installedModelIDs: Set<ModelID> = []
     private var downloadProgress: ModelDownloadProgress?
     private var downloadTask: Task<Void, Never>?
+    private var modelInstallError: ModelInstallErrorSnapshot?
     private var jobTask: Task<Void, Never>?
     private var modelTransitionTask: Task<Void, Error>?
     private var modelTransitionSequence: UInt64 = 0
@@ -1998,6 +1999,7 @@ public final class SayItBackendService: SayItService {
                 includesContent: includesPlaybackContent
             ),
             download: downloadProgress?.serviceSnapshot,
+            modelInstallError: modelInstallError,
             installedModelIDs: installedModelIDs
                 .map(\.rawValue)
                 .sorted(),
@@ -2270,6 +2272,7 @@ public final class SayItBackendService: SayItService {
             )
         }
         errorMessage = nil
+        modelInstallError = nil
         downloadTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -2280,7 +2283,7 @@ public final class SayItBackendService: SayItService {
             } catch is CancellationError {
                 self.finishCanceledInstall()
             } catch {
-                self.finishFailedInstall(error)
+                self.finishFailedInstall(error, modelID: id)
             }
         }
     }
@@ -2407,7 +2410,7 @@ public final class SayItBackendService: SayItService {
                 try await synthesizer.prepareDependencies(for: model)
                 try await modelManager.markDependenciesVerified(id)
             } catch {
-                finishFailedInstall(error)
+                finishFailedInstall(error, modelID: id)
                 return
             }
         }
@@ -2416,6 +2419,7 @@ public final class SayItBackendService: SayItService {
         modelsRevision &+= 1
         downloadTask = nil
         downloadProgress = nil
+        modelInstallError = nil
         statusText = "Ready to speak"
         revision &+= 1
     }
@@ -2426,18 +2430,24 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
-    private func finishFailedInstall(_ error: Error) {
+    private func finishFailedInstall(_ error: Error, modelID: ModelID) {
         downloadTask = nil
-        if let current = downloadProgress {
-            downloadProgress = ModelDownloadProgress(
-                modelID: current.modelID,
-                state: .failed,
-                completedBytes: current.completedBytes,
-                totalBytes: current.totalBytes,
-                bytesPerSecond: 0
+        downloadProgress = nil
+        modelInstallError = ModelInstallErrorSnapshot(
+            modelID: modelID.rawValue,
+            message: error.localizedDescription
+        )
+        statusText = "Ready to speak"
+        revision &+= 1
+        Task {
+            await diagnostics.record(
+                DiagnosticEvent(
+                    severity: .error,
+                    category: .download,
+                    code: "model.install_failed"
+                )
             )
         }
-        recordFailure(error.localizedDescription)
     }
 
     private func replayHistory(_ id: UUID) async throws {

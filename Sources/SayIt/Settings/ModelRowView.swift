@@ -41,6 +41,15 @@ struct ModelRowView: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                if let installError = state.modelInstallError,
+                   installError.modelID == model.id {
+                    Label(
+                        installError.message,
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                }
             }
 
             Spacer()
@@ -152,6 +161,15 @@ struct ModelRowView: View {
                             .help("Cancel the download")
                         }
                     }
+                } else if state.modelInstallError?.modelID == model.id {
+                    Button(
+                        "Retry",
+                        systemImage: "arrow.clockwise",
+                        action: downloadModel
+                    )
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(CircularIconButtonStyle())
+                    .help("Retry the download")
                 } else {
                     Button("Download", action: downloadModel)
                         .buttonStyle(.borderedProminent)

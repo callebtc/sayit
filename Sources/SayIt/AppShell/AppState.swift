@@ -40,6 +40,7 @@ final class AppState {
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
     private(set) var downloadProgress: ModelDownloadProgress?
+    private(set) var modelInstallError: (modelID: ModelID, message: String)?
     private(set) var requestedModelInstallID: ModelID?
     private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
@@ -262,6 +263,7 @@ final class AppState {
         }
         guard requestedModelInstallID == nil else { return }
 
+        modelInstallError = nil
         modelIDToSelectAfterInstallation =
             selectAfterInstallation ? id : nil
         requestedModelInstallID = id
@@ -958,6 +960,9 @@ final class AppState {
         }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
+        modelInstallError = snapshot.modelInstallError.map {
+            (modelID: ModelID($0.modelID), message: $0.message)
+        }
 
         if backendSettings != snapshot.settings {
             backendSettings = snapshot.settings
