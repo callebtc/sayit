@@ -88,7 +88,7 @@ struct ServiceSettingsView: View {
                             action: copyBaseURL
                         )
                         .labelStyle(.iconOnly)
-                        .buttonStyle(CircularIconButtonStyle(size: 22))
+                        .buttonStyle(CircularIconButtonStyle())
                     }
                 }
 
@@ -164,7 +164,7 @@ struct ServiceSettingsView: View {
                                     )
                                 }
                                 .labelStyle(.iconOnly)
-                                .buttonStyle(CircularIconButtonStyle(size: 22))
+                                .buttonStyle(CircularIconButtonStyle())
                                 .help("Reveal in Finder")
                                 Button(
                                     "Uninstall",
@@ -175,7 +175,7 @@ struct ServiceSettingsView: View {
                                     )
                                 }
                                 .labelStyle(.iconOnly)
-                                .buttonStyle(CircularIconButtonStyle(size: 22))
+                                .buttonStyle(CircularIconButtonStyle())
                                 .help("Uninstall the “sayit” command")
                             }
                         }
@@ -201,7 +201,7 @@ struct ServiceSettingsView: View {
                             copyLinkCommand(for: url)
                         }
                         .labelStyle(.iconOnly)
-                        .buttonStyle(CircularIconButtonStyle(size: 22))
+                        .buttonStyle(CircularIconButtonStyle())
                         .help("Copy the manual install command")
                     }
 

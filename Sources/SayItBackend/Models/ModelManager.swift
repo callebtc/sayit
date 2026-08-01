@@ -251,7 +251,7 @@ actor ModelManager: ModelManaging {
                 )
             }
         }
-        let startedAt = ContinuousClock.now
+        var speedMeter = DownloadSpeedMeter()
         await progress(
             ModelDownloadProgress(
                 modelID: model.id,
@@ -311,19 +311,14 @@ actor ModelManager: ModelManaging {
                 try? FileManager.default.removeItem(at: resumeURL)
                 try verify(destination, descriptor: file)
                 completedBytes += file.byteCount
-                let elapsed = startedAt.duration(to: .now)
-                let elapsedSeconds = max(
-                    Double(elapsed.components.seconds)
-                        + Double(elapsed.components.attoseconds) / 1e18,
-                    0.001
-                )
+                _ = speedMeter.record(totalBytes: completedBytes)
                 await progress(
                     ModelDownloadProgress(
                         modelID: model.id,
                         state: .downloading,
                         completedBytes: completedBytes,
                         totalBytes: totalBytes,
-                        bytesPerSecond: Int64(Double(completedBytes) / elapsedSeconds)
+                        bytesPerSecond: speedMeter.bytesPerSecond
                     )
                 )
             }

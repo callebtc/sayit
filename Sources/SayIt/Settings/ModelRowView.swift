@@ -72,7 +72,7 @@ struct ModelRowView: View {
                     action: confirmDelete
                 )
                 .labelStyle(.iconOnly)
-                .buttonStyle(CircularIconButtonStyle(size: 22))
+                .buttonStyle(CircularIconButtonStyle())
                 .foregroundStyle(.secondary)
                 .confirmationDialog(
                     "Delete \(model.displayName)?",
@@ -117,23 +117,46 @@ struct ModelRowView: View {
                             )
                         )
                         .monospacedDigit()
+                        if progress.state == .downloading {
+                            Text(
+                                "\(progress.bytesPerSecond, format: .byteCount(style: .file))/s"
+                            )
+                            .foregroundStyle(.secondary)
+                        }
                         if progress.state == .failed
                             || progress.state == .paused {
-                            Button("Retry", action: downloadModel)
-                        } else {
                             Button(
-                                "Cancel",
-                                systemImage: "xmark.circle",
+                                "Retry",
+                                systemImage: "arrow.clockwise",
+                                action: downloadModel
+                            )
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(CircularIconButtonStyle())
+                            .help("Resume the download")
+                            Button(
+                                "Remove",
+                                systemImage: "xmark",
                                 action: state.cancelModelInstall
                             )
                             .labelStyle(.iconOnly)
+                            .buttonStyle(CircularIconButtonStyle())
+                            .help("Discard the download")
+                        } else {
+                            Button(
+                                "Cancel",
+                                systemImage: "xmark",
+                                action: state.cancelModelInstall
+                            )
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(CircularIconButtonStyle())
+                            .help("Cancel the download")
                         }
                     }
                 } else {
                     Button("Download", action: downloadModel)
                         .buttonStyle(.borderedProminent)
                         .disabled(
-                            state.downloadProgress != nil
+                            isDownloadActive
                                 || state.requestedModelInstallID != nil
                         )
                 }
@@ -147,6 +170,16 @@ struct ModelRowView: View {
                 : "The background service must be connected to manage models."
         )
         .accessibilityElement(children: .contain)
+    }
+
+    private var isDownloadActive: Bool {
+        guard let progress = state.downloadProgress else { return false }
+        switch progress.state {
+        case .queued, .downloading, .verifying:
+            return true
+        case .notInstalled, .paused, .installed, .failed:
+            return false
+        }
     }
 
     private var statusSymbol: String {

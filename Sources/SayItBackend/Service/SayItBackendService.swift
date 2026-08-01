@@ -2348,6 +2348,12 @@ public final class SayItBackendService: SayItService {
 
     private func cancelModelInstall() {
         guard let current = downloadProgress else { return }
+        guard downloadTask != nil else {
+            downloadProgress = nil
+            statusText = "Ready to speak"
+            revision &+= 1
+            return
+        }
         downloadProgress = ModelDownloadProgress(
             modelID: current.modelID,
             state: .paused,

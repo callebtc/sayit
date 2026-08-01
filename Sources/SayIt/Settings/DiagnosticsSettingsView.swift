@@ -6,36 +6,39 @@ struct DiagnosticsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if state.diagnosticEvents.isEmpty {
-                ContentUnavailableView(
-                    "No diagnostic events",
-                    systemImage: "checkmark.circle",
-                    description: Text(
-                        "Say It records timings and stable error codes, never source text."
+            Group {
+                if state.diagnosticEvents.isEmpty {
+                    ContentUnavailableView(
+                        "No diagnostic events",
+                        systemImage: "checkmark.circle",
+                        description: Text(
+                            "Say It records timings and stable error codes, never source text."
+                        )
                     )
-                )
-            } else {
-                List(state.diagnosticEvents.reversed()) { event in
-                    HStack(spacing: DesignTokens.compactSpacing) {
-                        Image(systemName: symbol(for: event.severity))
-                            .foregroundStyle(color(for: event.severity))
-                            .frame(width: 20)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.code)
-                                .font(.callout.monospaced())
-                            Text(event.timestamp, format: .dateTime)
+                } else {
+                    List(state.diagnosticEvents.reversed()) { event in
+                        HStack(spacing: DesignTokens.compactSpacing) {
+                            Image(systemName: symbol(for: event.severity))
+                                .foregroundStyle(color(for: event.severity))
+                                .frame(width: 20)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(event.code)
+                                    .font(.callout.monospaced())
+                                Text(event.timestamp, format: .dateTime)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(event.category.rawValue)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(event.category.rawValue)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             HStack {
                 Text("Text, tokens, filenames, and local paths are excluded.")
