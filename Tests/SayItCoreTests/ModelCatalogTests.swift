@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 19)
+        #expect(catalog.models.count == 20)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -172,6 +172,14 @@ struct ModelCatalogTests {
             }
         )
         #expect(!chatterboxConditioning.modelTypes.contains("chatterbox_turbo"))
+
+        let chatterboxMultilingual = try #require(
+            models["chatterbox-multilingual-v3-fp16"]
+        )
+        #expect(chatterboxMultilingual.languages.count == 23)
+        #expect(chatterboxMultilingual.capabilities.languageSelection)
+        #expect(chatterboxMultilingual.capabilities.voiceCloning)
+        #expect(!chatterboxMultilingual.capabilities.requiresReferenceAudio)
 
         let kokoro = try #require(models["kokoro-bf16"])
         #expect(!kokoro.capabilities.supportsVoiceDiscovery)

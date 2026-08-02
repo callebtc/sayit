@@ -100,10 +100,15 @@ struct InstalledModelSmokeTests {
             voices = [model.defaultVoice]
         }
         let auditText = auditValue("SAYIT_MODEL_AUDIT_TEXT", in: environment)
+        let auditLanguage = auditValue(
+            "SAYIT_MODEL_AUDIT_LANGUAGE",
+            in: environment
+        )
 
         for voice in voices {
             let voiceName = voice ?? "none"
-            let language = model.inferredLanguage(forPresetVoice: voice)
+            let language = auditLanguage
+                ?? model.inferredLanguage(forPresetVoice: voice)
                 ?? model.defaultLanguage
             let request = SpeechRequest(
                 cleanedText: CleanedText(

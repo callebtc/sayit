@@ -273,7 +273,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 9,
+        "recommendationRank": 10,
         "size": "small",
         "speed": "fast",
         "note": "Playback compatibility is still being evaluated."
@@ -370,7 +370,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 11,
+        "recommendationRank": 12,
         "size": "large",
         "speed": "medium-slow",
         "note": "Create voices from natural-language descriptions."
@@ -422,7 +422,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 12,
+        "recommendationRank": 13,
         "size": "large",
         "speed": "medium-slow",
         "note": "Nine built-in speakers plus transcript-guided voice cloning."
@@ -483,6 +483,58 @@
       "testedDate": "2026-08-02"
     },
     {
+      "id": "chatterbox-multilingual-v3-fp16",
+      "displayName": "Chatterbox Multilingual V3",
+      "family": "Chatterbox",
+      "repository": "mlx-community/chatterbox-fp16",
+      "revision": "4923fcca09086356aeab5191a2348c5a17a23694",
+      "modelType": "chatterbox",
+      "parameterCount": "500M",
+      "quantization": "FP16",
+      "languages": ["ar", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi", "it", "ja", "ko", "ms", "nl", "no", "pl", "pt", "ru", "sv", "sw", "tr", "zh"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 5,
+          "recommendedMinimumDuration": 8,
+          "recommendedMaximumDuration": 12,
+          "maximumDuration": 15,
+          "transcriptRequired": false
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 2576567676,
+      "estimatedPeakMemoryBytes": 4500000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/chatterbox-fp16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 6,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Twenty-three languages with cross-language voice cloning."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
       "id": "chatterbox-fp16",
       "displayName": "Chatterbox",
       "family": "Chatterbox",
@@ -526,7 +578,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 6,
+        "recommendationRank": 7,
         "size": "medium",
         "speed": "slow",
         "note": "Slow generation and voices may sound unnatural."
@@ -661,7 +713,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 10,
+        "recommendationRank": 11,
         "size": "medium",
         "speed": "slow",
         "note": "Japanese voice design; playback compatibility is still being evaluated."
@@ -704,7 +756,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 7,
+        "recommendationRank": 8,
         "size": "medium",
         "speed": "medium-slow",
         "note": "Glitch-prone output that can sound unstable."
@@ -747,7 +799,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 8,
+        "recommendationRank": 9,
         "size": "large",
         "speed": "slow",
         "note": "Good voice quality, but slow and occasionally glitchy."
