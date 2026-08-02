@@ -113,22 +113,34 @@ public struct TextChunker: Sendable {
             range: Range<String.Index>,
             sourceOffset: Int
         )] = []
+        var paragraphStart = text.startIndex
         var cursor = text.startIndex
-        var sourceOffset = 0
-        while cursor < text.endIndex,
-              let separator = text.range(
-                of: "\n\n",
-                range: cursor..<text.endIndex
-              ) {
-            let range = cursor..<separator.lowerBound
-            output.append((range, sourceOffset))
-            sourceOffset += text.distance(
-                from: cursor,
-                to: separator.upperBound
+
+        func appendParagraph(endingAt end: String.Index) {
+            guard paragraphStart < end else { return }
+            output.append(
+                (
+                    paragraphStart..<end,
+                    text.distance(
+                        from: text.startIndex,
+                        to: paragraphStart
+                    )
+                )
             )
-            cursor = separator.upperBound
         }
-        output.append((cursor..<text.endIndex, sourceOffset))
+
+        while cursor < text.endIndex {
+            guard text[cursor] == "\n" else {
+                cursor = text.index(after: cursor)
+                continue
+            }
+            appendParagraph(endingAt: cursor)
+            repeat {
+                cursor = text.index(after: cursor)
+            } while cursor < text.endIndex && text[cursor] == "\n"
+            paragraphStart = cursor
+        }
+        appendParagraph(endingAt: text.endIndex)
         return output
     }
 

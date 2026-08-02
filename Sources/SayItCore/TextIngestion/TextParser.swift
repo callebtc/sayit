@@ -339,8 +339,8 @@ struct TextParser: Sendable {
         )
         value = replacingMatches(
             in: value,
-            pattern: #"\n{3,}"#,
-            with: "\n\n"
+            pattern: #"\n+"#,
+            with: "\n"
         )
         value = replacingMatches(
             in: value,

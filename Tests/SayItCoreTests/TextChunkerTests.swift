@@ -24,6 +24,15 @@ struct TextChunkerTests {
         )
     }
 
+    @Test("Single clean line breaks remain paragraph boundaries")
+    func treatsSingleLineBreaksAsParagraphs() {
+        let text = "First paragraph.\nSecond paragraph."
+        let chunks = TextChunker(targetCharacterCount: 2_000).chunks(for: text)
+
+        #expect(chunks.map(\.text) == ["First paragraph.", "Second paragraph."])
+        #expect(chunks.allSatisfy { $0.startsParagraph })
+    }
+
     @Test("Oversized sentences split at readable boundaries")
     func splitsOversizedSentence() {
         let sentence = String(repeating: "readable words, ", count: 40) + "done."
@@ -82,11 +91,12 @@ struct TextChunkerTests {
             hardCharacterLimit: 2_500
         ).chunks(for: text)
 
-        #expect(chunks.count == 3)
-        #expect(chunks[1].text == "Verse line one Verse line two")
+        #expect(chunks.count == 4)
+        #expect(chunks[1].text == "Verse line one")
+        #expect(chunks[2].text == "Verse line two")
         #expect(
             sourceText(in: chunks[1].sourceRange, from: text)
-                == "Verse line one\nVerse line two"
+                == "Verse line one"
         )
         #expect(
             chunks.flatMap {
@@ -146,7 +156,7 @@ struct TextChunkerTests {
 
     @Test("Adaptive subdivision preserves normalized source offsets")
     func adaptiveSubdivisionPreservesNormalizedOffsets() throws {
-        let text = "Verse line one\nVerse line two"
+        let text = "Verse line one\tVerse line two"
         let chunk = try #require(
             TextChunker(targetCharacterCount: 100).chunks(for: text).first
         )

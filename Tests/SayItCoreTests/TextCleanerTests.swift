@@ -39,8 +39,32 @@ struct TextCleanerTests {
             )
         )
 
-        #expect(result.text == "First sentence.\n\nLike this.")
+        #expect(result.text == "First sentence.\nLike this.")
         #expect(result.cleanupSummary.sourceFormat == "Plain text")
+    }
+
+    @Test("Pasted article paragraphs use one clean line break")
+    func cleansArticleParagraphSeparators() async throws {
+        let input = """
+        On July 21, OpenAI [disclosed](https://openai.com/index/hugging-face-model-evaluation-security-incident/) that several of their models had broken out of an isolated test environment by exploiting a previously unknown (“zero-day”) vulnerability. The models went on to access the production infrastructure of Hugging Face, a platform for open-source machine learning models and AI datasets.
+
+        In response to this incident, we began a large-scale retrospective review of our own cybersecurity evaluations. In particular, we looked for evidence that Claude—like the OpenAI models that accessed Hugging Face—was able to access the internet from within testing environments that should have been sealed off.
+        """
+        let result = try await TextCleaner().ingest(
+            TextSourcePayload(source: .clipboard, plainText: input)
+        )
+        let expected = """
+        On July 21, OpenAI disclosed that several of their models had broken out of an isolated test environment by exploiting a previously unknown (“zero-day”) vulnerability. The models went on to access the production infrastructure of Hugging Face, a platform for open-source machine learning models and AI datasets.
+        In response to this incident, we began a large-scale retrospective review of our own cybersecurity evaluations. In particular, we looked for evidence that Claude—like the OpenAI models that accessed Hugging Face—was able to access the internet from within testing environments that should have been sealed off.
+        """
+
+        #expect(result.text == expected)
+        #expect(!result.text.contains("\n\n"))
+        let chunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: result.text
+        )
+        #expect(chunks.count == 2)
+        #expect(chunks.allSatisfy { $0.startsParagraph })
     }
 
     @Test("HTML preserves semantic block, list, and table boundaries")
@@ -62,10 +86,10 @@ struct TextCleanerTests {
             )
         )
 
-        #expect(result.text.contains("Article title\n\nFirst paragraph."))
+        #expect(result.text.contains("Article title\nFirst paragraph."))
         #expect(result.text.contains("First item\nSecond item"))
         #expect(result.text.contains("Left cell Right cell"))
-        #expect(result.text.contains("A useful caption.\n\nFirst item"))
+        #expect(result.text.contains("A useful caption.\nFirst item"))
         #expect(result.text.hasSuffix("Final paragraph."))
     }
 
@@ -80,7 +104,7 @@ struct TextCleanerTests {
 
         #expect(
             result.text
-                == "First sentence.\n\nSecond softhyphen sentence. Third sentence! Next one? Final one.\nLast line."
+                == "First sentence.\nSecond softhyphen sentence. Third sentence! Next one? Final one.\nLast line."
         )
     }
 
@@ -215,7 +239,7 @@ struct TextCleanerTests {
             TextSourcePayload(source: .service, plainText: input)
         )
 
-        #expect(result.text == "First sentence.\n\nSecond paragraph.")
+        #expect(result.text == "First sentence.\nSecond paragraph.")
         #expect(result.title == "First sentence.")
     }
 
