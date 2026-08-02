@@ -383,40 +383,43 @@ struct BackendServiceCommandTests {
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
-    @Test("HTML clipboard submissions retain the browser plain-text paragraphs")
-    func htmlClipboardSubmissionRetainsPlainText() async throws {
+    @Test("Clipboard and selection submissions retain identical paragraphs")
+    func richInputPathsRetainIdenticalParagraphs() async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
         let plainText = "First sentence.\n\nLike this."
+        let expectedText = "First sentence.\nLike this."
         let html = Data(
             "<article><span>First sentence.</span><span>Like this.</span></article>".utf8
         )
 
-        _ = try submittedJob(
-            await fixture.service.handle(
-                .init(
-                    command: .submit(
-                        SpeechSubmission(
-                            text: plainText,
-                            inputFormat: .html,
-                            representationData: html,
-                            source: .clipboard,
-                            modelID: fixture.seedModelID,
-                            permitsLongText: true
+        for source in [SpeechJobSource.clipboard, .selection] {
+            _ = try submittedJob(
+                await fixture.service.handle(
+                    .init(
+                        command: .submit(
+                            SpeechSubmission(
+                                text: plainText,
+                                inputFormat: .html,
+                                representationData: html,
+                                source: source,
+                                modelID: fixture.seedModelID,
+                                permitsLongText: true
+                            )
                         )
                     )
                 )
             )
-        )
-        for _ in 0..<300 {
-            guard fixture.playback.spokenText != plainText else { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
+            for _ in 0..<300 {
+                guard fixture.playback.spokenText != expectedText else { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
 
-        #expect(fixture.playback.spokenText == plainText)
-        _ = await fixture.service.handle(.init(command: .clear))
+            #expect(fixture.playback.spokenText == expectedText)
+            _ = await fixture.service.handle(.init(command: .clear))
+        }
     }
 
     @Test("Model, voice studio, and token validation return stable failures")

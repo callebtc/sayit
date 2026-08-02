@@ -130,15 +130,10 @@ final class AppState {
     func speakSelectedText() {
         Task {
             do {
-                let text = try await selectionService.selectedText(
+                let payload = try await selectionService.selectedPayload(
                     promptIfNeeded: true
                 )
-                receive(
-                    TextSourcePayload(
-                        source: .selection,
-                        plainText: text
-                    )
-                )
+                receive(payload)
             } catch {
                 presentError(error.localizedDescription)
             }

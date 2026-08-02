@@ -1,4 +1,5 @@
 import Observation
+import SayItCore
 import SayItProtocol
 import SayItXPC
 import ServiceManagement
@@ -45,13 +46,24 @@ final class SelectionServiceController {
         }
     }
 
-    func selectedText(promptIfNeeded: Bool) async throws -> String {
+    func selectedPayload(
+        promptIfNeeded: Bool
+    ) async throws -> TextSourcePayload {
         try await ensureRunning()
         let response = try await client.send(.selectedText)
         switch response {
+        case .selectedContent(let content):
+            accessibilityIsTrusted = true
+            return TextSourcePayload(
+                source: .selection,
+                content: content
+            )
         case .selectedText(let text):
             accessibilityIsTrusted = true
-            return text
+            return TextSourcePayload(
+                source: .selection,
+                plainText: text
+            )
         case .authorizationRequired:
             accessibilityIsTrusted = false
             if promptIfNeeded {

@@ -31,16 +31,25 @@ struct TextCleanerTests {
         let html = Data(
             "<article><span>First sentence.</span><span>Like this.</span></article>".utf8
         )
-        let result = try await TextCleaner().ingest(
+        let cleaner = TextCleaner()
+        let clipboard = try await cleaner.ingest(
             TextSourcePayload(
                 source: .clipboard,
                 html: html,
                 plainText: "First sentence.\n\nLike this."
             )
         )
+        let selection = try await cleaner.ingest(
+            TextSourcePayload(
+                source: .selection,
+                html: html,
+                plainText: "First sentence.\n\nLike this."
+            )
+        )
 
-        #expect(result.text == "First sentence.\nLike this.")
-        #expect(result.cleanupSummary.sourceFormat == "Plain text")
+        #expect(clipboard.text == "First sentence.\nLike this.")
+        #expect(selection == clipboard)
+        #expect(clipboard.cleanupSummary.sourceFormat == "Plain text")
     }
 
     @Test("Pasted article paragraphs use one clean line break")

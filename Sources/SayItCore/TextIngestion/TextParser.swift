@@ -181,7 +181,7 @@ struct TextParser: Sendable {
         source = replacingMatches(
             in: source,
             pattern: #"(?i)</?(p|div|main|section|article|header|footer|nav|aside|h[1-6]|blockquote|pre|address|figure|figcaption|details|summary|fieldset|legend|dl|dt|dd|ul|ol|table|caption|form)\b[^>]*>"#,
-            with: "\n\n"
+            with: "<br><br>"
         )
         source = replacingMatches(
             in: source,
@@ -191,17 +191,17 @@ struct TextParser: Sendable {
         source = replacingMatches(
             in: source,
             pattern: #"(?i)</(li|tr)\s*>"#,
-            with: "\n"
+            with: "<br>"
         )
         source = replacingMatches(
             in: source,
             pattern: #"(?i)<br\b[^>]*>"#,
-            with: "\n"
+            with: "<br>"
         )
         source = replacingMatches(
             in: source,
             pattern: #"(?i)<hr\b[^>]*>"#,
-            with: "\n\n"
+            with: "<br><br>"
         )
         source = replacingMatches(
             in: source,

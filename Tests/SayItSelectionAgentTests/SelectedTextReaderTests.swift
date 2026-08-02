@@ -1,8 +1,36 @@
+import AppKit
+import SayItProtocol
 import Testing
 import SayItXPC
 
 @Suite("Selected text reader")
 struct SelectedTextReaderTests {
+    @Test("Reads all standard text representations from one pasteboard path")
+    func readsPasteboardRepresentations() throws {
+        let pasteboard = NSPasteboard(
+            name: .init("selection-reader-tests-\(UUID().uuidString)")
+        )
+        let html = Data("<p>First paragraph.</p><p>Second paragraph.</p>".utf8)
+        let richText = Data("mock rich text".utf8)
+        let item = NSPasteboardItem()
+        item.setString(
+            "First paragraph.\n\nSecond paragraph.",
+            forType: .string
+        )
+        item.setData(html, forType: .html)
+        item.setData(richText, forType: .rtf)
+        pasteboard.clearContents()
+        #expect(pasteboard.writeObjects([item]))
+
+        let content = try #require(
+            PasteboardContentReader.content(from: pasteboard)
+        )
+
+        #expect(content.plainText == "First paragraph.\n\nSecond paragraph.")
+        #expect(content.html == html)
+        #expect(content.richText == richText)
+    }
+
     @Test("Searches beyond eight accessibility ancestors")
     func deepAncestorSelection() {
         let result = firstValueAlongAncestorChain(

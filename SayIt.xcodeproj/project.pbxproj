@@ -132,6 +132,7 @@
 		4D59452091289DFCDC2C8742 /* ModelCatalogError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C66554A1398BBA115ACDD5B5 /* ModelCatalogError.swift */; };
 		4D7F4B3ABC9D7B95431EDD4D /* ModelSuitability.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD21BC78FB5068E080D2896 /* ModelSuitability.swift */; };
 		4DA5C22F03B90F753B5E13D3 /* SelectionServiceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E66D3300B4751A1F9C7314 /* SelectionServiceRequest.swift */; };
+		4E377DB5E14325FAD6E11A48 /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
 		4E3AC9A759280B1F3A00E23F /* SayItXPCClientError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79157408B606A6A97170DB7F /* SayItXPCClientError.swift */; };
 		4E78F203D84F8C3ED47C16C5 /* ProtocolRoundTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC8DFA0B3ED1DCC4E493256 /* ProtocolRoundTripTests.swift */; };
 		4E7EB61D3598174C96906B68 /* VoiceProfileOrigin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5659F3802E73F0AF22311F15 /* VoiceProfileOrigin.swift */; };
@@ -170,6 +171,7 @@
 		5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */; };
 		5E463C8DB9A3EE6B6DCD969B /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
 		5E4F195C99A8660397FBB6A6 /* StopCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3143D35E528697F33A92BD89 /* StopCommand.swift */; };
+		5F6CC39A0FA59CFECC05EF63 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5FBEFE4EA78B23047757B007 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		60080A0011D69A2FFB07DFCD /* InputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */; };
 		602F28C04FFDF118AEB7C006 /* GeneratedVoiceSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBBC444E81871E8DC37224 /* GeneratedVoiceSample.swift */; };
@@ -246,10 +248,12 @@
 		880072CD631F9FB61579D624 /* VoiceSampleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC3DB3AD7BCA8CAD5D6E2CA /* VoiceSampleText.swift */; };
 		880FA583B8A21CB73DAF01DB /* SayItHTTPServer+SystemRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBF73237570E80D42747421 /* SayItHTTPServer+SystemRoutes.swift */; };
 		882457A04917A9EE25B9EB3D /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
+		88562DC9C936EAF70C0B995E /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 278065AA0ADDB8B2D63C98CC /* AppKit.framework */; };
 		89AD3D4D8907B9BD8BC76B7F /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
 		89D4D1F9824FDC6B29ECA9AA /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
 		89FB85395B38ED936E9041C6 /* SayItAgentListenerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDE2008B198AA58D2CCB9D1 /* SayItAgentListenerDelegate.swift */; };
 		8AC249BFD853DC5AC9817965 /* ServiceControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B755ACCAC70B65101821A53 /* ServiceControlCommand.swift */; };
+		8BDF28F41CB4FA4456F56A74 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 278065AA0ADDB8B2D63C98CC /* AppKit.framework */; };
 		8C37C42D200745BF0203A5AD /* PlaybackError.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD7CD1882C35D31525620E7 /* PlaybackError.swift */; };
 		8C75E37B81E956CB8F3ADC37 /* SayItHTTPServer+Responses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2263B37D07FDBD6AAD94452F /* SayItHTTPServer+Responses.swift */; };
 		8C86A585B42AAC5091C2515A /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = B085212FC4B8B933B6D6E28B /* Yams */; };
@@ -280,6 +284,7 @@
 		995B694DFA188619270022B8 /* SayItSelectionXPCExportedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF768A2E826D211CF143AC18 /* SayItSelectionXPCExportedService.swift */; };
 		9A25C707A79C52C03BD5BB7D /* SayItBackend.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; };
 		9A468EF5A94031E08CFEE119 /* CommunityModelResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F82CDFD943568E864550065 /* CommunityModelResolver.swift */; };
+		9A4FD2C4EA98313D0C9A523F /* PasteboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0E2C5B2C451E65A94E2BD22 /* PasteboardContent.swift */; };
 		9A551BA00DBE4C31FA3FC402 /* HardwareTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789D50F733AE1AF2033A988B /* HardwareTier.swift */; };
 		9B39AA03CBD27C79BB07C6B7 /* GitHubRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC5588F06EF897327ABB4F2 /* GitHubRelease.swift */; };
 		9B9A58939E5B0BA96CDE5E67 /* VoiceCandidateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F6D46E06272DBBA7E296DBA /* VoiceCandidateCard.swift */; };
@@ -294,6 +299,7 @@
 		9F2F336F030A559A0653D0CF /* PlaybackRateMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */; };
 		9F3A06ACFC59D72F85ABCF59 /* HuggingFaceModelResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C653B2059CA0C0A44D0172 /* HuggingFaceModelResponse.swift */; };
 		9F5FA1C7694F5EDE270C51D7 /* SpeechPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B2409CEE7E510324C9AEDC /* SpeechPreviewView.swift */; };
+		9F66410C6D5DB695997589D4 /* PasteboardContentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB8CB9BC1FD542C5625A758 /* PasteboardContentReader.swift */; };
 		A10D0A04E5DB9D764612E847 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A1250E6CC74EF0A5452B14B2 /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A3070F1EE828AB3AFE51A3C6 /* ModelDownloadProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */; };
@@ -558,6 +564,13 @@
 			remoteGlobalIDString = 6A4303A3D2D6CF1067B59EC0;
 			remoteInfo = SayItXPC;
 		};
+		8D2C0986CCF70452FB8FBC5A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4824402F65B5745F1B19F74;
+			remoteInfo = SayItProtocol;
+		};
 		90DB7FE87B8B34CC7B8890BA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
@@ -764,6 +777,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				5F6CC39A0FA59CFECC05EF63 /* SayItProtocol.framework in Embed Frameworks */,
 				6E71E36C113B1EEBE1E36576 /* SayItXPC.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -894,6 +908,7 @@
 		4BD8B26C287145EBC1CDAC35 /* PlaybackRateMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateMenu.swift; sourceTree = "<group>"; };
 		4C074F8772DC89E43CE2A267 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+HistoryRoutes.swift"; sourceTree = "<group>"; };
+		4CB8CB9BC1FD542C5625A758 /* PasteboardContentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardContentReader.swift; sourceTree = "<group>"; };
 		4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabel.swift; sourceTree = "<group>"; };
 		4D514FBB81728B5F7E53FCCE /* openapi.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = openapi.yaml; sourceTree = "<group>"; };
 		4E19E0A44E938CCC17DEF7EE /* SayItSelectionAgentMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItSelectionAgentMain.swift; sourceTree = "<group>"; };
@@ -1028,6 +1043,7 @@
 		A022F5B29532790F5FB8FEA7 /* SelectionServiceError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceError.swift; sourceTree = "<group>"; };
 		A0607E47123E83EC79342535 /* ModelLicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLicense.swift; sourceTree = "<group>"; };
 		A07CB98D7E8BB1E9C661C03A /* ModelArchiveImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelArchiveImporterTests.swift; sourceTree = "<group>"; };
+		A0E2C5B2C451E65A94E2BD22 /* PasteboardContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardContent.swift; sourceTree = "<group>"; };
 		A42DE1A1821373642D9C83EC /* VoiceDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDiscoveryView.swift; sourceTree = "<group>"; };
 		A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadProgress.swift; sourceTree = "<group>"; };
 		A5E69C5B004A8649EF5386AF /* ExportKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportKind.swift; sourceTree = "<group>"; };
@@ -1263,7 +1279,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E377DB5E14325FAD6E11A48 /* SayItProtocol.framework in Frameworks */,
 				7F653706F588CCDCA2C95BFC /* SayItXPC.framework in Frameworks */,
+				8BDF28F41CB4FA4456F56A74 /* AppKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1295,6 +1313,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0B86C452FDF118DF4A2F663B /* SayItProtocol.framework in Frameworks */,
+				88562DC9C936EAF70C0B995E /* AppKit.framework in Frameworks */,
 				22C12D8531FD1643C9832746 /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1623,6 +1642,7 @@
 			isa = PBXGroup;
 			children = (
 				456A6147E5C1F299C5F70B42 /* AccessibilityAncestorSearch.swift */,
+				4CB8CB9BC1FD542C5625A758 /* PasteboardContentReader.swift */,
 				F2D4E715EB917ECA227B62A4 /* SayItClientValidator.swift */,
 				431BE087EDC0779B11802FCC /* SayItXPCClient.swift */,
 				79157408B606A6A97170DB7F /* SayItXPCClientError.swift */,
@@ -1756,6 +1776,7 @@
 				5DBFBE7F0F05F8D4567764EB /* InputFormat.swift */,
 				84FFBC6CF75E2C0899B2BA9A /* ModelInstallErrorSnapshot.swift */,
 				D14E6F09D7A8D43565BD371C /* ModelSnapshot.swift */,
+				A0E2C5B2C451E65A94E2BD22 /* PasteboardContent.swift */,
 				DE3238BA973C01646E22A935 /* PlaybackSnapshot.swift */,
 				1C35797452379AD419E11196 /* PlaybackTextChunk.swift */,
 				D3E857E910DF547DDF281E5A /* QueuePolicy.swift */,
@@ -2479,6 +2500,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				0F4FD699560E21C2C3FA8BAE /* PBXTargetDependency */,
 				B9C333867A05B8879EAA5663 /* PBXTargetDependency */,
 			);
 			name = SayItSelectionAgentTests;
@@ -2740,6 +2762,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				11F40A811AF89ADAF6D28E44 /* AccessibilityAncestorSearch.swift in Sources */,
+				9F66410C6D5DB695997589D4 /* PasteboardContentReader.swift in Sources */,
 				5569E42F0E35EE45C24EB0AC /* SayItClientValidator.swift in Sources */,
 				E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */,
 				4E3AC9A759280B1F3A00E23F /* SayItXPCClientError.swift in Sources */,
@@ -2889,6 +2912,7 @@
 				60080A0011D69A2FFB07DFCD /* InputFormat.swift in Sources */,
 				92EA40B64EC644F2EDAC55BA /* ModelInstallErrorSnapshot.swift in Sources */,
 				9BB4F1D68B609492CD7B3737 /* ModelSnapshot.swift in Sources */,
+				9A4FD2C4EA98313D0C9A523F /* PasteboardContent.swift in Sources */,
 				D22CB839B0E58587F414A88E /* PlaybackSnapshot.swift in Sources */,
 				82F6789D43D7D1741CC4A46C /* PlaybackTextChunk.swift in Sources */,
 				19488C0CF76ABE8972AE4980 /* QueuePolicy.swift in Sources */,
@@ -3159,6 +3183,11 @@
 			isa = PBXTargetDependency;
 			target = 805D294C1B998FB17D83063C /* SayItHTTP */;
 			targetProxy = D637764A95361951569F0EF7 /* PBXContainerItemProxy */;
+		};
+		0F4FD699560E21C2C3FA8BAE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
+			targetProxy = 8D2C0986CCF70452FB8FBC5A /* PBXContainerItemProxy */;
 		};
 		129154E6C75FB179F0C363E9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

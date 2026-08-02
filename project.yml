@@ -110,6 +110,7 @@ targets:
       - path: Sources/SayItXPC
     dependencies:
       - target: SayItProtocol
+      - sdk: AppKit.framework
       - sdk: Security.framework
     settings:
       base:
@@ -428,7 +429,9 @@ targets:
     sources:
       - path: Tests/SayItSelectionAgentTests
     dependencies:
+      - target: SayItProtocol
       - target: SayItXPC
+      - sdk: AppKit.framework
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true

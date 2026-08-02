@@ -86,6 +86,7 @@ let package = Package(
                 .enableUpcomingFeature("StrictConcurrency")
             ],
             linkerSettings: [
+                .linkedFramework("AppKit"),
                 .linkedFramework("Security")
             ]
         ),
@@ -201,7 +202,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SayItSelectionAgentTests",
-            dependencies: ["SayItXPC"],
+            dependencies: ["SayItProtocol", "SayItXPC"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]

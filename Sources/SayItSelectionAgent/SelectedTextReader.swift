@@ -46,11 +46,79 @@ struct SelectedTextReader {
             let response = selectedText(
                 inApplication: AXUIElementCreateApplication(processIdentifier)
             )
-            if response != .noSelection {
+            switch response {
+            case .selectedText:
+                return await copiedSelection(
+                    from: processIdentifier
+                ) ?? .unavailable
+            case .noSelection:
+                continue
+            default:
                 return response
             }
         }
         return .noSelection
+    }
+
+    @MainActor
+    private func copiedSelection(
+        from processIdentifier: pid_t
+    ) async -> SelectionServiceResponse? {
+        let pasteboard = NSPasteboard.general
+        let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
+        let initialChangeCount = pasteboard.changeCount
+        defer { snapshot.restore(to: pasteboard) }
+
+        guard postCopyEvent(to: processIdentifier) else { return nil }
+        for delay in [
+            Duration.milliseconds(20),
+            .milliseconds(40),
+            .milliseconds(80),
+            .milliseconds(160)
+        ] {
+            try? await Task.sleep(for: delay)
+            guard NSWorkspace.shared.frontmostApplication?
+                .processIdentifier == processIdentifier else {
+                return nil
+            }
+            if pasteboard.changeCount != initialChangeCount {
+                guard let content = PasteboardContentReader.content(
+                    from: pasteboard
+                ) else {
+                    return nil
+                }
+                if let plainText = content.plainText,
+                   plainText.count > Self.maximumCharacters {
+                    return .selectionTooLong(
+                        maximumCharacters: Self.maximumCharacters
+                    )
+                }
+                return .selectedContent(content)
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func postCopyEvent(to processIdentifier: pid_t) -> Bool {
+        guard let source = CGEventSource(stateID: .combinedSessionState),
+              let keyDown = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 8,
+                keyDown: true
+              ),
+              let keyUp = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 8,
+                keyDown: false
+              ) else {
+            return false
+        }
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
+        keyDown.postToPid(processIdentifier)
+        keyUp.postToPid(processIdentifier)
+        return true
     }
 
     private func selectedText(
@@ -181,5 +249,31 @@ struct SelectedTextReader {
             return nil
         }
         return unsafeDowncast(value, to: AXUIElement.self)
+    }
+}
+
+@MainActor
+private struct PasteboardSnapshot {
+    private let items: [[String: Data]]
+
+    init(pasteboard: NSPasteboard) {
+        items = pasteboard.pasteboardItems?.map { item in
+            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
+                item.data(forType: type).map { (type.rawValue, $0) }
+            })
+        } ?? []
+    }
+
+    func restore(to pasteboard: NSPasteboard) {
+        pasteboard.clearContents()
+        guard !items.isEmpty else { return }
+        let restoredItems = items.map { values in
+            let item = NSPasteboardItem()
+            for (type, data) in values {
+                item.setData(data, forType: .init(type))
+            }
+            return item
+        }
+        pasteboard.writeObjects(restoredItems)
     }
 }
