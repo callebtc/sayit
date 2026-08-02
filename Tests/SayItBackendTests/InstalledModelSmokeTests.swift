@@ -38,6 +38,7 @@ struct InstalledModelSmokeTests {
             activeModelID: ModelID("model-audit")
         )
         try await manager.install(model.id)
+        print("MODEL_AUDIT_DOWNLOAD_RESULT id=\(model.id.rawValue) downloaded=true")
         try await manager.markDependenciesVerified(model.id)
 
         #expect(await manager.installedURL(for: model.id) != nil)
@@ -98,6 +99,7 @@ struct InstalledModelSmokeTests {
         } else {
             voices = [model.defaultVoice]
         }
+        let auditText = auditValue("SAYIT_MODEL_AUDIT_TEXT", in: environment)
 
         for voice in voices {
             let voiceName = voice ?? "none"
@@ -105,7 +107,7 @@ struct InstalledModelSmokeTests {
                 ?? model.defaultLanguage
             let request = SpeechRequest(
                 cleanedText: CleanedText(
-                    text: sampleText(for: model, language: language),
+                    text: auditText ?? sampleText(for: model, language: language),
                     title: "Model audit",
                     detectedLanguage: language ?? "en",
                     cleanupSummary: CleanupSummary(sourceFormat: "plainText"),

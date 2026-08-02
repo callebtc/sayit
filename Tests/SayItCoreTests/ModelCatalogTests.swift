@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 18)
+        #expect(catalog.models.count == 19)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -124,11 +124,9 @@ struct ModelCatalogTests {
 
     @Test("Generated and cloned voice capabilities are explicitly routed")
     func voiceCapabilities() throws {
+        let catalog = try ModelCatalogLoader().bundledCatalog()
         let models = Dictionary(
-            uniqueKeysWithValues: try ModelCatalogLoader()
-                .bundledCatalog()
-                .models
-                .map { ($0.id.rawValue, $0) }
+            uniqueKeysWithValues: catalog.models.map { ($0.id.rawValue, $0) }
         )
         for id in [
             "qwen3-06b-base-8bit",
@@ -162,6 +160,18 @@ struct ModelCatalogTests {
         #expect(customVoice.capabilities.voiceCloning)
         #expect(!customVoice.capabilities.supportsRandomVoiceSampling)
         #expect(customVoice.defaultVoice == "ryan")
+
+        let chatterboxTurbo = try #require(models["chatterbox-turbo-fp16"])
+        #expect(chatterboxTurbo.modelType == "chatterbox_turbo")
+        #expect(chatterboxTurbo.capabilities.voiceCloning)
+        #expect(!chatterboxTurbo.capabilities.requiresReferenceAudio)
+        #expect(!chatterboxTurbo.capabilities.supportsRandomVoiceSampling)
+        let chatterboxConditioning = try #require(
+            catalog.dependencies.first {
+                $0.id == "chatterbox-default-conditioning"
+            }
+        )
+        #expect(!chatterboxConditioning.modelTypes.contains("chatterbox_turbo"))
 
         let kokoro = try #require(models["kokoro-bf16"])
         #expect(!kokoro.capabilities.supportsVoiceDiscovery)

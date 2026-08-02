@@ -81,7 +81,7 @@
     },
     {
       "id": "chatterbox-default-conditioning",
-      "modelTypes": ["chatterbox", "chatterbox_tts", "chatterbox_turbo"],
+      "modelTypes": ["chatterbox", "chatterbox_tts"],
       "repository": "mlx-community/chatterbox-fp16",
       "revision": "4923fcca09086356aeab5191a2348c5a17a23694",
       "targetSubdirectory": "mlx-community_chatterbox-fp16-default-conditioning",
@@ -273,7 +273,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 8,
+        "recommendationRank": 9,
         "size": "small",
         "speed": "fast",
         "note": "Playback compatibility is still being evaluated."
@@ -370,7 +370,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 10,
+        "recommendationRank": 11,
         "size": "large",
         "speed": "medium-slow",
         "note": "Create voices from natural-language descriptions."
@@ -422,10 +422,62 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 11,
+        "recommendationRank": 12,
         "size": "large",
         "speed": "medium-slow",
         "note": "Nine built-in speakers plus transcript-guided voice cloning."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
+      "id": "chatterbox-turbo-fp16",
+      "displayName": "Chatterbox Turbo",
+      "family": "Chatterbox",
+      "repository": "mlx-community/chatterbox-turbo-fp16",
+      "revision": "b2d0a13aa7cfff0a06d9acb247ae91c8f19a6d75",
+      "modelType": "chatterbox_turbo",
+      "parameterCount": "600M",
+      "quantization": "FP16",
+      "languages": ["en"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 5,
+          "recommendedMinimumDuration": 8,
+          "recommendedMaximumDuration": 12,
+          "maximumDuration": 15,
+          "transcriptRequired": false
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 2987621715,
+      "estimatedPeakMemoryBytes": 5000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/chatterbox-turbo-fp16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 5,
+        "size": "medium",
+        "speed": "medium",
+        "note": "Fast English speech with cloning and expressive event tags."
       },
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-02"
@@ -474,7 +526,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 5,
+        "recommendationRank": 6,
         "size": "medium",
         "speed": "slow",
         "note": "Slow generation and voices may sound unnatural."
@@ -609,7 +661,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 9,
+        "recommendationRank": 10,
         "size": "medium",
         "speed": "slow",
         "note": "Japanese voice design; playback compatibility is still being evaluated."
@@ -652,7 +704,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 6,
+        "recommendationRank": 7,
         "size": "medium",
         "speed": "medium-slow",
         "note": "Glitch-prone output that can sound unstable."
@@ -695,7 +747,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 7,
+        "recommendationRank": 8,
         "size": "large",
         "speed": "slow",
         "note": "Good voice quality, but slow and occasionally glitchy."
