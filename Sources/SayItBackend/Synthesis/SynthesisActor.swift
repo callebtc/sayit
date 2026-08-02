@@ -588,6 +588,24 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let candidate: SpeechGenerationModel
         do {
             switch model.modelType.lowercased() {
+            case "omnivoice":
+                let hubCache = ProcessInfo.processInfo.environment[
+                    "HF_HUB_CACHE"
+                ].map {
+                    URL(filePath: $0, directoryHint: .isDirectory)
+                } ?? modelURL.deletingLastPathComponent()
+                let repository = try MLXAudioLocalModelBridge
+                    .repositoryIdentifier(
+                        modelType: model.modelType,
+                        repository: model.repository,
+                        localDirectory: modelURL,
+                        hubCache: hubCache
+                    ) ?? model.repository
+                candidate = try await TTS.loadModel(
+                    modelRepo: repository,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
             case "kitten", "kitten_tts":
                 try KittenVoiceArchiveConverter.prepareVoices(in: modelURL)
                 candidate = try await TTS.loadModel(

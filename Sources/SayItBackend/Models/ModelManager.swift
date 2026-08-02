@@ -106,6 +106,11 @@ actor ModelManager: ModelManaging {
         }
         let url = directories.models.appending(path: installation.relativePath)
         try FileManager.default.removeItem(at: url)
+        try MLXAudioLocalModelBridge.removeAliasIfPresent(
+            modelType: model.modelType,
+            repository: model.repository,
+            hubCache: directories.hubCache
+        )
         for dependency in dependencies(for: model) {
             let isStillNeeded = modelList.contains { candidate in
                 candidate.id != model.id

@@ -52,7 +52,7 @@ struct ModelCatalogTests {
                 .map { ($0.id.rawValue, $0) }
         )
 
-        for id in ["omnivoice", "moss-tts", "marvis-250m-8bit"] {
+        for id in ["moss-tts", "marvis-250m-8bit"] {
             #expect(models[id]?.stability == .unavailable)
             #expect(models[id]?.isSelectable == false)
         }
@@ -139,6 +139,11 @@ struct ModelCatalogTests {
             #expect(model.capabilities.voiceCloning)
             #expect(model.capabilities.voiceCloneRequirements != nil)
         }
+
+        let omniVoice = try #require(models["omnivoice"])
+        #expect(omniVoice.repository == "mlx-community/OmniVoice-bfloat16")
+        #expect(omniVoice.quantization == "BF16")
+        #expect(omniVoice.stability == .experimental)
 
         let chatterbox = try #require(models["chatterbox-fp16"])
         #expect(!chatterbox.capabilities.supportsVoiceDiscovery)

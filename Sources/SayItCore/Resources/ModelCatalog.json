@@ -588,13 +588,13 @@
     },
     {
       "id": "omnivoice",
-      "displayName": "OmniVoice",
+      "displayName": "OmniVoice BF16",
       "family": "OmniVoice",
-      "repository": "mlx-community/OmniVoice",
-      "revision": "defe4bdce0decb321d17e96a4774417be08022ea",
+      "repository": "mlx-community/OmniVoice-bfloat16",
+      "revision": "6119f7072580cc30c3cbdf496269216b03ad9742",
       "modelType": "omnivoice",
-      "parameterCount": "1.3B",
-      "quantization": "MLX",
+      "parameterCount": "0.6B",
+      "quantization": "BF16",
       "languages": ["en"],
       "voices": [],
       "defaultVoice": null,
@@ -619,18 +619,24 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 3100000000,
-      "estimatedPeakMemoryBytes": 6000000000,
+      "estimatedDiskBytes": 2042279124,
+      "estimatedPeakMemoryBytes": 5000000000,
       "hardwareTier": "high",
       "license": {
-        "identifier": "See model card",
-        "url": "https://huggingface.co/mlx-community/OmniVoice",
-        "commercialUseAllowed": false,
-        "requiresAcceptance": true
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/OmniVoice-bfloat16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
       },
-      "stability": "unavailable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 14,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Broad multilingual voice design and cloning with slower diffusion-based generation."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-01"
+      "testedDate": "2026-08-02"
     },
     {
       "id": "fish-s2-pro-8bit",
