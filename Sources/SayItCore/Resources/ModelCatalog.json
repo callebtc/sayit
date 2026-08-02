@@ -379,6 +379,58 @@
       "testedDate": "2026-08-02"
     },
     {
+      "id": "qwen3-17b-customvoice-8bit",
+      "displayName": "Qwen3 CustomVoice",
+      "family": "Qwen3-TTS",
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "revision": "41d3337e8b7f2843a75841595fc14e4b9a7a4b96",
+      "modelType": "qwen3_tts",
+      "parameterCount": "1.7B",
+      "quantization": "8-bit",
+      "languages": ["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+      "voices": ["ryan", "aiden", "serena", "vivian", "uncle_fu", "dylan", "eric", "ono_anna", "sohee"],
+      "defaultVoice": "ryan",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 3,
+          "recommendedMinimumDuration": 6,
+          "recommendedMaximumDuration": 10,
+          "maximumDuration": 15,
+          "transcriptRequired": true
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 3080141538,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 11,
+        "size": "large",
+        "speed": "medium-slow",
+        "note": "Nine built-in speakers plus transcript-guided voice cloning."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
       "id": "chatterbox-fp16",
       "displayName": "Chatterbox",
       "family": "Chatterbox",
