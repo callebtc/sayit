@@ -710,14 +710,19 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         for request: SpeechRequest,
         model: SpeechGenerationModel
     ) async throws -> [SpeechChunk] {
+        let separatesParagraphs = request.voiceMode == .randomPerParagraph
         guard let loadedTextProcessor else {
-            return chunker.chunks(for: request.cleanedText.text)
+            return chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            )
         }
 
         switch request.model.modelType.lowercased() {
         case "orpheus", "orpheus_tts":
             return Self.orpheusChunker.chunks(
-                for: request.cleanedText.text
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
             )
         case "kokoro", "kokoro_tts":
             let language = request.language
@@ -729,7 +734,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 loadedTextProcessor as? KokoroMultilingualProcessor {
                 try await processor.prepare(for: language)
             }
-            return try chunker.chunks(for: request.cleanedText.text) { text in
+            return try chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            ) { text in
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: language
@@ -743,7 +751,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     .config.plbert.maxPositionEmbeddings
                 ?? 512
             let tokenBudget = max(contextLength - 2, 1)
-            return try chunker.chunks(for: request.cleanedText.text) { text in
+            return try chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            ) { text in
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: request.language
@@ -751,7 +762,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 return processed.count <= tokenBudget
             }
         default:
-            return chunker.chunks(for: request.cleanedText.text)
+            return chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            )
         }
     }
 

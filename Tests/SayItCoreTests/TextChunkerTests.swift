@@ -24,13 +24,51 @@ struct TextChunkerTests {
         )
     }
 
-    @Test("Single clean line breaks remain paragraph boundaries")
-    func treatsSingleLineBreaksAsParagraphs() {
+    @Test("Single clean line breaks remain inside an accumulated block")
+    func accumulatesParagraphs() throws {
         let text = "First paragraph.\nSecond paragraph."
         let chunks = TextChunker(targetCharacterCount: 2_000).chunks(for: text)
+        let chunk = try #require(chunks.first)
+
+        #expect(chunks.count == 1)
+        #expect(chunk.text == text)
+        #expect(chunk.startsParagraph)
+        #expect(chunk.sourceRange == 0..<text.count)
+    }
+
+    @Test("Paragraph-specific voices can still force paragraph blocks")
+    func separatesParagraphsWhenRequested() {
+        let text = "First paragraph.\nSecond paragraph."
+        let chunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: text,
+            separatesParagraphs: true
+        )
 
         #expect(chunks.map(\.text) == ["First paragraph.", "Second paragraph."])
         #expect(chunks.allSatisfy { $0.startsParagraph })
+    }
+
+    @Test("Configured target accumulates short article paragraphs")
+    func accumulatesShortParagraphsToTarget() {
+        let paragraphs = (0..<20).map { index in
+            "Paragraph \(index) contains enough words to resemble a short article paragraph while remaining far below the configured block target."
+        }
+        let text = paragraphs.joined(separator: "\n")
+        let chunks = TextChunker(
+            targetCharacterCount: 1_300,
+            hardCharacterLimit: 1_650
+        ).chunks(for: text)
+
+        #expect(chunks.count < paragraphs.count)
+        #expect(chunks.allSatisfy { $0.text.count <= 1_300 })
+        #expect(chunks.dropLast().allSatisfy { $0.text.count > 1_000 })
+        #expect(chunks.contains { $0.text.contains("\n") })
+        #expect(
+            chunks.flatMap {
+                sourceText(in: $0.sourceRange, from: text)
+                    .split(whereSeparator: \.isWhitespace)
+            } == text.split(whereSeparator: \.isWhitespace)
+        )
     }
 
     @Test("Oversized sentences split at readable boundaries")
@@ -91,12 +129,13 @@ struct TextChunkerTests {
             hardCharacterLimit: 2_500
         ).chunks(for: text)
 
-        #expect(chunks.count == 4)
-        #expect(chunks[1].text == "Verse line one")
-        #expect(chunks[2].text == "Verse line two")
+        #expect(chunks.count == 1)
         #expect(
-            sourceText(in: chunks[1].sourceRange, from: text)
-                == "Verse line one"
+            chunks[0].text
+                == "Intro sentence.\nVerse line one\nVerse line two\nOutro sentence."
+        )
+        #expect(
+            sourceText(in: chunks[0].sourceRange, from: text) == text
         )
         #expect(
             chunks.flatMap {

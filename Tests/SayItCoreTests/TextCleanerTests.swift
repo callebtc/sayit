@@ -72,8 +72,9 @@ struct TextCleanerTests {
         let chunks = TextChunker(targetCharacterCount: 2_000).chunks(
             for: result.text
         )
-        #expect(chunks.count == 2)
-        #expect(chunks.allSatisfy { $0.startsParagraph })
+        #expect(chunks.count == 1)
+        #expect(chunks.first?.text == expected)
+        #expect(chunks.first?.startsParagraph == true)
     }
 
     @Test("HTML preserves semantic block, list, and table boundaries")

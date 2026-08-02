@@ -357,7 +357,7 @@ struct BackendServiceCommandTests {
             )
         )
         for _ in 0..<300 {
-            guard fixture.playback.spokenChunks.count < 3 else { break }
+            guard fixture.playback.spokenChunks.isEmpty else { break }
             try await Task.sleep(for: .milliseconds(10))
         }
 
@@ -373,11 +373,11 @@ struct BackendServiceCommandTests {
             return text[lower..<upper]
                 .split(whereSeparator: \.isWhitespace)
         }
-        #expect(ranges.count == 3)
+        #expect(ranges.count == 1)
         #expect(spokenWords == text.split(whereSeparator: \.isWhitespace))
         #expect(
             fixture.playback.spokenChunks.map(\.audioStart)
-                == [0, 1, 2]
+                == [0]
         )
 
         _ = await fixture.service.handle(.init(command: .clear))

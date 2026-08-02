@@ -52,6 +52,7 @@ struct SpeechLyricsViewTests {
                 audioStart: Double(index) * 2
             )
         }
+        #expect(chunks.count == 1)
         let blocks = SpeechLyricsView.blockRanges(in: text, chunks: chunks)
         let renderedWords = blocks.flatMap {
             text[$0].split(whereSeparator: \.isWhitespace)

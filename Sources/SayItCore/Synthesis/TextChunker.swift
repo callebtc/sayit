@@ -14,7 +14,10 @@ public struct TextChunker: Sendable {
         self.hardCharacterLimit = hardCharacterLimit
     }
 
-    public func chunks(for text: String) -> [SpeechChunk] {
+    public func chunks(
+        for text: String,
+        separatesParagraphs: Bool = false
+    ) -> [SpeechChunk] {
         var output: [SpeechChunk] = []
         var buffer: SpeechChunk?
 
@@ -52,13 +55,18 @@ public struct TextChunker: Sendable {
                     continue
                 }
 
+                let separator = isFirstSentence ? "\n" : " "
                 if let buffer,
-                   buffer.text.count + 1 + sentence.text.count
+                   buffer.text.count + separator.count + sentence.text.count
                     > targetCharacterCount {
                     flush()
                 }
                 if let current = buffer {
-                    buffer = joining(current, sentence)
+                    buffer = joining(
+                        current,
+                        sentence,
+                        separator: separator
+                    )
                 } else {
                     buffer = sentence.reidentified(
                         as: 0,
@@ -67,18 +75,25 @@ public struct TextChunker: Sendable {
                 }
                 isFirstSentence = false
             }
-            flush()
+            if separatesParagraphs {
+                flush()
+            }
         }
+        flush()
         return output
     }
 
     public func chunks(
         for text: String,
+        separatesParagraphs: Bool = false,
         fitting fits: (String) throws -> Bool
     ) rethrows -> [SpeechChunk] {
         var output: [SpeechChunk] = []
 
-        for chunk in chunks(for: text) {
+        for chunk in chunks(
+            for: text,
+            separatesParagraphs: separatesParagraphs
+        ) {
             let pieces = try fittingPieces(for: chunk, fits: fits)
             for (index, piece) in pieces.enumerated() {
                 output.append(
@@ -336,11 +351,13 @@ public struct TextChunker: Sendable {
 
     private func joining(
         _ first: SpeechChunk,
-        _ second: SpeechChunk
+        _ second: SpeechChunk,
+        separator: String
     ) -> SpeechChunk {
-        SpeechChunk(
+        precondition(separator.count == 1)
+        return SpeechChunk(
             id: first.id,
-            text: first.text + " " + second.text,
+            text: first.text + separator + second.text,
             startsParagraph: first.startsParagraph,
             sourceBoundaryOffsets: first.sourceBoundaryOffsets
                 + [second.sourceRange.lowerBound]
