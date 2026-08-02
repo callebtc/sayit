@@ -206,6 +206,33 @@ final class AppState {
         )
     }
 
+    func previewVoiceSelection(
+        _ selection: VoiceSelection,
+        model: ModelDescriptor
+    ) {
+        let sample = settings.voicePreviewSample.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let isActiveModel = model.id == settings.activeModelID
+        submit(
+            SpeechSubmission(
+                text: sample.isEmpty
+                    ? "Say It turns the words on your Mac into calm, private audio."
+                    : sample,
+                source: .preview,
+                modelID: model.id.rawValue,
+                voiceSelection: selection,
+                language: isActiveModel ? settings.activeLanguage : nil,
+                voiceDescription: isActiveModel
+                    ? settings.voiceDescription : nil,
+                speakingPace: settings.speakingPace.rawValue,
+                playbackRate: settings.playbackRate,
+                queuePolicy: .interruptCurrent,
+                permitsLongText: true
+            )
+        )
+    }
+
     func receive(_ payload: TextSourcePayload) {
         let submission: SpeechSubmission
         if let html = payload.html {

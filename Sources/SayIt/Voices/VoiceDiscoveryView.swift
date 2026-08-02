@@ -133,34 +133,19 @@ struct VoiceDiscoveryView: View {
                 .font(.callout)
             }
 
-            HStack(spacing: DesignTokens.standardSpacing) {
-                Button(action: generate) {
-                    HStack {
-                        Label(
-                            candidates.isEmpty
-                                ? "Generate Four Voices"
-                                : "Generate Four More",
-                            systemImage: surpriseMe ? "dice" : "sparkles"
-                        )
-                        .font(.callout.weight(.medium))
-                        Spacer()
-                    }
-                }
-                .buttonStyle(.sayItRow)
-                .disabled(isGenerating || sampleTextIsInvalid)
-
-                if isGenerating {
-                    ProgressView(
-                        value: Double(studio?.completedCount ?? 0),
-                        total: Double(studio?.totalCount ?? 4)
-                    )
-                    .frame(maxWidth: 160)
-                    Button("Cancel", role: .cancel, action: state.cancelVoiceStudio)
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .animation(DesignTokens.smoothAnimation, value: isGenerating)
+            VoiceGenerationButton(
+                title: candidates.isEmpty
+                    ? "Generate Four Voices"
+                    : "Generate Four More",
+                systemImage: surpriseMe ? "dice" : "sparkles",
+                generatingTitle: "Voicing the same sentence four ways…",
+                isGenerating: isGenerating,
+                completedCount: studio?.completedCount ?? 0,
+                totalCount: studio?.totalCount ?? 4,
+                isDisabled: sampleTextIsInvalid,
+                action: generate,
+                onCancel: state.cancelVoiceStudio
+            )
         }
         .sayItCard()
     }

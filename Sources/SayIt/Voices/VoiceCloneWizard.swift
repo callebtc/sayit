@@ -554,26 +554,6 @@ struct VoiceCloneWizard: View {
 
             if let studio = state.voiceStudio,
                studio.id == currentStudioID {
-                if studio.state == .generating {
-                    VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
-                        ProgressView(
-                            value: Double(studio.completedCount),
-                            total: Double(studio.totalCount)
-                        )
-                        .animation(
-                            DesignTokens.smoothAnimation,
-                            value: studio.completedCount
-                        )
-                        Text(
-                            "Generating sample \(min(studio.completedCount + 1, studio.totalCount)) of \(studio.totalCount)…"
-                        )
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(
-                            .numericText(value: Double(studio.completedCount))
-                        )
-                    }
-                }
                 ForEach(studio.candidates) { candidate in
                     HStack(spacing: DesignTokens.standardSpacing) {
                         VoiceFingerprintView(
@@ -610,6 +590,19 @@ struct VoiceCloneWizard: View {
                         .font(.callout)
                         .foregroundStyle(.red)
                         .lineLimit(2)
+                }
+                VoiceGenerationButton(
+                    title: studio.candidates.isEmpty
+                        ? "Generate Samples"
+                        : "Regenerate Samples",
+                    systemImage: "arrow.clockwise",
+                    generatingTitle: "Generating samples…",
+                    isGenerating: studio.state == .generating,
+                    completedCount: studio.completedCount,
+                    totalCount: studio.totalCount,
+                    isDisabled: recorder.isRecording || isSubmitting
+                ) {
+                    Task { await generatePreviews(stayOnStep: true) }
                 }
             } else {
                 HStack(spacing: DesignTokens.compactSpacing) {
@@ -716,12 +709,6 @@ struct VoiceCloneWizard: View {
                 .prominentFooterButton()
                 .disabled(analysis == nil || recorder.isRecording || isSubmitting)
             case .preview:
-                Button("Regenerate") {
-                    Task { await generatePreviews(stayOnStep: true) }
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .disabled(isSubmitting || recorder.isRecording)
                 Button("Save Voice") {
                     Task { await save() }
                 }
