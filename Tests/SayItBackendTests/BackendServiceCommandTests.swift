@@ -69,6 +69,33 @@ struct BackendServiceCommandTests {
         #expect(cleared.statusText == "Ready to speak")
     }
 
+    @Test("Waiting event requests resume when service state changes")
+    func waitingEventsResumeOnRevision() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let waitingResponse = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: started.revision,
+                        playbackInterval: 1
+                    )
+                )
+            )
+        }
+        await Task.yield()
+        await fixture.service.reportServiceError("Transport failed")
+
+        let received = try events(await waitingResponse.value)
+        #expect(received.last?.id ?? 0 > started.revision)
+        #expect(received.last?.snapshot.lastError == "Transport failed")
+    }
+
     @Test("Playback commands forward state and validate rates")
     func playbackCommands() async throws {
         let fixture = try ServiceFixture()
@@ -141,6 +168,18 @@ struct BackendServiceCommandTests {
         let original = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         ).settings
+        var httpConfigurations: [HTTPServiceConfiguration] = []
+        fixture.service.setHTTPServiceConfigurationHandler {
+            httpConfigurations.append($0)
+        }
+        #expect(
+            httpConfigurations == [
+                HTTPServiceConfiguration(
+                    isEnabled: original.httpEnabled,
+                    port: original.httpPort
+                )
+            ]
+        )
 
         var invalidCases: [(BackendSettingsSnapshot, String)] = []
         var value = original
@@ -202,6 +241,13 @@ struct BackendServiceCommandTests {
         #expect(fixture.playback.forwardSkipInterval == 42)
         #expect(fixture.playback.showTitleInNowPlaying)
         #expect(
+            httpConfigurations.last
+                == HTTPServiceConfiguration(
+                    isEnabled: true,
+                    port: 49_999
+                )
+        )
+        #expect(
             try snapshot(
                 await fixture.service.handle(.init(command: .snapshot))
             ).settings == updated
@@ -213,6 +259,13 @@ struct BackendServiceCommandTests {
         )
         #expect(httpFailure.httpServiceError == "Port occupied")
         #expect(!httpFailure.settings.httpEnabled)
+        #expect(
+            httpConfigurations.last
+                == HTTPServiceConfiguration(
+                    isEnabled: false,
+                    port: 49_999
+                )
+        )
     }
 
     @Test("Submission validation and queue commands are deterministic")

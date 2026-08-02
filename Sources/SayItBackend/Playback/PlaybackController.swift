@@ -120,7 +120,6 @@ final class PlaybackController: BackendPlaybackControlling {
         timePitch.pitch = 0
         timePitch.overlap = Self.highQualityTimePitchOverlap
         configureRemoteCommands()
-        startTimeline()
         monitorAudioConfiguration()
     }
 
@@ -208,6 +207,7 @@ final class PlaybackController: BackendPlaybackControlling {
         )
         lastStablePlaybackTime = elapsed
         cancelAudioConfigurationRecovery()
+        stopTimeline()
         player.pause()
         state = .paused
         updateNowPlaying()
@@ -448,6 +448,7 @@ final class PlaybackController: BackendPlaybackControlling {
         failureMessage = nil
         state = .playing
         lastStablePlaybackTime = elapsed
+        startTimeline()
         scheduleCompletionWatchdog()
         updateNowPlaying()
     }
@@ -614,6 +615,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func invalidateScheduledAudio() {
+        stopTimeline()
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         scheduleGeneration &+= 1
@@ -780,17 +782,25 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func startTimeline() {
+        guard timelineTask == nil else { return }
         timelineTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard let self else { return }
-                if self.state == .playing {
-                    self.elapsed = self.currentPlaybackTime()
-                    self.lastStablePlaybackTime = self.elapsed
-                    self.updateNowPlaying(throttleTimeline: true)
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch {
+                    return
                 }
+                guard let self, self.state == .playing else { return }
+                self.elapsed = self.currentPlaybackTime()
+                self.lastStablePlaybackTime = self.elapsed
+                self.updateNowPlaying(throttleTimeline: true)
             }
         }
+    }
+
+    private func stopTimeline() {
+        timelineTask?.cancel()
+        timelineTask = nil
     }
 
     private func monitorAudioConfiguration() {
@@ -958,6 +968,7 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func reportFailure(_ error: Error, shouldResume: Bool = false) {
         cancelAudioConfigurationRecovery()
+        stopTimeline()
         if shouldResume {
             elapsed = currentPlaybackTime()
         }

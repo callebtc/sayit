@@ -2,14 +2,12 @@ import SwiftUI
 
 struct VoiceRibbonView: View {
     @State private var ribbonWidth = DesignTokens.popoverWidth
-    @State private var smoothedProgress: Double = 0
-    @State private var smoothedGeneration: Double = 0
     let amplitudes: [Float]
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
     let estimatedDuration: TimeInterval
-    let isPlaying: Bool
     let isBuffering: Bool
+    let isPresented: Bool
     let onSeek: (TimeInterval) -> Void
 
     private var totalDuration: TimeInterval {
@@ -32,12 +30,15 @@ struct VoiceRibbonView: View {
 
     var body: some View {
         TimelineView(
-            .animation(minimumInterval: 1.0 / 30.0, paused: !isProcessing)
+            .animation(
+                minimumInterval: 1.0 / 15.0,
+                paused: !isPresented || !isProcessing
+            )
         ) { timeline in
             RibbonCanvas(
                 amplitudes: amplitudes,
-                progress: smoothedProgress,
-                generation: smoothedGeneration,
+                progress: progress,
+                generation: generation,
                 phase: timeline.date.timeIntervalSinceReferenceDate
             )
         }
@@ -77,30 +78,6 @@ struct VoiceRibbonView: View {
             .animation(DesignTokens.smoothAnimation, value: isBuffering)
         }
         .padding(.bottom, 13)
-        .onChange(of: progress, initial: true) { oldValue, newValue in
-            let isJump = newValue < oldValue || abs(newValue - oldValue) > 0.03
-            if isPlaying, !isJump {
-                let target = min(newValue + (newValue - oldValue), 1)
-                withAnimation(.linear(duration: 0.1)) {
-                    smoothedProgress = target
-                }
-            } else {
-                withAnimation(.smooth(duration: isJump ? 0.4 : 0.25)) {
-                    smoothedProgress = newValue
-                }
-            }
-        }
-        .onChange(of: isPlaying) { _, playing in
-            guard !playing else { return }
-            withAnimation(.smooth(duration: 0.2)) {
-                smoothedProgress = progress
-            }
-        }
-        .onChange(of: generation, initial: true) { _, newValue in
-            withAnimation(.smooth(duration: 0.6)) {
-                smoothedGeneration = newValue
-            }
-        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Playback position")
         .accessibilityValue(
@@ -119,19 +96,11 @@ struct VoiceRibbonView: View {
     }
 }
 
-private struct RibbonCanvas: View, Animatable {
+private struct RibbonCanvas: View {
     var amplitudes: [Float]
     var progress: Double
     var generation: Double
     var phase: Double
-
-    nonisolated var animatableData: AnimatablePair<Double, Double> {
-        get { AnimatablePair(progress, generation) }
-        set {
-            progress = newValue.first
-            generation = newValue.second
-        }
-    }
 
     var body: some View {
         Canvas { context, size in

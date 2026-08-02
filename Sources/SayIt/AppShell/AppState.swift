@@ -29,11 +29,15 @@ final class AppState {
     private var modelSelectionTask: Task<Void, Never>?
     private var modelSelectionGeneration: UInt64 = 0
     private var serviceRepairTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var menuActivityTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
     private var lastVoicesRevision: UInt64?
     private var lastServiceRevision: UInt64?
+    @ObservationIgnored
+    private var activeJobID: UUID?
     private var downloadByteCounts: [ModelID: Int64] = [:]
     private var modelIDToSelectAfterInstallation: ModelID?
 
@@ -46,7 +50,6 @@ final class AppState {
     private(set) var errorMessage: String?
     private(set) var needsLongTextConfirmation = false
     private(set) var diagnosticEvents: [DiagnosticEvent] = []
-    private(set) var serviceSnapshot: ServiceSnapshot?
     private(set) var serviceConnection: ServiceConnectionState = .connecting
     private(set) var backendSettings = BackendSettingsSnapshot()
     private(set) var apiTokens: [APITokenMetadata] = []
@@ -59,6 +62,7 @@ final class AppState {
     private(set) var availableUpdateURL: URL?
     private(set) var isCheckingForUpdates = false
     private(set) var clipboardHasNewText = false
+    private(set) var isMenuPresented = false
     @ObservationIgnored
     private var lastReadChangeCount = NSPasteboard.general.changeCount
     var isShowingOnboarding: Bool
@@ -255,13 +259,34 @@ final class AppState {
     }
 
     func confirmLongText() {
-        guard let id = serviceSnapshot?.activeJob?.id else { return }
+        guard let id = activeJobID else { return }
         perform(.confirmJob(id))
     }
 
     func cancelLongText() {
-        guard let id = serviceSnapshot?.activeJob?.id else { return }
+        guard let id = activeJobID else { return }
         perform(.cancelJob(id))
+    }
+
+    func setMenuPresented(_ isPresented: Bool) {
+        guard isMenuPresented != isPresented else { return }
+        isMenuPresented = isPresented
+        menuActivityTask?.cancel()
+        menuActivityTask = nil
+        guard isPresented else { return }
+
+        refreshClipboardState()
+        menuActivityTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard let self, self.isMenuPresented else { return }
+                self.refreshClipboardState()
+            }
+        }
     }
 
     func cancelCurrentRequest(preserveHistory: Bool = true) {
@@ -774,6 +799,7 @@ final class AppState {
         Task {
             await backgroundService.restart()
             await client.invalidate()
+            lastServiceRevision = nil
             serviceConnection = .connecting
         }
     }
@@ -782,6 +808,7 @@ final class AppState {
         Task {
             await backgroundService.enable()
             await client.invalidate()
+            lastServiceRevision = nil
             serviceConnection = .connecting
         }
     }
@@ -860,22 +887,33 @@ final class AppState {
                 guard let self else { return }
                 self.backgroundService.refresh()
                 guard !self.backgroundService.isUserDisabled else {
-                    self.serviceConnection = .disabled
+                    self.lastServiceRevision = nil
+                    if self.serviceConnection != .disabled {
+                        self.serviceConnection = .disabled
+                    }
                     try? await Task.sleep(for: .seconds(1))
                     continue
                 }
                 do {
                     try await self.synchronizeServiceState()
                     retryDelay = .milliseconds(250)
-                    try await Task.sleep(for: .milliseconds(100))
                 } catch let failure as ServiceFailure
                     where failure.code == "protocol.version_mismatch" {
-                    self.serviceConnection = .updateRequired
-                    self.statusText = "Service update required"
+                    if self.serviceConnection != .updateRequired {
+                        self.serviceConnection = .updateRequired
+                    }
+                    if self.statusText != "Service update required" {
+                        self.statusText = "Service update required"
+                    }
                     try? await Task.sleep(for: .seconds(2))
                 } catch {
-                    self.serviceConnection = .offline
-                    self.statusText = "Background service unavailable"
+                    self.lastServiceRevision = nil
+                    if self.serviceConnection != .offline {
+                        self.serviceConnection = .offline
+                    }
+                    if self.statusText != "Background service unavailable" {
+                        self.statusText = "Background service unavailable"
+                    }
                     await self.client.invalidate()
                     self.scheduleServiceRepair()
                     try? await Task.sleep(for: retryDelay)
@@ -896,6 +934,7 @@ final class AppState {
             guard let self, !Task.isCancelled else { return }
             await self.backgroundService.ensureRunning()
             await self.client.invalidate()
+            self.lastServiceRevision = nil
             self.serviceRepairTask = nil
         }
     }
@@ -905,7 +944,12 @@ final class AppState {
             try await reloadServiceSnapshot()
             return
         }
-        let response = try await send(.events(after: lastServiceRevision))
+        let response = try await send(
+            .waitForEvents(
+                after: lastServiceRevision,
+                playbackInterval: isMenuPresented ? 0.25 : 1
+            )
+        )
         guard case .events(let events) = response else {
             try requireSuccess(response)
             throw ServiceFailure(
@@ -944,16 +988,33 @@ final class AppState {
 
     private func apply(_ snapshot: ServiceSnapshot) {
         lastServiceRevision = snapshot.revision
-        serviceSnapshot = snapshot
-        serviceConnection = .online(version: snapshot.serviceVersion)
-        statusText = snapshot.statusText
-        errorMessage = snapshot.lastError
-        httpAPIErrorMessage = snapshot.httpServiceError
-        needsLongTextConfirmation =
+        activeJobID = snapshot.activeJob?.id
+        let onlineConnection = ServiceConnectionState.online(
+            version: snapshot.serviceVersion
+        )
+        if serviceConnection != onlineConnection {
+            serviceConnection = onlineConnection
+        }
+        if statusText != snapshot.statusText {
+            statusText = snapshot.statusText
+        }
+        if errorMessage != snapshot.lastError {
+            errorMessage = snapshot.lastError
+        }
+        if httpAPIErrorMessage != snapshot.httpServiceError {
+            httpAPIErrorMessage = snapshot.httpServiceError
+        }
+        let awaitsConfirmation =
             snapshot.activeJob?.state == .awaitingConfirmation
-        installedModelIDs = Set(
+        if needsLongTextConfirmation != awaitsConfirmation {
+            needsLongTextConfirmation = awaitsConfirmation
+        }
+        let newInstalledModelIDs = Set(
             snapshot.installedModelIDs.map { ModelID($0) }
         )
+        if installedModelIDs != newInstalledModelIDs {
+            installedModelIDs = newInstalledModelIDs
+        }
         if let requestedModelInstallID,
            installedModelIDs.contains(requestedModelInstallID) {
             self.requestedModelInstallID = nil
@@ -965,8 +1026,12 @@ final class AppState {
         }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
-        modelInstallError = snapshot.modelInstallError.map {
+        let nextModelInstallError = snapshot.modelInstallError.map {
             (modelID: ModelID($0.modelID), message: $0.message)
+        }
+        if modelInstallError?.modelID != nextModelInstallError?.modelID
+            || modelInstallError?.message != nextModelInstallError?.message {
+            modelInstallError = nextModelInstallError
         }
 
         if backendSettings != snapshot.settings {
@@ -978,8 +1043,11 @@ final class AppState {
                 snapshot.settings.showNowPlayingTitles
         }
 
-        isShowingOnboarding = installedModelIDs.isEmpty
+        let shouldShowOnboarding = installedModelIDs.isEmpty
             || !settings.onboardingComplete
+        if isShowingOnboarding != shouldShowOnboarding {
+            isShowingOnboarding = shouldShowOnboarding
+        }
 
         if lastModelsRevision != snapshot.modelsRevision {
             lastModelsRevision = snapshot.modelsRevision
@@ -993,7 +1061,9 @@ final class AppState {
             lastDiagnosticsRevision = snapshot.diagnosticsRevision
             Task { await loadDiagnostics() }
         }
-        voiceStudio = snapshot.voiceStudio
+        if voiceStudio != snapshot.voiceStudio {
+            voiceStudio = snapshot.voiceStudio
+        }
         if lastVoicesRevision != snapshot.voicesRevision {
             lastVoicesRevision = snapshot.voicesRevision
             Task { await refreshVoices() }
@@ -1005,16 +1075,21 @@ final class AppState {
               let state = ModelInstallationState(
                 rawValue: snapshot.state
               ) else {
-            downloadProgress = nil
+            if downloadProgress != nil {
+                downloadProgress = nil
+            }
             return
         }
-        downloadProgress = ModelDownloadProgress(
+        let nextProgress = ModelDownloadProgress(
             modelID: ModelID(snapshot.modelID),
             state: state,
             completedBytes: snapshot.completedBytes,
             totalBytes: snapshot.totalBytes,
             bytesPerSecond: Int64(snapshot.bytesPerSecond)
         )
+        if downloadProgress != nextProgress {
+            downloadProgress = nextProgress
+        }
         if requestedModelInstallID == downloadProgress?.modelID {
             requestedModelInstallID = nil
         }

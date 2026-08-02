@@ -43,7 +43,19 @@ public final class SayItBackendService: SayItService {
     private var statusText = "Starting service"
     private var errorMessage: String?
     private var httpServiceError: String?
-    private var revision: UInt64 = 0
+    private var httpServiceConfigurationHandler: (
+        @MainActor (HTTPServiceConfiguration) -> Void
+    )?
+    private var eventWaiters: [
+        UUID: CheckedContinuation<Void, Never>
+    ] = [:]
+    private var eventWaiterTimeoutTasks: [UUID: Task<Void, Never>] = [:]
+    private var revision: UInt64 = 0 {
+        didSet {
+            guard revision != oldValue else { return }
+            resumeAllEventWaiters()
+        }
+    }
     private var modelsRevision: UInt64 = 0
     private var historyRevision: UInt64 = 0
     private var diagnosticsRevision: UInt64 = 0
@@ -52,8 +64,6 @@ public final class SayItBackendService: SayItService {
     private var voiceStudioSnapshot: VoiceStudioSnapshot?
     private var voiceDraftsByID: [UUID: VoiceDraftCandidate] = [:]
     private var voiceCloneDraft: VoiceCloneDraft?
-    private var lastProgressRevisionDate = Date.distantPast
-    private var lastReplayProgressTick: Int?
     private var lastPlaybackContent: PlaybackContentState?
     private var playbackContentRevision: UInt64 = 0
     private var isModelTransitionInProgress = false
@@ -257,6 +267,74 @@ public final class SayItBackendService: SayItService {
         ]
     }
 
+    private func waitForEvents(
+        after sequence: UInt64,
+        playbackInterval: TimeInterval
+    ) async -> [ServiceEvent] {
+        let currentEvents = await events(after: sequence)
+        guard currentEvents.isEmpty else { return currentEvents }
+
+        let requestedInterval = playbackInterval.isFinite
+            ? playbackInterval
+            : 1
+        let interval = min(max(requestedInterval, 0.1), 5)
+        let timeout: Duration = playback.state == .playing
+            ? .milliseconds(Int64((interval * 1_000).rounded()))
+            : .seconds(30)
+        await waitForRevision(after: sequence, timeout: timeout)
+
+        if revision <= sequence, playback.state == .playing {
+            revision &+= 1
+        }
+        return await events(after: sequence)
+    }
+
+    private func waitForRevision(
+        after sequence: UInt64,
+        timeout: Duration
+    ) async {
+        guard revision <= sequence else { return }
+        let waiterID = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard revision <= sequence else {
+                    continuation.resume()
+                    return
+                }
+                eventWaiters[waiterID] = continuation
+                eventWaiterTimeoutTasks[waiterID] = Task {
+                    do {
+                        try await Task.sleep(for: timeout)
+                    } catch {
+                        return
+                    }
+                    self.resumeEventWaiter(waiterID)
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.resumeEventWaiter(waiterID)
+            }
+        }
+    }
+
+    private func resumeEventWaiter(_ id: UUID) {
+        eventWaiterTimeoutTasks.removeValue(forKey: id)?.cancel()
+        eventWaiters.removeValue(forKey: id)?.resume()
+    }
+
+    private func resumeAllEventWaiters() {
+        let continuations = Array(eventWaiters.values)
+        eventWaiters.removeAll(keepingCapacity: true)
+        for task in eventWaiterTimeoutTasks.values {
+            task.cancel()
+        }
+        eventWaiterTimeoutTasks.removeAll(keepingCapacity: true)
+        for continuation in continuations {
+            continuation.resume()
+        }
+    }
+
     public func authorize(
         token: String,
         for scope: APITokenScope
@@ -278,11 +356,19 @@ public final class SayItBackendService: SayItService {
         diagnosticsRevision &+= 1
     }
 
+    public func setHTTPServiceConfigurationHandler(
+        _ handler: (@MainActor (HTTPServiceConfiguration) -> Void)?
+    ) {
+        httpServiceConfigurationHandler = handler
+        handler?(httpServiceConfiguration)
+    }
+
     public func reportHTTPServiceError(_ message: String) async {
         await waitForPendingModelTransitions()
         var settings = settingsStore.value
         settings.httpEnabled = false
         try? settingsStore.update(settings)
+        httpServiceConfigurationHandler?(httpServiceConfiguration)
         httpServiceError = message
         revision &+= 1
         await diagnostics.record(
@@ -305,6 +391,13 @@ public final class SayItBackendService: SayItService {
             return .snapshot(makeSnapshot())
         case .events(let sequence):
             return .events(await events(after: sequence))
+        case .waitForEvents(let sequence, let playbackInterval):
+            return .events(
+                await waitForEvents(
+                    after: sequence,
+                    playbackInterval: playbackInterval
+                )
+            )
         case .submit(let submission):
             return .job(try await submit(submission))
         case .jobs:
@@ -1647,12 +1740,7 @@ public final class SayItBackendService: SayItService {
             || playback.state == .buffering
             || playback.state == .preparing {
             try Task.checkCancellation()
-            if playback.state == .paused {
-                updateJob(id, state: .paused, progress: playbackProgress)
-            } else {
-                updateJob(id, state: .playing, progress: playbackProgress)
-            }
-            try await Task.sleep(for: .milliseconds(100))
+            try await Task.sleep(for: .milliseconds(250))
         }
         finishJob(id, state: .completed)
     }
@@ -1863,18 +1951,17 @@ public final class SayItBackendService: SayItService {
     ) {
         guard var job = jobsByID[id], !job.state.isTerminal else { return }
         let previousState = job.state
+        let boundedProgress = min(max(progress, 0), 1)
+        guard state != previousState || boundedProgress != job.progress else {
+            return
+        }
         if job.startedAt == nil, state != .queued {
             job.startedAt = .now
         }
         job.state = state
-        job.progress = min(max(progress, 0), 1)
+        job.progress = boundedProgress
         jobsByID[id] = job
-        let now = Date.now
-        if state != previousState
-            || now.timeIntervalSince(lastProgressRevisionDate) >= 0.1 {
-            revision &+= 1
-            lastProgressRevisionDate = now
-        }
+        revision &+= 1
         if state != previousState {
             persistJobJournal()
         }
@@ -1950,15 +2037,6 @@ public final class SayItBackendService: SayItService {
     private func makeSnapshot(
         playbackContentAfter sequence: UInt64? = nil
     ) -> ServiceSnapshot {
-        if activeJobID == nil, playback.state == .playing {
-            let tick = Int(playback.elapsed * 10)
-            if tick != lastReplayProgressTick {
-                lastReplayProgressTick = tick
-                revision &+= 1
-            }
-        } else {
-            lastReplayProgressTick = nil
-        }
         var activeJob = activeJobID.flatMap { jobsByID[$0] }
         if var job = activeJob, playback.state == .playing {
             job.state = .playing
@@ -2715,6 +2793,7 @@ public final class SayItBackendService: SayItService {
         if settings.httpEnabled != previousSettings.httpEnabled
             || settings.httpPort != previousSettings.httpPort {
             httpServiceError = nil
+            httpServiceConfigurationHandler?(httpServiceConfiguration)
         }
         applyPlaybackSettings(settings)
         await synthesizer.updateConfiguration(
@@ -2744,6 +2823,14 @@ public final class SayItBackendService: SayItService {
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+    }
+
+    private var httpServiceConfiguration: HTTPServiceConfiguration {
+        let settings = settingsStore.value
+        return HTTPServiceConfiguration(
+            isEnabled: settings.httpEnabled,
+            port: settings.httpPort
+        )
     }
 
     private static func textCleaningOptions(
