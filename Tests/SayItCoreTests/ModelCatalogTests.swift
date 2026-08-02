@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 20)
+        #expect(catalog.models.count == 21)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -144,6 +144,11 @@ struct ModelCatalogTests {
         #expect(omniVoice.repository == "mlx-community/OmniVoice-bfloat16")
         #expect(omniVoice.quantization == "BF16")
         #expect(omniVoice.stability == .experimental)
+
+        let kittenNano = try #require(models["kitten-nano-08-4bit"])
+        #expect(kittenNano.voices.count == 8)
+        #expect(kittenNano.defaultVoice == "Jasper")
+        #expect(kittenNano.estimatedDiskBytes == 34_000_000)
 
         let chatterbox = try #require(models["chatterbox-fp16"])
         #expect(!chatterbox.capabilities.supportsVoiceDiscovery)

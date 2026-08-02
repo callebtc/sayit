@@ -196,6 +196,56 @@
       "testedDate": "2026-08-01"
     },
     {
+      "id": "kitten-nano-08-4bit",
+      "displayName": "Kitten Nano 4-bit",
+      "family": "KittenTTS",
+      "repository": "mlx-community/kitten-tts-nano-0.8-4bit",
+      "revision": "6880e461c24e30da0bbc622070d1370e5c19d8c2",
+      "modelType": "kitten_tts",
+      "parameterCount": "7.6M",
+      "quantization": "4-bit",
+      "languages": ["en"],
+      "voices": ["Bella", "Jasper", "Luna", "Bruno", "Rosie", "Hugo", "Kiki", "Leo"],
+      "defaultVoice": "Jasper",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "progressive",
+      "files": [
+        {"path": "config.json", "byteCount": 2079, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 30266836, "sha256": "44d067f84c8a8ed026b129b9194e1d0cb16beb3e052a413ad6df831c44121513"},
+        {"path": "model.safetensors.index.json", "byteCount": 44352, "sha256": null},
+        {"path": "voices.npz", "byteCount": 3278902, "sha256": "8aa7cee235abb0739cb51e6559685f65a4dacd95568833d05699b1633f519b3f"}
+      ],
+      "estimatedDiskBytes": 34000000,
+      "estimatedPeakMemoryBytes": 750000000,
+      "hardwareTier": "base",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 15,
+        "size": "small",
+        "speed": "medium",
+        "note": "Smallest KittenTTS option; optimized for storage over voice quality."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
       "id": "pocket-tts",
       "displayName": "Pocket TTS",
       "family": "Pocket TTS",
