@@ -36,6 +36,16 @@ struct VoicesSettingsView: View {
                         settings.voiceSelections[model.id.rawValue] = selection
                     }
 
+                    if model.capabilities.voiceDescription,
+                       selection == .automaticStable {
+                        TextField(
+                            "Custom voice description",
+                            text: $settings.voiceDescription,
+                            axis: .vertical
+                        )
+                        .lineLimit(2...4)
+                    }
+
                     if !isSelectedModelActive {
                         Button(
                             "Use \(model.displayName) for Speech",

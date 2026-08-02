@@ -1584,6 +1584,12 @@ public final class SayItBackendService: SayItService {
             settings: settings,
             model: model
         )
+        let voiceDescription = model.capabilities.voiceDescription
+            ? resolvedVoice.preset
+                ?? submission.voiceDescription
+                ?? nonEmpty(settings.voiceDescription)
+            : submission.voiceDescription
+                ?? nonEmpty(settings.voiceDescription)
         let request = SpeechRequest(
             id: id,
             cleanedText: cleaned,
@@ -1593,8 +1599,7 @@ public final class SayItBackendService: SayItService {
                 ?? model.inferredLanguage(forPresetVoice: resolvedVoice.preset)
                 ?? nonEmpty(settings.activeLanguage)
                 ?? model.defaultLanguage,
-            voiceDescription: submission.voiceDescription
-                ?? nonEmpty(settings.voiceDescription),
+            voiceDescription: voiceDescription,
             voiceMode: resolvedVoice.mode,
             voiceReference: resolvedVoice.reference,
             voiceProfileID: resolvedVoice.profileID,

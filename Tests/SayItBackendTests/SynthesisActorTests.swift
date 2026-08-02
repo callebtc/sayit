@@ -86,6 +86,27 @@ struct SynthesisActorTests {
         await synthesizer.cancelCurrentRequest()
         await synthesizer.unloadModel()
     }
+
+    @Test("Orpheus long form stays below its audio-token ceiling")
+    func orpheusLongFormChunking() {
+        let text = """
+        The first paragraph introduces one complete idea in a measured voice and should never be joined to unrelated material from another block.
+
+        The second paragraph continues with a distinct subject, enough words to require several safe synthesis requests, and a clear ending.
+        """
+        let chunks = SynthesisActor.orpheusChunker.chunks(
+            for: text,
+            separatesParagraphs: true
+        )
+
+        #expect(chunks.count >= 3)
+        #expect(chunks.allSatisfy { $0.text.count <= 120 })
+        #expect(chunks.contains { $0.text.hasPrefix("The second paragraph") })
+        #expect(
+            chunks.flatMap { $0.text.split(whereSeparator: \.isWhitespace) }
+                == text.split(whereSeparator: \.isWhitespace)
+        )
+    }
 }
 
 private actor ModelIDRecorder {

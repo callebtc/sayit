@@ -187,7 +187,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 4,
+        "recommendationRank": 6,
         "size": "small",
         "speed": "slow",
         "note": "Slow generation with lower voice quality."
@@ -237,13 +237,13 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 15,
+        "recommendationRank": 10,
         "size": "small",
         "speed": "medium",
-        "note": "Smallest KittenTTS option; optimized for storage over voice quality."
+        "note": "Extremely small and efficient; impressive for a 4-bit model, but voice quality is noticeably low."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "pocket-tts",
@@ -280,7 +280,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 3,
+        "recommendationRank": 5,
         "size": "small",
         "speed": "medium-fast",
         "note": "Good quality with occasional audio artifacts."
@@ -323,7 +323,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 10,
+        "recommendationRank": 7,
         "size": "small",
         "speed": "fast",
         "note": "Playback compatibility is still being evaluated."
@@ -393,11 +393,11 @@
       "parameterCount": "1.7B",
       "quantization": "8-bit",
       "languages": ["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
-      "voices": [],
-      "defaultVoice": null,
+      "voices": ["Warm storyteller", "Dramatic narrator", "Calm documentary narrator", "Bright animated guide", "Deep cinematic narrator", "Gentle conversational voice"],
+      "defaultVoice": "Warm storyteller",
       "defaultLanguage": "en",
       "capabilities": {
-        "presetVoices": false,
+        "presetVoices": true,
         "voiceDescription": true,
         "voiceCloning": false,
         "streaming": true,
@@ -420,13 +420,13 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 12,
+        "recommendationRank": 9,
         "size": "large",
         "speed": "medium-slow",
-        "note": "Create voices from natural-language descriptions."
+        "note": "Six curated description presets plus custom natural-language voice design. This checkpoint does not support reference-audio cloning."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "qwen3-17b-customvoice-8bit",
@@ -470,15 +470,15 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "experimental",
+      "stability": "recommended",
       "experience": {
-        "recommendationRank": 13,
+        "recommendationRank": 3,
         "size": "large",
         "speed": "medium-slow",
-        "note": "Nine built-in speakers plus transcript-guided voice cloning."
+        "note": "Recommended for dramatic, expressive speech; nine fun built-in speakers plus transcript-guided voice cloning."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "chatterbox-turbo-fp16",
@@ -524,13 +524,13 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 5,
+        "recommendationRank": 15,
         "size": "medium",
         "speed": "medium",
-        "note": "Fast English speech with cloning and expressive event tags."
+        "note": "Glitch-prone and often inaccurate; voice cloning can sound unstable or unlike the reference."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "chatterbox-multilingual-v3-fp16",
@@ -576,13 +576,13 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 6,
+        "recommendationRank": 16,
         "size": "medium",
         "speed": "medium-slow",
-        "note": "Twenty-three languages with cross-language voice cloning."
+        "note": "Twenty-three languages, but current generation and cross-language cloning are unreliable and may sound unnatural."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "chatterbox-fp16",
@@ -628,7 +628,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 7,
+        "recommendationRank": 13,
         "size": "medium",
         "speed": "slow",
         "note": "Slow generation and voices may sound unnatural."
@@ -678,15 +678,15 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "experimental",
+      "stability": "recommended",
       "experience": {
-        "recommendationRank": 14,
+        "recommendationRank": 4,
         "size": "medium",
         "speed": "slow",
-        "note": "Broad multilingual voice design and cloning with slower diffusion-based generation."
+        "note": "Recommended for high-quality voice cloning and strong generated voices; slower diffusion-based synthesis."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "fish-s2-pro-8bit",
@@ -769,7 +769,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 11,
+        "recommendationRank": 8,
         "size": "medium",
         "speed": "slow",
         "note": "Japanese voice design; playback compatibility is still being evaluated."
@@ -812,7 +812,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 8,
+        "recommendationRank": 14,
         "size": "medium",
         "speed": "medium-slow",
         "note": "Glitch-prone output that can sound unstable."
@@ -855,7 +855,7 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 9,
+        "recommendationRank": 11,
         "size": "large",
         "speed": "slow",
         "note": "Good voice quality, but slow and occasionally glitchy."
@@ -937,13 +937,13 @@
       },
       "stability": "experimental",
       "experience": {
-        "recommendationRank": 16,
+        "recommendationRank": 12,
         "size": "medium",
         "speed": "medium-slow",
-        "note": "Lower-storage Orpheus option with occasional glitchy output."
+        "note": "Lower-storage expressive presets with short, paragraph-aware chunks that avoid the model's roughly 15-second generation ceiling; occasional glitches remain."
       },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-08-02"
+      "testedDate": "2026-08-03"
     },
     {
       "id": "marvis-250m-8bit",
