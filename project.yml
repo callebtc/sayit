@@ -492,6 +492,23 @@ targets:
         TEST_TARGET_NAME: SayIt
 
 schemes:
+  SayItBackendTests:
+    build:
+      targets:
+        SayItBackendTests: [test]
+    test:
+      config: Debug
+      targets:
+        - SayItBackendTests
+      environmentVariables:
+        SAYIT_MODEL_AUDIT_ALL_VOICES: "$(SAYIT_MODEL_AUDIT_ALL_VOICES)"
+        SAYIT_MODEL_AUDIT_ID: "$(SAYIT_MODEL_AUDIT_ID)"
+        SAYIT_MODEL_AUDIT_OUTPUT: "$(SAYIT_MODEL_AUDIT_OUTPUT)"
+        SAYIT_MODEL_AUDIT_REFERENCE: "$(SAYIT_MODEL_AUDIT_REFERENCE)"
+        SAYIT_MODEL_AUDIT_REFERENCE_TEXT: "$(SAYIT_MODEL_AUDIT_REFERENCE_TEXT)"
+        SAYIT_MODEL_AUDIT_ROOT: "$(SAYIT_MODEL_AUDIT_ROOT)"
+        SAYIT_MODEL_AUDIT_VOICE: "$(SAYIT_MODEL_AUDIT_VOICE)"
+
   SayIt:
     build:
       targets:

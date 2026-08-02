@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 16)
+        #expect(catalog.models.count == 17)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -147,6 +147,13 @@ struct ModelCatalogTests {
         #expect(!chatterbox.capabilities.supportsRandomVoiceSampling)
         #expect(chatterbox.capabilities.voiceCloning)
         #expect(chatterbox.capabilities.voiceCloneRequirements != nil)
+
+        let voiceDesign = try #require(
+            models["qwen3-17b-voicedesign-8bit"]
+        )
+        #expect(voiceDesign.capabilities.voiceDescription)
+        #expect(!voiceDesign.capabilities.voiceCloning)
+        #expect(!voiceDesign.capabilities.supportsRandomVoiceSampling)
 
         let kokoro = try #require(models["kokoro-bf16"])
         #expect(!kokoro.capabilities.supportsVoiceDiscovery)

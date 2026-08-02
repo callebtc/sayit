@@ -334,6 +334,51 @@
       "testedDate": "2026-08-01"
     },
     {
+      "id": "qwen3-17b-voicedesign-8bit",
+      "displayName": "Qwen3 VoiceDesign",
+      "family": "Qwen3-TTS",
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "revision": "f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee",
+      "modelType": "qwen3_tts",
+      "parameterCount": "1.7B",
+      "quantization": "8-bit",
+      "languages": ["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": true,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 3080140867,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 10,
+        "size": "large",
+        "speed": "medium-slow",
+        "note": "Create voices from natural-language descriptions."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
       "id": "chatterbox-fp16",
       "displayName": "Chatterbox",
       "family": "Chatterbox",

@@ -8,7 +8,10 @@ struct InstalledModelSmokeTests {
     @Test("Configured model completes its production download")
     func configuredModelCompletesDownload() async throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let modelID = environment["SAYIT_MODEL_AUDIT_INSTALL_ID"] else {
+        guard let modelID = auditValue(
+            "SAYIT_MODEL_AUDIT_INSTALL_ID",
+            in: environment
+        ) else {
             return
         }
 
@@ -16,9 +19,19 @@ struct InstalledModelSmokeTests {
         let model = try #require(catalog.models.first {
             $0.id.rawValue == modelID
         })
-        let directories = try AppDirectories.shared(
-            appGroupIdentifier: "app.sayit.audit"
-        )
+        let directories: AppDirectories
+        if let installRoot = auditValue(
+            "SAYIT_MODEL_AUDIT_INSTALL_ROOT",
+            in: environment
+        ) {
+            directories = try AppDirectories.testing(
+                root: URL(filePath: installRoot, directoryHint: .isDirectory)
+            )
+        } else {
+            directories = try AppDirectories.shared(
+                appGroupIdentifier: "app.sayit.audit"
+            )
+        }
         let manager = ModelManager(
             catalog: catalog,
             directories: directories,
@@ -34,8 +47,11 @@ struct InstalledModelSmokeTests {
     @Test("Configured model generates finite, audible samples")
     func configuredModelGeneratesAudio() async throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let modelID = environment["SAYIT_MODEL_AUDIT_ID"],
-              let modelsRoot = environment["SAYIT_MODEL_AUDIT_ROOT"] else {
+        guard let modelID = auditValue("SAYIT_MODEL_AUDIT_ID", in: environment),
+              let modelsRoot = auditValue(
+                  "SAYIT_MODEL_AUDIT_ROOT",
+                  in: environment
+              ) else {
             return
         }
 
@@ -58,17 +74,26 @@ struct InstalledModelSmokeTests {
         let synthesizer = SynthesisActor { requestedID in
             requestedID == model.id ? modelURL : nil
         }
-        let voiceReference = environment["SAYIT_MODEL_AUDIT_REFERENCE"].map {
+        let voiceReference = auditValue(
+            "SAYIT_MODEL_AUDIT_REFERENCE",
+            in: environment
+        ).map {
             VoiceReference(
                 audioURL: URL(filePath: $0),
-                transcript: environment["SAYIT_MODEL_AUDIT_REFERENCE_TEXT"]
+                transcript: auditValue(
+                    "SAYIT_MODEL_AUDIT_REFERENCE_TEXT",
+                    in: environment
+                )
             )
         }
         let voices: [String?]
         if environment["SAYIT_MODEL_AUDIT_ALL_VOICES"] == "1",
            !model.voices.isEmpty {
             voices = model.voices.map(Optional.some)
-        } else if let requestedVoice = environment["SAYIT_MODEL_AUDIT_VOICE"] {
+        } else if let requestedVoice = auditValue(
+            "SAYIT_MODEL_AUDIT_VOICE",
+            in: environment
+        ) {
             voices = [requestedVoice]
         } else {
             voices = [model.defaultVoice]
@@ -143,8 +168,40 @@ struct InstalledModelSmokeTests {
             #expect(sampleRate >= 8_000, "Invalid rate for voice \(voiceName)")
             #expect(peak > 0.001, "Silent audio for voice \(voiceName)")
             #expect(rms > 0.0001, "Silent audio for voice \(voiceName)")
+
+            if let outputPath = auditValue(
+                "SAYIT_MODEL_AUDIT_OUTPUT",
+                in: environment
+            ),
+               voices.count == 1 {
+                let outputURL = URL(filePath: outputPath)
+                let outputDirectory = outputURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(
+                    at: outputDirectory,
+                    withIntermediateDirectories: true
+                )
+                let archive = AudioArchive(directory: outputDirectory)
+                try await archive.writeWAV(
+                    samples: samples,
+                    sampleRate: sampleRate,
+                    destination: outputURL
+                )
+                print("MODEL_AUDIT_OUTPUT path=\(outputURL.path)")
+            }
         }
         await synthesizer.unloadModel()
+    }
+
+    private func auditValue(
+        _ key: String,
+        in environment: [String: String]
+    ) -> String? {
+        guard let value = environment[key],
+              !value.isEmpty,
+              !value.hasPrefix("$(") else {
+            return nil
+        }
+        return value
     }
 
     private func sampleText(
