@@ -41,7 +41,64 @@ struct PlaybackBufferPolicyTests {
         )
     }
 
-    @Test("Observed generation latency raises the adaptive watermark")
+    @Test("Adaptive playback waits for a measured generation rate")
+    func adaptiveWaitsForMeasurement() {
+        let unmeasured = policy(.adaptive)
+        #expect(!unmeasured.streamingIsSustainable)
+        #expect(
+            !unmeasured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 100
+            )
+        )
+
+        var estimator = SynthesisPerformanceEstimator()
+        estimator.record(
+            SynthesisMetrics(
+                chunkIndex: 0,
+                generationDuration: 1,
+                audioDuration: 4
+            )
+        )
+        let measured = policy(.adaptive, estimator: estimator)
+        #expect(measured.streamingIsSustainable)
+        #expect(
+            measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 4
+            )
+        )
+    }
+
+    @Test("Adaptive playback builds enough lead for a slow model")
+    func adaptiveSlowModelLead() {
+        var estimator = SynthesisPerformanceEstimator()
+        estimator.record(
+            SynthesisMetrics(
+                chunkIndex: 0,
+                generationDuration: 8,
+                audioDuration: 4
+            )
+        )
+        let measured = policy(.adaptive, estimator: estimator)
+
+        #expect(
+            !measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 6.39,
+                estimatedRemainingDuration: 6
+            )
+        )
+        #expect(
+            measured.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 6.41,
+                estimatedRemainingDuration: 6
+            )
+        )
+    }
+
+    @Test("Known-sustainable generation starts with minimal buffer")
     func observedLatency() {
         var estimator = SynthesisPerformanceEstimator()
         estimator.record(
@@ -57,13 +114,13 @@ struct PlaybackBufferPolicyTests {
         #expect(
             !policy.shouldStart(
                 synthesisIsComplete: false,
-                bufferedDuration: 5
+                bufferedDuration: 0.14
             )
         )
         #expect(
             policy.shouldStart(
                 synthesisIsComplete: false,
-                bufferedDuration: 5.1
+                bufferedDuration: 0.15
             )
         )
     }
@@ -110,6 +167,24 @@ struct PlaybackBufferPolicyTests {
             .streamingIsSustainable)
         #expect(!policy(.progressive, rate: 2, estimator: estimator)
             .streamingIsSustainable)
+    }
+
+    @Test("Unknown generation speed waits for the baseline lead")
+    func unknownSpeedWaitsForBaseline() {
+        let policy = policy(.progressive)
+
+        #expect(
+            !policy.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 1.19
+            )
+        )
+        #expect(
+            policy.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 1.2
+            )
+        )
     }
 
     @Test("Estimator is bounded and uses a conservative percentile")

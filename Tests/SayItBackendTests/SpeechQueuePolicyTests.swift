@@ -593,6 +593,7 @@ struct SpeechQueuePolicyTests {
             installedBytes: model.estimatedDiskBytes,
             verifiedAt: .now,
             dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
             relativePath: relativePath
         )
         try JSONEncoder.sayIt.encode(installation).write(
@@ -631,6 +632,7 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     var shouldStartWhenBuffered = false
     var showTitleInNowPlaying = false
     var rate: Double = 1
+    var volume: Double = 1
     var backwardSkipInterval: TimeInterval = 15
     var forwardSkipInterval: TimeInterval = 30
     private(set) var modelSwitchStopCount = 0

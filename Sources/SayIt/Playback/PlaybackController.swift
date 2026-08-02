@@ -21,6 +21,12 @@ final class PlaybackController {
             commandHandler?(.setPlaybackRate(rate))
         }
     }
+    var volume: Double = 1 {
+        didSet {
+            guard volume != oldValue else { return }
+            commandHandler?(.setVolume(volume))
+        }
+    }
     var showTitleInNowPlaying = false
     var backwardSkipInterval: TimeInterval = 15
     var forwardSkipInterval: TimeInterval = 30
@@ -44,6 +50,12 @@ final class PlaybackController {
             let handler = commandHandler
             commandHandler = nil
             rate = snapshot.rate
+            commandHandler = handler
+        }
+        if volume != snapshot.volume {
+            let handler = commandHandler
+            commandHandler = nil
+            volume = snapshot.volume
             commandHandler = handler
         }
     }

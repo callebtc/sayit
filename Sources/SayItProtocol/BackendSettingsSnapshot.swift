@@ -8,6 +8,7 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
     public var voiceDescription: String
     public var speakingPace: Double
     public var playbackRate: Double
+    public var volume: Double
     public var rewindInterval: Double
     public var forwardInterval: Double
     public var showNowPlayingTitles: Bool
@@ -34,6 +35,7 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         voiceDescription: String = "",
         speakingPace: Double = 1,
         playbackRate: Double = 1,
+        volume: Double = 1,
         rewindInterval: Double = 15,
         forwardInterval: Double = 30,
         showNowPlayingTitles: Bool = false,
@@ -59,6 +61,7 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         self.voiceDescription = voiceDescription
         self.speakingPace = speakingPace
         self.playbackRate = playbackRate
+        self.volume = volume
         self.rewindInterval = rewindInterval
         self.forwardInterval = forwardInterval
         self.showNowPlayingTitles = showNowPlayingTitles
@@ -87,6 +90,7 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         case voiceDescription
         case speakingPace
         case playbackRate
+        case volume
         case rewindInterval
         case forwardInterval
         case showNowPlayingTitles
@@ -138,6 +142,10 @@ public struct BackendSettingsSnapshot: Codable, Equatable, Sendable {
         playbackRate = try container.decodeIfPresent(
             Double.self,
             forKey: .playbackRate
+        ) ?? 1
+        volume = try container.decodeIfPresent(
+            Double.self,
+            forKey: .volume
         ) ?? 1
         rewindInterval = try container.decodeIfPresent(
             Double.self,

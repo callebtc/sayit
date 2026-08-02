@@ -8,11 +8,11 @@ struct OnboardingModelPickerView: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
-                Text("Other voice models")
+                Text("Other recommended model")
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Text(
-                    "Compare download size, license, languages, and expected performance."
+                    "Compare the recommended choices by size, features, and expected performance."
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -41,6 +41,14 @@ struct OnboardingModelPickerView: View {
     }
 
     private var alternativeModels: [ModelDescriptor] {
-        state.models.filter { $0.id != recommendedModelID }
+        state.models
+            .filter {
+                $0.id != recommendedModelID
+                    && $0.stability == .recommended
+            }
+            .sorted {
+                ($0.experience?.recommendationRank ?? .max)
+                    < ($1.experience?.recommendationRank ?? .max)
+            }
     }
 }

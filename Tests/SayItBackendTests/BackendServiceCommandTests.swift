@@ -112,6 +112,22 @@ struct BackendServiceCommandTests {
         }
 
         #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .setVolume(1.5))
+                )
+            )
+        )
+        #expect(fixture.playback.volume == 1.5)
+
+        for volume in [0.19, 2.01, Double.nan, Double.infinity] {
+            let response = await fixture.service.handle(
+                .init(command: .setVolume(volume))
+            )
+            #expect(try failure(response).code == "playback.invalid_volume")
+        }
+
+        #expect(
             isAccepted(await fixture.service.handle(.init(command: .clear)))
         )
         #expect(fixture.playback.stopCount >= 1)
@@ -136,6 +152,9 @@ struct BackendServiceCommandTests {
         value = original
         value.playbackRate = 0.4
         invalidCases.append((value, "settings.invalid_playback_rate"))
+        value = original
+        value.volume = 0.1
+        invalidCases.append((value, "settings.invalid_volume"))
         value = original
         value.chunkCharacterTarget = 0
         invalidCases.append((value, "settings.invalid_chunk_size"))
@@ -306,6 +325,101 @@ struct BackendServiceCommandTests {
         )
         #expect(jobs.first(where: { $0.id == long.id })?.state == .canceled)
         #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
+    }
+
+    @Test("Synthesis forwards multiline source ranges without rematching text")
+    func synthesisForwardsMultilineSourceRanges() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let text = """
+        Intro sentence.
+
+        Verse line one
+        Verse line two
+
+        Outro sentence.
+        """
+
+        _ = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: text,
+                            source: .preview,
+                            modelID: fixture.seedModelID,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        for _ in 0..<300 {
+            guard fixture.playback.spokenChunks.isEmpty else { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let ranges = fixture.playback.spokenChunks.map {
+            $0.textStart..<$0.textEnd
+        }
+        let spokenWords = ranges.flatMap { range in
+            let lower = text.index(
+                text.startIndex,
+                offsetBy: range.lowerBound
+            )
+            let upper = text.index(lower, offsetBy: range.count)
+            return text[lower..<upper]
+                .split(whereSeparator: \.isWhitespace)
+        }
+        #expect(ranges.count == 1)
+        #expect(spokenWords == text.split(whereSeparator: \.isWhitespace))
+        #expect(
+            fixture.playback.spokenChunks.map(\.audioStart)
+                == [0]
+        )
+
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Clipboard and selection submissions retain identical paragraphs")
+    func richInputPathsRetainIdenticalParagraphs() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let plainText = "First sentence.\n\nLike this."
+        let expectedText = "First sentence.\nLike this."
+        let html = Data(
+            "<article><span>First sentence.</span><span>Like this.</span></article>".utf8
+        )
+
+        for source in [SpeechJobSource.clipboard, .selection] {
+            _ = try submittedJob(
+                await fixture.service.handle(
+                    .init(
+                        command: .submit(
+                            SpeechSubmission(
+                                text: plainText,
+                                inputFormat: .html,
+                                representationData: html,
+                                source: source,
+                                modelID: fixture.seedModelID,
+                                permitsLongText: true
+                            )
+                        )
+                    )
+                )
+            )
+            for _ in 0..<300 {
+                guard fixture.playback.spokenText != expectedText else { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+
+            #expect(fixture.playback.spokenText == expectedText)
+            _ = await fixture.service.handle(.init(command: .clear))
+        }
     }
 
     @Test("Model, voice studio, and token validation return stable failures")
@@ -777,6 +891,19 @@ struct BackendServiceCommandTests {
         #expect(loadFailure == "synthesis.failed")
         #expect(fixture.playback.rate == 1.25)
         #expect(fixture.playback.spokenText == "Valid preset reaches model loading.")
+
+        let localizedLoadFailure = try await terminalErrorCode(
+            for: SpeechSubmission(
+                text: "Japanese preset reaches model loading.",
+                source: .frontend,
+                modelID: "kokoro-bf16",
+                voiceSelection: .preset("jf_alpha"),
+                permitsLongText: true
+            ),
+            service: fixture.service
+        )
+        #expect(localizedLoadFailure == "synthesis.failed")
+        #expect(await fixture.synthesizer.requestedLanguages.last == "ja")
     }
 
     @Test("Installed models validate and complete voice-studio workflows")
@@ -1155,6 +1282,60 @@ struct BackendServiceCommandTests {
         )
     }
 
+    @Test("Chatterbox clones do not condition on or retain a transcript")
+    func chatterboxCloneOmitsTranscript() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        let modelID = "chatterbox-fp16"
+        try fixture.seedInstallation(modelID: modelID)
+        await fixture.service.start()
+
+        let recordingID = UUID()
+        try await fixture.seedRecording(id: recordingID, duration: 8)
+        let clone = try voiceStudio(
+            await fixture.service.handle(
+                .init(
+                    command: .startVoiceClone(
+                        VoiceCloneRequest(
+                            recordingID: recordingID,
+                            modelID: modelID,
+                            language: "en",
+                            transcript: "This text must not be retained.",
+                            tuning: VoiceTuning()
+                        )
+                    )
+                )
+            )
+        )
+        #expect(clone.state == .generating)
+        try await waitForVoiceStudioState(.ready, service: fixture.service)
+        let referenceTranscripts = await fixture.synthesizer
+            .referenceTranscripts
+        #expect(referenceTranscripts.count == 3)
+        #expect(referenceTranscripts.allSatisfy { $0 == nil })
+
+        let ready = try #require(
+            try snapshot(
+                await fixture.service.handle(.init(command: .snapshot))
+            ).voiceStudio
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(
+                        command: .saveVoiceClone(
+                            ready.id,
+                            name: "Natural Harbor"
+                        )
+                    )
+                )
+            )
+        )
+        let store = VoiceProfileStore(directories: fixture.directories)
+        let record = try #require(store.records(modelID: modelID).first)
+        #expect(record.transcript == nil)
+    }
+
     @Test("Uploaded local models integrate, select, and remove")
     func uploadedLocalModelLifecycle() async throws {
         let fixture = try ServiceFixture()
@@ -1220,7 +1401,10 @@ private final class ServiceFixture {
     private(set) var profileID: UUID?
     private(set) var historyID: UUID?
 
-    init(seedVoiceAndHistory: Bool = false) throws {
+    init(
+        seedVoiceAndHistory: Bool = false,
+        synthesizesAudio: Bool = false
+    ) throws {
         root = FileManager.default.temporaryDirectory.appending(
             path: "SayItServiceTests-\(UUID().uuidString)",
             directoryHint: .isDirectory
@@ -1236,7 +1420,9 @@ private final class ServiceFixture {
             historyID = try Self.seedHistory(directories: directories)
         }
         playback = RecordingBackendPlayback()
-        synthesizer = DeterministicSynthesizer()
+        synthesizer = DeterministicSynthesizer(
+            synthesizesAudio: synthesizesAudio
+        )
         service = try SayItBackendService(
             directories: directories,
             serviceVersion: "test-version",
@@ -1250,8 +1436,9 @@ private final class ServiceFixture {
     }
 
     func seedInstallation(modelID: String) throws {
+        let catalog = try ModelCatalogLoader().bundledCatalog()
         let model = try #require(
-            ModelCatalogLoader().bundledCatalog().models.first {
+            catalog.models.first {
                 $0.id.rawValue == modelID
             }
         )
@@ -1270,6 +1457,7 @@ private final class ServiceFixture {
             installedBytes: model.estimatedDiskBytes,
             verifiedAt: .now,
             dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
             relativePath: relativePath
         )
         try JSONEncoder.sayIt.encode(installation).write(
@@ -1289,10 +1477,18 @@ private final class ServiceFixture {
                 ) * 0.15
             )
         }
+        let rawURL = directory.appending(path: "raw.wav")
         try await AudioArchive(directory: directories.voiceDrafts).writeWAV(
             samples: samples,
             sampleRate: sampleRate,
-            destination: directory.appending(path: "reference.wav")
+            destination: rawURL
+        )
+        _ = try VoiceRecordingProcessor().process(
+            source: rawURL,
+            destination: directory.appending(path: "reference.wav"),
+            targetSampleRate: sampleRate,
+            minimumDuration: 0,
+            maximumDuration: 60
         )
     }
 
@@ -1370,15 +1566,52 @@ private final class ServiceFixture {
 
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
+    private(set) var requestedLanguages: [String?] = []
+    private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
+    private let synthesizesAudio: Bool
+
+    init(synthesizesAudio: Bool = false) {
+        self.synthesizesAudio = synthesizesAudio
+    }
 
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
         requestedModelIDs.append(request.model.id.rawValue)
+        requestedLanguages.append(request.language)
+        guard synthesizesAudio else {
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.loadingModel(request.model.id))
+                continuation.finish(
+                    throwing: SynthesisError.modelNotInstalled
+                )
+            }
+        }
+        let chunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: request.cleanedText.text)
         return AsyncThrowingStream { continuation in
-            continuation.yield(.loadingModel(request.model.id))
-            continuation.finish(throwing: SynthesisError.modelNotInstalled)
+            continuation.yield(.modelLoaded(request.model.id))
+            for (index, chunk) in chunks.enumerated() {
+                continuation.yield(
+                    .chunkStarted(index: index, chunk: chunk)
+                )
+                continuation.yield(
+                    .audio(
+                        AudioChunk(
+                            requestID: request.id,
+                            index: index,
+                            samples: [0.1],
+                            sampleRate: 1,
+                            startsParagraph: chunk.startsParagraph
+                        )
+                    )
+                )
+            }
+            continuation.yield(.completed)
+            continuation.finish()
         }
     }
 
@@ -1403,9 +1636,10 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         language _: String?,
         tuning _: VoiceSynthesisTuning,
         seed _: UInt64,
-        reference _: VoiceReference?
+        reference: VoiceReference?
     ) async throws -> GeneratedVoiceSample {
-        GeneratedVoiceSample(
+        referenceTranscripts.append(reference?.transcript)
+        return GeneratedVoiceSample(
             samples: (0..<2_400).map { frame in
                 Float(
                     sin(2 * .pi * 220 * Double(frame) / 24_000) * 0.1
@@ -1435,6 +1669,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var shouldStartWhenBuffered = false
     var showTitleInNowPlaying = false
     var rate: Double = 1
+    var volume: Double = 1
     var backwardSkipInterval: TimeInterval = 15
     var forwardSkipInterval: TimeInterval = 30
 

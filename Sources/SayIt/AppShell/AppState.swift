@@ -17,6 +17,7 @@ final class AppState {
     let launchAtLogin = LaunchAtLoginController()
     let backgroundService = BackgroundServiceController()
     let selectionService = SelectionServiceController()
+    let commandLineInstaller = CommandLineInstallController()
     let voicePreview = VoicePreviewPlayer()
 
     private let client = SayItXPCClient()
@@ -39,6 +40,7 @@ final class AppState {
     private(set) var models: [ModelDescriptor]
     private(set) var installedModelIDs: Set<ModelID> = []
     private(set) var downloadProgress: ModelDownloadProgress?
+    private(set) var modelInstallError: (modelID: ModelID, message: String)?
     private(set) var requestedModelInstallID: ModelID?
     private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
@@ -128,15 +130,10 @@ final class AppState {
     func speakSelectedText() {
         Task {
             do {
-                let text = try await selectionService.selectedText(
+                let payload = try await selectionService.selectedPayload(
                     promptIfNeeded: true
                 )
-                receive(
-                    TextSourcePayload(
-                        source: .selection,
-                        plainText: text
-                    )
-                )
+                receive(payload)
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -204,6 +201,33 @@ final class AppState {
         )
     }
 
+    func previewVoiceSelection(
+        _ selection: VoiceSelection,
+        model: ModelDescriptor
+    ) {
+        let sample = settings.voicePreviewSample.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let isActiveModel = model.id == settings.activeModelID
+        submit(
+            SpeechSubmission(
+                text: sample.isEmpty
+                    ? "Say It turns the words on your Mac into calm, private audio."
+                    : sample,
+                source: .preview,
+                modelID: model.id.rawValue,
+                voiceSelection: selection,
+                language: isActiveModel ? settings.activeLanguage : nil,
+                voiceDescription: isActiveModel
+                    ? settings.voiceDescription : nil,
+                speakingPace: settings.speakingPace.rawValue,
+                playbackRate: settings.playbackRate,
+                queuePolicy: .interruptCurrent,
+                permitsLongText: true
+            )
+        )
+    }
+
     func receive(_ payload: TextSourcePayload) {
         let submission: SpeechSubmission
         if let html = payload.html {
@@ -261,6 +285,7 @@ final class AppState {
         }
         guard requestedModelInstallID == nil else { return }
 
+        modelInstallError = nil
         modelIDToSelectAfterInstallation =
             selectAfterInstallation ? id : nil
         requestedModelInstallID = id
@@ -302,24 +327,7 @@ final class AppState {
         _ voice: String,
         model: ModelDescriptor
     ) {
-        guard ["kokoro", "kokoro_tts"].contains(
-            model.modelType.lowercased()
-        ),
-        let prefix = voice.first else {
-            return
-        }
-        let languageByPrefix: [Character: String] = [
-            "a": "en-US",
-            "b": "en-GB",
-            "e": "es",
-            "f": "fr",
-            "h": "hi",
-            "i": "it",
-            "j": "ja",
-            "p": "pt",
-            "z": "cmn"
-        ]
-        if let language = languageByPrefix[prefix] {
+        if let language = model.inferredLanguage(forPresetVoice: voice) {
             settings.activeLanguage = language
         }
     }
@@ -957,6 +965,9 @@ final class AppState {
         }
         playback.apply(snapshot.playback)
         applyDownload(snapshot.download)
+        modelInstallError = snapshot.modelInstallError.map {
+            (modelID: ModelID($0.modelID), message: $0.message)
+        }
 
         if backendSettings != snapshot.settings {
             backendSettings = snapshot.settings

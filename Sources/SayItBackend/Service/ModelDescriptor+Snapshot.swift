@@ -49,7 +49,11 @@ extension ModelDescriptor {
             testedMLXAudioVersion: testedMLXAudioVersion,
             testedDate: testedDate,
             isSelectable: isSelectable,
-            supportsNativeSpeakingPace: supportsNativeSpeakingPace
+            supportsNativeSpeakingPace: supportsNativeSpeakingPace,
+            experienceRecommendationRank: experience?.recommendationRank,
+            experienceSize: experience?.size.rawValue,
+            experienceSpeed: experience?.speed.rawValue,
+            experienceNote: experience?.note
         )
     }
 }

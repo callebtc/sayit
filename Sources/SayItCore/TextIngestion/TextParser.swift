@@ -16,17 +16,31 @@ struct TextParser: Sendable {
 
         let parsed: (text: String, sourceFormat: String, removedCodeBlocks: Int)
 
-        if let html = payload.html {
+        let plainText = payload.plainText.flatMap { text in
+            sanitize(text).isEmpty ? nil : text
+        }
+        // Browser-provided plain text reflects CSS layout more reliably than
+        // fragment HTML. A matching copy is raw HTML rather than a fallback.
+        let plainTextMirrorsHTML = plainText.map { text in
+            payload.html.flatMap(decodeHTMLSource).map {
+                sanitize($0) == sanitize(text)
+            } ?? false
+        } ?? false
+        if let plainText,
+           (payload.html == nil
+               || (options.stripHTML && !plainTextMirrorsHTML)) {
+            parsed = cleanPlainText(plainText)
+        } else if let html = payload.html {
             if options.stripHTML {
                 parsed = (try cleanHTML(html), "HTML", 0)
-            } else if let raw = String(data: html, encoding: .utf8) {
+            } else if let raw = decodeHTMLSource(html) {
                 parsed = (raw, "HTML", 0)
             } else {
                 throw TextIngestionError.invalidRepresentation
             }
         } else if let richText = payload.richText {
             parsed = (try cleanRichText(richText), "Rich text", 0)
-        } else if let plainText = payload.plainText {
+        } else if let plainText {
             parsed = cleanPlainText(plainText)
         } else {
             throw TextIngestionError.noReadableText
@@ -56,7 +70,7 @@ struct TextParser: Sendable {
             )
         }
         if let html = payload.html,
-           let raw = String(data: html, encoding: .utf8) {
+           let raw = decodeHTMLSource(html) {
             return (sanitize(raw), "HTML", 0, false)
         }
         if let richText = payload.richText {
@@ -156,23 +170,47 @@ struct TextParser: Sendable {
     }
 
     private func cleanHTML(_ data: Data) throws -> String {
-        guard var source = String(data: data, encoding: .utf8)
-                ?? String(data: data, encoding: .utf16) else {
+        guard var source = decodeHTMLSource(data) else {
             throw TextIngestionError.invalidRepresentation
         }
 
         source = removingMatches(
             in: source,
-            pattern: #"(?is)<!--.*?-->|<(script|style|head|noscript|template)\b[^>]*>.*?</\1>"#
+            pattern: #"(?is)<!--.*?-->|<(script|style|head|noscript|template|svg|canvas|iframe|object)\b[^>]*>.*?</\1>"#
         )
         source = replacingMatches(
             in: source,
-            pattern: #"(?i)</?(p|div|section|article|header|footer|h[1-6]|li|tr|blockquote|pre|br)\b[^>]*>"#,
-            with: "\n"
+            pattern: #"(?i)</?(p|div|main|section|article|header|footer|nav|aside|h[1-6]|blockquote|pre|address|figure|figcaption|details|summary|fieldset|legend|dl|dt|dd|ul|ol|table|caption|form)\b[^>]*>"#,
+            with: "<br><br>"
         )
         source = replacingMatches(
             in: source,
-            pattern: #"(?i)</?(td|th)\b[^>]*>"#,
+            pattern: #"(?i)<(li|tr)\b[^>]*>"#,
+            with: ""
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)</(li|tr)\s*>"#,
+            with: "<br>"
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)<br\b[^>]*>"#,
+            with: "<br>"
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)<hr\b[^>]*>"#,
+            with: "<br><br>"
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)<(td|th)\b[^>]*>"#,
+            with: ""
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)</(td|th)\s*>"#,
             with: " "
         )
 
@@ -209,6 +247,19 @@ struct TextParser: Sendable {
             options: options,
             documentAttributes: nil
         ).string
+    }
+
+    private func decodeHTMLSource(_ data: Data) -> String? {
+        let encodings: [String.Encoding] = [
+            .utf8,
+            .utf16,
+            .utf32,
+            .windowsCP1252,
+            .isoLatin1
+        ]
+        return encodings.lazy.compactMap { encoding in
+            String(data: data, encoding: encoding)
+        }.first
     }
 
     private func stripMarkdownBlocks(from input: String) -> (
@@ -250,6 +301,11 @@ struct TextParser: Sendable {
         let canonical = input.precomposedStringWithCanonicalMapping
             .replacing("\r\n", with: "\n")
             .replacing("\r", with: "\n")
+            .replacing("\u{2029}", with: "\n\n")
+            .replacing("\u{2028}", with: "\n")
+            .replacing("\u{0085}", with: "\n")
+            .replacing("\u{000C}", with: "\n\n")
+            .replacing("\u{000B}", with: "\n")
 
         var value: String
         if options.stripSpecialCharacters {
@@ -259,6 +315,12 @@ struct TextParser: Sendable {
                     || allowedControls.contains(scalar)
             }
             value = String(String.UnicodeScalarView(withoutControls))
+                // Common clipboard artifacts that are neither spoken nor visible.
+                .replacing("\u{00AD}", with: "")
+                .replacing("\u{200B}", with: "")
+                .replacing("\u{2060}", with: "")
+                .replacing("\u{FEFF}", with: "")
+                .replacing("\u{FFFC}", with: " ")
         } else {
             value = canonical
         }
@@ -267,7 +329,7 @@ struct TextParser: Sendable {
         }
         value = replacingMatches(
             in: value,
-            pattern: #"[ \t]+"#,
+            pattern: #"[\p{Zs}\t]+"#,
             with: " "
         )
         value = replacingMatches(
@@ -277,8 +339,18 @@ struct TextParser: Sendable {
         )
         value = replacingMatches(
             in: value,
-            pattern: #"\n{3,}"#,
-            with: "\n\n"
+            pattern: #"\n+"#,
+            with: "\n"
+        )
+        value = replacingMatches(
+            in: value,
+            pattern: #"([\p{Ll}\p{Nd}]\.[\"'’”)\]]*)(?=\p{Lu})"#,
+            with: "$1 "
+        )
+        value = replacingMatches(
+            in: value,
+            pattern: #"([!?…][\"'’”)\]]*)(?=\p{Lu})"#,
+            with: "$1 "
         )
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }

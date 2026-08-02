@@ -3,17 +3,23 @@ import SayItProtocol
 import SwiftUI
 
 struct SpeechLyricsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let text: String
     let chunks: [PlaybackTextChunk]
     let elapsed: TimeInterval
     let generatedDuration: TimeInterval
+    var showsHighlight = true
     var showsBlockSeparators = false
     var onSeek: ((TimeInterval) -> Void)?
 
     @State private var tokenization = Tokenization()
-    @State private var autoFollow = true
+    @State private var isFollowing = true
     @State private var lastScrolledWord = -1
     @State private var scrollMetrics = ScrollMetrics()
+    @State private var scrollPosition = ScrollPosition()
+    @State private var visibleWordIDs: Set<Int> = []
+    @State private var hasMeasuredVisibleWords = false
 
     private struct Block: Identifiable {
         let id: Int
@@ -64,6 +70,7 @@ struct SpeechLyricsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             scrollContent
+                .scrollPosition($scrollPosition)
                 .scrollIndicators(.never)
                 .mask(fadeMask)
                 .onScrollGeometryChange(
@@ -79,12 +86,9 @@ struct SpeechLyricsView: View {
                         scrollMetrics = metrics
                     }
                 )
-                .onScrollPhaseChange { _, phase in
-                    if phase == .interacting || phase == .tracking {
-                        withAnimation(DesignTokens.quickAnimation) {
-                            autoFollow = false
-                        }
-                    }
+                .onChange(of: scrollPosition.isPositionedByUser) { _, byUser in
+                    guard byUser else { return }
+                    isFollowing = false
                 }
                 .overlay(alignment: .trailing) {
                     minimalScrollIndicator
@@ -95,14 +99,16 @@ struct SpeechLyricsView: View {
                 .onChange(of: currentWordIndex, initial: true) { _, newValue in
                     follow(newValue, proxy: proxy)
                 }
+                .onAppear {
+                    attachFollow(proxy: proxy)
+                }
+                .onChange(of: text) { _, _ in
+                    attachFollow(proxy: proxy)
+                }
+                .onChange(of: chunks) { _, _ in
+                    rebuildTokens()
+                }
         }
-        .onAppear(perform: rebuildTokens)
-        .onChange(of: text) { _, _ in
-            autoFollow = true
-            lastScrolledWord = -1
-            rebuildTokens()
-        }
-        .onChange(of: chunks) { _, _ in rebuildTokens() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Spoken text")
         .accessibilityValue(currentWord)
@@ -157,7 +163,8 @@ struct SpeechLyricsView: View {
     }
 
     private var currentWordIndex: Int? {
-        SpeechLyricsTimeline.activeWordIndex(
+        guard showsHighlight, generatedDuration > 0 else { return nil }
+        return SpeechLyricsTimeline.activeWordIndex(
             at: elapsed + 0.08,
             tokenCount: tokens.count
         ) { index in
@@ -165,8 +172,20 @@ struct SpeechLyricsView: View {
         }
     }
 
+    private func attachFollow(proxy: ScrollViewProxy) {
+        if activeTokenization == nil {
+            rebuildTokens()
+        }
+        isFollowing = true
+        lastScrolledWord = -1
+        visibleWordIDs = []
+        hasMeasuredVisibleWords = false
+        scrollPosition = ScrollPosition()
+        follow(currentWordIndex, proxy: proxy)
+    }
+
     private func follow(_ wordIndex: Int?, proxy: ScrollViewProxy) {
-        guard autoFollow, let wordIndex else { return }
+        guard isFollowing, let wordIndex else { return }
         let blockID = wordIndex < tokens.count ? tokens[wordIndex].blockID : nil
         let lastBlockID = lastScrolledWord >= 0 && lastScrolledWord < tokens.count
             ? tokens[lastScrolledWord].blockID
@@ -174,36 +193,49 @@ struct SpeechLyricsView: View {
         let jumped = lastScrolledWord < 0 || abs(wordIndex - lastScrolledWord) > 4
         let blockChanged = blockID != lastBlockID
         guard jumped || blockChanged || wordIndex - lastScrolledWord >= 2 else { return }
-        withAnimation(.smooth(duration: 0.55)) {
-            if blockChanged || jumped, let blockID {
-                proxy.scrollTo(Self.scrollID(forBlock: blockID), anchor: UnitPoint(x: 0.5, y: 0.3))
+        let target = Self.scrollID(forWord: wordIndex)
+        if reduceMotion {
+            proxy.scrollTo(
+                target,
+                anchor: UnitPoint(x: 0.5, y: 0.42)
+            )
+        } else {
+            withAnimation(.smooth(duration: 0.55)) {
+                proxy.scrollTo(
+                    target,
+                    anchor: UnitPoint(x: 0.5, y: 0.42)
+                )
             }
-            proxy.scrollTo(Self.scrollID(forWord: wordIndex), anchor: UnitPoint(x: 0.5, y: 0.42))
         }
         lastScrolledWord = wordIndex
     }
 
     private func followButton(proxy: ScrollViewProxy) -> some View {
-        Button {
-            withAnimation(DesignTokens.quickAnimation) {
-                autoFollow = true
-            }
-            lastScrolledWord = -1
-            follow(currentWordIndex, proxy: proxy)
-        } label: {
-            Image(systemName: "arrow.down.to.line")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(6)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Resume following the spoken text")
+        Button(
+            "Resume following the spoken text",
+            systemImage: "arrow.down.to.line",
+            action: { attachFollow(proxy: proxy) }
+        )
+        .labelStyle(.iconOnly)
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(.secondary)
         .padding(6)
-        .opacity(autoFollow ? 0 : 1)
-        .scaleEffect(autoFollow ? 0.6 : 1)
-        .allowsHitTesting(!autoFollow)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: autoFollow)
+        .background(.ultraThinMaterial, in: Circle())
+        .buttonStyle(.plain)
+        .padding(6)
+        .opacity(showsFollowButton ? 1 : 0)
+        .scaleEffect(showsFollowButton ? 1 : 0.6)
+        .allowsHitTesting(showsFollowButton)
+        .animation(
+            .spring(response: 0.3, dampingFraction: 0.7),
+            value: showsFollowButton
+        )
+    }
+
+    private var showsFollowButton: Bool {
+        if !isFollowing { return true }
+        guard hasMeasuredVisibleWords, let currentWordIndex else { return false }
+        return !visibleWordIDs.contains(currentWordIndex)
     }
 
     private var minimalScrollIndicator: some View {
@@ -231,10 +263,13 @@ struct SpeechLyricsView: View {
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
         let seekTime = startTime(for: token)
-        let canSeek = onSeek != nil && seekTime <= generatedDuration
+        let isProcessed = seekTime <= generatedDuration
+        let canSeek = onSeek != nil && isProcessed
         return Text(token.text)
             .font(.callout)
-            .foregroundStyle(wordColor(isCurrent: isCurrent, isPast: isPast))
+            .foregroundStyle(
+                wordColor(isCurrent: isCurrent, isPast: isPast, isProcessed: isProcessed)
+            )
             .background {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.accentColor.opacity(isCurrent ? 0.13 : 0))
@@ -257,12 +292,29 @@ struct SpeechLyricsView: View {
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.72), value: isCurrent)
             .id(Self.scrollID(forWord: token.id))
+            .onScrollVisibilityChange(threshold: 0.5) { isVisible in
+                setWordVisibility(token.id, isVisible: isVisible)
+            }
             .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
     }
 
-    private func wordColor(isCurrent: Bool, isPast: Bool) -> Color {
+    private func setWordVisibility(_ id: Int, isVisible: Bool) {
+        hasMeasuredVisibleWords = true
+        if isVisible {
+            visibleWordIDs.insert(id)
+        } else {
+            visibleWordIDs.remove(id)
+        }
+    }
+
+    private func wordColor(
+        isCurrent: Bool,
+        isPast: Bool,
+        isProcessed: Bool
+    ) -> Color {
         if isCurrent { return .accentColor }
-        return isPast ? .primary.opacity(0.9) : .primary.opacity(0.45)
+        if isPast { return .primary.opacity(0.9) }
+        return isProcessed ? .primary.opacity(0.45) : .primary.opacity(0.22)
     }
 
     private struct ChunkMarkerView: View {
@@ -379,31 +431,32 @@ struct SpeechLyricsView: View {
         let textCount = text.count
         var offsetCursor = 0
         var indexCursor = text.startIndex
-        var ranges: [Range<String.Index>] = []
-        ranges.reserveCapacity(chunks.count)
+        var boundaries = [text.startIndex]
+        boundaries.reserveCapacity(chunks.count + 1)
         for chunk in chunks {
             guard chunk.textStart >= 0,
                   chunk.textEnd > chunk.textStart,
                   chunk.textEnd <= textCount,
                   chunk.textStart >= offsetCursor,
-                  let lower = text.index(
+                  let boundary = text.index(
                     indexCursor,
                     offsetBy: chunk.textStart - offsetCursor,
                     limitedBy: text.endIndex
-                  ),
-                  let upper = text.index(
-                    lower,
-                    offsetBy: chunk.textEnd - chunk.textStart,
-                    limitedBy: text.endIndex
-                  ),
-                  lower < upper else {
+                  ) else {
                 continue
             }
-            ranges.append(lower..<upper)
-            offsetCursor = chunk.textEnd
-            indexCursor = upper
+            if boundary > boundaries[boundaries.count - 1] {
+                boundaries.append(boundary)
+            }
+            offsetCursor = chunk.textStart
+            indexCursor = boundary
         }
-        return ranges
+        if boundaries[boundaries.count - 1] < text.endIndex {
+            boundaries.append(text.endIndex)
+        }
+        return zip(boundaries, boundaries.dropFirst()).map {
+            $0.0..<$0.1
+        }
     }
 
     nonisolated static func wordRanges(

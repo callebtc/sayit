@@ -6,6 +6,7 @@ public struct ModelInstallation: Codable, Equatable, Sendable {
     public let installedBytes: Int64
     public let verifiedAt: Date
     public let dependenciesVerifiedAt: Date?
+    public let dependenciesFingerprint: String?
     public let relativePath: String
 
     public init(
@@ -14,6 +15,7 @@ public struct ModelInstallation: Codable, Equatable, Sendable {
         installedBytes: Int64,
         verifiedAt: Date,
         dependenciesVerifiedAt: Date? = nil,
+        dependenciesFingerprint: String? = nil,
         relativePath: String
     ) {
         self.modelID = modelID
@@ -21,6 +23,7 @@ public struct ModelInstallation: Codable, Equatable, Sendable {
         self.installedBytes = installedBytes
         self.verifiedAt = verifiedAt
         self.dependenciesVerifiedAt = dependenciesVerifiedAt
+        self.dependenciesFingerprint = dependenciesFingerprint
         self.relativePath = relativePath
     }
 }

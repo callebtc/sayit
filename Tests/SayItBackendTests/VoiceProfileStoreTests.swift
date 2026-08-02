@@ -86,7 +86,7 @@ struct VoiceProfileStoreTests {
         let draft = VoiceCloneDraft(
             sessionID: sessionID,
             recordingID: recordingID,
-            modelID: "chatterbox-fp16",
+            modelID: "omnivoice",
             language: "en-US",
             transcript: "The retained local transcript.",
             duration: 9,

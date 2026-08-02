@@ -175,12 +175,13 @@ struct VoicesSettingsView: View {
 
     private var voiceModels: [ModelDescriptor] {
         state.models.filter { model in
-            model.capabilities.presetVoices
-                || model.capabilities.voiceCloning
-                || model.capabilities.supportsVoiceDiscovery
-                || state.voiceProfiles.contains {
-                    $0.modelID == model.id.rawValue
-                }
+            model.isSelectable
+                && (model.capabilities.presetVoices
+                    || model.capabilities.voiceCloning
+                    || model.capabilities.supportsVoiceDiscovery
+                    || state.voiceProfiles.contains {
+                        $0.modelID == model.id.rawValue
+                    })
         }
     }
 

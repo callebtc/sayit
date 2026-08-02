@@ -30,6 +30,7 @@ public final class SayItBackendService: SayItService {
     private var installedModelIDs: Set<ModelID> = []
     private var downloadProgress: ModelDownloadProgress?
     private var downloadTask: Task<Void, Never>?
+    private var modelInstallError: ModelInstallErrorSnapshot?
     private var jobTask: Task<Void, Never>?
     private var modelTransitionTask: Task<Void, Error>?
     private var modelTransitionSequence: UInt64 = 0
@@ -153,11 +154,14 @@ public final class SayItBackendService: SayItService {
                 try await modelManager.select(first.id)
                 var settings = settingsStore.value
                 settings.activeModelID = first.id.rawValue
-                settings.activeVoice = legacyVoice(
+                let activeVoice = legacyVoice(
                     for: settings.voiceSelections[first.id.rawValue],
                     fallback: first.defaultVoice
                 )
-                settings.activeLanguage = first.defaultLanguage ?? ""
+                settings.activeVoice = activeVoice
+                settings.activeLanguage = first.inferredLanguage(
+                    forPresetVoice: activeVoice
+                ) ?? first.defaultLanguage ?? ""
                 try settingsStore.update(settings)
             } catch {
                 recordFailure(error.localizedDescription)
@@ -341,6 +345,9 @@ public final class SayItBackendService: SayItService {
             return .accepted
         case .setPlaybackRate(let rate):
             try await setPlaybackRate(rate)
+            return .accepted
+        case .setVolume(let volume):
+            try await setVolume(volume)
             return .accepted
         case .models:
             return .models(models.map(\.serviceSnapshot))
@@ -759,10 +766,12 @@ public final class SayItBackendService: SayItService {
         let referenceURL = directory.appending(path: "clone-reference.wav")
         let analysis: VoiceRecordingAnalysis
         do {
-            analysis = try VoiceRecordingProcessor().process(
+            analysis = try VoiceRecordingProcessor().validateProcessedReference(
                 source: source,
                 destination: referenceURL,
-                targetSampleRate: targetReferenceSampleRate(for: model),
+                targetSampleRate: VoiceReferenceFormat.sampleRate(
+                    forModelType: model.modelType
+                ),
                 minimumDuration: requirements.minimumDuration,
                 maximumDuration: requirements.maximumDuration
             )
@@ -773,15 +782,15 @@ public final class SayItBackendService: SayItService {
                 message: error.localizedDescription
             )
         }
-        let conditioningTranscript = model.modelType.lowercased() == "chatterbox"
-            ? nil
-            : transcript
+        let conditioningTranscript = requirements.transcriptRequired
+            ? transcript
+            : nil
         voiceCloneDraft = VoiceCloneDraft(
             sessionID: sessionID,
             recordingID: request.recordingID,
             modelID: model.id.rawValue,
             language: request.language,
-            transcript: transcript.nilIfEmpty,
+            transcript: conditioningTranscript?.nilIfEmpty,
             duration: analysis.duration,
             tuning: tuning,
             referenceURL: referenceURL
@@ -1194,12 +1203,6 @@ public final class SayItBackendService: SayItService {
         return profile
     }
 
-    private func targetReferenceSampleRate(
-        for model: ModelDescriptor
-    ) -> Double {
-        model.modelType.lowercased() == "fish_speech" ? 44_100 : 24_000
-    }
-
     private func clonePreviewTexts(language: String?) -> [String] {
         let code = language?.lowercased().split(separator: "-").first
         return switch code {
@@ -1586,7 +1589,9 @@ public final class SayItBackendService: SayItService {
             cleanedText: cleaned,
             model: model,
             voice: resolvedVoice.preset,
-            language: submission.language ?? nonEmpty(settings.activeLanguage)
+            language: submission.language
+                ?? model.inferredLanguage(forPresetVoice: resolvedVoice.preset)
+                ?? nonEmpty(settings.activeLanguage)
                 ?? model.defaultLanguage,
             voiceDescription: submission.voiceDescription
                 ?? nonEmpty(settings.voiceDescription),
@@ -1617,15 +1622,15 @@ public final class SayItBackendService: SayItService {
             modelID: request.model.id.rawValue
         )
         playback.setSpokenText(cleaned.text)
-        activeSpokenText = cleaned.text
+        spokenTextCharacterCount = cleaned.characterCount
+        lastRecordedTextEnd = 0
         if submission.source != .preview {
             playbackContext = PlaybackContext(
                 text: cleaned.text,
                 language: request.language
             )
         }
-        spokenTextCursor = cleaned.text.startIndex
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         spokenAudioCursor = 0
         updateJob(id, state: .preparing, progress: 0.08)
         statusText = "Preparing speech"
@@ -1666,8 +1671,8 @@ public final class SayItBackendService: SayItService {
         case .creatingArticleVoice:
             statusText = "Creating an article voice"
             updateJob(request.id, state: .synthesizing, progress: 0.12)
-        case .chunkStarted(_, let text):
-            registerSpokenChunk(text)
+        case .chunkStarted(_, let chunk):
+            registerSpokenChunk(chunk)
         case .audio(let chunk):
             flushPendingSpokenChunk()
             try playback.enqueue(chunk)
@@ -1682,6 +1687,15 @@ public final class SayItBackendService: SayItService {
             }
         case .metrics(let metrics):
             playback.observeSynthesisMetrics(metrics)
+            if playback.shouldStartWhenBuffered {
+                playback.play()
+                statusText = "Playing"
+                updateJob(
+                    request.id,
+                    state: .playing,
+                    progress: playbackProgress
+                )
+            }
             await diagnostics.record(
                 DiagnosticEvent(
                     severity: .info,
@@ -1901,43 +1915,36 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private var activeSpokenText: String?
     private var playbackContext: PlaybackContext?
-    private var spokenTextCursor: String.Index?
-    private var pendingSpokenChunkRange: Range<String.Index>?
+    private var spokenTextCharacterCount = 0
+    private var lastRecordedTextEnd = 0
+    private var pendingSpokenSourceRange: Range<Int>?
     private var spokenAudioCursor: TimeInterval = 0
 
-    private func registerSpokenChunk(_ chunkText: String) {
-        guard let fullText = activeSpokenText else { return }
-        let cursor = spokenTextCursor ?? fullText.startIndex
-        var range = fullText.range(of: chunkText, range: cursor..<fullText.endIndex)
-        if range == nil {
-            range = fullText.range(of: chunkText)
+    private func registerSpokenChunk(_ chunk: SpeechChunk) {
+        let range = chunk.sourceRange
+        guard range.lowerBound >= lastRecordedTextEnd,
+              range.upperBound <= spokenTextCharacterCount,
+              !range.isEmpty else {
+            pendingSpokenSourceRange = nil
+            return
         }
-        guard let found = range else { return }
-        pendingSpokenChunkRange = found
-        spokenTextCursor = found.upperBound
+        pendingSpokenSourceRange = range
     }
 
     private func flushPendingSpokenChunk() {
-        guard let fullText = activeSpokenText,
-              let range = pendingSpokenChunkRange else {
+        guard let range = pendingSpokenSourceRange else {
             return
         }
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         playback.appendSpokenChunk(
             PlaybackTextChunk(
-                textStart: fullText.distance(
-                    from: fullText.startIndex,
-                    to: range.lowerBound
-                ),
-                textEnd: fullText.distance(
-                    from: fullText.startIndex,
-                    to: range.upperBound
-                ),
+                textStart: range.lowerBound,
+                textEnd: range.upperBound,
                 audioStart: spokenAudioCursor
             )
         )
+        lastRecordedTextEnd = range.upperBound
     }
 
     private func makeSnapshot(
@@ -1987,6 +1994,7 @@ public final class SayItBackendService: SayItService {
                 generatedDuration: playback.generatedDuration,
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
+                volume: playback.volume,
                 currentTitle: includesPlaybackContent
                     ? playbackContent.currentTitle
                     : "",
@@ -2005,6 +2013,7 @@ public final class SayItBackendService: SayItService {
                 includesContent: includesPlaybackContent
             ),
             download: downloadProgress?.serviceSnapshot,
+            modelInstallError: modelInstallError,
             installedModelIDs: installedModelIDs
                 .map(\.rawValue)
                 .sorted(),
@@ -2031,7 +2040,8 @@ public final class SayItBackendService: SayItService {
             }
             return TextSourcePayload(
                 source: submission.source.triggerSource,
-                html: data
+                html: data,
+                plainText: submission.text
             )
         case .richText:
             guard let data = submission.representationData else {
@@ -2074,6 +2084,21 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
+    private func setVolume(_ volume: Double) async throws {
+        let validated = validatedVolume(volume)
+        guard validated == volume else {
+            throw ServiceFailure(
+                code: "playback.invalid_volume",
+                message: "Volume must be between 0.2 and 2."
+            )
+        }
+        playback.volume = validated
+        var settings = settingsStore.value
+        settings.volume = validated
+        try settingsStore.update(settings)
+        revision &+= 1
+    }
+
     private func selectModel(_ id: ModelID) async throws {
         guard let model = models.first(where: { $0.id == id }) else {
             throw ServiceFailure(
@@ -2089,11 +2114,14 @@ public final class SayItBackendService: SayItService {
         }
         var settings = settingsStore.value
         settings.activeModelID = id.rawValue
-        settings.activeVoice = legacyVoice(
+        let activeVoice = legacyVoice(
             for: settings.voiceSelections[id.rawValue],
             fallback: model.defaultVoice
         )
-        settings.activeLanguage = model.defaultLanguage ?? ""
+        settings.activeVoice = activeVoice
+        settings.activeLanguage = model.inferredLanguage(
+            forPresetVoice: activeVoice
+        ) ?? model.defaultLanguage ?? ""
         try await enqueueModelTransition(to: id, settings: settings)
     }
 
@@ -2277,6 +2305,7 @@ public final class SayItBackendService: SayItService {
             )
         }
         errorMessage = nil
+        modelInstallError = nil
         downloadTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -2287,7 +2316,7 @@ public final class SayItBackendService: SayItService {
             } catch is CancellationError {
                 self.finishCanceledInstall()
             } catch {
-                self.finishFailedInstall(error)
+                self.finishFailedInstall(error, modelID: id)
             }
         }
     }
@@ -2348,6 +2377,12 @@ public final class SayItBackendService: SayItService {
 
     private func cancelModelInstall() {
         guard let current = downloadProgress else { return }
+        guard downloadTask != nil else {
+            downloadProgress = nil
+            statusText = "Ready to speak"
+            revision &+= 1
+            return
+        }
         downloadProgress = ModelDownloadProgress(
             modelID: current.modelID,
             state: .paused,
@@ -2377,11 +2412,14 @@ public final class SayItBackendService: SayItService {
             }
             var settings = settingsStore.value
             settings.activeModelID = replacement.id.rawValue
-            settings.activeVoice = legacyVoice(
+            let activeVoice = legacyVoice(
                 for: settings.voiceSelections[replacement.id.rawValue],
                 fallback: replacement.defaultVoice
             )
-            settings.activeLanguage = replacement.defaultLanguage ?? ""
+            settings.activeVoice = activeVoice
+            settings.activeLanguage = replacement.inferredLanguage(
+                forPresetVoice: activeVoice
+            ) ?? replacement.defaultLanguage ?? ""
             try await enqueueModelTransition(
                 to: replacement.id,
                 settings: settings
@@ -2408,7 +2446,7 @@ public final class SayItBackendService: SayItService {
                 try await synthesizer.prepareDependencies(for: model)
                 try await modelManager.markDependenciesVerified(id)
             } catch {
-                finishFailedInstall(error)
+                finishFailedInstall(error, modelID: id)
                 return
             }
         }
@@ -2417,6 +2455,7 @@ public final class SayItBackendService: SayItService {
         modelsRevision &+= 1
         downloadTask = nil
         downloadProgress = nil
+        modelInstallError = nil
         statusText = "Ready to speak"
         revision &+= 1
     }
@@ -2427,18 +2466,24 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
-    private func finishFailedInstall(_ error: Error) {
+    private func finishFailedInstall(_ error: Error, modelID: ModelID) {
         downloadTask = nil
-        if let current = downloadProgress {
-            downloadProgress = ModelDownloadProgress(
-                modelID: current.modelID,
-                state: .failed,
-                completedBytes: current.completedBytes,
-                totalBytes: current.totalBytes,
-                bytesPerSecond: 0
+        downloadProgress = nil
+        modelInstallError = ModelInstallErrorSnapshot(
+            modelID: modelID.rawValue,
+            message: error.localizedDescription
+        )
+        statusText = "Ready to speak"
+        revision &+= 1
+        Task {
+            await diagnostics.record(
+                DiagnosticEvent(
+                    severity: .error,
+                    category: .download,
+                    code: "model.install_failed"
+                )
             )
         }
-        recordFailure(error.localizedDescription)
     }
 
     private func replayHistory(_ id: UUID) async throws {
@@ -2456,13 +2501,13 @@ public final class SayItBackendService: SayItService {
             modelID: item.modelID.rawValue
         )
         playback.setSpokenText(item.cleanedText)
-        activeSpokenText = item.cleanedText
+        spokenTextCharacterCount = item.cleanedText.count
+        lastRecordedTextEnd = 0
         playbackContext = PlaybackContext(
             text: item.cleanedText,
             language: item.language
         )
-        spokenTextCursor = item.cleanedText.startIndex
-        pendingSpokenChunkRange = nil
+        pendingSpokenSourceRange = nil
         spokenAudioCursor = 0
         errorMessage = nil
         statusText = "Playing"
@@ -2633,6 +2678,12 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
+        guard (0.2...2).contains(settings.volume) else {
+            throw ServiceFailure(
+                code: "settings.invalid_volume",
+                message: "Volume must be between 0.2 and 2."
+            )
+        }
         guard (1...5_000).contains(settings.chunkCharacterTarget) else {
             throw ServiceFailure(
                 code: "settings.invalid_chunk_size",
@@ -2689,6 +2740,7 @@ public final class SayItBackendService: SayItService {
 
     private func applyPlaybackSettings(_ settings: BackendSettingsSnapshot) {
         playback.rate = settings.playbackRate
+        playback.volume = settings.volume
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
@@ -2796,6 +2848,10 @@ public final class SayItBackendService: SayItService {
 
     private func validatedPlaybackRate(_ value: Double) -> Double {
         min(max(value, 0.5), 2)
+    }
+
+    private func validatedVolume(_ value: Double) -> Double {
+        min(max(value, 0.2), 2)
     }
 
     private func nonEmpty(_ value: String) -> String? {

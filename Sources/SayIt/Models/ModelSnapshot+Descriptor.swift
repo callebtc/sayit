@@ -53,7 +53,24 @@ extension ModelSnapshot {
             stability: ModelStability(rawValue: stability)
                 ?? .experimental,
             testedMLXAudioVersion: testedMLXAudioVersion,
-            testedDate: testedDate
+            testedDate: testedDate,
+            experience: experience
+        )
+    }
+
+    private var experience: ModelExperience? {
+        guard let recommendationRank = experienceRecommendationRank,
+              let sizeValue = experienceSize,
+              let size = ModelExperience.Size(rawValue: sizeValue),
+              let speedValue = experienceSpeed,
+              let speed = ModelExperience.Speed(rawValue: speedValue) else {
+            return nil
+        }
+        return ModelExperience(
+            recommendationRank: recommendationRank,
+            size: size,
+            speed: speed,
+            note: experienceNote
         )
     }
 }

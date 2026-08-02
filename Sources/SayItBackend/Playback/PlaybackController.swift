@@ -74,7 +74,11 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         return bufferPolicy.shouldStart(
             synthesisIsComplete: synthesisIsComplete,
-            bufferedDuration: bufferedDuration
+            bufferedDuration: bufferedDuration,
+            estimatedRemainingDuration: max(
+                estimatedDuration - generatedDuration,
+                0
+            )
         )
     }
     var showTitleInNowPlaying = false {
@@ -85,6 +89,11 @@ final class PlaybackController: BackendPlaybackControlling {
             timePitch.rate = Float(rate)
             scheduleCompletionWatchdog()
             updateNowPlaying()
+        }
+    }
+    var volume: Double = 1 {
+        didSet {
+            player.volume = Float(volume)
         }
     }
     var backwardSkipInterval: TimeInterval = 15 {
@@ -279,7 +288,7 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         try validatePlayerFormat(for: buffer)
         player.scheduleBuffer(buffer)
-        player.volume = 1
+        player.volume = Float(volume)
         player.play()
         return .seconds(Double(samples.count) / sampleRate)
     }
@@ -296,7 +305,7 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask = nil
         invalidateScheduledAudio()
         engine.pause()
-        player.volume = 1
+        player.volume = Float(volume)
         pcmStore = nil
         frameScheduler = nil
         resetAmplitudeAnalysis(sampleRate: sampleRate)
@@ -312,6 +321,7 @@ final class PlaybackController: BackendPlaybackControlling {
         estimatedDuration = 0
         scheduleOffset = 0
         synthesisIsComplete = false
+        configuredSampleRate = nil
         state = .idle
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }

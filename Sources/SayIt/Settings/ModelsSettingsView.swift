@@ -3,7 +3,10 @@ import SwiftUI
 
 struct ModelsSettingsView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var searchText = ""
+    @State private var isExperimentalExpanded = false
+    @State private var isUnsupportedExpanded = false
     @State private var isShowingCommunityModelSheet = false
 
     var body: some View {
@@ -20,11 +23,69 @@ struct ModelsSettingsView: View {
 
             Divider()
 
-            List(filteredModels) { model in
-                ModelRowView(model: model)
+            List {
+                if !recommendedModels.isEmpty {
+                    Section("Recommended") {
+                        ForEach(recommendedModels) { model in
+                            ModelRowView(model: model)
+                        }
+                    }
+                }
+
+                if !stableModels.isEmpty {
+                    Section("Available") {
+                        ForEach(stableModels) { model in
+                            ModelRowView(model: model)
+                        }
+                    }
+                }
+
+                if !experimentalModels.isEmpty {
+                    if isSearching {
+                        Section("Experimental") {
+                            ForEach(experimentalModels) { model in
+                                ModelRowView(model: model)
+                            }
+                        }
+                    } else {
+                        CollapsibleModelSection(
+                            isExpanded: $isExperimentalExpanded,
+                            models: experimentalModels,
+                            title: "Experimental models",
+                            detail: "May be slow, glitchy, or produce lower-quality speech",
+                            tint: .orange
+                        )
+                    }
+                }
+
+                if !unsupportedModels.isEmpty {
+                    if isSearching {
+                        Section("Not supported") {
+                            ForEach(unsupportedModels) { model in
+                                ModelRowView(model: model)
+                            }
+                        }
+                    } else {
+                        CollapsibleModelSection(
+                            isExpanded: $isUnsupportedExpanded,
+                            models: unsupportedModels,
+                            title: "Not supported",
+                            detail: "Models that cannot run in this version",
+                            tint: .gray
+                        )
+                    }
+                }
             }
+            .animation(
+                reduceMotion ? nil : DesignTokens.smoothAnimation,
+                value: isExperimentalExpanded
+            )
+            .animation(
+                reduceMotion ? nil : DesignTokens.smoothAnimation,
+                value: isUnsupportedExpanded
+            )
             .overlay {
-                if filteredModels.isEmpty {
+                if matchingModels.isEmpty {
                     if searchText.isEmpty {
                         ContentUnavailableView(
                             "No models available",
@@ -67,15 +128,54 @@ struct ModelsSettingsView: View {
         }
     }
 
-    private var filteredModels: [ModelDescriptor] {
-        guard !searchText.isEmpty else { return state.models }
-        return state.models.filter {
-            $0.displayName.localizedStandardContains(searchText)
-                || $0.family.localizedStandardContains(searchText)
+    private var rankedModels: [ModelDescriptor] {
+        state.models.enumerated().sorted { left, right in
+            let leftRank = left.element.experience?.recommendationRank
+                ?? 10_000 + left.offset
+            let rightRank = right.element.experience?.recommendationRank
+                ?? 10_000 + right.offset
+            return leftRank < rightRank
+        }.map(\.element)
+    }
+
+    private var matchingModels: [ModelDescriptor] {
+        guard isSearching else { return rankedModels }
+        return rankedModels.filter {
+            $0.displayName.localizedStandardContains(searchQuery)
+                || $0.family.localizedStandardContains(searchQuery)
+                || ($0.experience?.note?.localizedStandardContains(
+                    searchQuery
+                ) ?? false)
+                || ($0.experience?.speed.displayName
+                    .localizedStandardContains(searchQuery) ?? false)
                 || $0.languages.contains {
-                    $0.localizedStandardContains(searchText)
+                    $0.localizedStandardContains(searchQuery)
                 }
         }
+    }
+
+    private var recommendedModels: [ModelDescriptor] {
+        matchingModels.filter { $0.stability == .recommended }
+    }
+
+    private var experimentalModels: [ModelDescriptor] {
+        matchingModels.filter { $0.stability == .experimental }
+    }
+
+    private var stableModels: [ModelDescriptor] {
+        matchingModels.filter { $0.stability == .stable }
+    }
+
+    private var unsupportedModels: [ModelDescriptor] {
+        matchingModels.filter { $0.stability == .unavailable }
+    }
+
+    private var isSearching: Bool {
+        !searchQuery.isEmpty
+    }
+
+    private var searchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func showCommunityModelSheet() {

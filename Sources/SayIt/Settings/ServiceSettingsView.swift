@@ -88,7 +88,7 @@ struct ServiceSettingsView: View {
                             action: copyBaseURL
                         )
                         .labelStyle(.iconOnly)
-                        .buttonStyle(CircularIconButtonStyle(size: 22))
+                        .buttonStyle(CircularIconButtonStyle())
                     }
                 }
 
@@ -139,20 +139,76 @@ struct ServiceSettingsView: View {
                 )
             }
 
-            Section("Command line") {
+            Section {
                 if let url = state.commandLineToolURL {
-                    LabeledContent("Bundled tool") {
-                        Text(url.path)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-                            .foregroundStyle(.secondary)
+                    switch state.commandLineInstaller.status {
+                    case .installed(let location):
+                        LabeledContent("Command") {
+                            HStack(spacing: 6) {
+                                Label {
+                                    Text(
+                                        state.commandLineInstaller
+                                            .abbreviatedPath(for: location)
+                                    )
+                                } icon: {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                                .foregroundStyle(.secondary)
+                                Button(
+                                    "Reveal in Finder",
+                                    systemImage: "folder"
+                                ) {
+                                    state.commandLineInstaller.revealInFinder(
+                                        location
+                                    )
+                                }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(CircularIconButtonStyle())
+                                .help("Reveal in Finder")
+                                Button(
+                                    "Uninstall",
+                                    systemImage: "trash"
+                                ) {
+                                    state.commandLineInstaller.uninstall(
+                                        toolURL: url
+                                    )
+                                }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(CircularIconButtonStyle())
+                                .help("Uninstall the “sayit” command")
+                            }
+                        }
+                    case .notInstalled:
+                        Button {
+                            state.commandLineInstaller.installWithPanel(
+                                toolURL: url
+                            )
+                        } label: {
+                            Label(
+                                "Install “sayit” Command…",
+                                systemImage: "terminal"
+                            )
+                        }
+                        .buttonStyle(.sayItRow)
                     }
-                    LabeledContent("Link command") {
-                        Text(linkCommand(for: url))
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
-                            .foregroundStyle(.secondary)
+
+                    LabeledContent("Manual command") {
+                        Button(
+                            "Copy",
+                            systemImage: "doc.on.doc"
+                        ) {
+                            copyLinkCommand(for: url)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(CircularIconButtonStyle())
+                        .help("Copy the manual install command")
+                    }
+
+                    if let message = state.commandLineInstaller.errorMessage {
+                        Label(message, systemImage: "exclamationmark.triangle")
+                            .font(.callout)
+                            .foregroundStyle(.red)
                     }
                 } else {
                     Label(
@@ -162,6 +218,12 @@ struct ServiceSettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.red)
                 }
+            } header: {
+                Text("Command line")
+            } footer: {
+                Text(
+                    "Installs a “sayit” link to the bundled tool. Pick a folder in your shell’s PATH, such as ~/.local/bin, or copy the manual command to run in Terminal."
+                )
             }
         }
         .task {
@@ -221,6 +283,7 @@ struct ServiceSettingsView: View {
 
     private func synchronize() {
         state.backgroundService.refresh()
+        state.commandLineInstaller.refresh(against: state.commandLineToolURL)
         synchronizeHTTPSettings()
     }
 
@@ -257,6 +320,11 @@ struct ServiceSettingsView: View {
     private func showTokenCreation() {
         state.clearAPITokenError()
         isCreatingToken = true
+    }
+
+    private func copyLinkCommand(for url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(linkCommand(for: url), forType: .string)
     }
 
     private func linkCommand(for url: URL) -> String {

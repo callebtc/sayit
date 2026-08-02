@@ -36,6 +36,10 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
     public let testedDate: String
     public let isSelectable: Bool
     public let supportsNativeSpeakingPace: Bool
+    public let experienceRecommendationRank: Int?
+    public let experienceSize: String?
+    public let experienceSpeed: String?
+    public let experienceNote: String?
 
     public init(
         id: String,
@@ -72,7 +76,11 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
         testedMLXAudioVersion: String,
         testedDate: String,
         isSelectable: Bool,
-        supportsNativeSpeakingPace: Bool
+        supportsNativeSpeakingPace: Bool,
+        experienceRecommendationRank: Int? = nil,
+        experienceSize: String? = nil,
+        experienceSpeed: String? = nil,
+        experienceNote: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -109,5 +117,9 @@ public struct ModelSnapshot: Codable, Identifiable, Sendable {
         self.testedDate = testedDate
         self.isSelectable = isSelectable
         self.supportsNativeSpeakingPace = supportsNativeSpeakingPace
+        self.experienceRecommendationRank = experienceRecommendationRank
+        self.experienceSize = experienceSize
+        self.experienceSpeed = experienceSpeed
+        self.experienceNote = experienceNote
     }
 }

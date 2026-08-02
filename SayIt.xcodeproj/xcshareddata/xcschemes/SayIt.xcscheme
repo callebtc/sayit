@@ -85,6 +85,20 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F23B43B98E726994A63D9041"
+               BuildableName = "SayItSelectionAgentTests.xctest"
+               BlueprintName = "SayItSelectionAgentTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "E35EC8D6492EC6959B766F93"
                BuildableName = "SayItUpdateTests.xctest"
                BlueprintName = "SayItUpdateTests"
@@ -128,6 +142,17 @@
                BlueprintIdentifier = "95793290520BEA9ABABE8DA0"
                BuildableName = "SayItProtocolTests.xctest"
                BlueprintName = "SayItProtocolTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F23B43B98E726994A63D9041"
+               BuildableName = "SayItSelectionAgentTests.xctest"
+               BlueprintName = "SayItSelectionAgentTests"
                ReferencedContainer = "container:SayIt.xcodeproj">
             </BuildableReference>
          </TestableReference>

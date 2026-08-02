@@ -14,6 +14,7 @@ public enum ServiceCommand: Codable, Sendable {
     case seek(TimeInterval)
     case skip(TimeInterval)
     case setPlaybackRate(Double)
+    case setVolume(Double)
     case models
     case selectModel(String)
     case installModel(String)

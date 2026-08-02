@@ -35,10 +35,11 @@ struct MenuFooterView: View {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "shippingbox")
+                    .imageScale(.small)
                 Text(modelLabel)
                     .lineLimit(1)
             }
-            .font(.caption)
+            .font(.callout)
             .foregroundStyle(.secondary)
         }
         .menuStyle(.borderlessButton)

@@ -63,6 +63,25 @@ public struct ModelCatalogLoader: Sendable {
                     reason: "storage and memory estimates must be positive"
                 )
             }
+            guard model.capabilities.presetVoices == !model.voices.isEmpty else {
+                throw ModelCatalogError.invalidModel(
+                    model.id,
+                    reason: "preset voice capability must match the voice list"
+                )
+            }
+            if let defaultVoice = model.defaultVoice {
+                guard model.voices.contains(defaultVoice) else {
+                    throw ModelCatalogError.invalidModel(
+                        model.id,
+                        reason: "default voice must be present in the voice list"
+                    )
+                }
+            } else if !model.voices.isEmpty {
+                throw ModelCatalogError.invalidModel(
+                    model.id,
+                    reason: "models with preset voices need a default voice"
+                )
+            }
             if model.capabilities.requiresReferenceAudio && model.isSelectable {
                 throw ModelCatalogError.invalidModel(
                     model.id,

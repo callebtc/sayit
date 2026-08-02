@@ -19,10 +19,7 @@ struct PlaybackRateMenu: View {
                 }
             }
         } label: {
-            Label(
-                formattedRate(state.playback.rate),
-                systemImage: "speedometer"
-            )
+            Text(formattedRate(state.playback.rate))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()

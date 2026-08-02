@@ -4,7 +4,7 @@ public enum SynthesisEvent: Sendable {
     case loadingModel(ModelID)
     case modelLoaded(ModelID)
     case creatingArticleVoice
-    case chunkStarted(index: Int, text: String)
+    case chunkStarted(index: Int, chunk: SpeechChunk)
     case audio(AudioChunk)
     case metrics(SynthesisMetrics)
     case completed

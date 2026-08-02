@@ -9,7 +9,7 @@ struct VoiceOnboardingView: View {
         OnboardingPage(
             symbol: "waveform.circle",
             title: "Choose a voice",
-            subtitle: "A compact, multilingual voice model, recommended for this Mac."
+            subtitle: "Start with a voice model we have tested and recommend."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
                 if let model = recommendedModel {
@@ -17,7 +17,7 @@ struct VoiceOnboardingView: View {
                 }
 
                 Button(
-                    "Choose another model…",
+                    "Choose another recommended model…",
                     systemImage: "list.bullet",
                     action: showModelPicker
                 )

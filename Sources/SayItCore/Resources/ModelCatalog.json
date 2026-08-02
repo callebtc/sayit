@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-29",
+  "generatedAt": "2026-08-02",
   "dependencies": [
     {
       "id": "kitten-tts-g2p",
@@ -38,6 +38,55 @@
       "files": [
         {"path": "config.json", "byteCount": 817, "sha256": null},
         {"path": "model.safetensors", "byteCount": 82635688, "sha256": "ba965cc26804861252459556f40fdf8a643b7bf6f0e5d9565674b6a2c2ec3e38"}
+      ]
+    },
+    {
+      "id": "irodori-text-tokenizer",
+      "modelTypes": ["irodori_tts", "irodori"],
+      "repository": "llm-jp/llm-jp-3-150m",
+      "revision": "b112feef602fff752e4dac4c30af6a2c2fa41c7a",
+      "targetSubdirectory": "llm-jp_llm-jp-3-150m",
+      "files": [
+        {"path": "config.json", "byteCount": 680, "sha256": null},
+        {"path": "generation_config.json", "byteCount": 111, "sha256": null},
+        {"path": "special_tokens_map.json", "byteCount": 237, "sha256": null},
+        {"path": "tokenizer.json", "byteCount": 6416433, "sha256": null},
+        {"path": "tokenizer_config.json", "byteCount": 494, "sha256": null}
+      ]
+    },
+    {
+      "id": "qwen3-snac-codec",
+      "modelTypes": [
+        "qwen3", "qwen", "llama_tts", "llama3_tts", "llama3", "llama",
+        "orpheus", "orpheus_tts"
+      ],
+      "repository": "mlx-community/snac_24khz",
+      "revision": "556af1cd3b1c5f2d294f6aa9bb886245d7b716ac",
+      "targetSubdirectory": "mlx-community_snac_24khz",
+      "files": [
+        {"path": "config.json", "byteCount": 300, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 79404951, "sha256": "e61ae2f638f56ee07a37592cd5a6a9e7d642560ddc78a76ee4a7f96d6922f1be"}
+      ]
+    },
+    {
+      "id": "chatterbox-s3-tokenizer",
+      "modelTypes": ["chatterbox", "chatterbox_tts", "chatterbox_turbo"],
+      "repository": "mlx-community/S3TokenizerV2",
+      "revision": "e0c9886f0e1c35ae85b1f27277416fb19fc72bec",
+      "targetSubdirectory": "mlx-community_S3TokenizerV2",
+      "files": [
+        {"path": "config.json", "byteCount": 126, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 494868984, "sha256": "928726bc1f206a613d36b8f49e297eae9c5593a21bf9b92ddfe2c23f85eb92cc"}
+      ]
+    },
+    {
+      "id": "chatterbox-default-conditioning",
+      "modelTypes": ["chatterbox", "chatterbox_tts"],
+      "repository": "mlx-community/chatterbox-fp16",
+      "revision": "4923fcca09086356aeab5191a2348c5a17a23694",
+      "targetSubdirectory": "mlx-community_chatterbox-fp16-default-conditioning",
+      "files": [
+        {"path": "conds.safetensors", "byteCount": 105316, "sha256": "709e5a7fa80e010a011c8244f553853aed7a49c106fff54008fbd89a0f5a6148"}
       ]
     }
   ],
@@ -89,8 +138,14 @@
         "requiresAcceptance": false
       },
       "stability": "recommended",
+      "experience": {
+        "recommendationRank": 1,
+        "size": "small",
+        "speed": "medium-fast",
+        "note": "Best balance of size, speed, and quality."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "kitten-mini-08",
@@ -130,9 +185,65 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 4,
+        "size": "small",
+        "speed": "slow",
+        "note": "Slow generation with lower voice quality."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
+    },
+    {
+      "id": "kitten-nano-08-4bit",
+      "displayName": "Kitten Nano 4-bit",
+      "family": "KittenTTS",
+      "repository": "mlx-community/kitten-tts-nano-0.8-4bit",
+      "revision": "6880e461c24e30da0bbc622070d1370e5c19d8c2",
+      "modelType": "kitten_tts",
+      "parameterCount": "7.6M",
+      "quantization": "4-bit",
+      "languages": ["en"],
+      "voices": ["Bella", "Jasper", "Luna", "Bruno", "Rosie", "Hugo", "Kiki", "Leo"],
+      "defaultVoice": "Jasper",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "progressive",
+      "files": [
+        {"path": "config.json", "byteCount": 2079, "sha256": null},
+        {"path": "model.safetensors", "byteCount": 30266836, "sha256": "44d067f84c8a8ed026b129b9194e1d0cb16beb3e052a413ad6df831c44121513"},
+        {"path": "model.safetensors.index.json", "byteCount": 44352, "sha256": null},
+        {"path": "voices.npz", "byteCount": 3278902, "sha256": "8aa7cee235abb0739cb51e6559685f65a4dacd95568833d05699b1633f519b3f"}
+      ],
+      "estimatedDiskBytes": 34000000,
+      "estimatedPeakMemoryBytes": 750000000,
+      "hardwareTier": "base",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 15,
+        "size": "small",
+        "speed": "medium",
+        "note": "Smallest KittenTTS option; optimized for storage over voice quality."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
     },
     {
       "id": "pocket-tts",
@@ -167,9 +278,15 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 3,
+        "size": "small",
+        "speed": "medium-fast",
+        "note": "Good quality with occasional audio artifacts."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "soprano-11-bf16",
@@ -204,9 +321,15 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "stable",
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 10,
+        "size": "small",
+        "speed": "fast",
+        "note": "Playback compatibility is still being evaluated."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "qwen3-06b-base-8bit",
@@ -222,7 +345,7 @@
       "defaultVoice": null,
       "defaultLanguage": "en",
       "capabilities": {
-        "presetVoices": true,
+        "presetVoices": false,
         "voiceDescription": false,
         "voiceCloning": true,
         "streaming": true,
@@ -241,7 +364,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1100000000,
+      "estimatedDiskBytes": 2000000000,
       "estimatedPeakMemoryBytes": 4700000000,
       "hardwareTier": "high",
       "license": {
@@ -250,9 +373,216 @@
         "commercialUseAllowed": true,
         "requiresAcceptance": false
       },
-      "stability": "experimental",
+      "stability": "recommended",
+      "experience": {
+        "recommendationRank": 2,
+        "size": "medium",
+        "speed": "medium",
+        "note": "Unlimited generated voices and voice cloning."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
+    },
+    {
+      "id": "qwen3-17b-voicedesign-8bit",
+      "displayName": "Qwen3 VoiceDesign",
+      "family": "Qwen3-TTS",
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+      "revision": "f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee",
+      "modelType": "qwen3_tts",
+      "parameterCount": "1.7B",
+      "quantization": "8-bit",
+      "languages": ["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": true,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 3080140867,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 12,
+        "size": "large",
+        "speed": "medium-slow",
+        "note": "Create voices from natural-language descriptions."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
+      "id": "qwen3-17b-customvoice-8bit",
+      "displayName": "Qwen3 CustomVoice",
+      "family": "Qwen3-TTS",
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+      "revision": "41d3337e8b7f2843a75841595fc14e4b9a7a4b96",
+      "modelType": "qwen3_tts",
+      "parameterCount": "1.7B",
+      "quantization": "8-bit",
+      "languages": ["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+      "voices": ["ryan", "aiden", "serena", "vivian", "uncle_fu", "dylan", "eric", "ono_anna", "sohee"],
+      "defaultVoice": "ryan",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 3,
+          "recommendedMinimumDuration": 6,
+          "recommendedMaximumDuration": 10,
+          "maximumDuration": 15,
+          "transcriptRequired": true
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 3080141538,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 13,
+        "size": "large",
+        "speed": "medium-slow",
+        "note": "Nine built-in speakers plus transcript-guided voice cloning."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
+      "id": "chatterbox-turbo-fp16",
+      "displayName": "Chatterbox Turbo",
+      "family": "Chatterbox",
+      "repository": "mlx-community/chatterbox-turbo-fp16",
+      "revision": "b2d0a13aa7cfff0a06d9acb247ae91c8f19a6d75",
+      "modelType": "chatterbox_turbo",
+      "parameterCount": "600M",
+      "quantization": "FP16",
+      "languages": ["en"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 5,
+          "recommendedMinimumDuration": 8,
+          "recommendedMaximumDuration": 12,
+          "maximumDuration": 15,
+          "transcriptRequired": false
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 2987621715,
+      "estimatedPeakMemoryBytes": 5000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/chatterbox-turbo-fp16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 5,
+        "size": "medium",
+        "speed": "medium",
+        "note": "Fast English speech with cloning and expressive event tags."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
+      "id": "chatterbox-multilingual-v3-fp16",
+      "displayName": "Chatterbox Multilingual V3",
+      "family": "Chatterbox",
+      "repository": "mlx-community/chatterbox-fp16",
+      "revision": "4923fcca09086356aeab5191a2348c5a17a23694",
+      "modelType": "chatterbox",
+      "parameterCount": "500M",
+      "quantization": "FP16",
+      "languages": ["ar", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi", "it", "ja", "ko", "ms", "nl", "no", "pl", "pt", "ru", "sv", "sw", "tr", "zh"],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false,
+        "voiceCloneRequirements": {
+          "minimumDuration": 5,
+          "recommendedMinimumDuration": 8,
+          "recommendedMaximumDuration": 12,
+          "maximumDuration": 15,
+          "transcriptRequired": false
+        }
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 2576567676,
+      "estimatedPeakMemoryBytes": 4500000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/chatterbox-fp16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 6,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Twenty-three languages with cross-language voice cloning."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
     },
     {
       "id": "chatterbox-fp16",
@@ -287,7 +617,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1900000000,
+      "estimatedDiskBytes": 3200000000,
       "estimatedPeakMemoryBytes": 4500000000,
       "hardwareTier": "high",
       "license": {
@@ -297,18 +627,24 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 7,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Slow generation and voices may sound unnatural."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "omnivoice",
-      "displayName": "OmniVoice",
+      "displayName": "OmniVoice BF16",
       "family": "OmniVoice",
-      "repository": "mlx-community/OmniVoice",
-      "revision": "defe4bdce0decb321d17e96a4774417be08022ea",
+      "repository": "mlx-community/OmniVoice-bfloat16",
+      "revision": "6119f7072580cc30c3cbdf496269216b03ad9742",
       "modelType": "omnivoice",
-      "parameterCount": "1.3B",
-      "quantization": "MLX",
+      "parameterCount": "0.6B",
+      "quantization": "BF16",
       "languages": ["en"],
       "voices": [],
       "defaultVoice": null,
@@ -333,18 +669,24 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 2700000000,
-      "estimatedPeakMemoryBytes": 6000000000,
+      "estimatedDiskBytes": 2042279124,
+      "estimatedPeakMemoryBytes": 5000000000,
       "hardwareTier": "high",
       "license": {
-        "identifier": "See model card",
-        "url": "https://huggingface.co/mlx-community/OmniVoice",
-        "commercialUseAllowed": false,
-        "requiresAcceptance": true
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/OmniVoice-bfloat16",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 14,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Broad multilingual voice design and cloning with slower diffusion-based generation."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-02"
     },
     {
       "id": "fish-s2-pro-8bit",
@@ -352,7 +694,7 @@
       "family": "Fish Audio",
       "repository": "mlx-community/fish-audio-s2-pro-8bit",
       "revision": "c8d4481b3f7cbfe64d855c8b7cda7739502fc3ff",
-      "modelType": "fish_speech",
+      "modelType": "fish_qwen3_omni",
       "parameterCount": "4B",
       "quantization": "8-bit",
       "languages": ["en", "zh", "ja", "ko"],
@@ -366,7 +708,7 @@
         "streaming": true,
         "longForm": true,
         "languageSelection": true,
-        "requiresReferenceAudio": false,
+        "requiresReferenceAudio": true,
         "voiceDiscovery": true,
         "randomVoiceSampling": true,
         "voiceCloneRequirements": {
@@ -388,9 +730,9 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "irodori-v3-8bit",
@@ -426,8 +768,14 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 11,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Japanese voice design; playback compatibility is still being evaluated."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "vyvo-en-4bit",
@@ -453,7 +801,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 1200000000,
+      "estimatedDiskBytes": 1300000000,
       "estimatedPeakMemoryBytes": 4500000000,
       "hardwareTier": "high",
       "license": {
@@ -463,8 +811,14 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 8,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Glitch-prone output that can sound unstable."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "orpheus-3b-bf16",
@@ -488,9 +842,9 @@
         "languageSelection": false,
         "requiresReferenceAudio": false
       },
-      "playbackMode": "buffered",
+      "playbackMode": "adaptive",
       "files": [],
-      "estimatedDiskBytes": 6200000000,
+      "estimatedDiskBytes": 6700000000,
       "estimatedPeakMemoryBytes": 10000000000,
       "hardwareTier": "high",
       "license": {
@@ -500,8 +854,14 @@
         "requiresAcceptance": true
       },
       "stability": "experimental",
+      "experience": {
+        "recommendationRank": 9,
+        "size": "large",
+        "speed": "slow",
+        "note": "Good voice quality, but slow and occasionally glitchy."
+      },
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "moss-tts",
@@ -527,7 +887,7 @@
       },
       "playbackMode": "buffered",
       "files": [],
-      "estimatedDiskBytes": 5000000000,
+      "estimatedDiskBytes": 23000000000,
       "estimatedPeakMemoryBytes": 9000000000,
       "hardwareTier": "high",
       "license": {
@@ -536,9 +896,54 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
+    },
+    {
+      "id": "orpheus-3b-4bit",
+      "displayName": "Orpheus 4-bit",
+      "family": "Orpheus",
+      "repository": "mlx-community/orpheus-3b-0.1-ft-4bit",
+      "revision": "b30aed4ecfa03c0177a5419b51919d14a105f183",
+      "modelType": "orpheus",
+      "parameterCount": "3B",
+      "quantization": "4-bit",
+      "languages": ["en"],
+      "voices": ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"],
+      "defaultVoice": "tara",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "adaptive",
+      "files": [],
+      "estimatedDiskBytes": 1879911935,
+      "estimatedPeakMemoryBytes": 6000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/orpheus-3b-0.1-ft-4bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 16,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Lower-storage Orpheus option with occasional glitchy output."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
     },
     {
       "id": "marvis-250m-8bit",
@@ -550,11 +955,11 @@
       "parameterCount": "250M",
       "quantization": "8-bit",
       "languages": ["en"],
-      "voices": ["conversational"],
-      "defaultVoice": "conversational",
+      "voices": [],
+      "defaultVoice": null,
       "defaultLanguage": "en",
       "capabilities": {
-        "presetVoices": true,
+        "presetVoices": false,
         "voiceDescription": false,
         "voiceCloning": false,
         "streaming": true,
@@ -573,9 +978,9 @@
         "commercialUseAllowed": false,
         "requiresAcceptance": true
       },
-      "stability": "experimental",
+      "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "index-tts",
@@ -612,7 +1017,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "echo-base",
@@ -649,7 +1054,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     },
     {
       "id": "moss-nano-100m",
@@ -686,7 +1091,7 @@
       },
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
-      "testedDate": "2026-07-29"
+      "testedDate": "2026-08-01"
     }
   ]
 }

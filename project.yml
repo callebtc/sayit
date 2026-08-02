@@ -110,6 +110,7 @@ targets:
       - path: Sources/SayItXPC
     dependencies:
       - target: SayItProtocol
+      - sdk: AppKit.framework
       - sdk: Security.framework
     settings:
       base:
@@ -422,6 +423,20 @@ targets:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.protocol-tests
 
+  SayItSelectionAgentTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/SayItSelectionAgentTests
+    dependencies:
+      - target: SayItProtocol
+      - target: SayItXPC
+      - sdk: AppKit.framework
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.selection-agent-tests
+
   SayItBackendTests:
     type: bundle.unit-test
     platform: macOS
@@ -477,12 +492,32 @@ targets:
         TEST_TARGET_NAME: SayIt
 
 schemes:
+  SayItBackendTests:
+    build:
+      targets:
+        SayItBackendTests: [test]
+    test:
+      config: Debug
+      targets:
+        - SayItBackendTests
+      environmentVariables:
+        SAYIT_MODEL_AUDIT_ALL_VOICES: "$(SAYIT_MODEL_AUDIT_ALL_VOICES)"
+        SAYIT_MODEL_AUDIT_ID: "$(SAYIT_MODEL_AUDIT_ID)"
+        SAYIT_MODEL_AUDIT_LANGUAGE: "$(SAYIT_MODEL_AUDIT_LANGUAGE)"
+        SAYIT_MODEL_AUDIT_OUTPUT: "$(SAYIT_MODEL_AUDIT_OUTPUT)"
+        SAYIT_MODEL_AUDIT_REFERENCE: "$(SAYIT_MODEL_AUDIT_REFERENCE)"
+        SAYIT_MODEL_AUDIT_REFERENCE_TEXT: "$(SAYIT_MODEL_AUDIT_REFERENCE_TEXT)"
+        SAYIT_MODEL_AUDIT_ROOT: "$(SAYIT_MODEL_AUDIT_ROOT)"
+        SAYIT_MODEL_AUDIT_TEXT: "$(SAYIT_MODEL_AUDIT_TEXT)"
+        SAYIT_MODEL_AUDIT_VOICE: "$(SAYIT_MODEL_AUDIT_VOICE)"
+
   SayIt:
     build:
       targets:
         SayIt: all
         SayItCoreTests: [test]
         SayItProtocolTests: [test]
+        SayItSelectionAgentTests: [test]
         SayItBackendTests: [test]
         SayItHTTPTests: [test]
         SayItUpdateTests: [test]
@@ -493,6 +528,7 @@ schemes:
       targets:
         - SayItCoreTests
         - SayItProtocolTests
+        - SayItSelectionAgentTests
         - SayItBackendTests
         - SayItHTTPTests
         - SayItUpdateTests

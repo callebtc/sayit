@@ -2,9 +2,10 @@ import Foundation
 import SayItProtocol
 
 enum SpeechLyricsTimeline {
-    struct Timing: Equatable {
-        let chunkIndex: Int?
-        let fraction: Double
+    enum Timing: Equatable {
+        case chunk(index: Int, fraction: Double)
+        case proportional(fraction: Double)
+        case absolute(TimeInterval)
     }
 
     static func timing(
@@ -13,20 +14,27 @@ enum SpeechLyricsTimeline {
         chunks: [PlaybackTextChunk],
         chunkIndex: inout Int
     ) -> Timing {
+        guard !chunks.isEmpty else {
+            return proportionalTiming(offset: offset, textCount: textCount)
+        }
         while chunkIndex + 1 < chunks.count,
               chunks[chunkIndex + 1].textStart <= offset {
             chunkIndex += 1
         }
-        guard chunks.indices.contains(chunkIndex) else {
-            return proportionalTiming(offset: offset, textCount: textCount)
-        }
+        guard chunks.indices.contains(chunkIndex) else { return .absolute(.infinity) }
         let chunk = chunks[chunkIndex]
-        guard chunk.textStart <= offset, offset <= chunk.textEnd else {
-            return proportionalTiming(offset: offset, textCount: textCount)
+        if offset < chunk.textStart {
+            return .absolute(chunk.audioStart)
+        }
+        guard offset <= chunk.textEnd else {
+            if chunkIndex + 1 < chunks.count {
+                return .absolute(chunks[chunkIndex + 1].audioStart)
+            }
+            return .absolute(.infinity)
         }
         let length = max(chunk.textEnd - chunk.textStart, 1)
-        return Timing(
-            chunkIndex: chunkIndex,
+        return .chunk(
+            index: chunkIndex,
             fraction: min(
                 max(Double(offset - chunk.textStart) / Double(length), 0),
                 1
@@ -39,16 +47,20 @@ enum SpeechLyricsTimeline {
         chunks: [PlaybackTextChunk],
         generatedDuration: TimeInterval
     ) -> TimeInterval {
-        guard let index = timing.chunkIndex else {
-            return timing.fraction * max(generatedDuration, 0)
+        switch timing {
+        case .chunk(let index, let fraction):
+            guard chunks.indices.contains(index) else { return 0 }
+            let chunk = chunks[index]
+            let end = index + 1 < chunks.count
+                ? chunks[index + 1].audioStart
+                : max(generatedDuration, chunk.audioStart)
+            return chunk.audioStart
+                + fraction * max(end - chunk.audioStart, 0.001)
+        case .proportional(let fraction):
+            return fraction * max(generatedDuration, 0)
+        case .absolute(let time):
+            return time
         }
-        guard chunks.indices.contains(index) else { return 0 }
-        let chunk = chunks[index]
-        let end = index + 1 < chunks.count
-            ? chunks[index + 1].audioStart
-            : max(generatedDuration, chunk.audioStart)
-        return chunk.audioStart
-            + timing.fraction * max(end - chunk.audioStart, 0.001)
     }
 
     static func activeWordIndex(
@@ -74,8 +86,7 @@ enum SpeechLyricsTimeline {
         offset: Int,
         textCount: Int
     ) -> Timing {
-        Timing(
-            chunkIndex: nil,
+        .proportional(
             fraction: textCount > 0
                 ? Double(offset) / Double(textCount)
                 : 0

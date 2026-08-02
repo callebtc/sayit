@@ -52,4 +52,20 @@ struct PlaybackSnapshotApplicationTests {
         #expect(!AppState.shouldApplyEvent(id: 7, after: 7))
         #expect(!AppState.shouldApplyEvent(id: 6, after: 7))
     }
+
+    @Test("Volume edits send commands while snapshot application stays silent")
+    func volumeCommandsAndSnapshotSync() {
+        let controller = PlaybackController()
+        var commands: [ServiceCommand] = []
+        controller.commandHandler = { commands.append($0) }
+
+        controller.volume = 1.4
+        #expect(commands.count == 1)
+
+        controller.apply(
+            PlaybackSnapshot(state: "playing", volume: 0.6)
+        )
+        #expect(controller.volume == 0.6)
+        #expect(commands.count == 1)
+    }
 }

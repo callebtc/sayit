@@ -18,11 +18,6 @@ struct MenuBarRootView: View {
                 ServiceRepairView()
                     .padding(DesignTokens.generousSpacing)
                     .transition(.opacity)
-            } else if let progress = state.downloadProgress {
-                Divider()
-                DownloadStatusView(progress: progress)
-                    .padding(DesignTokens.generousSpacing)
-                    .transition(.opacity)
             } else if let error = state.errorMessage {
                 Divider()
                 ErrorStatusView(message: error)
@@ -43,6 +38,9 @@ struct MenuBarRootView: View {
                     chunks: state.playback.spokenChunks,
                     elapsed: state.playback.elapsed,
                     generatedDuration: state.playback.generatedDuration,
+                    showsHighlight: state.playback.state == .playing
+                        || state.playback.state == .paused
+                        || state.playback.state == .finished,
                     showsBlockSeparators:
                         state.settings.showLyricsBlockSeparators,
                     onSeek: state.playback.seek
@@ -78,10 +76,9 @@ struct MenuBarRootView: View {
 
     private var section: Int {
         if state.serviceConnection.showsRepair { return 1 }
-        if state.downloadProgress != nil { return 2 }
-        if state.errorMessage != nil { return 3 }
-        if state.needsLongTextConfirmation { return 4 }
-        if state.playback.state != .idle { return 5 }
-        return 6
+        if state.errorMessage != nil { return 2 }
+        if state.needsLongTextConfirmation { return 3 }
+        if state.playback.state != .idle { return 4 }
+        return 5
     }
 }

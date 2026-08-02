@@ -295,6 +295,7 @@ private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
     var shouldStartWhenBuffered = false
     var showTitleInNowPlaying = false
     var rate: Double = 1
+    var volume: Double = 1
     var backwardSkipInterval: TimeInterval = 15
     var forwardSkipInterval: TimeInterval = 30
 

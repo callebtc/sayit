@@ -2,6 +2,7 @@ import Foundation
 
 public enum SelectionServiceResponse: Codable, Equatable, Sendable {
     case authorizationStatus(isTrusted: Bool)
+    case selectedContent(PasteboardContent)
     case selectedText(String)
     case authorizationRequired
     case noSelection

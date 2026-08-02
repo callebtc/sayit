@@ -21,6 +21,7 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
     public let hardwareTier: HardwareTier
     public let license: ModelLicense
     public let stability: ModelStability
+    public let experience: ModelExperience?
     public let testedMLXAudioVersion: String
     public let testedDate: String
 
@@ -46,7 +47,8 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
         license: ModelLicense,
         stability: ModelStability,
         testedMLXAudioVersion: String,
-        testedDate: String
+        testedDate: String,
+        experience: ModelExperience? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -68,6 +70,7 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
         self.hardwareTier = hardwareTier
         self.license = license
         self.stability = stability
+        self.experience = experience
         self.testedMLXAudioVersion = testedMLXAudioVersion
         self.testedDate = testedDate
     }
@@ -91,5 +94,24 @@ public struct ModelDescriptor: Codable, Identifiable, Equatable, Sendable {
         default:
             false
         }
+    }
+
+    public func inferredLanguage(forPresetVoice voice: String?) -> String? {
+        guard ["kokoro", "kokoro_tts"].contains(modelType.lowercased()),
+              let prefix = voice?.first else {
+            return nil
+        }
+        let languageByPrefix: [Character: String] = [
+            "a": "en-US",
+            "b": "en-GB",
+            "e": "es",
+            "f": "fr",
+            "h": "hi",
+            "i": "it",
+            "j": "ja",
+            "p": "pt",
+            "z": "cmn"
+        ]
+        return languageByPrefix[prefix]
     }
 }

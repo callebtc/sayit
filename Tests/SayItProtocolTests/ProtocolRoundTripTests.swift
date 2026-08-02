@@ -7,6 +7,13 @@ struct ProtocolRoundTripTests {
     func selectionServiceMessagesRoundTripThroughJSON() throws {
         let responses: [SelectionServiceResponse] = [
             .authorizationStatus(isTrusted: true),
+            .selectedContent(
+                PasteboardContent(
+                    html: Data("<p>Selected text</p>".utf8),
+                    richText: Data("rich text".utf8),
+                    plainText: "Selected text"
+                )
+            ),
             .selectedText("Selected text"),
             .authorizationRequired,
             .noSelection,

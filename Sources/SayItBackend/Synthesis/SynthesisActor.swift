@@ -11,6 +11,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let orpheusChunker = TextChunker(
+        targetCharacterCount: 180,
+        hardCharacterLimit: 280
+    )
     private static let operationGate = SynthesisOperationGate()
 
     private struct ActiveOperation: Sendable {
@@ -373,7 +377,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             continuation.yield(
                 .chunkStarted(
                     index: completedChunkCount,
-                    text: chunk.text
+                    chunk: chunk
                 )
             )
 
@@ -583,11 +587,44 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let textProcessor = makeTextProcessor(for: model)
         let candidate: SpeechGenerationModel
         do {
-            candidate = try await TTS.loadModel(
-                modelRepo: modelURL.path,
-                modelType: model.modelType,
-                textProcessor: textProcessor
-            )
+            switch model.modelType.lowercased() {
+            case "omnivoice":
+                let hubCache = ProcessInfo.processInfo.environment[
+                    "HF_HUB_CACHE"
+                ].map {
+                    URL(filePath: $0, directoryHint: .isDirectory)
+                } ?? modelURL.deletingLastPathComponent()
+                let repository = try MLXAudioLocalModelBridge
+                    .repositoryIdentifier(
+                        modelType: model.modelType,
+                        repository: model.repository,
+                        localDirectory: modelURL,
+                        hubCache: hubCache
+                    ) ?? model.repository
+                candidate = try await TTS.loadModel(
+                    modelRepo: repository,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
+            case "kitten", "kitten_tts":
+                try KittenVoiceArchiveConverter.prepareVoices(in: modelURL)
+                candidate = try await TTS.loadModel(
+                    modelRepo: modelURL.path,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
+            case "soprano", "soprano_tts":
+                candidate = try await SopranoModel.fromModelDirectory(
+                    modelURL,
+                    repo: model.repository
+                )
+            default:
+                candidate = try await TTS.loadModel(
+                    modelRepo: modelURL.path,
+                    modelType: model.modelType,
+                    textProcessor: textProcessor
+                )
+            }
         } catch {
             Stream.gpu.synchronize()
             Memory.clearCache()
@@ -691,11 +728,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         for request: SpeechRequest,
         model: SpeechGenerationModel
     ) async throws -> [SpeechChunk] {
+        let separatesParagraphs = request.voiceMode == .randomPerParagraph
         guard let loadedTextProcessor else {
-            return chunker.chunks(for: request.cleanedText.text)
+            return chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            )
         }
 
         switch request.model.modelType.lowercased() {
+        case "orpheus", "orpheus_tts":
+            return Self.orpheusChunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            )
         case "kokoro", "kokoro_tts":
             let language = request.language
                 ?? request.voice.flatMap(
@@ -706,7 +752,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 loadedTextProcessor as? KokoroMultilingualProcessor {
                 try await processor.prepare(for: language)
             }
-            return try chunker.chunks(for: request.cleanedText.text) { text in
+            return try chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            ) { text in
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: language
@@ -720,7 +769,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     .config.plbert.maxPositionEmbeddings
                 ?? 512
             let tokenBudget = max(contextLength - 2, 1)
-            return try chunker.chunks(for: request.cleanedText.text) { text in
+            return try chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            ) { text in
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: request.language
@@ -728,7 +780,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 return processed.count <= tokenBudget
             }
         default:
-            return chunker.chunks(for: request.cleanedText.text)
+            return chunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: separatesParagraphs
+            )
         }
     }
 

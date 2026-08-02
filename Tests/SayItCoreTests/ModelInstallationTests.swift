@@ -15,6 +15,7 @@ struct ModelInstallationTests {
                 strategy: .iso8601
             ),
             dependenciesVerifiedAt: nil,
+            dependenciesFingerprint: "dependency-fingerprint",
             relativePath: "kokoro-bf16/revision"
         )
 

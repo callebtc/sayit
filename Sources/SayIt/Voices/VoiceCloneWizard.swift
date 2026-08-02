@@ -284,14 +284,14 @@ struct VoiceCloneWizard: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
                 VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
-                    Text("READ ALOUD")
+                    Text(recordingPrompt.title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(passage)
+                    Text(recordingPrompt.text)
                         .font(.body)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel("Passage to record")
+                        .accessibilityLabel(recordingPrompt.accessibilityLabel)
                 }
                 .sayItCard()
 
@@ -412,8 +412,8 @@ struct VoiceCloneWizard: View {
         } else {
             Text(
                 recorder.isRecording
-                    ? "Recording — read the passage aloud, then stop."
-                    : "Press the button and read the passage aloud."
+                    ? recordingPrompt.activeInstruction
+                    : recordingPrompt.idleInstruction
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -554,26 +554,6 @@ struct VoiceCloneWizard: View {
 
             if let studio = state.voiceStudio,
                studio.id == currentStudioID {
-                if studio.state == .generating {
-                    VStack(alignment: .leading, spacing: DesignTokens.compactSpacing) {
-                        ProgressView(
-                            value: Double(studio.completedCount),
-                            total: Double(studio.totalCount)
-                        )
-                        .animation(
-                            DesignTokens.smoothAnimation,
-                            value: studio.completedCount
-                        )
-                        Text(
-                            "Generating sample \(min(studio.completedCount + 1, studio.totalCount)) of \(studio.totalCount)…"
-                        )
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(
-                            .numericText(value: Double(studio.completedCount))
-                        )
-                    }
-                }
                 ForEach(studio.candidates) { candidate in
                     HStack(spacing: DesignTokens.standardSpacing) {
                         VoiceFingerprintView(
@@ -610,6 +590,19 @@ struct VoiceCloneWizard: View {
                         .font(.callout)
                         .foregroundStyle(.red)
                         .lineLimit(2)
+                }
+                VoiceGenerationButton(
+                    title: studio.candidates.isEmpty
+                        ? "Generate Samples"
+                        : "Regenerate Samples",
+                    systemImage: "arrow.clockwise",
+                    generatingTitle: "Generating samples…",
+                    isGenerating: studio.state == .generating,
+                    completedCount: studio.completedCount,
+                    totalCount: studio.totalCount,
+                    isDisabled: recorder.isRecording || isSubmitting
+                ) {
+                    Task { await generatePreviews(stayOnStep: true) }
                 }
             } else {
                 HStack(spacing: DesignTokens.compactSpacing) {
@@ -716,12 +709,6 @@ struct VoiceCloneWizard: View {
                 .prominentFooterButton()
                 .disabled(analysis == nil || recorder.isRecording || isSubmitting)
             case .preview:
-                Button("Regenerate") {
-                    Task { await generatePreviews(stayOnStep: true) }
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .disabled(isSubmitting || recorder.isRecording)
                 Button("Save Voice") {
                     Task { await save() }
                 }
@@ -754,6 +741,13 @@ struct VoiceCloneWizard: View {
         VoiceClonePassage.text(
             language: language,
             targetDuration: requirements?.recommendedMaximumDuration ?? 10
+        )
+    }
+
+    private var recordingPrompt: VoiceCloneRecordingPrompt {
+        VoiceCloneRecordingPrompt(
+            passage: passage,
+            transcriptRequired: requirements?.transcriptRequired ?? true
         )
     }
 
@@ -881,9 +875,9 @@ struct VoiceCloneWizard: View {
     }
 
     private var targetSampleRate: Double {
-        selectedModel.modelType.lowercased() == "fish_speech"
-            ? 44_100
-            : 24_000
+        VoiceReferenceFormat.sampleRate(
+            forModelType: selectedModel.modelType
+        )
     }
 
     private func draftReferenceURL(
@@ -917,7 +911,7 @@ struct VoiceCloneWizard: View {
             recordingID: recordingID,
             modelID: selectedModel.id.rawValue,
             language: language,
-            transcript: passage,
+            transcript: recordingPrompt.transcript,
             tuning: tuning
         )
         if await state.startVoiceClone(request) {

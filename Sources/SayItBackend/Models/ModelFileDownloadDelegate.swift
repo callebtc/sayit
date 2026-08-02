@@ -18,8 +18,7 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
     private var resumeDataURL: URL?
     private var transferError: Error?
     private var isCancelled = false
-    private var lastProgressUpdate = ContinuousClock.now
-    private var lastReportedTaskBytes: Int64?
+    private var speedMeter = DownloadSpeedMeter()
 
     init(
         modelID: ModelID,
@@ -88,29 +87,19 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        let now = ContinuousClock.now
-        let reporting = lock.withLock {
-            let interval = lastProgressUpdate.duration(to: now)
-            let seconds = Double(interval.components.seconds)
-                + Double(interval.components.attoseconds) / 1e18
-            guard lastReportedTaskBytes == nil || seconds >= 0.1 else {
-                return (false, Int64(0))
-            }
-            let bytesPerSecond = lastReportedTaskBytes.map {
-                Int64(Double(max(totalBytesWritten - $0, 0)) / max(seconds, 0.001))
-            } ?? 0
-            lastProgressUpdate = now
-            lastReportedTaskBytes = totalBytesWritten
-            return (true, bytesPerSecond)
+        let speed = lock.withLock { () -> Int64? in
+            speedMeter.record(totalBytes: totalBytesWritten)
+                ? speedMeter.bytesPerSecond
+                : nil
         }
-        guard reporting.0 else { return }
+        guard let speed else { return }
         let completed = baseCompletedBytes + totalBytesWritten
         let event = ModelDownloadProgress(
             modelID: modelID,
             state: .downloading,
             completedBytes: completed,
             totalBytes: totalModelBytes,
-            bytesPerSecond: reporting.1
+            bytesPerSecond: speed
         )
         Task {
             await progress(event)

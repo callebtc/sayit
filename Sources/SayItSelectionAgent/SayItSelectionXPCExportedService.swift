@@ -10,31 +10,33 @@ final class SayItSelectionXPCExportedService: NSObject,
         _ request: Data,
         withReply reply: @escaping @Sendable (Data) -> Void
     ) {
-        let response: SelectionServiceResponse
-        do {
-            switch try SayItWireCodec.decode(
-                SelectionServiceRequest.self,
-                from: request
-            ) {
-            case .authorizationStatus:
-                response = .authorizationStatus(
-                    isTrusted: reader.isAuthorized
-                )
-            case .requestAuthorization:
-                response = .authorizationStatus(
-                    isTrusted: reader.requestAuthorization()
-                )
-            case .selectedText:
-                response = reader.selectedText()
+        Task {
+            let response: SelectionServiceResponse
+            do {
+                switch try SayItWireCodec.decode(
+                    SelectionServiceRequest.self,
+                    from: request
+                ) {
+                case .authorizationStatus:
+                    response = .authorizationStatus(
+                        isTrusted: reader.isAuthorized
+                    )
+                case .requestAuthorization:
+                    response = .authorizationStatus(
+                        isTrusted: reader.requestAuthorization()
+                    )
+                case .selectedText:
+                    response = await reader.selectedText()
+                }
+            } catch {
+                response = .unavailable
             }
-        } catch {
-            response = .unavailable
-        }
 
-        guard let data = try? SayItWireCodec.encode(response) else {
-            reply(Data())
-            return
+            guard let data = try? SayItWireCodec.encode(response) else {
+                reply(Data())
+                return
+            }
+            reply(data)
         }
-        reply(data)
     }
 }
