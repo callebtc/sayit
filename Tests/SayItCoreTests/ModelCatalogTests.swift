@@ -16,7 +16,7 @@ struct ModelCatalogTests {
         })
     }
 
-    @Test("Only Kokoro and Qwen are recommended")
+    @Test("Hands-on recommendations lead the ranked catalog")
     func recommendedModelsAndRanking() throws {
         let models = try ModelCatalogLoader().bundledCatalog().models
         let recommended = models
@@ -29,6 +29,8 @@ struct ModelCatalogTests {
         #expect(recommended.map(\.id.rawValue) == [
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
+            "qwen3-17b-customvoice-8bit",
+            "omnivoice",
         ])
 
         let ranked = models
@@ -36,11 +38,13 @@ struct ModelCatalogTests {
                 model.experience.map { ($0.recommendationRank, model.id) }
             }
             .sorted { $0.0 < $1.0 }
-        #expect(ranked.prefix(3).map { $0.1.rawValue } == [
+        #expect(ranked.prefix(4).map { $0.1.rawValue } == [
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
-            "pocket-tts",
+            "qwen3-17b-customvoice-8bit",
+            "omnivoice",
         ])
+        #expect(ranked.map(\.0) == Array(1...ranked.count))
     }
 
     @Test("Legacy unsupported downloads remain unavailable")
@@ -143,7 +147,7 @@ struct ModelCatalogTests {
         let omniVoice = try #require(models["omnivoice"])
         #expect(omniVoice.repository == "mlx-community/OmniVoice-bfloat16")
         #expect(omniVoice.quantization == "BF16")
-        #expect(omniVoice.stability == .experimental)
+        #expect(omniVoice.stability == .recommended)
 
         let kittenNano = try #require(models["kitten-nano-08-4bit"])
         #expect(kittenNano.voices.count == 8)
@@ -165,8 +169,11 @@ struct ModelCatalogTests {
             models["qwen3-17b-voicedesign-8bit"]
         )
         #expect(voiceDesign.capabilities.voiceDescription)
+        #expect(voiceDesign.capabilities.presetVoices)
         #expect(!voiceDesign.capabilities.voiceCloning)
         #expect(!voiceDesign.capabilities.supportsRandomVoiceSampling)
+        #expect(voiceDesign.voices.count == 6)
+        #expect(voiceDesign.defaultVoice == "Warm storyteller")
 
         let customVoice = try #require(
             models["qwen3-17b-customvoice-8bit"]
@@ -175,6 +182,7 @@ struct ModelCatalogTests {
         #expect(customVoice.capabilities.voiceCloning)
         #expect(!customVoice.capabilities.supportsRandomVoiceSampling)
         #expect(customVoice.defaultVoice == "ryan")
+        #expect(customVoice.stability == .recommended)
 
         let chatterboxTurbo = try #require(models["chatterbox-turbo-fp16"])
         #expect(chatterboxTurbo.modelType == "chatterbox_turbo")

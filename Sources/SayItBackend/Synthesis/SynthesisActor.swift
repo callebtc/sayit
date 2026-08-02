@@ -11,9 +11,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
-    private static let orpheusChunker = TextChunker(
-        targetCharacterCount: 180,
-        hardCharacterLimit: 280
+    // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
+    // Short inputs let each request reach EOS instead of truncating mid-block.
+    static let orpheusChunker = TextChunker(
+        targetCharacterCount: 90,
+        hardCharacterLimit: 120
     )
     private static let operationGate = SynthesisOperationGate()
 
@@ -729,6 +731,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         model: SpeechGenerationModel
     ) async throws -> [SpeechChunk] {
         let separatesParagraphs = request.voiceMode == .randomPerParagraph
+        let modelType = request.model.modelType.lowercased()
+        if ["orpheus", "orpheus_tts"].contains(modelType) {
+            return Self.orpheusChunker.chunks(
+                for: request.cleanedText.text,
+                separatesParagraphs: true
+            )
+        }
         guard let loadedTextProcessor else {
             return chunker.chunks(
                 for: request.cleanedText.text,
@@ -736,12 +745,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             )
         }
 
-        switch request.model.modelType.lowercased() {
-        case "orpheus", "orpheus_tts":
-            return Self.orpheusChunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: separatesParagraphs
-            )
+        switch modelType {
         case "kokoro", "kokoro_tts":
             let language = request.language
                 ?? request.voice.flatMap(

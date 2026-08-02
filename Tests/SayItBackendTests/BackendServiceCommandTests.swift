@@ -802,6 +802,9 @@ struct BackendServiceCommandTests {
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: "kokoro-bf16")
         try fixture.seedInstallation(modelID: fixture.seedModelID)
+        try fixture.seedInstallation(
+            modelID: "qwen3-17b-voicedesign-8bit"
+        )
         await fixture.service.start()
         let profileID = try #require(fixture.profileID)
 
@@ -904,6 +907,23 @@ struct BackendServiceCommandTests {
         )
         #expect(localizedLoadFailure == "synthesis.failed")
         #expect(await fixture.synthesizer.requestedLanguages.last == "ja")
+
+        let designedVoiceFailure = try await terminalErrorCode(
+            for: SpeechSubmission(
+                text: "Curated description reaches model loading.",
+                source: .frontend,
+                modelID: "qwen3-17b-voicedesign-8bit",
+                voiceSelection: .preset("Dramatic narrator"),
+                voiceDescription: "This stale custom description is ignored.",
+                permitsLongText: true
+            ),
+            service: fixture.service
+        )
+        #expect(designedVoiceFailure == "synthesis.failed")
+        #expect(
+            await fixture.synthesizer.requestedVoiceDescriptions.last
+                == "Dramatic narrator"
+        )
     }
 
     @Test("Installed models validate and complete voice-studio workflows")
@@ -1567,6 +1587,7 @@ private final class ServiceFixture {
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
     private(set) var requestedLanguages: [String?] = []
+    private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
@@ -1580,6 +1601,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
         requestedModelIDs.append(request.model.id.rawValue)
         requestedLanguages.append(request.language)
+        requestedVoiceDescriptions.append(request.voiceDescription)
         guard synthesizesAudio else {
             return AsyncThrowingStream { continuation in
                 continuation.yield(.loadingModel(request.model.id))

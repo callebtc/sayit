@@ -104,6 +104,10 @@ struct InstalledModelSmokeTests {
             "SAYIT_MODEL_AUDIT_LANGUAGE",
             in: environment
         )
+        let auditVoiceDescription = auditValue(
+            "SAYIT_MODEL_AUDIT_VOICE_DESCRIPTION",
+            in: environment
+        )
 
         for voice in voices {
             let voiceName = voice ?? "none"
@@ -122,7 +126,8 @@ struct InstalledModelSmokeTests {
                 voice: voice,
                 language: language,
                 voiceDescription: model.capabilities.voiceDescription
-                    ? "A calm, clear adult voice with natural pacing."
+                    ? auditVoiceDescription
+                        ?? "A calm, clear adult voice with natural pacing."
                     : nil,
                 voiceMode: voiceReference == nil
                     ? model.capabilities.supportsRandomVoiceSampling
@@ -137,10 +142,19 @@ struct InstalledModelSmokeTests {
             let stream = await synthesizer.synthesize(request)
             var samples: [Float] = []
             var sampleRate = 0.0
+            var synthesizedChunks: [SpeechChunk] = []
+            var chunkDurations: [Double] = []
             for try await event in stream {
-                if case .audio(let chunk) = event {
+                switch event {
+                case .chunkStarted(_, let chunk):
+                    synthesizedChunks.append(chunk)
+                case .audio(let chunk):
                     samples.append(contentsOf: chunk.samples)
                     sampleRate = chunk.sampleRate
+                case .metrics(let metrics):
+                    chunkDurations.append(metrics.audioDuration)
+                default:
+                    break
                 }
             }
 
@@ -192,6 +206,18 @@ struct InstalledModelSmokeTests {
                     samples: samples,
                     sampleRate: sampleRate,
                     destination: outputURL
+                )
+                let diagnostics = synthesizedChunks.enumerated().map {
+                    index, chunk in
+                    let duration = chunkDurations.indices.contains(index)
+                        ? chunkDurations[index]
+                        : 0
+                    return "\(chunk.id)\t\(chunk.text.count)\t\(duration)\t\(chunk.text)"
+                }.joined(separator: "\n")
+                try diagnostics.write(
+                    to: outputURL.appendingPathExtension("chunks.txt"),
+                    atomically: true,
+                    encoding: .utf8
                 )
                 print("MODEL_AUDIT_OUTPUT path=\(outputURL.path)")
             }

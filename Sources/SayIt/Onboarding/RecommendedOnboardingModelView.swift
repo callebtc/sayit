@@ -9,7 +9,7 @@ struct RecommendedOnboardingModelView: View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
             HStack(alignment: .firstTextBaseline) {
                 Label(
-                    "\(model.displayName) · \(model.defaultVoice ?? "")",
+                    "\(model.displayName) · \(voiceLabel)",
                     systemImage: "speaker.wave.2.fill"
                 )
                 .font(.headline)
@@ -88,5 +88,15 @@ struct RecommendedOnboardingModelView: View {
 
     private func selectModel() {
         state.selectModel(model)
+    }
+
+    private var voiceLabel: String {
+        if let defaultVoice = model.defaultVoice {
+            defaultVoice
+        } else if model.capabilities.voiceDescription {
+            "Designed voice"
+        } else {
+            "Generated voice"
+        }
     }
 }

@@ -13,7 +13,11 @@ struct VoiceSelectionPicker: View {
         HStack(spacing: DesignTokens.compactSpacing) {
             Picker("Voice", selection: $selection) {
                 if !model.capabilities.supportsRandomVoiceSampling {
-                    Text("Automatic")
+                    Text(
+                        model.capabilities.voiceDescription
+                            ? "Custom description"
+                            : "Automatic"
+                    )
                         .tag(VoiceSelection.automaticStable)
                 }
 
