@@ -901,6 +901,51 @@
       "testedDate": "2026-08-01"
     },
     {
+      "id": "orpheus-3b-4bit",
+      "displayName": "Orpheus 4-bit",
+      "family": "Orpheus",
+      "repository": "mlx-community/orpheus-3b-0.1-ft-4bit",
+      "revision": "b30aed4ecfa03c0177a5419b51919d14a105f183",
+      "modelType": "orpheus",
+      "parameterCount": "3B",
+      "quantization": "4-bit",
+      "languages": ["en"],
+      "voices": ["tara", "leah", "jess", "leo", "dan", "mia", "zac", "zoe"],
+      "defaultVoice": "tara",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false,
+        "voiceDiscovery": false,
+        "randomVoiceSampling": false
+      },
+      "playbackMode": "adaptive",
+      "files": [],
+      "estimatedDiskBytes": 1879911935,
+      "estimatedPeakMemoryBytes": 6000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/mlx-community/orpheus-3b-0.1-ft-4bit",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 16,
+        "size": "medium",
+        "speed": "medium-slow",
+        "note": "Lower-storage Orpheus option with occasional glitchy output."
+      },
+      "testedMLXAudioVersion": "0.1.3",
+      "testedDate": "2026-08-02"
+    },
+    {
       "id": "marvis-250m-8bit",
       "displayName": "Marvis",
       "family": "Marvis TTS",
