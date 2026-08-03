@@ -18,11 +18,20 @@ struct SelectionAccessSettingsView: View {
                     .foregroundStyle(.secondary)
 
                     if state.selectionService.accessibilityIsTrusted != true {
-                        Button(
-                            "Allow…",
-                            action: state.requestSelectionAccessibilityAccess
-                        )
-                        .disabled(state.selectionService.isWorking)
+                        if state.selectionService.accessibilityIsTrusted == false {
+                            Button(
+                                "Open Settings…",
+                                action: state
+                                    .openSelectionAccessibilitySettings
+                            )
+                        } else {
+                            Button(
+                                "Allow…",
+                                action: state
+                                    .requestSelectionAccessibilityAccess
+                            )
+                            .disabled(state.selectionService.isWorking)
+                        }
                     }
                     if state.selectionService.requiresLoginItemApproval {
                         Button(

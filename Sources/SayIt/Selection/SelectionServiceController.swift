@@ -1,3 +1,4 @@
+import AppKit
 import Observation
 import SayItCore
 import SayItProtocol
@@ -103,6 +104,15 @@ final class SelectionServiceController {
 
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    func openAccessibilitySettings() -> Bool {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else {
+            return false
+        }
+        return NSWorkspace.shared.open(url)
     }
 
     private func perform(_ work: () async throws -> Void) async {

@@ -18,7 +18,13 @@ struct ErrorStatusView: View {
             HStack {
                 Button("Dismiss", action: state.clearError)
                 Spacer()
-                if state.installedModelIDs.isEmpty {
+                if let recoveryAction = state.errorRecoveryAction {
+                    Button(
+                        recoveryAction.buttonTitle,
+                        action: state.performErrorRecovery
+                    )
+                    .buttonStyle(.borderedProminent)
+                } else if state.installedModelIDs.isEmpty {
                     Button("Choose a model", action: openOnboarding)
                         .buttonStyle(.borderedProminent)
                 }
