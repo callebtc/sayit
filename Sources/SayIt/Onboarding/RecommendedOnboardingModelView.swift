@@ -52,29 +52,41 @@ struct RecommendedOnboardingModelView: View {
                         .controlSize(.small)
                 }
             }
-        } else if state.requestedModelInstallID == model.id {
+        } else if state.requestedModelInstallID == model.id
+                    || (state.isCancelingModelInstall
+                        && state.downloadProgress == nil) {
             HStack(spacing: DesignTokens.compactSpacing) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Starting download…")
+                Text(
+                    state.isCancelingModelInstall
+                        ? "Canceling download…"
+                        : "Starting download…"
+                )
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                Spacer()
+                if !state.isCancelingModelInstall {
+                    Button("Cancel", action: state.cancelModelInstall)
+                        .controlSize(.small)
+                }
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
         } else if let progress = state.downloadProgress,
                   progress.modelID == model.id {
             OnboardingModelDownloadView(
                 progress: progress,
                 modelName: model.displayName
             )
-        } else if state.downloadProgress == nil,
-                  state.requestedModelInstallID == nil {
+        } else {
             HStack {
                 Spacer()
                 Button("Download \(model.displayName)", action: downloadModel)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(!state.isServiceOnline)
+                    .disabled(
+                        !state.isServiceOnline || state.modelInstallIsBusy
+                    )
             }
         }
     }

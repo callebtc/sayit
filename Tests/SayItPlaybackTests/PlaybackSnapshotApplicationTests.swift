@@ -53,6 +53,14 @@ struct PlaybackSnapshotApplicationTests {
         #expect(!AppState.shouldApplyEvent(id: 6, after: 7))
     }
 
+    @Test("Completed onboarding stays dismissed without requiring a model")
+    func completedOnboardingStaysDismissed() {
+        #expect(
+            !AppState.shouldPresentOnboarding(onboardingComplete: true)
+        )
+        #expect(AppState.shouldPresentOnboarding(onboardingComplete: false))
+    }
+
     @Test("Volume edits send commands while snapshot application stays silent")
     func volumeCommandsAndSnapshotSync() {
         let controller = PlaybackController()

@@ -30,6 +30,8 @@ public final class SayItBackendService: SayItService {
     private var installedModelIDs: Set<ModelID> = []
     private var downloadProgress: ModelDownloadProgress?
     private var downloadTask: Task<Void, Never>?
+    private var downloadSequence: UInt64 = 0
+    private var cancelingDownloadSequence: UInt64?
     private var modelInstallError: ModelInstallErrorSnapshot?
     private var jobTask: Task<Void, Never>?
     private var modelTransitionTask: Task<Void, Error>?
@@ -75,14 +77,20 @@ public final class SayItBackendService: SayItService {
         directories: AppDirectories,
         serviceVersion: String = "0.1.0",
         playback: any BackendPlaybackControlling,
-        synthesizer: (any BackendSpeechSynthesizing)? = nil
+        synthesizer: (any BackendSpeechSynthesizing)? = nil,
+        catalogOverride: ModelCatalog? = nil,
+        modelManagerOverride: ModelManager? = nil
     ) throws {
         self.directories = directories
         self.serviceVersion = serviceVersion
         self.playback = playback
         setenv("HF_HUB_CACHE", directories.hubCache.path, 1)
 
-        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let catalog = if let catalogOverride {
+            catalogOverride
+        } else {
+            try ModelCatalogLoader().bundledCatalog()
+        }
         let settingsStore = BackendSettingsStore(
             directory: directories.applicationSupport
         )
@@ -92,7 +100,7 @@ public final class SayItBackendService: SayItService {
         let history = try HistoryStore(directories: directories)
         let voiceProfiles = VoiceProfileStore(directories: directories)
         let tokenStore = KeychainTokenStore()
-        let manager = ModelManager(
+        let manager = modelManagerOverride ?? ModelManager(
             catalog: catalog,
             directories: directories,
             activeModelID: ModelID(settingsStore.value.activeModelID),
@@ -2303,7 +2311,7 @@ public final class SayItBackendService: SayItService {
                 message: "Another model download is already in progress."
             )
         }
-        guard models.contains(where: { $0.id == id }) else {
+        guard let model = models.first(where: { $0.id == id }) else {
             throw ServiceFailure(
                 code: "model.not_found",
                 message: "The requested model was not found."
@@ -2311,17 +2319,37 @@ public final class SayItBackendService: SayItService {
         }
         errorMessage = nil
         modelInstallError = nil
+        downloadSequence &+= 1
+        let sequence = downloadSequence
+        cancelingDownloadSequence = nil
+        downloadProgress = ModelDownloadProgress(
+            modelID: id,
+            state: .queued,
+            completedBytes: 0,
+            totalBytes: model.downloadByteCount,
+            bytesPerSecond: 0
+        )
+        statusText = "Preparing model download"
+        revision &+= 1
         downloadTask = Task { [weak self] in
             guard let self else { return }
             do {
                 try await self.modelManager.install(id) { progress in
-                    await self.setDownloadProgress(progress)
+                    await self.setDownloadProgress(
+                        progress,
+                        sequence: sequence
+                    )
                 }
-                await self.finishInstall(id)
+                try Task.checkCancellation()
+                try await self.finishInstall(id, sequence: sequence)
             } catch is CancellationError {
-                self.finishCanceledInstall()
+                self.finishCanceledInstall(id, sequence: sequence)
             } catch {
-                self.finishFailedInstall(error, modelID: id)
+                self.finishFailedInstall(
+                    error,
+                    modelID: id,
+                    sequence: sequence
+                )
             }
         }
     }
@@ -2384,13 +2412,16 @@ public final class SayItBackendService: SayItService {
         guard let current = downloadProgress else { return }
         guard downloadTask != nil else {
             downloadProgress = nil
+            modelInstallError = nil
             statusText = "Ready to speak"
             revision &+= 1
             return
         }
+        guard cancelingDownloadSequence != downloadSequence else { return }
+        cancelingDownloadSequence = downloadSequence
         downloadProgress = ModelDownloadProgress(
             modelID: current.modelID,
-            state: .paused,
+            state: .canceling,
             completedBytes: current.completedBytes,
             totalBytes: current.totalBytes,
             bytesPerSecond: 0
@@ -2399,7 +2430,7 @@ public final class SayItBackendService: SayItService {
         Task {
             await modelManager.cancelInstall(current.modelID)
         }
-        statusText = "Download paused"
+        statusText = "Canceling model download"
         revision &+= 1
     }
 
@@ -2437,57 +2468,120 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
-    private func setDownloadProgress(_ progress: ModelDownloadProgress) {
-        downloadProgress = progress
-        statusText = progress.state == .verifying
-            ? "Verifying model"
+    private func setDownloadProgress(
+        _ progress: ModelDownloadProgress,
+        sequence: UInt64
+    ) {
+        guard sequence == downloadSequence,
+              cancelingDownloadSequence != sequence,
+              downloadTask != nil else {
+            return
+        }
+        let visibleProgress = if progress.state == .installed {
+            ModelDownloadProgress(
+                modelID: progress.modelID,
+                state: .verifying,
+                completedBytes: progress.completedBytes,
+                totalBytes: progress.totalBytes,
+                bytesPerSecond: 0
+            )
+        } else {
+            progress
+        }
+        downloadProgress = visibleProgress
+        statusText = visibleProgress.state == .verifying
+            ? "Finishing model setup"
             : "Downloading model"
         revision &+= 1
     }
 
-    private func finishInstall(_ id: ModelID) async {
-        if let model = models.first(where: { $0.id == id }) {
-            do {
-                try await synthesizer.prepareDependencies(for: model)
-                try await modelManager.markDependenciesVerified(id)
-            } catch {
-                finishFailedInstall(error, modelID: id)
-                return
-            }
+    private func finishInstall(
+        _ id: ModelID,
+        sequence: UInt64
+    ) async throws {
+        guard sequence == downloadSequence else { return }
+        if let current = downloadProgress {
+            downloadProgress = ModelDownloadProgress(
+                modelID: id,
+                state: .verifying,
+                completedBytes: current.completedBytes,
+                totalBytes: current.totalBytes,
+                bytesPerSecond: 0
+            )
+            statusText = "Finishing model setup"
+            revision &+= 1
         }
+        if let model = models.first(where: { $0.id == id }) {
+            try Task.checkCancellation()
+            try await synthesizer.prepareDependencies(for: model)
+            try Task.checkCancellation()
+            try await modelManager.markDependenciesVerified(id)
+        }
+        try Task.checkCancellation()
+        guard sequence == downloadSequence else { return }
         installedModelIDs = await modelManager.installedModelIDs()
         models = await modelManager.models()
         modelsRevision &+= 1
         downloadTask = nil
         downloadProgress = nil
+        cancelingDownloadSequence = nil
         modelInstallError = nil
         statusText = "Ready to speak"
         revision &+= 1
     }
 
-    private func finishCanceledInstall() {
+    private func finishCanceledInstall(
+        _ id: ModelID,
+        sequence: UInt64
+    ) {
+        guard sequence == downloadSequence else { return }
+        let current = downloadProgress
         downloadTask = nil
+        cancelingDownloadSequence = nil
+        downloadProgress = ModelDownloadProgress(
+            modelID: id,
+            state: .paused,
+            completedBytes: current?.completedBytes ?? 0,
+            totalBytes: current?.totalBytes ?? 0,
+            bytesPerSecond: 0
+        )
         statusText = "Download paused"
         revision &+= 1
     }
 
-    private func finishFailedInstall(_ error: Error, modelID: ModelID) {
+    private func finishFailedInstall(
+        _ error: Error,
+        modelID: ModelID,
+        sequence: UInt64
+    ) {
+        guard sequence == downloadSequence else { return }
+        let current = downloadProgress
         downloadTask = nil
-        downloadProgress = nil
+        cancelingDownloadSequence = nil
+        downloadProgress = ModelDownloadProgress(
+            modelID: modelID,
+            state: .failed,
+            completedBytes: current?.completedBytes ?? 0,
+            totalBytes: current?.totalBytes ?? 0,
+            bytesPerSecond: 0
+        )
         modelInstallError = ModelInstallErrorSnapshot(
             modelID: modelID.rawValue,
             message: error.localizedDescription
         )
-        statusText = "Ready to speak"
+        statusText = "Model download failed"
         revision &+= 1
-        Task {
-            await diagnostics.record(
+        Task { [weak self] in
+            guard let self else { return }
+            await self.diagnostics.record(
                 DiagnosticEvent(
                     severity: .error,
                     category: .download,
                     code: "model.install_failed"
                 )
             )
+            self.diagnosticsRevision &+= 1
+            self.revision &+= 1
         }
     }
 

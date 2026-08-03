@@ -53,6 +53,7 @@ actor ModelManager: ModelManaging {
         _ id: ModelID,
         progress: @escaping ProgressHandler
     ) async throws {
+        try Task.checkCancellation()
         guard activeInstallID == nil else {
             throw ModelManagerError.anotherDownloadIsActive
         }
@@ -88,7 +89,11 @@ actor ModelManager: ModelManaging {
             activeInstallID = nil
             activeInstallTask = nil
         }
-        try await task.value
+        try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     func cancelInstall(_ id: ModelID) {

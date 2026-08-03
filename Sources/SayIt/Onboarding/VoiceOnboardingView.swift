@@ -9,7 +9,7 @@ struct VoiceOnboardingView: View {
         OnboardingPage(
             symbol: "waveform.circle",
             title: "Choose a voice",
-            subtitle: "Start with a voice model we have tested and recommend."
+            subtitle: "Start with a tested voice model, or set one up later in Settings."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
                 if let model = recommendedModel {

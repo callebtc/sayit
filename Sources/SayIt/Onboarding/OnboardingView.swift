@@ -36,12 +36,6 @@ struct OnboardingView: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .keyboardShortcut(.defaultAction)
-                        .disabled(nextButtonIsDisabled)
-                        .help(
-                            nextButtonIsDisabled
-                                ? "Download a voice model to continue"
-                                : ""
-                        )
                 }
             }
             .padding(DesignTokens.generousSpacing)
@@ -52,12 +46,14 @@ struct OnboardingView: View {
         .onDisappear(perform: state.onboardingWindowDidClose)
     }
 
-    private var nextButtonIsDisabled: Bool {
-        step == .voice && state.installedModelIDs.isEmpty
-    }
-
     private var nextButtonTitle: String {
-        step == .anywhere ? "Finish" : "Continue"
+        if step == .anywhere {
+            "Finish"
+        } else if step == .voice && state.installedModelIDs.isEmpty {
+            "Continue Without a Model"
+        } else {
+            "Continue"
+        }
     }
 
     private func goBack() {

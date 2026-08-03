@@ -113,31 +113,46 @@ struct ModelRowView: View {
                         ProgressView()
                             .controlSize(.small)
                         Text("Starting…")
+                        Button(
+                            "Cancel",
+                            systemImage: "xmark",
+                            action: state.cancelModelInstall
+                        )
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(CircularIconButtonStyle())
                     }
                     .foregroundStyle(.secondary)
-                    .accessibilityElement(children: .combine)
+                    .accessibilityElement(children: .contain)
                     .accessibilityLabel("Starting model download")
                 } else if let progress = state.downloadProgress,
                           progress.modelID == model.id {
                     HStack(spacing: DesignTokens.compactSpacing) {
-                        ProgressView(value: progress.fractionCompleted)
-                            .frame(width: 76)
-                            .accessibilityLabel(
-                                "\(model.displayName) download"
-                            )
-                            .accessibilityValue(
-                                Text(
-                                    progress.fractionCompleted,
-                                    format: .percent
+                        if showsDeterminateProgress(progress) {
+                            ProgressView(value: progress.fractionCompleted)
+                                .frame(width: 76)
+                                .accessibilityLabel(
+                                    "\(model.displayName) download"
+                                )
+                                .accessibilityValue(
+                                    Text(
+                                        progress.fractionCompleted,
+                                        format: .percent
+                                    )
+                                )
+                            Text(
+                                progress.fractionCompleted,
+                                format: .percent.precision(
+                                    .fractionLength(0)
                                 )
                             )
-                        Text(
-                            progress.fractionCompleted,
-                            format: .percent.precision(
-                                .fractionLength(0)
-                            )
-                        )
-                        .monospacedDigit()
+                            .monospacedDigit()
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 76)
+                            Text(statusTitle(for: progress.state))
+                                .foregroundStyle(.secondary)
+                        }
                         if progress.state == .downloading {
                             Text(
                                 "\(progress.bytesPerSecond, format: .byteCount(style: .file))/s"
@@ -161,8 +176,9 @@ struct ModelRowView: View {
                             )
                             .labelStyle(.iconOnly)
                             .buttonStyle(CircularIconButtonStyle())
-                            .help("Discard the download")
-                        } else {
+                            .help("Dismiss the download")
+                        } else if [.queued, .downloading, .verifying]
+                            .contains(progress.state) {
                             Button(
                                 "Cancel",
                                 systemImage: "xmark",
@@ -185,10 +201,7 @@ struct ModelRowView: View {
                 } else {
                     Button("Download", action: downloadModel)
                         .buttonStyle(.borderedProminent)
-                        .disabled(
-                            isDownloadActive
-                                || state.requestedModelInstallID != nil
-                        )
+                        .disabled(state.modelInstallIsBusy)
                 }
             }
         }
@@ -202,16 +215,6 @@ struct ModelRowView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var isDownloadActive: Bool {
-        guard let progress = state.downloadProgress else { return false }
-        switch progress.state {
-        case .queued, .downloading, .verifying:
-            return true
-        case .notInstalled, .paused, .installed, .failed:
-            return false
-        }
-    }
-
     private var statusSymbol: String {
         if !model.isSelectable {
             "lock.circle"
@@ -219,6 +222,32 @@ struct ModelRowView: View {
             "checkmark.circle.fill"
         } else {
             "arrow.down.circle"
+        }
+    }
+
+    private func showsDeterminateProgress(
+        _ progress: ModelDownloadProgress
+    ) -> Bool {
+        switch progress.state {
+        case .downloading, .paused, .failed:
+            true
+        case .notInstalled, .queued, .canceling, .verifying, .installed:
+            false
+        }
+    }
+
+    private func statusTitle(for state: ModelInstallationState) -> String {
+        switch state {
+        case .notInstalled:
+            "Waiting"
+        case .queued:
+            "Starting…"
+        case .canceling:
+            "Canceling…"
+        case .verifying, .installed:
+            "Finishing…"
+        case .downloading, .paused, .failed:
+            "Downloading…"
         }
     }
 

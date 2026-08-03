@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SayItCore
 import SayItProtocol
@@ -538,6 +539,137 @@ struct BackendServiceCommandTests {
                 )
             ).isEmpty
         )
+    }
+
+    @Test("Model downloads cancel, fail, restart, and finish setup before install")
+    func modelDownloadCancellationAndRestart() async throws {
+        let modelConfig = Data(#"{"model_type":"qwen3_tts"}"#.utf8)
+        let modelWeights = Data([1, 2, 3, 4])
+        let model = downloadTestModel(
+            config: modelConfig,
+            weights: modelWeights
+        )
+        let catalog = ModelCatalog(
+            schemaVersion: 1,
+            generatedAt: "test",
+            models: [model]
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RestartableDownloadURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        RestartableDownloadURLProtocol.setHandler { _ in nil }
+        let dependencyGate = DependencyPreparationGate()
+        let fixture = try ServiceFixture(
+            downloadCatalog: catalog,
+            downloadSession: session,
+            dependencyPreparationGate: dependencyGate
+        )
+        defer { fixture.remove() }
+        await fixture.service.start()
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .installModel(model.id.rawValue))
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.download?.state
+                == ModelInstallationState.downloading.rawValue
+        }
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .cancelModelInstall)
+                )
+            )
+        )
+        let paused = try await waitForServiceSnapshot(fixture.service) {
+            $0.download?.state == ModelInstallationState.paused.rawValue
+        }
+        #expect(paused.installedModelIDs.isEmpty)
+
+        RestartableDownloadURLProtocol.setHandler { request in
+            (
+                HTTPURLResponse(
+                    url: request.url ?? URL(string: "about:blank")!,
+                    statusCode: 503,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: nil
+                )!,
+                Data()
+            )
+        }
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .installModel(model.id.rawValue))
+                )
+            )
+        )
+        let failed = try await waitForServiceSnapshot(fixture.service) {
+            $0.download?.state == ModelInstallationState.failed.rawValue
+        }
+        #expect(failed.modelInstallError?.modelID == model.id.rawValue)
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .cancelModelInstall)
+                )
+            )
+        )
+        let dismissed = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(dismissed.download == nil)
+        #expect(dismissed.modelInstallError == nil)
+
+        RestartableDownloadURLProtocol.setHandler { request in
+            let data = request.url?.lastPathComponent == "config.json"
+                ? modelConfig
+                : modelWeights
+            return (
+                HTTPURLResponse(
+                    url: request.url ?? URL(string: "about:blank")!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Length": "\(data.count)"]
+                )!,
+                data
+            )
+        }
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .installModel(model.id.rawValue))
+                )
+            )
+        )
+
+        for _ in 0..<400 {
+            if await dependencyGate.hasEntered { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(await dependencyGate.hasEntered)
+        let finishing = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(
+            finishing.download?.state
+                == ModelInstallationState.verifying.rawValue
+        )
+        #expect(finishing.download?.completedBytes == model.downloadByteCount)
+        #expect(finishing.installedModelIDs.isEmpty)
+
+        await dependencyGate.release()
+        let completed = try await waitForServiceSnapshot(fixture.service) {
+            $0.download == nil
+                && $0.installedModelIDs.contains(model.id.rawValue)
+        }
+        #expect(completed.statusText == "Ready to speak")
     }
 
     @Test("Saved voice and history commands cover complete local lifecycles")
@@ -1423,7 +1555,10 @@ private final class ServiceFixture {
 
     init(
         seedVoiceAndHistory: Bool = false,
-        synthesizesAudio: Bool = false
+        synthesizesAudio: Bool = false,
+        downloadCatalog: ModelCatalog? = nil,
+        downloadSession: URLSession? = nil,
+        dependencyPreparationGate: DependencyPreparationGate? = nil
     ) throws {
         root = FileManager.default.temporaryDirectory.appending(
             path: "SayItServiceTests-\(UUID().uuidString)",
@@ -1441,13 +1576,27 @@ private final class ServiceFixture {
         }
         playback = RecordingBackendPlayback()
         synthesizer = DeterministicSynthesizer(
-            synthesizesAudio: synthesizesAudio
+            synthesizesAudio: synthesizesAudio,
+            dependencyPreparationGate: dependencyPreparationGate
         )
+        let modelManager: ModelManager?
+        if let downloadCatalog {
+            modelManager = ModelManager(
+                catalog: downloadCatalog,
+                directories: directories,
+                activeModelID: ModelID("active"),
+                session: downloadSession ?? .shared
+            )
+        } else {
+            modelManager = nil
+        }
         service = try SayItBackendService(
             directories: directories,
             serviceVersion: "test-version",
             playback: playback,
-            synthesizer: synthesizer
+            synthesizer: synthesizer,
+            catalogOverride: downloadCatalog,
+            modelManagerOverride: modelManager
         )
     }
 
@@ -1591,9 +1740,14 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
+    private let dependencyPreparationGate: DependencyPreparationGate?
 
-    init(synthesizesAudio: Bool = false) {
+    init(
+        synthesizesAudio: Bool = false,
+        dependencyPreparationGate: DependencyPreparationGate? = nil
+    ) {
         self.synthesizesAudio = synthesizesAudio
+        self.dependencyPreparationGate = dependencyPreparationGate
     }
 
     func synthesize(
@@ -1650,7 +1804,11 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         idleUnloadDelay _: Double
     ) async {}
 
-    func prepareDependencies(for _: ModelDescriptor) async throws {}
+    func prepareDependencies(for _: ModelDescriptor) async throws {
+        if let dependencyPreparationGate {
+            await dependencyPreparationGate.wait()
+        }
+    }
 
     func generateVoiceSample(
         model _: ModelDescriptor,
@@ -1928,6 +2086,144 @@ private func waitForVoiceStudioState(
     Issue.record("Voice studio did not reach \(state.rawValue)")
 }
 
+@MainActor
+private func waitForServiceSnapshot(
+    _ service: SayItBackendService,
+    matching predicate: (ServiceSnapshot) -> Bool
+) async throws -> ServiceSnapshot {
+    for _ in 0..<400 {
+        let current = try snapshot(
+            await service.handle(.init(command: .snapshot))
+        )
+        if predicate(current) {
+            return current
+        }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    throw TestResponseError.timedOut
+}
+
+private actor DependencyPreparationGate {
+    private(set) var hasEntered = false
+    private var isReleased = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        hasEntered = true
+        guard !isReleased else { return }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func release() {
+        isReleased = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private final class RestartableDownloadURLProtocol: URLProtocol,
+    @unchecked Sendable {
+    typealias Handler = @Sendable (URLRequest) -> (HTTPURLResponse, Data)?
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var handler: Handler?
+
+    static func setHandler(_ newHandler: @escaping Handler) {
+        lock.withLock {
+            handler = newHandler
+        }
+    }
+
+    override class func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(
+        for request: URLRequest
+    ) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        let result = Self.lock.withLock {
+            Self.handler?(request)
+        }
+        guard let (response, data) = result else { return }
+        client?.urlProtocol(
+            self,
+            didReceive: response,
+            cacheStoragePolicy: .notAllowed
+        )
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private func downloadTestModel(
+    config: Data,
+    weights: Data
+) -> ModelDescriptor {
+    ModelDescriptor(
+        id: ModelID("download-lifecycle"),
+        displayName: "Download Lifecycle",
+        family: "Tests",
+        repository: "tests/download-lifecycle",
+        revision: "revision",
+        modelType: "qwen3_tts",
+        parameterCount: "1",
+        quantization: "none",
+        languages: ["en"],
+        voices: ["test-voice"],
+        defaultVoice: "test-voice",
+        defaultLanguage: "en",
+        capabilities: ModelCapabilities(
+            presetVoices: true,
+            voiceDescription: false,
+            voiceCloning: false,
+            streaming: false,
+            longForm: true,
+            languageSelection: true,
+            requiresReferenceAudio: false
+        ),
+        playbackMode: .buffered,
+        files: [
+            ModelFileDescriptor(
+                path: "config.json",
+                byteCount: Int64(config.count),
+                sha256: downloadSHA256(config)
+            ),
+            ModelFileDescriptor(
+                path: "model.safetensors",
+                byteCount: Int64(weights.count),
+                sha256: downloadSHA256(weights)
+            )
+        ],
+        estimatedDiskBytes: Int64(config.count + weights.count),
+        estimatedPeakMemoryBytes: 1,
+        hardwareTier: .base,
+        license: ModelLicense(
+            identifier: "test",
+            url: URL(string: "https://example.invalid")!,
+            commercialUseAllowed: true,
+            requiresAcceptance: false
+        ),
+        stability: .stable,
+        testedMLXAudioVersion: "test",
+        testedDate: "test"
+    )
+}
+
+private func downloadSHA256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { byte in
+        String(byte, radix: 16).leftPadding(toLength: 2, withPad: "0")
+    }.joined()
+}
+
 private enum TestResponseError: Error {
     case unexpected
+    case timedOut
 }

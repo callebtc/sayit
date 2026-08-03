@@ -90,6 +90,57 @@ struct ModelManagerTests {
         #expect(await removableManager.installedURL(for: model.id) == nil)
     }
 
+    @Test("Cancellation before install setup does not leave an active download")
+    func cancellationBeforeInstallSetup() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+        defer { fixture.remove() }
+        let config = Data(#"{"model_type":"qwen3_tts"}"#.utf8)
+        let weights = Data([1])
+        let model = makeModel(
+            id: "cancel-before-start",
+            revision: "revision",
+            files: [
+                ModelFileDescriptor(
+                    path: "config.json",
+                    byteCount: Int64(config.count),
+                    sha256: sha256(config)
+                ),
+                ModelFileDescriptor(
+                    path: "model.safetensors",
+                    byteCount: Int64(weights.count),
+                    sha256: sha256(weights)
+                )
+            ]
+        )
+        let manager = ModelManager(
+            catalog: makeCatalog(models: [model]),
+            directories: fixture.directories,
+            activeModelID: ModelID("active")
+        )
+        let staging = fixture.directories.downloads.appending(
+            path: "cancel-before-start-revision.partial"
+        )
+        try FileManager.default.createDirectory(
+            at: staging,
+            withIntermediateDirectories: true
+        )
+        try config.write(to: staging.appending(path: "config.json"))
+        try weights.write(to: staging.appending(path: "model.safetensors"))
+
+        let canceledInstall = Task {
+            withUnsafeCurrentTask { task in
+                task?.cancel()
+            }
+            try await manager.install(model.id)
+        }
+        await #expect(throws: CancellationError.self) {
+            try await canceledInstall.value
+        }
+
+        try await manager.install(model.id)
+        #expect(await manager.installedModelIDs() == [model.id])
+    }
+
     @Test("Install and selection reject unknown, unavailable, and invalid snapshots")
     func installValidationFailures() async throws {
         let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")

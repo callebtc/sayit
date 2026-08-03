@@ -28,6 +28,8 @@ final class AppState {
     private var settingsPushTask: Task<Void, Never>?
     private var modelSelectionTask: Task<Void, Never>?
     private var modelSelectionGeneration: UInt64 = 0
+    private var modelInstallRequestTask: Task<Void, Never>?
+    private var modelInstallRequestGeneration: UInt64 = 0
     private var serviceRepairTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
@@ -42,6 +44,7 @@ final class AppState {
     private(set) var downloadProgress: ModelDownloadProgress?
     private(set) var modelInstallError: (modelID: ModelID, message: String)?
     private(set) var requestedModelInstallID: ModelID?
+    private(set) var isCancelingModelInstall = false
     private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
     private(set) var needsLongTextConfirmation = false
@@ -66,7 +69,9 @@ final class AppState {
     private init() {
         settings = AppSettings()
         models = (try? ModelCatalogLoader().bundledCatalog().models) ?? []
-        isShowingOnboarding = !settings.onboardingComplete
+        isShowingOnboarding = Self.shouldPresentOnboarding(
+            onboardingComplete: settings.onboardingComplete
+        )
         settings.onBackendChange = { [weak self] in
             self?.scheduleBackendSettingsPush()
         }
@@ -283,22 +288,51 @@ final class AppState {
             )
             return
         }
-        guard requestedModelInstallID == nil else { return }
+        guard !modelInstallIsBusy else { return }
 
         modelInstallError = nil
+        if let downloadProgress,
+           [.paused, .failed].contains(downloadProgress.state) {
+            self.downloadProgress = nil
+        }
         modelIDToSelectAfterInstallation =
             selectAfterInstallation ? id : nil
         requestedModelInstallID = id
-        Task {
+        modelInstallRequestGeneration &+= 1
+        let generation = modelInstallRequestGeneration
+        let task = Task { [weak self] in
+            guard let self else { return }
             do {
                 let response = try await send(.installModel(id.rawValue))
                 try requireSuccess(response)
+                guard generation == modelInstallRequestGeneration else {
+                    return
+                }
+                modelInstallRequestTask = nil
             } catch {
+                guard generation == modelInstallRequestGeneration else {
+                    return
+                }
                 modelIDToSelectAfterInstallation = nil
                 requestedModelInstallID = nil
+                modelInstallRequestTask = nil
+                let totalBytes = models.first(where: { $0.id == id })
+                    .map { downloadByteCount(for: $0) } ?? 0
+                downloadProgress = ModelDownloadProgress(
+                    modelID: id,
+                    state: .failed,
+                    completedBytes: 0,
+                    totalBytes: totalBytes,
+                    bytesPerSecond: 0
+                )
+                modelInstallError = (
+                    modelID: id,
+                    message: error.localizedDescription
+                )
                 presentError(error.localizedDescription)
             }
         }
+        modelInstallRequestTask = task
     }
 
     func downloadByteCount(for model: ModelDescriptor) -> Int64 {
@@ -306,9 +340,64 @@ final class AppState {
     }
 
     func cancelModelInstall() {
+        guard !isCancelingModelInstall else { return }
+        guard requestedModelInstallID != nil || downloadProgress != nil else {
+            return
+        }
+        let installRequestTask = modelInstallRequestTask
+        modelInstallRequestGeneration &+= 1
+        modelInstallRequestTask = nil
         modelIDToSelectAfterInstallation = nil
         requestedModelInstallID = nil
-        perform(.cancelModelInstall)
+        isCancelingModelInstall = true
+        if let progress = downloadProgress {
+            downloadProgress = ModelDownloadProgress(
+                modelID: progress.modelID,
+                state: .canceling,
+                completedBytes: progress.completedBytes,
+                totalBytes: progress.totalBytes,
+                bytesPerSecond: 0
+            )
+        }
+        Task { [weak self] in
+            await installRequestTask?.value
+            guard let self else { return }
+            do {
+                let response = try await send(.cancelModelInstall)
+                try requireSuccess(response)
+                try await reloadServiceSnapshot()
+            } catch {
+                if let progress = downloadProgress,
+                   progress.state == .canceling {
+                    downloadProgress = ModelDownloadProgress(
+                        modelID: progress.modelID,
+                        state: .failed,
+                        completedBytes: progress.completedBytes,
+                        totalBytes: progress.totalBytes,
+                        bytesPerSecond: 0
+                    )
+                    modelInstallError = (
+                        modelID: progress.modelID,
+                        message: error.localizedDescription
+                    )
+                }
+                presentError(error.localizedDescription)
+            }
+            isCancelingModelInstall = false
+        }
+    }
+
+    var modelInstallIsBusy: Bool {
+        if requestedModelInstallID != nil || isCancelingModelInstall {
+            return true
+        }
+        guard let downloadProgress else { return false }
+        switch downloadProgress.state {
+        case .queued, .downloading, .canceling, .verifying, .installed:
+            return true
+        case .notInstalled, .paused, .failed:
+            return false
+        }
     }
 
     func selectModel(_ model: ModelDescriptor) {
@@ -581,7 +670,6 @@ final class AppState {
     }
 
     func finishOnboarding() {
-        guard !installedModelIDs.isEmpty else { return }
         settings.onboardingComplete = true
         isShowingOnboarding = false
     }
@@ -930,6 +1018,12 @@ final class AppState {
         id > revision
     }
 
+    nonisolated static func shouldPresentOnboarding(
+        onboardingComplete: Bool
+    ) -> Bool {
+        !onboardingComplete
+    }
+
     private func reloadServiceSnapshot() async throws {
         let response = try await send(.snapshot)
         guard case .snapshot(let snapshot) = response else {
@@ -968,6 +1062,10 @@ final class AppState {
         modelInstallError = snapshot.modelInstallError.map {
             (modelID: ModelID($0.modelID), message: $0.message)
         }
+        if let modelInstallError,
+           modelIDToSelectAfterInstallation == modelInstallError.modelID {
+            modelIDToSelectAfterInstallation = nil
+        }
 
         if backendSettings != snapshot.settings {
             backendSettings = snapshot.settings
@@ -978,8 +1076,9 @@ final class AppState {
                 snapshot.settings.showNowPlayingTitles
         }
 
-        isShowingOnboarding = installedModelIDs.isEmpty
-            || !settings.onboardingComplete
+        isShowingOnboarding = Self.shouldPresentOnboarding(
+            onboardingComplete: settings.onboardingComplete
+        )
 
         if lastModelsRevision != snapshot.modelsRevision {
             lastModelsRevision = snapshot.modelsRevision

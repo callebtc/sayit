@@ -18,6 +18,8 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
     private var resumeDataURL: URL?
     private var transferError: Error?
     private var isCancelled = false
+    private var didSaveResumeData = false
+    private var progressTask: Task<Void, Never>?
     private var speedMeter = DownloadSpeedMeter()
 
     init(
@@ -77,6 +79,10 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
         }
         task?.cancel { [weak self] resumeData in
             self?.saveResumeData(resumeData)
+            self?.finishCancellationIfNeeded()
+        }
+        if task == nil {
+            finishCancellationIfNeeded()
         }
     }
 
@@ -101,8 +107,13 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
             totalBytes: totalModelBytes,
             bytesPerSecond: speed
         )
-        Task {
-            await progress(event)
+        lock.withLock {
+            let previous = progressTask
+            progressTask = Task {
+                await previous?.value
+                guard !Task.isCancelled else { return }
+                await progress(event)
+            }
         }
         _ = session
         _ = downloadTask
@@ -153,27 +164,73 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
             let finalError = isCancelled
                 ? CancellationError()
                 : transferError ?? error
-            return (continuation, finalError)
+            return (continuation, finalError, progressTask)
         }
         session.finishTasksAndInvalidate()
 
         guard let continuation = completion.0 else { return }
-        if let error = completion.1 {
-            continuation.resume(throwing: error)
-        } else if let response = task.response {
-            continuation.resume(returning: response)
-        } else {
-            continuation.resume(throwing: URLError(.badServerResponse))
-        }
+        resume(
+            continuation,
+            response: task.response,
+            error: completion.1,
+            after: completion.2
+        )
     }
 
     private func saveResumeData(_ data: Data?) {
-        guard let data,
-              let destination = lock.withLock({
-                  resumeDataURL
-              }) else {
+        guard let data else {
             return
         }
+        let destination = lock.withLock { () -> URL? in
+            guard !didSaveResumeData else { return nil }
+            didSaveResumeData = true
+            return resumeDataURL
+        }
+        guard let destination else { return }
         try? data.write(to: destination, options: .atomic)
+    }
+
+    private func finishCancellationIfNeeded() {
+        let completion: (
+            CheckedContinuation<URLResponse, Error>,
+            URLSession?,
+            Task<Void, Never>?
+        )? = lock.withLock {
+            guard isCancelled, let continuation else { return nil }
+            self.continuation = nil
+            let session = downloadSession
+            downloadTask = nil
+            downloadSession = nil
+            return (continuation, session, progressTask)
+        }
+        guard let completion else { return }
+        completion.1?.invalidateAndCancel()
+        completion.2?.cancel()
+        resume(
+            completion.0,
+            response: nil,
+            error: CancellationError(),
+            after: nil
+        )
+    }
+
+    private func resume(
+        _ continuation: CheckedContinuation<URLResponse, Error>,
+        response: URLResponse?,
+        error: Error?,
+        after progressTask: Task<Void, Never>?
+    ) {
+        Task {
+            await progressTask?.value
+            if let error {
+                continuation.resume(throwing: error)
+            } else if let response {
+                continuation.resume(returning: response)
+            } else {
+                continuation.resume(
+                    throwing: URLError(.badServerResponse)
+                )
+            }
+        }
     }
 }
