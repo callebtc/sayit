@@ -44,6 +44,7 @@ final class AppState {
     private(set) var requestedModelInstallID: ModelID?
     private(set) var statusText = "Connecting to service"
     private(set) var errorMessage: String?
+    private(set) var errorRecoveryAction: AppErrorRecoveryAction?
     private(set) var needsLongTextConfirmation = false
     private(set) var diagnosticEvents: [DiagnosticEvent] = []
     private(set) var serviceSnapshot: ServiceSnapshot?
@@ -135,18 +136,42 @@ final class AppState {
                 )
                 receive(payload)
             } catch {
-                presentError(error.localizedDescription)
+                presentError(
+                    error.localizedDescription,
+                    recoveryAction: (error as? SelectionServiceError)?
+                        .recoveryAction
+                )
             }
         }
     }
 
     func refreshSelectionAccessibilityAccess() async {
         await selectionService.refreshAuthorization()
+        clearAccessibilityErrorIfAuthorized()
     }
 
     func requestSelectionAccessibilityAccess() {
         Task {
             await selectionService.requestAuthorization()
+            clearAccessibilityErrorIfAuthorized()
+        }
+    }
+
+    func performErrorRecovery() {
+        guard let errorRecoveryAction else { return }
+        switch errorRecoveryAction {
+        case .openAccessibilitySettings:
+            openSelectionAccessibilitySettings()
+        }
+    }
+
+    func openSelectionAccessibilitySettings() {
+        guard selectionService.openAccessibilitySettings() else {
+            presentError(
+                "Accessibility Settings couldn’t be opened. Open System Settings, choose Privacy & Security, then Accessibility.",
+                recoveryAction: .openAccessibilitySettings
+            )
+            return
         }
     }
 
@@ -570,14 +595,27 @@ final class AppState {
         }
     }
 
-    func presentError(_ message: String) {
+    func presentError(
+        _ message: String,
+        recoveryAction: AppErrorRecoveryAction? = nil
+    ) {
         errorMessage = message
+        errorRecoveryAction = recoveryAction
         statusText = "Needs attention"
     }
 
     func clearError() {
         errorMessage = nil
+        errorRecoveryAction = nil
         perform(.clearError)
+    }
+
+    private func clearAccessibilityErrorIfAuthorized() {
+        guard selectionService.accessibilityIsTrusted == true,
+              errorRecoveryAction == .openAccessibilitySettings else {
+            return
+        }
+        clearError()
     }
 
     func finishOnboarding() {
@@ -946,8 +984,14 @@ final class AppState {
         lastServiceRevision = snapshot.revision
         serviceSnapshot = snapshot
         serviceConnection = .online(version: snapshot.serviceVersion)
-        statusText = snapshot.statusText
-        errorMessage = snapshot.lastError
+        if let serviceError = snapshot.lastError {
+            statusText = snapshot.statusText
+            errorMessage = serviceError
+            errorRecoveryAction = nil
+        } else if errorRecoveryAction == nil {
+            statusText = snapshot.statusText
+            errorMessage = nil
+        }
         httpAPIErrorMessage = snapshot.httpServiceError
         needsLongTextConfirmation =
             snapshot.activeJob?.state == .awaitingConfirmation

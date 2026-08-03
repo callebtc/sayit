@@ -277,6 +277,7 @@
 		94E614AD286A5262C7EAFD39 /* BackendPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9041E9369BA31A0007824D /* BackendPersistenceTests.swift */; };
 		95C03B8BF70FFF18F99B80F8 /* SpeechItemState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD51CABBD6A4B66774A1984 /* SpeechItemState.swift */; };
 		969D61B2F282C219FF951296 /* DiagnosticSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8F4DCDC453E07A4518905B /* DiagnosticSnapshot.swift */; };
+		975420AF9C82FB50C0F04794 /* AppErrorRecoveryAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F6AEFFFEB026A11B8235D5 /* AppErrorRecoveryAction.swift */; };
 		97FFD241C34F9894CF4E8B9E /* SynthesisOperationLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40828984E8B5F3F75C795F92 /* SynthesisOperationLifecycleTests.swift */; };
 		980814CF3D25517505F78C03 /* SayItHTTP.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		98E075B62EF1F0140D7056EF /* SayItStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB95F4768AD968BE1C4CBCD1 /* SayItStyles.swift */; };
@@ -1051,6 +1052,7 @@
 		A42DE1A1821373642D9C83EC /* VoiceDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDiscoveryView.swift; sourceTree = "<group>"; };
 		A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadProgress.swift; sourceTree = "<group>"; };
 		A5E69C5B004A8649EF5386AF /* ExportKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportKind.swift; sourceTree = "<group>"; };
+		A7F6AEFFFEB026A11B8235D5 /* AppErrorRecoveryAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorRecoveryAction.swift; sourceTree = "<group>"; };
 		A7FD50F093D897C5794716C1 /* ModelManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManaging.swift; sourceTree = "<group>"; };
 		A89BAB57F71A7F5E2FBB982E /* SayIt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayIt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A8C3FAB8E768F21BF7E8DFA3 /* SayItAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayItAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1363,6 +1365,7 @@
 			isa = PBXGroup;
 			children = (
 				9D05793EC7DD8A6AD63C5EB8 /* AppDelegate.swift */,
+				A7F6AEFFFEB026A11B8235D5 /* AppErrorRecoveryAction.swift */,
 				6A47804F46DFB604995541E6 /* AppSettings.swift */,
 				D47CAB42068B3B8CA73B1C23 /* AppState.swift */,
 				233AA2BFB1498E7AE7F086BC /* AppWindowCoordinator.swift */,
@@ -3009,6 +3012,7 @@
 				1B7DE382603E96F6DCFE8250 /* AboutSettingsView.swift in Sources */,
 				1499573C719AFE565957C8DE /* AnywhereOnboardingView.swift in Sources */,
 				45E5E96E262A16E29BC0B1C3 /* AppDelegate.swift in Sources */,
+				975420AF9C82FB50C0F04794 /* AppErrorRecoveryAction.swift in Sources */,
 				50F000C6F5AC706BD4EBD9E1 /* AppSettings.swift in Sources */,
 				FFDA6AAAF51DAC39E8D32853 /* AppState.swift in Sources */,
 				B5677AD3CAE8F0FB0A6430A0 /* AppWindowCoordinator.swift in Sources */,

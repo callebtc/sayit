@@ -11,7 +11,7 @@ enum SelectionServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .accessibilityRequired:
-            "Allow Accessibility access for the selected-text helper, then press the shortcut again."
+            "Accessibility access is off. Allow the Say It selected-text helper in Accessibility Settings, then press the shortcut again."
         case .noSelection:
             "No readable text is selected in the frontmost app."
         case .selectionTooLong(let maximumCharacters):
@@ -22,6 +22,15 @@ enum SelectionServiceError: LocalizedError {
             "Allow the Say It selected-text helper in Login Items."
         case .helperUnavailable:
             "The selected-text helper is unavailable."
+        }
+    }
+
+    var recoveryAction: AppErrorRecoveryAction? {
+        switch self {
+        case .accessibilityRequired:
+            .openAccessibilitySettings
+        default:
+            nil
         }
     }
 }
