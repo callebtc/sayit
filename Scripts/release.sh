@@ -113,23 +113,43 @@ xcrun notarytool history \
     --keychain-profile "$SAYIT_NOTARY_PROFILE" \
     --output-format json >/dev/null
 
-if [ "$skip_tests" = "NO" ]; then
-    echo "Running tests…"
-    mkdir -p "$module_cache" "$swiftpm_cache"
-    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-    CLANG_MODULE_CACHE_PATH="$module_cache" \
-    SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
-    XDG_CACHE_HOME="$swiftpm_cache" \
-        xcrun swift test --disable-sandbox
-else
-    echo "Skipping tests because SAYIT_SKIP_TESTS=YES."
-fi
-
 echo "Building the signed release app…"
 SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
 SAYIT_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
 SAYIT_UPDATE_API_URL="$SAYIT_UPDATE_API_URL" \
     "$project_root/Scripts/build-app.sh"
+
+if [ "$skip_tests" = "NO" ]; then
+    echo "Running tests…"
+    mkdir -p "$module_cache" "$swiftpm_cache"
+
+    app_metallib="$app_root/Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+    [ -f "$app_metallib" ] \
+        || fail "the signed app is missing the MLX Metal library required by tests."
+    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+    CLANG_MODULE_CACHE_PATH="$module_cache" \
+    SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
+    XDG_CACHE_HOME="$swiftpm_cache" \
+        xcrun swift build --build-tests
+    swiftpm_bin_path=$(xcrun swift build --show-bin-path)
+    test_executable="$swiftpm_bin_path/SayItPackageTests.xctest/Contents/MacOS/SayItPackageTests"
+    [ -x "$test_executable" ] \
+        || fail "the SwiftPM test executable is missing."
+    test_metallib="$(dirname "$test_executable")/mlx.metallib"
+    cp "$app_metallib" "$test_metallib"
+
+    if ! DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+        CLANG_MODULE_CACHE_PATH="$module_cache" \
+        SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
+        XDG_CACHE_HOME="$swiftpm_cache" \
+            xcrun swift test --disable-sandbox --skip-build; then
+        rm -f "$test_metallib"
+        fail "the Swift test suite failed."
+    fi
+    rm -f "$test_metallib"
+else
+    echo "Skipping tests because SAYIT_SKIP_TESTS=YES."
+fi
 
 version=$(
     /usr/libexec/PlistBuddy \

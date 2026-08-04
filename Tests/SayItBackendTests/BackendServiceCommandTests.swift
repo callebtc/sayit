@@ -365,13 +365,14 @@ struct BackendServiceCommandTests {
         let ranges = fixture.playback.spokenChunks.map {
             $0.textStart..<$0.textEnd
         }
+        let spokenText = fixture.playback.spokenText
         let spokenWords = ranges.flatMap { range in
-            let lower = text.index(
-                text.startIndex,
+            let lower = spokenText.index(
+                spokenText.startIndex,
                 offsetBy: range.lowerBound
             )
-            let upper = text.index(lower, offsetBy: range.count)
-            return text[lower..<upper]
+            let upper = spokenText.index(lower, offsetBy: range.count)
+            return spokenText[lower..<upper]
                 .split(whereSeparator: \.isWhitespace)
         }
         #expect(ranges.count == 1)
