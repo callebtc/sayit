@@ -27,27 +27,70 @@ version=$(
 dmg_path="${SAYIT_LOCAL_DMG_PATH:-$build_root/SayIt-$version-local.dmg}"
 
 staging=$(mktemp -d "${TMPDIR:-/tmp}/sayit-local-dmg.XXXXXX")
+mountpoint="$staging/mount"
+content="$staging/content"
+read_write_dmg="$staging/SayIt-rw.dmg"
+mounted=NO
 cleanup() {
+    if [ "$mounted" = "YES" ]; then
+        hdiutil detach "$mountpoint" >/dev/null 2>&1 || true
+    fi
     rm -rf "$staging"
 }
 trap cleanup EXIT
 
+mkdir -p "$content" "$mountpoint"
 ditto \
     --norsrc \
     --noextattr \
     --noqtn \
     --noacl \
     "$app_root" \
-    "$staging/Say It.app"
-ln -s /Applications "$staging/Applications"
-xattr -cr "$staging"
+    "$content/Say It.app"
+ln -s /Applications "$content/Applications"
+xattr -cr "$content"
 
 COPYFILE_DISABLE=1 hdiutil create \
     -volname "Say It" \
-    -srcfolder "$staging" \
-    -format UDZO \
+    -srcfolder "$content" \
+    -format UDRW \
     -ov \
-    "$dmg_path"
+    "$read_write_dmg"
+
+hdiutil attach \
+    -readwrite \
+    -noverify \
+    -noautoopen \
+    -mountpoint "$mountpoint" \
+    "$read_write_dmg" >/dev/null
+mounted=YES
+
+osascript "$project_root/Scripts/style-dmg.applescript" "$mountpoint"
+sync
+
+# Writable APFS images may pick up host filesystem metadata while Finder saves
+# the window layout. Keep only the intentional installer contents.
+case "$mountpoint" in
+    "$staging"/mount) ;;
+    *)
+        echo "Refusing to clean an unexpected DMG mount point." >&2
+        exit 1
+        ;;
+esac
+rm -rf \
+    "$mountpoint/.fseventsd" \
+    "$mountpoint/.Spotlight-V100" \
+    "$mountpoint/.Trashes"
+
+hdiutil detach "$mountpoint" >/dev/null
+mounted=NO
+
+hdiutil convert \
+    "$read_write_dmg" \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    -ov \
+    -o "$dmg_path" >/dev/null
 
 if [ -n "$dmg_sign_identity" ]; then
     code_sign_flags=

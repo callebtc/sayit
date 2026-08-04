@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1430"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      runPostActionsOnFailure = "NO">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
+               BuildableName = "SayItBackendTests.xctest"
+               BlueprintName = "SayItBackendTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "NO"
+      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
+            BuildableName = "SayItBackendTests.xctest"
+            BlueprintName = "SayItBackendTests"
+            ReferencedContainer = "container:SayIt.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
+               BuildableName = "SayItBackendTests.xctest"
+               BlueprintName = "SayItBackendTests"
+               ReferencedContainer = "container:SayIt.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_ALL_VOICES"
+            value = "$(SAYIT_MODEL_AUDIT_ALL_VOICES)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_ID"
+            value = "$(SAYIT_MODEL_AUDIT_ID)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_LANGUAGE"
+            value = "$(SAYIT_MODEL_AUDIT_LANGUAGE)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_OUTPUT"
+            value = "$(SAYIT_MODEL_AUDIT_OUTPUT)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_REFERENCE"
+            value = "$(SAYIT_MODEL_AUDIT_REFERENCE)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_REFERENCE_TEXT"
+            value = "$(SAYIT_MODEL_AUDIT_REFERENCE_TEXT)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_ROOT"
+            value = "$(SAYIT_MODEL_AUDIT_ROOT)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_TEXT"
+            value = "$(SAYIT_MODEL_AUDIT_TEXT)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_VOICE"
+            value = "$(SAYIT_MODEL_AUDIT_VOICE)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "SAYIT_MODEL_AUDIT_VOICE_DESCRIPTION"
+            value = "$(SAYIT_MODEL_AUDIT_VOICE_DESCRIPTION)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
+            BuildableName = "SayItBackendTests.xctest"
+            BlueprintName = "SayItBackendTests"
+            ReferencedContainer = "container:SayIt.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "76FCBBBD58375040CFAEC740"
+            BuildableName = "SayItBackendTests.xctest"
+            BlueprintName = "SayItBackendTests"
+            ReferencedContainer = "container:SayIt.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
