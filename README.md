@@ -105,6 +105,10 @@ number of concurrent build operations. Signed release builds keep whole-module
 optimization; set `SAYIT_SWIFT_COMPILATION_MODE=wholemodule` to reproduce that
 behavior in an ad-hoc local build.
 
+Local builds are written to `Build/DerivedData-Local`; signed builds use
+`Build/DerivedData-Release`. The build stops if the app at its selected output
+path is still running, so quit Say It before rebuilding it.
+
 For a stable Accessibility grant across Debug rebuilds, set
 `SAYIT_SELECTION_SIGN_IDENTITY` to the same Apple Development signing identity
 used for the app. The build does not select a certificate from your keychain
@@ -118,7 +122,9 @@ The release workflow is automated, but publishing to GitHub is deliberately
 separate. The script builds and tests the app, applies Developer ID signatures
 with secure timestamps, creates the DMG, submits it to Apple's notarization
 service, staples the ticket, mounts the result, and audits its signatures and
-contents.
+contents. Before packaging, it also launches the signed app in a non-interactive
+smoke-test mode and verifies the production selected-text helper over XPC
+without requesting Accessibility access.
 
 One time only:
 

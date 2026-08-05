@@ -91,6 +91,14 @@ final class SelectionServiceController {
         }
     }
 
+    func verifyXPCConnection() async throws {
+        try await ensureRunning()
+        let response = try await client.send(.authorizationStatus)
+        guard case .authorizationStatus = response else {
+            throw SelectionServiceError.helperUnavailable
+        }
+    }
+
     func terminateForQuit() async {
         await client.invalidate()
         #if DEBUG || SAYIT_LOCAL_BUILD

@@ -3,7 +3,8 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 build_root="$project_root/Build"
-app_root="$build_root/DerivedData/Build/Products/Release/SayIt.app"
+derived_data="$build_root/DerivedData-Release"
+app_root="$derived_data/Build/Products/Release/SayIt.app"
 module_cache="$build_root/ModuleCache"
 swiftpm_cache="$build_root/SwiftPMCache"
 local_config="$project_root/.env.release"
@@ -94,7 +95,7 @@ if [ "$allow_notarization_upload" != "YES" ]; then
     exit 2
 fi
 
-for command_name in codesign git hdiutil security shasum swift xcodegen xcrun; do
+for command_name in codesign git hdiutil pgrep security shasum swift xcodegen xcrun; do
     command -v "$command_name" >/dev/null 2>&1 \
         || fail "required command is unavailable: $command_name"
 done
@@ -115,6 +116,7 @@ xcrun notarytool history \
 
 echo "Building the signed release app…"
 SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
+SAYIT_DERIVED_DATA_PATH="$derived_data" \
 SAYIT_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
 SAYIT_UPDATE_API_URL="$SAYIT_UPDATE_API_URL" \
     "$project_root/Scripts/build-app.sh"
@@ -150,6 +152,10 @@ if [ "$skip_tests" = "NO" ]; then
 else
     echo "Skipping tests because SAYIT_SKIP_TESTS=YES."
 fi
+
+echo "Testing the selected-text helper XPC connection…"
+SAYIT_APP_PATH="$app_root" \
+    "$project_root/Scripts/smoke-test-selection-xpc.sh"
 
 version=$(
     /usr/libexec/PlistBuddy \

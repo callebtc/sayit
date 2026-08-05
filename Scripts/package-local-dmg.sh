@@ -3,7 +3,7 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 build_root="$project_root/Build"
-app_root="${SAYIT_APP_PATH:-$build_root/DerivedData/Build/Products/Release/SayIt.app}"
+app_root="${SAYIT_APP_PATH:-$build_root/DerivedData-Local/Build/Products/Release/SayIt.app}"
 dmg_sign_identity="${SAYIT_DMG_SIGN_IDENTITY:-}"
 disable_secure_timestamp="${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}"
 

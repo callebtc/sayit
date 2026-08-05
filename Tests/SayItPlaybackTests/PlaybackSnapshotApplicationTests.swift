@@ -61,6 +61,28 @@ struct PlaybackSnapshotApplicationTests {
         #expect(AppState.shouldPresentOnboarding(onboardingComplete: false))
     }
 
+    @Test("Successful playback dismisses a stale presented error")
+    func successfulPlaybackDismissesPresentedError() {
+        #expect(
+            AppState.shouldDismissPresentedError(
+                serviceError: nil,
+                playbackState: "playing"
+            )
+        )
+        #expect(
+            !AppState.shouldDismissPresentedError(
+                serviceError: nil,
+                playbackState: "preparing"
+            )
+        )
+        #expect(
+            !AppState.shouldDismissPresentedError(
+                serviceError: "Playback failed",
+                playbackState: "playing"
+            )
+        )
+    }
+
     @Test("Volume edits send commands while snapshot application stays silent")
     func volumeCommandsAndSnapshotSync() {
         let controller = PlaybackController()

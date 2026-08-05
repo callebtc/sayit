@@ -6,6 +6,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let serviceProvider = ServiceProvider()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if SelectionXPCSmokeTest.isRequested {
+            Task {
+                await SelectionXPCSmokeTest.run()
+            }
+            return
+        }
+
         NSApp.servicesProvider = serviceProvider
         NSUpdateDynamicServices()
 

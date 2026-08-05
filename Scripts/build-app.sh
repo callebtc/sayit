@@ -3,12 +3,17 @@ set -eu
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 build_root="$project_root/Build"
-derived_data="$build_root/DerivedData"
+sign_identity="${SAYIT_SIGN_IDENTITY:--}"
+if [ "$sign_identity" = "-" ]; then
+    default_derived_data="$build_root/DerivedData-Local"
+else
+    default_derived_data="$build_root/DerivedData-Release"
+fi
+derived_data="${SAYIT_DERIVED_DATA_PATH:-$default_derived_data}"
 source_packages="$build_root/SourcePackages"
 module_cache="$build_root/ModuleCache"
 swiftpm_cache="$build_root/SwiftPMCache"
 app_root="$derived_data/Build/Products/Release/SayIt.app"
-sign_identity="${SAYIT_SIGN_IDENTITY:--}"
 disable_secure_timestamp="${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}"
 update_api_url="${SAYIT_UPDATE_API_URL:-}"
 build_jobs="${SAYIT_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}"
@@ -29,6 +34,13 @@ case "$disable_secure_timestamp" in
         exit 2
         ;;
 esac
+
+app_executable="$app_root/Contents/MacOS/SayIt"
+if [ -x "$app_executable" ] \
+    && pgrep -f "$app_executable" >/dev/null 2>&1; then
+    echo "Quit Say It before rebuilding this app bundle." >&2
+    exit 2
+fi
 
 mkdir -p "$source_packages" "$module_cache" "$swiftpm_cache"
 

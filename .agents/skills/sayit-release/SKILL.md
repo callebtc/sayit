@@ -67,7 +67,9 @@ rg -n 'MARKETING_VERSION|CURRENT_PROJECT_VERSION' project.yml
 test -x Scripts/release.sh
 test -x Scripts/build-app.sh
 test -x Scripts/package-local-dmg.sh
-sh -n Scripts/release.sh Scripts/build-app.sh Scripts/package-local-dmg.sh
+test -x Scripts/smoke-test-selection-xpc.sh
+sh -n Scripts/release.sh Scripts/build-app.sh Scripts/package-local-dmg.sh \
+  Scripts/smoke-test-selection-xpc.sh
 git check-ignore -q .env.release
 ```
 
@@ -129,6 +131,8 @@ The repository script is responsible for:
 
 - running the Swift test suite;
 - regenerating and building the Release app;
+- exercising the production selected-text helper over XPC without prompting
+  for Accessibility access;
 - applying Developer ID signatures and secure timestamps;
 - verifying hardened runtime for the app and bundled helpers;
 - creating and signing `Build/SayIt-VERSION.dmg`;

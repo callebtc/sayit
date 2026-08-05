@@ -1062,6 +1062,14 @@ final class AppState {
         !onboardingComplete
     }
 
+    nonisolated static func shouldDismissPresentedError(
+        serviceError: String?,
+        playbackState: String
+    ) -> Bool {
+        serviceError == nil
+            && PlaybackState(rawValue: playbackState) == .playing
+    }
+
     private func reloadServiceSnapshot() async throws {
         let response = try await send(.snapshot)
         guard case .snapshot(let snapshot) = response else {
@@ -1081,6 +1089,13 @@ final class AppState {
         if let serviceError = snapshot.lastError {
             statusText = snapshot.statusText
             errorMessage = serviceError
+            errorRecoveryAction = nil
+        } else if Self.shouldDismissPresentedError(
+            serviceError: snapshot.lastError,
+            playbackState: snapshot.playback.state
+        ) {
+            statusText = snapshot.statusText
+            errorMessage = nil
             errorRecoveryAction = nil
         } else if errorRecoveryAction == nil {
             statusText = snapshot.statusText
