@@ -98,6 +98,7 @@
 		364005AD51699126DC66000A /* IdempotencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC719FAC8BB29024BACE25E2 /* IdempotencyStore.swift */; };
 		36AE79C17C50D6CC04BAB404 /* OnboardingModelDownloadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAB456E7038F355490CF803 /* OnboardingModelDownloadView.swift */; };
 		3708667FF2CF32FF6D123AFC /* article.html in Resources */ = {isa = PBXBuildFile; fileRef = F879A4D1F0B1C6C29831ADE1 /* article.html */; };
+		37A9955C3EA97FCB6171DDE0 /* SelectionServiceLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */; };
 		37EBE22FAD6F6ABEBD147923 /* ServiceJobManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6BA1A384D7C99A7E51992C8 /* ServiceJobManager.swift */; };
 		3817ED2CC61FEC44879D58F0 /* VoiceRecordingProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4131E2F67BB0F4B12F4E8AA /* VoiceRecordingProcessorTests.swift */; };
 		39C253ED1EC6C988E4E8FDEC /* SayItUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5E19E0FDD1DD8B00C3839A /* SayItUITests.swift */; };
@@ -271,7 +272,6 @@
 		92F7AFC98D4FD17999991ACA /* RetentionPeriod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF16666B0AD7C529898B79C /* RetentionPeriod.swift */; };
 		9319C72701DD32A09AB34E0C /* VoiceClonePassage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CBD5EE3B9314A3F3CA68216 /* VoiceClonePassage.swift */; };
 		937DC7149D4BF19AEA44A3E1 /* ModelCatalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 70120889C7D5939C0578DB4D /* ModelCatalog.json */; };
-		93812F9599DADD007EA48C99 /* DevelopmentSelectionServiceLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9B554D989BDC946BCBA1C6 /* DevelopmentSelectionServiceLauncher.swift */; };
 		945A39481BECA04AEDA50C1F /* DiagnosticEvent+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */; };
 		949825DCFA63B68D7D413914 /* VoiceCandidateSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A3C6644EA34D12746690E4 /* VoiceCandidateSnapshot.swift */; };
 		94E614AD286A5262C7EAFD39 /* BackendPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9041E9369BA31A0007824D /* BackendPersistenceTests.swift */; };
@@ -811,6 +811,7 @@
 		04A092AE8477F880752CF985 /* DiagnosticCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticCategory.swift; sourceTree = "<group>"; };
 		04D4CBC539AFA34387DA49C6 /* ModelFileDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelFileDescriptor.swift; sourceTree = "<group>"; };
 		060772E7D86FC0C811C36B0D /* VoiceRecordingSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingSink.swift; sourceTree = "<group>"; };
+		065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceLauncher.swift; sourceTree = "<group>"; };
 		068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyEntry.swift; sourceTree = "<group>"; };
 		06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendSettingsStore.swift; sourceTree = "<group>"; };
 		077D725F6B2841CB8D718F24 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
@@ -934,7 +935,6 @@
 		5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReferenceFormat.swift; sourceTree = "<group>"; };
 		5842EBC765548471AD55DED2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		5893C6A2226C5DB7DD366D9A /* VoiceProfileSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfileSnapshot.swift; sourceTree = "<group>"; };
-		5A9B554D989BDC946BCBA1C6 /* DevelopmentSelectionServiceLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentSelectionServiceLauncher.swift; sourceTree = "<group>"; };
 		5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateRequest.swift; sourceTree = "<group>"; };
 		5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+PlaybackRoutes.swift"; sourceTree = "<group>"; };
 		5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+SettingsRoutes.swift"; sourceTree = "<group>"; };
@@ -2120,9 +2120,9 @@
 		FCEFEB8FFC1478A9B360A25F /* Selection */ = {
 			isa = PBXGroup;
 			children = (
-				5A9B554D989BDC946BCBA1C6 /* DevelopmentSelectionServiceLauncher.swift */,
 				3083E18F1B28B31D261C1F00 /* SelectionServiceController.swift */,
 				A022F5B29532790F5FB8FEA7 /* SelectionServiceError.swift */,
+				065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */,
 				DE475C05CB98A5B79F93A9F1 /* SelectionXPCSmokeTest.swift */,
 			);
 			path = Selection;
@@ -2696,7 +2696,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${service_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier sh.sayit.mac.selection \\\n    \"${service_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.selection.plist\" \"${agent_dir}/sh.sayit.mac.selection.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  find \"${app_dir}\" \\\n    -type f \\\n    -name '*.dylib' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}\" \\\n    -type d \\\n    -name '*.framework' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}/Contents\" \\\n    -type d \\\n    -name '*.app' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\nfi\n";
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${service_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection-helper.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${cli_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier sh.sayit.mac.selection-helper \\\n    \"${cli_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  find \"${app_dir}\" \\\n    -type f \\\n    -name '*.dylib' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}\" \\\n    -type d \\\n    -name '*.framework' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}/Contents\" \\\n    -type d \\\n    -name '*.app' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -3026,7 +3026,6 @@
 				227C33C4A2279F0D8D3CDCBC /* CommandLineInstallController.swift in Sources */,
 				80CA4EFFCF36DC568596C1A3 /* CommunityModelSheet.swift in Sources */,
 				4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */,
-				93812F9599DADD007EA48C99 /* DevelopmentSelectionServiceLauncher.swift in Sources */,
 				FFFF4D85067174B0A3BCAC1A /* DevelopmentServiceLauncher.swift in Sources */,
 				237FCE4FBE1E65624CCBEF35 /* DiagnosticExport.swift in Sources */,
 				2E66646AAA47CC18D80E876B /* DiagnosticSnapshot+Event.swift in Sources */,
@@ -3075,6 +3074,7 @@
 				7C1CD00B82E7BD882C630F91 /* SelectionAccessSettingsView.swift in Sources */,
 				F7EDAE89400223BABD57B7F9 /* SelectionServiceController.swift in Sources */,
 				927010F10DB914F87831DC7F /* SelectionServiceError.swift in Sources */,
+				37A9955C3EA97FCB6171DDE0 /* SelectionServiceLauncher.swift in Sources */,
 				CB9E8FF2D1596FA2BF963494 /* SelectionXPCSmokeTest.swift in Sources */,
 				F56C34C0B55FBF947F5D58FE /* SemanticVersion.swift in Sources */,
 				65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */,
@@ -3371,6 +3371,7 @@
 				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
 				EXECUTABLE_NAME = SayIt;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3589,7 +3590,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -3822,6 +3823,7 @@
 				CODE_SIGN_IDENTITY = "$(SAYIT_SIGN_IDENTITY)";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
 				EXECUTABLE_NAME = SayIt;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -3886,10 +3888,14 @@
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
 				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.selection;
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It Selected-Text Helper";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper";
 				PRODUCT_NAME = SayItSelectionAgent;
 				SDKROOT = macosx;
 			};
@@ -3956,7 +3962,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = D7AHD3GLH6;
@@ -4031,10 +4037,14 @@
 			buildSettings = {
 				CODE_SIGNING_ALLOWED = NO;
 				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac.selection;
+				INFOPLIST_KEY_CFBundleDisplayName = "Say It Selected-Text Helper";
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper";
 				PRODUCT_NAME = SayItSelectionAgent;
 				SDKROOT = macosx;
 			};

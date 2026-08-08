@@ -1,10 +1,13 @@
-#if DEBUG || SAYIT_LOCAL_BUILD
 import Foundation
 import SayItProtocol
 import SayItXPC
 
-enum DevelopmentSelectionServiceLauncher {
+enum SelectionServiceLauncher {
+#if DEBUG || SAYIT_LOCAL_BUILD
     private static let label = "sh.sayit.mac.selection.debug"
+#else
+    private static let label = "sh.sayit.mac.selection-helper"
+#endif
     private static let legacyLabel = "com.sayit.mac.selection.debug"
 
     static func ensureRunning(agentURL: URL) async throws {
@@ -37,4 +40,3 @@ enum DevelopmentSelectionServiceLauncher {
         )
     }
 }
-#endif

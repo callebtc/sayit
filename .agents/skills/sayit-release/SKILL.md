@@ -68,8 +68,9 @@ test -x Scripts/release.sh
 test -x Scripts/build-app.sh
 test -x Scripts/package-local-dmg.sh
 test -x Scripts/smoke-test-selection-xpc.sh
+test -x Scripts/validate-selection-bundle.sh
 sh -n Scripts/release.sh Scripts/build-app.sh Scripts/package-local-dmg.sh \
-  Scripts/smoke-test-selection-xpc.sh
+  Scripts/smoke-test-selection-xpc.sh Scripts/validate-selection-bundle.sh
 git check-ignore -q .env.release
 ```
 
@@ -133,6 +134,8 @@ The repository script is responsible for:
 - regenerating and building the Release app;
 - exercising the production selected-text helper over XPC without prompting
   for Accessibility access;
+- rejecting a sandbox or missing embedded Info.plist that would prevent the
+  selected-text helper from registering on a clean Mac;
 - applying Developer ID signatures and secure timestamps;
 - verifying hardened runtime for the app and bundled helpers;
 - creating and signing `Build/SayIt-VERSION.dmg`;

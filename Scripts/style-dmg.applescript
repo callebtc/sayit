@@ -11,7 +11,9 @@ on run arguments
         set statusbar visible of dmgWindow to false
         set pathbar visible of dmgWindow to false
         set sidebar width of dmgWindow to 0
-        set bounds of dmgWindow to {100, 100, 700, 500}
+        -- Leave enough room for the installer icons even when Finder restores
+        -- the path and status bars from the user's global preferences.
+        set bounds of dmgWindow to {100, 100, 820, 580}
 
         set viewOptions to icon view options of dmgWindow
         set arrangement of viewOptions to not arranged
@@ -20,8 +22,8 @@ on run arguments
         set shows item info of viewOptions to false
         set shows icon preview of viewOptions to true
 
-        set position of item "Say It.app" of mountedFolder to {160, 190}
-        set position of item "Applications" of mountedFolder to {440, 190}
+        set position of item "Say It.app" of mountedFolder to {190, 165}
+        set position of item "Applications" of mountedFolder to {530, 165}
 
         update mountedFolder without registering applications
         delay 2

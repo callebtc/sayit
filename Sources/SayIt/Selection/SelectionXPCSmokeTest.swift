@@ -11,13 +11,15 @@ enum SelectionXPCSmokeTest {
 
     static func run() async -> Never {
         let controller = SelectionServiceController()
-        await controller.terminateForQuit()
 
         let succeeded: Bool
         do {
             try await controller.verifyXPCConnection()
             succeeded = true
         } catch {
+            FileHandle.standardError.write(
+                Data("Selection helper XPC error: \(error)\n".utf8)
+            )
             succeeded = false
         }
 

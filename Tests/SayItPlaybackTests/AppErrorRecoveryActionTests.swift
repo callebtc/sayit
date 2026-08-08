@@ -18,6 +18,10 @@ struct AppErrorRecoveryActionTests {
     func unrelatedSelectionFailureRecovery() {
         #expect(SelectionServiceError.noSelection.recoveryAction == nil)
         #expect(
+            SelectionServiceError.helperRegistrationFailed.recoveryAction
+                == nil
+        )
+        #expect(
             SelectionServiceError.helperUnavailable.recoveryAction == nil
         )
     }

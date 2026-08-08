@@ -33,13 +33,6 @@ struct SelectionAccessSettingsView: View {
                             .disabled(state.selectionService.isWorking)
                         }
                     }
-                    if state.selectionService.requiresLoginItemApproval {
-                        Button(
-                            "Open Login Items",
-                            action: state.selectionService
-                                .openLoginItemsSettings
-                        )
-                    }
                 }
             }
 

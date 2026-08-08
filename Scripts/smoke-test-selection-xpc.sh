@@ -60,6 +60,7 @@ watchdog_pid=
 
 if [ "$status" -ne 0 ]; then
     echo "The selected-text helper XPC smoke test did not complete successfully." >&2
+    tail -n 40 "$smoke_log" >&2
     exit 1
 fi
 

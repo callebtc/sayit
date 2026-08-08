@@ -103,9 +103,11 @@ else
         --force \
         --sign "$sign_identity" \
         ${code_sign_flags} \
-        --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
+        --options runtime \
+        --preserve-metadata=entitlements \
         "$app_root"
 fi
 
 codesign --verify --deep --strict "$app_root"
+"$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
 echo "$app_root"

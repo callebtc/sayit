@@ -207,8 +207,9 @@ verify_release_code \
     "$app_root/Contents/Helpers/SayItCLI.app" \
     "the CLI"
 verify_release_code \
-    "$app_root/Contents/Library/LaunchServices/SayItSelectionAgent" \
+    "$app_root/Contents/Helpers/SayItSelectionAgent" \
     "the selection helper"
+"$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
 
 find "$app_root" -type f -name '*.dylib' -print \
     | while IFS= read -r dylib_path; do
@@ -288,8 +289,9 @@ verify_release_code \
     "$mounted_app/Contents/Helpers/SayItCLI.app" \
     "the mounted CLI"
 verify_release_code \
-    "$mounted_app/Contents/Library/LaunchServices/SayItSelectionAgent" \
+    "$mounted_app/Contents/Helpers/SayItSelectionAgent" \
     "the mounted selection helper"
+"$project_root/Scripts/validate-selection-bundle.sh" "$mounted_app"
 
 find "$mounted_app" -type f -name '*.dylib' -print \
     | while IFS= read -r dylib_path; do

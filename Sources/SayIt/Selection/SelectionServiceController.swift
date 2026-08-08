@@ -3,27 +3,15 @@ import Observation
 import SayItCore
 import SayItProtocol
 import SayItXPC
-import ServiceManagement
 
 @MainActor
 @Observable
 final class SelectionServiceController {
-    private let service = SMAppService.agent(
-        plistName: SayItServiceIdentifiers.selectionLaunchAgentPlist
-    )
     private let client = SelectionXPCClient()
 
     private(set) var accessibilityIsTrusted: Bool?
     private(set) var isWorking = false
     private(set) var errorMessage: String?
-
-    var requiresLoginItemApproval: Bool {
-        #if DEBUG || SAYIT_LOCAL_BUILD
-        false
-        #else
-        service.status == .requiresApproval
-        #endif
-    }
 
     func refreshAuthorization() async {
         await perform {
@@ -101,17 +89,7 @@ final class SelectionServiceController {
 
     func terminateForQuit() async {
         await client.invalidate()
-        #if DEBUG || SAYIT_LOCAL_BUILD
-        try? DevelopmentSelectionServiceLauncher.unregister()
-        #else
-        if service.status == .enabled || service.status == .requiresApproval {
-            try? await service.unregister()
-        }
-        #endif
-    }
-
-    func openLoginItemsSettings() {
-        SMAppService.openSystemSettingsLoginItems()
+        try? SelectionServiceLauncher.unregister()
     }
 
     func openAccessibilitySettings() -> Bool {
@@ -136,37 +114,18 @@ final class SelectionServiceController {
     }
 
     private func ensureRunning() async throws {
-        #if DEBUG || SAYIT_LOCAL_BUILD
-        try await DevelopmentSelectionServiceLauncher.ensureRunning(
-            agentURL: agentURL
-        )
-        #else
-        if service.status == .requiresApproval {
-            throw SelectionServiceError.helperApprovalRequired
+        do {
+            try await SelectionServiceLauncher.ensureRunning(
+                agentURL: agentURL
+            )
+        } catch {
+            throw SelectionServiceError.helperRegistrationFailed
         }
-        if service.status != .enabled {
-            try service.register()
-        }
-        for _ in 0..<50 {
-            if service.status == .enabled {
-                return
-            }
-            if service.status == .requiresApproval {
-                throw SelectionServiceError.helperApprovalRequired
-            }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-        guard service.status == .enabled else {
-            throw SelectionServiceError.helperUnavailable
-        }
-        #endif
     }
 
-    #if DEBUG || SAYIT_LOCAL_BUILD
     private var agentURL: URL {
         Bundle.main.bundleURL.appending(
-            path: "Contents/Library/LaunchServices/SayItSelectionAgent"
+            path: "Contents/Helpers/SayItSelectionAgent"
         )
     }
-    #endif
 }
