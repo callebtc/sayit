@@ -270,10 +270,13 @@ mounted_app="$mountpoint/Say It.app"
 [ -L "$mountpoint/Applications" ] || fail "the Applications symlink is missing."
 [ "$(readlink "$mountpoint/Applications")" = "/Applications" ] \
     || fail "the Applications symlink has an unexpected target."
+[ -f "$mountpoint/.background/dmg-background.png" ] \
+    || fail "the DMG background image is missing."
 
 top_level_count=$(
     find "$mountpoint" -mindepth 1 -maxdepth 1 \
         ! -name '.DS_Store' \
+        ! -name '.background' \
         | wc -l \
         | tr -d ' '
 )

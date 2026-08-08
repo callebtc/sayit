@@ -1,6 +1,7 @@
 on run arguments
     set mountPath to item 1 of arguments
     set mountedFolder to POSIX file mountPath as alias
+    set backgroundImage to POSIX file (mountPath & "/.background/dmg-background.png") as alias
 
     tell application "Finder"
         open mountedFolder
@@ -21,9 +22,11 @@ on run arguments
         set text size of viewOptions to 14
         set shows item info of viewOptions to false
         set shows icon preview of viewOptions to true
+        set background color of viewOptions to {62708, 63222, 63993}
+        set background picture of viewOptions to backgroundImage
 
-        set position of item "Say It.app" of mountedFolder to {190, 165}
-        set position of item "Applications" of mountedFolder to {530, 165}
+        set position of item "Say It.app" of mountedFolder to {182, 210}
+        set position of item "Applications" of mountedFolder to {542, 210}
 
         update mountedFolder without registering applications
         delay 2

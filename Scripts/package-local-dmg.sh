@@ -4,6 +4,7 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 build_root="$project_root/Build"
 app_root="${SAYIT_APP_PATH:-$build_root/DerivedData-Local/Build/Products/Release/SayIt.app}"
+dmg_background="$project_root/Scripts/Assets/dmg-background.png"
 dmg_sign_identity="${SAYIT_DMG_SIGN_IDENTITY:-}"
 disable_secure_timestamp="${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}"
 
@@ -18,6 +19,17 @@ esac
 if [ ! -x "$app_root/Contents/MacOS/SayIt" ]; then
     "$project_root/Scripts/build-app.sh"
 fi
+
+[ -f "$dmg_background" ] || {
+    echo "The DMG background image is missing." >&2
+    exit 1
+}
+background_width=$(sips -g pixelWidth "$dmg_background" | awk '/pixelWidth:/ {print $2}')
+background_height=$(sips -g pixelHeight "$dmg_background" | awk '/pixelHeight:/ {print $2}')
+[ "$background_width" = "720" ] && [ "$background_height" = "480" ] || {
+    echo "The DMG background image must be 720 by 480 pixels." >&2
+    exit 1
+}
 
 version=$(
     /usr/libexec/PlistBuddy \
@@ -39,7 +51,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$content" "$mountpoint"
+mkdir -p "$content/.background" "$mountpoint"
 ditto \
     --norsrc \
     --noextattr \
@@ -47,6 +59,13 @@ ditto \
     --noacl \
     "$app_root" \
     "$content/Say It.app"
+ditto \
+    --norsrc \
+    --noextattr \
+    --noqtn \
+    --noacl \
+    "$dmg_background" \
+    "$content/.background/dmg-background.png"
 ln -s /Applications "$content/Applications"
 xattr -cr "$content"
 
