@@ -39,7 +39,9 @@ public struct ServiceJobManager: Sendable {
         }
     }
 
-    public func ensureRunning() async throws {
+    public func ensureRunning(
+        restartingExistingJob: Bool = true
+    ) async throws {
         guard FileManager.default.isExecutableFile(atPath: agentURL.path) else {
             throw JobError.agentMissing(agentURL.path)
         }
@@ -49,6 +51,7 @@ public struct ServiceJobManager: Sendable {
            existing.output.contains(agentURL.path),
            existing.output.contains(machServiceName),
            existing.output.contains(logURL.path) {
+            guard restartingExistingJob else { return }
             let result = try Self.run([
                 "kickstart",
                 "-k",

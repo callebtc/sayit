@@ -31,6 +31,7 @@
 		09E94756EA98F9506DD13C52 /* DiagnosticCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A092AE8477F880752CF985 /* DiagnosticCategory.swift */; };
 		0A00DCDC6CC2981A2DF8C523 /* ModelID.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB04A144E7B0EC58078BD43A /* ModelID.swift */; };
 		0A2D669D9D8BCA189C6ECF28 /* SayItHTTPServer+VoiceRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E46C278E2A69A51F79DE353 /* SayItHTTPServer+VoiceRoutes.swift */; };
+		0AA91D2459428B799CF9F727 /* SelectionRequestFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FAD8898C143F6D470DFFE7 /* SelectionRequestFlow.swift */; };
 		0ABBF6D2B19B6666B372E308 /* VoiceReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC20994C0FBDFBF9945C121 /* VoiceReference.swift */; };
 		0B5B5BCD24A338EB27529A01 /* SayItHTTPServer+HistoryRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */; };
 		0B5ECAFD3F15F86699770E53 /* VoiceCustomizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA60588FF7DFF98E2DFD377B /* VoiceCustomizeSheet.swift */; };
@@ -1053,6 +1054,7 @@
 		A42DE1A1821373642D9C83EC /* VoiceDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDiscoveryView.swift; sourceTree = "<group>"; };
 		A5D4DF6C5D91C97996C6017A /* ModelDownloadProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadProgress.swift; sourceTree = "<group>"; };
 		A5E69C5B004A8649EF5386AF /* ExportKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportKind.swift; sourceTree = "<group>"; };
+		A6FAD8898C143F6D470DFFE7 /* SelectionRequestFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionRequestFlow.swift; sourceTree = "<group>"; };
 		A7F6AEFFFEB026A11B8235D5 /* AppErrorRecoveryAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrorRecoveryAction.swift; sourceTree = "<group>"; };
 		A7FD50F093D897C5794716C1 /* ModelManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManaging.swift; sourceTree = "<group>"; };
 		A89BAB57F71A7F5E2FBB982E /* SayIt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SayIt.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2120,6 +2122,7 @@
 		FCEFEB8FFC1478A9B360A25F /* Selection */ = {
 			isa = PBXGroup;
 			children = (
+				A6FAD8898C143F6D470DFFE7 /* SelectionRequestFlow.swift */,
 				3083E18F1B28B31D261C1F00 /* SelectionServiceController.swift */,
 				A022F5B29532790F5FB8FEA7 /* SelectionServiceError.swift */,
 				065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */,
@@ -3072,6 +3075,7 @@
 				435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */,
 				98E075B62EF1F0140D7056EF /* SayItStyles.swift in Sources */,
 				7C1CD00B82E7BD882C630F91 /* SelectionAccessSettingsView.swift in Sources */,
+				0AA91D2459428B799CF9F727 /* SelectionRequestFlow.swift in Sources */,
 				F7EDAE89400223BABD57B7F9 /* SelectionServiceController.swift in Sources */,
 				927010F10DB914F87831DC7F /* SelectionServiceError.swift in Sources */,
 				37A9955C3EA97FCB6171DDE0 /* SelectionServiceLauncher.swift in Sources */,

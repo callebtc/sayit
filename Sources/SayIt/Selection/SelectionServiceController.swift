@@ -7,7 +7,11 @@ import SayItXPC
 @MainActor
 @Observable
 final class SelectionServiceController {
+    private static let authorizationPollInterval = Duration.milliseconds(250)
+    private static let authorizationPollAttempts = 480
+
     private let client = SelectionXPCClient()
+    private var hasPreparedHelper = false
 
     private(set) var accessibilityIsTrusted: Bool?
     private(set) var isWorking = false
@@ -15,29 +19,33 @@ final class SelectionServiceController {
 
     func refreshAuthorization() async {
         await perform {
-            try await ensureRunning()
-            let response = try await client.send(.authorizationStatus)
-            guard case .authorizationStatus(let isTrusted) = response else {
-                throw SelectionServiceError.helperUnavailable
-            }
-            accessibilityIsTrusted = isTrusted
+            _ = try await authorizationStatus()
         }
     }
 
     func requestAuthorization() async {
         await perform {
-            try await ensureRunning()
-            let response = try await client.send(.requestAuthorization)
-            guard case .authorizationStatus(let isTrusted) = response else {
-                throw SelectionServiceError.helperUnavailable
+            guard try await requestAuthorizationAndWait() else {
+                throw SelectionServiceError.accessibilityRequired
             }
-            accessibilityIsTrusted = isTrusted
         }
     }
 
-    func selectedPayload(
-        promptIfNeeded: Bool
-    ) async throws -> TextSourcePayload {
+    func requestAuthorizationAndWait() async throws -> Bool {
+        if try await authorizationStatus(prompt: true) {
+            return true
+        }
+
+        for _ in 0..<Self.authorizationPollAttempts {
+            try await Task.sleep(for: Self.authorizationPollInterval)
+            if try await authorizationStatus() {
+                return true
+            }
+        }
+        return false
+    }
+
+    func selectedPayload() async throws -> TextSourcePayload {
         try await ensureRunning()
         let response = try await client.send(.selectedText)
         switch response {
@@ -55,14 +63,6 @@ final class SelectionServiceController {
             )
         case .authorizationRequired:
             accessibilityIsTrusted = false
-            if promptIfNeeded {
-                let promptResponse = try await client.send(
-                    .requestAuthorization
-                )
-                if case .authorizationStatus(let isTrusted) = promptResponse {
-                    accessibilityIsTrusted = isTrusted
-                }
-            }
             throw SelectionServiceError.accessibilityRequired
         case .noSelection:
             accessibilityIsTrusted = true
@@ -90,6 +90,7 @@ final class SelectionServiceController {
     func terminateForQuit() async {
         await client.invalidate()
         try? SelectionServiceLauncher.unregister()
+        hasPreparedHelper = false
     }
 
     func openAccessibilitySettings() -> Bool {
@@ -114,13 +115,31 @@ final class SelectionServiceController {
     }
 
     private func ensureRunning() async throws {
+        let shouldRestartExistingJob = !hasPreparedHelper
         do {
             try await SelectionServiceLauncher.ensureRunning(
-                agentURL: agentURL
+                agentURL: agentURL,
+                restartingExistingJob: shouldRestartExistingJob
             )
+            hasPreparedHelper = true
         } catch {
+            if shouldRestartExistingJob {
+                hasPreparedHelper = false
+            }
             throw SelectionServiceError.helperRegistrationFailed
         }
+    }
+
+    private func authorizationStatus(prompt: Bool = false) async throws -> Bool {
+        try await ensureRunning()
+        let response = try await client.send(
+            prompt ? .requestAuthorization : .authorizationStatus
+        )
+        guard case .authorizationStatus(let isTrusted) = response else {
+            throw SelectionServiceError.helperUnavailable
+        }
+        accessibilityIsTrusted = isTrusted
+        return isTrusted
     }
 
     private var agentURL: URL {

@@ -10,9 +10,14 @@ enum SelectionServiceLauncher {
 #endif
     private static let legacyLabel = "com.sayit.mac.selection.debug"
 
-    static func ensureRunning(agentURL: URL) async throws {
+    static func ensureRunning(
+        agentURL: URL,
+        restartingExistingJob: Bool
+    ) async throws {
         removeLegacyJobIfNeeded()
-        try await jobManager(agentURL: agentURL).ensureRunning()
+        try await jobManager(agentURL: agentURL).ensureRunning(
+            restartingExistingJob: restartingExistingJob
+        )
     }
 
     static func unregister() throws {

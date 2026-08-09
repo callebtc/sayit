@@ -31,6 +31,7 @@ final class AppState {
     private var modelInstallRequestTask: Task<Void, Never>?
     private var modelInstallRequestGeneration: UInt64 = 0
     private var serviceRepairTask: Task<Void, Never>?
+    private var selectionRequestTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
@@ -134,12 +135,31 @@ final class AppState {
     }
 
     func speakSelectedText() {
-        Task {
+        guard selectionRequestTask == nil else { return }
+        let targetApplication = NSWorkspace.shared.frontmostApplication
+        clearPresentedError()
+
+        selectionRequestTask = Task { [weak self] in
+            guard let self else { return }
+            defer { selectionRequestTask = nil }
             do {
-                let payload = try await selectionService.selectedPayload(
-                    promptIfNeeded: true
+                let payload = try await SelectionRequestFlow.perform(
+                    readSelection: {
+                        try await self.selectionService.selectedPayload()
+                    },
+                    requestAuthorization: {
+                        try await self.selectionService
+                            .requestAuthorizationAndWait()
+                    },
+                    resumeTargetApplication: {
+                        try await self.restoreSelectionTarget(
+                            targetApplication
+                        )
+                    }
                 )
                 receive(payload)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(
                     error.localizedDescription,
@@ -694,9 +714,13 @@ final class AppState {
     }
 
     func clearError() {
+        clearPresentedError()
+        perform(.clearError)
+    }
+
+    private func clearPresentedError() {
         errorMessage = nil
         errorRecoveryAction = nil
-        perform(.clearError)
     }
 
     private func clearAccessibilityErrorIfAuthorized() {
@@ -913,8 +937,37 @@ final class AppState {
     }
 
     func terminateBackgroundServiceForQuit() async {
+        selectionRequestTask?.cancel()
+        await selectionRequestTask?.value
+        selectionRequestTask = nil
         await selectionService.terminateForQuit()
         await backgroundService.terminateForQuit()
+    }
+
+    private func restoreSelectionTarget(
+        _ application: NSRunningApplication?
+    ) async throws {
+        guard let application, !application.isTerminated else {
+            throw SelectionServiceError.frontmostApplicationUnavailable
+        }
+
+        if !application.isActive {
+            guard application.activate(options: []) else {
+                throw SelectionServiceError.frontmostApplicationUnavailable
+            }
+            for _ in 0..<40 {
+                try Task.checkCancellation()
+                if application.isActive {
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+        }
+
+        guard application.isActive else {
+            throw SelectionServiceError.frontmostApplicationUnavailable
+        }
+        try await Task.sleep(for: .milliseconds(150))
     }
 
     func checkForUpdates() {
