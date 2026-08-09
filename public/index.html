@@ -9,6 +9,17 @@
 <meta property="og:description" content="Open TTS models, running entirely on your Mac. Select text anywhere, press a hotkey, listen.">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
+<script>
+  // Resolve the effective theme before first paint: stored choice, else system.
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem("sayit-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") {
+      t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
 <style>
   :root {
     --bg: #0a0a0b;
@@ -17,9 +28,28 @@
     --fg-faint: rgba(242, 241, 237, 0.34);
     --line: rgba(242, 241, 237, 0.10);
     --line-strong: rgba(242, 241, 237, 0.22);
+    --veil: rgba(10, 10, 11, 0.72);
+    --chip: rgba(10, 10, 11, 0.4);
+    --focus: rgba(242, 241, 237, 0.7);
+    --icon-filter: invert(0.94);
+    --btn-primary-hover: #ffffff;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg: #f6f5f1;
+    --fg: #171714;
+    --fg-muted: rgba(23, 23, 20, 0.62);
+    --fg-faint: rgba(23, 23, 20, 0.40);
+    --line: rgba(23, 23, 20, 0.12);
+    --line-strong: rgba(23, 23, 20, 0.28);
+    --veil: rgba(246, 245, 241, 0.78);
+    --chip: rgba(246, 245, 241, 0.55);
+    --focus: rgba(23, 23, 20, 0.55);
+    --icon-filter: none;
+    --btn-primary-hover: #000000;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,6 +62,7 @@
     font-family: var(--sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    transition: background-color 300ms ease, color 300ms ease;
   }
 
   ::selection { background: rgba(242, 241, 237, 0.92); color: var(--bg); }
@@ -49,7 +80,7 @@
     z-index: 1;
     pointer-events: none;
     background:
-      radial-gradient(ellipse 90% 70% at 50% 46%, transparent 40%, rgba(10, 10, 11, 0.72) 100%);
+      radial-gradient(ellipse 90% 70% at 50% 46%, transparent 40%, var(--veil) 100%);
   }
 
   .page {
@@ -80,7 +111,7 @@
   .brand img {
     width: 22px;
     height: 22px;
-    filter: invert(0.94);
+    filter: var(--icon-filter);
     display: block;
   }
 
@@ -88,6 +119,53 @@
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.01em;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .theme-toggle {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--chip);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: transform 160ms var(--ease-out), border-color 160ms ease,
+                color 160ms ease, background-color 300ms ease;
+  }
+
+  .theme-toggle svg {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity 180ms ease, transform 220ms var(--ease-out);
+  }
+
+  .theme-toggle .i-sun { opacity: 1; transform: none; }
+  .theme-toggle .i-moon { opacity: 0; transform: scale(0.6) rotate(90deg); }
+
+  [data-theme="light"] .theme-toggle .i-sun { opacity: 0; transform: scale(0.6) rotate(90deg); }
+  [data-theme="light"] .theme-toggle .i-moon { opacity: 1; transform: none; }
+
+  .theme-toggle:active { transform: scale(0.94); }
+
+  @media (hover: hover) and (pointer: fine) {
+    .theme-toggle:hover { border-color: var(--line-strong); color: var(--fg); }
   }
 
   .stars {
@@ -101,10 +179,11 @@
     color: var(--fg-muted);
     font-family: var(--mono);
     font-size: 12px;
-    background: rgba(10, 10, 11, 0.4);
+    background: var(--chip);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition: transform 160ms var(--ease-out), border-color 160ms ease, color 160ms ease;
+    transition: transform 160ms var(--ease-out), border-color 160ms ease,
+                color 160ms ease, background-color 300ms ease;
   }
 
   .stars svg { display: block; fill: currentColor; }
@@ -196,7 +275,7 @@
   .btn-ghost {
     color: var(--fg);
     border: 1px solid var(--line);
-    background: rgba(10, 10, 11, 0.4);
+    background: var(--chip);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -204,12 +283,12 @@
   .btn:active { transform: scale(0.97); }
 
   @media (hover: hover) and (pointer: fine) {
-    .btn-primary:hover { background: #ffffff; }
+    .btn-primary:hover { background: var(--btn-primary-hover); }
     .btn-ghost:hover { border-color: var(--line-strong); }
   }
 
-  .btn:focus-visible, .stars:focus-visible, a:focus-visible {
-    outline: 1.5px solid rgba(242, 241, 237, 0.7);
+  .btn:focus-visible, .stars:focus-visible, .theme-toggle:focus-visible, a:focus-visible {
+    outline: 1.5px solid var(--focus);
     outline-offset: 3px;
     border-radius: 999px;
   }
@@ -318,6 +397,9 @@
     }
     @keyframes fade { to { opacity: 1; } }
     .btn, .stars, .micro a, .fineprint a { transition: none; }
+    .theme-toggle { transition: border-color 160ms ease, color 160ms ease; }
+    .theme-toggle svg { transition: opacity 180ms ease; transform: none; }
+    html, body { transition: none; }
   }
 </style>
 </head>
@@ -333,12 +415,23 @@
       <img src="icon.svg" alt="" width="22" height="22">
       <span>SayIt</span>
     </a>
-    <a class="stars rise" style="--d:60ms" href="https://github.com/callebtc/sayit" target="_blank" rel="noopener" aria-label="Star SayIt on GitHub">
-      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
-      <span class="sep" aria-hidden="true"></span>
-      <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
-      <span class="count" id="starCount">–</span>
-    </a>
+    <div class="actions rise" style="--d:60ms">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" aria-pressed="false">
+        <svg class="i-sun" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2"/>
+          <path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/>
+        </svg>
+        <svg class="i-moon" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a7 7 0 0 0 9.7 9.7Z"/>
+        </svg>
+      </button>
+      <a class="stars" href="https://github.com/callebtc/sayit" target="_blank" rel="noopener" aria-label="Star SayIt on GitHub">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+        <span class="sep" aria-hidden="true"></span>
+        <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
+        <span class="count" id="starCount">–</span>
+      </a>
+    </div>
   </header>
 
   <main>
@@ -414,9 +507,18 @@
   var RAMP = [" ", ".", "·", ":", ";", "~", "=", "+", "*", "#", "%", "@"];
   var BUCKETS = 14;
   var alphas = [];
-  for (var i = 0; i <= BUCKETS; i++) {
-    alphas.push("rgba(228,226,220," + (Math.pow(i / BUCKETS, 1.6) * 0.26).toFixed(3) + ")");
+
+  function buildAlphas() {
+    var light = document.documentElement.dataset.theme === "light";
+    var base = light ? "26,26,24" : "228,226,220";
+    var max = light ? 0.32 : 0.26;
+    alphas = [];
+    for (var i = 0; i <= BUCKETS; i++) {
+      alphas.push("rgba(" + base + "," + (Math.pow(i / BUCKETS, 1.6) * max).toFixed(3) + ")");
+    }
   }
+
+  buildAlphas();
 
   var W = 0, H = 0, cols = 0, rows = 0;
   var trailGrid = new Float32Array(0);
@@ -557,6 +659,39 @@
     };
     requestAnimationFrame(loop);
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Theme toggle: explicit choice persists, otherwise follow the system */
+  /* ------------------------------------------------------------------ */
+
+  var rootEl = document.documentElement;
+  var themeMedia = window.matchMedia("(prefers-color-scheme: light)");
+  var toggle = document.getElementById("themeToggle");
+
+  function storedTheme() {
+    try { return localStorage.getItem("sayit-theme"); } catch (e) { return null; }
+  }
+
+  function applyTheme(theme, persist) {
+    rootEl.dataset.theme = theme;
+    buildAlphas();
+    var toLight = theme === "dark";
+    toggle.setAttribute("aria-label", toLight ? "Switch to light mode" : "Switch to dark mode");
+    toggle.setAttribute("aria-pressed", theme === "light" ? "true" : "false");
+    if (persist) {
+      try { localStorage.setItem("sayit-theme", theme); } catch (e) {}
+    }
+  }
+
+  toggle.addEventListener("click", function () {
+    applyTheme(rootEl.dataset.theme === "light" ? "dark" : "light", true);
+  });
+
+  themeMedia.addEventListener("change", function (e) {
+    if (!storedTheme()) applyTheme(e.matches ? "light" : "dark", false);
+  });
+
+  applyTheme(rootEl.dataset.theme === "light" ? "light" : "dark", false);
 
   /* ------------------------------------------------------------------ */
   /* GitHub: live star count + point the download at the latest release  */
