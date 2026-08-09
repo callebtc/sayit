@@ -2699,7 +2699,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${service_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection-helper.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${cli_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier sh.sayit.mac.selection-helper \\\n    \"${cli_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  find \"${app_dir}\" \\\n    -type f \\\n    -name '*.dylib' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}\" \\\n    -type d \\\n    -name '*.framework' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}/Contents\" \\\n    -type d \\\n    -name '*.app' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\nfi\n";
+			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${service_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection-helper.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${cli_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier \"${SAYIT_SELECTION_BUNDLE_IDENTIFIER}\" \\\n    \"${cli_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  find \"${app_dir}\" \\\n    -type f \\\n    -name '*.dylib' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}\" \\\n    -type d \\\n    -name '*.framework' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\n\n  find \"${app_dir}/Contents\" \\\n    -type d \\\n    -name '*.app' \\\n    -exec /usr/bin/codesign \\\n      --force \\\n      --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \\\n      ${timestamp_option} \\\n      --preserve-metadata=identifier,entitlements,requirements,flags,runtime \\\n      {} \\;\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -3382,7 +3382,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SAYIT_APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = SayIt;
 				PROVISIONING_PROFILE_SPECIFIER = "Say It Developer ID";
 				SDKROOT = macosx;
@@ -3617,6 +3617,10 @@
 				MTL_FAST_MATH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SAYIT_APP_BUNDLE_IDENTIFIER = sh.sayit.mac;
+				SAYIT_APP_DISPLAY_NAME = "Say It";
+				SAYIT_SELECTION_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper";
+				SAYIT_SELECTION_DISPLAY_NAME = "Say It Selected-Text Helper";
 				SDKROOT = macosx;
 				STRIP_INSTALLED_PRODUCT = YES;
 				STRIP_STYLE = "non-global";
@@ -3834,7 +3838,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = sh.sayit.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SAYIT_APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = SayIt;
 				PROVISIONING_PROFILE_SPECIFIER = "Say It Developer ID";
 				SDKROOT = macosx;
@@ -3895,11 +3899,11 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Say It Selected-Text Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(SAYIT_SELECTION_DISPLAY_NAME)";
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
 				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SAYIT_SELECTION_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = SayItSelectionAgent;
 				SDKROOT = macosx;
 			};
@@ -3995,6 +3999,10 @@
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SAYIT_APP_BUNDLE_IDENTIFIER = sh.sayit.mac.local;
+				SAYIT_APP_DISPLAY_NAME = "Say It Local";
+				SAYIT_SELECTION_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper.local";
+				SAYIT_SELECTION_DISPLAY_NAME = "Say It Local Selected-Text Helper";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -4044,11 +4052,11 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Say It Selected-Text Helper";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(SAYIT_SELECTION_DISPLAY_NAME)";
 				INFOPLIST_KEY_LSBackgroundOnly = YES;
 				INFOPLIST_KEY_LSMinimumSystemVersion = "$(MACOSX_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.selection-helper";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SAYIT_SELECTION_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = SayItSelectionAgent;
 				SDKROOT = macosx;
 			};

@@ -81,6 +81,10 @@ if [ "$sign_identity" = "-" ]; then
         CODE_SIGNING_ALLOWED=NO \
         CODE_SIGNING_REQUIRED=NO \
         ENABLE_HARDENED_RUNTIME=NO \
+        SAYIT_APP_BUNDLE_IDENTIFIER=sh.sayit.mac.local \
+        SAYIT_APP_DISPLAY_NAME="Say It Local" \
+        SAYIT_SELECTION_BUNDLE_IDENTIFIER=sh.sayit.mac.selection-helper.local \
+        SAYIT_SELECTION_DISPLAY_NAME="Say It Local Selected-Text Helper" \
         SAYIT_LOCAL_SWIFT_FLAG=-DSAYIT_LOCAL_BUILD \
         SWIFT_COMPILATION_MODE="${SAYIT_SWIFT_COMPILATION_MODE:-singlefile}"
 

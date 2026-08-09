@@ -40,10 +40,19 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "15.0"
     MARKETING_VERSION: "0.1.3"
     OTHER_SWIFT_FLAGS: "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)"
+    SAYIT_APP_BUNDLE_IDENTIFIER: sh.sayit.mac
+    SAYIT_APP_DISPLAY_NAME: Say It
+    SAYIT_SELECTION_BUNDLE_IDENTIFIER: sh.sayit.mac.selection-helper
+    SAYIT_SELECTION_DISPLAY_NAME: Say It Selected-Text Helper
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_TREAT_WARNINGS_AS_ERRORS: true
     SWIFT_VERSION: "6.0"
   configs:
+    Debug:
+      SAYIT_APP_BUNDLE_IDENTIFIER: sh.sayit.mac.local
+      SAYIT_APP_DISPLAY_NAME: Say It Local
+      SAYIT_SELECTION_BUNDLE_IDENTIFIER: sh.sayit.mac.selection-helper.local
+      SAYIT_SELECTION_DISPLAY_NAME: Say It Local Selected-Text Helper
     Release:
       COPY_PHASE_STRIP: true
       DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
@@ -195,11 +204,11 @@ targets:
         CREATE_INFOPLIST_SECTION_IN_BINARY: true
         ENABLE_APP_SANDBOX: false
         GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_KEY_CFBundleDisplayName: Say It Selected-Text Helper
+        INFOPLIST_KEY_CFBundleDisplayName: "$(SAYIT_SELECTION_DISPLAY_NAME)"
         INFOPLIST_KEY_LSBackgroundOnly: true
         INFOPLIST_KEY_LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
-        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.selection-helper
+        PRODUCT_BUNDLE_IDENTIFIER: "$(SAYIT_SELECTION_BUNDLE_IDENTIFIER)"
         PRODUCT_NAME: SayItSelectionAgent
 
   SayItCLI:
@@ -246,7 +255,7 @@ targets:
     info:
       path: Config/Info.plist
       properties:
-        CFBundleDisplayName: Say It
+        CFBundleDisplayName: "$(SAYIT_APP_DISPLAY_NAME)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
@@ -312,7 +321,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         EXECUTABLE_NAME: SayIt
         INFOPLIST_FILE: Config/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac
+        PRODUCT_BUNDLE_IDENTIFIER: "$(SAYIT_APP_BUNDLE_IDENTIFIER)"
         PRODUCT_NAME: SayIt
         PROVISIONING_PROFILE_SPECIFIER: Say It Developer ID
     postBuildScripts:
@@ -348,7 +357,7 @@ targets:
               --sign "${SAYIT_SELECTION_SIGN_IDENTITY}" \
               ${timestamp_option} \
               --options runtime \
-              --identifier sh.sayit.mac.selection-helper \
+              --identifier "${SAYIT_SELECTION_BUNDLE_IDENTIFIER}" \
               "${cli_dir}/SayItSelectionAgent"
           fi
           ditto "${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle" "${service_dir}/mlx-swift_Cmlx.bundle"

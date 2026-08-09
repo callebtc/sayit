@@ -9,13 +9,31 @@ fail() {
     exit 1
 }
 
+app_identifier=$(
+    /usr/libexec/PlistBuddy \
+        -c 'Print :CFBundleIdentifier' \
+        "$app_root/Contents/Info.plist"
+) || fail "the host app has no bundle identifier."
+
+case "$app_identifier" in
+    sh.sayit.mac)
+        expected_helper_identifier=sh.sayit.mac.selection-helper
+        ;;
+    sh.sayit.mac.local)
+        expected_helper_identifier=sh.sayit.mac.selection-helper.local
+        ;;
+    *)
+        fail "the host app has an unexpected bundle identifier."
+        ;;
+esac
+
 [ -x "$selection_helper" ] || fail "the helper executable is missing."
 
 helper_info=$(
     /usr/bin/plutil -p "$selection_helper" 2>/dev/null
 ) || fail "the helper has no embedded Info.plist."
 printf '%s\n' "$helper_info" \
-    | grep -F '"CFBundleIdentifier" => "sh.sayit.mac.selection-helper"' \
+    | grep -F "\"CFBundleIdentifier\" => \"$expected_helper_identifier\"" \
         >/dev/null \
     || fail "the helper has an unexpected bundle identifier."
 

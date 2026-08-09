@@ -4,6 +4,25 @@ import Testing
 
 struct ProtocolRoundTripTests {
     @Test
+    func applicationIdentityMatchesTheBuildMode() {
+#if DEBUG || SAYIT_LOCAL_BUILD
+        #expect(
+            SayItServiceIdentifiers.applicationBundle == "sh.sayit.mac.local"
+        )
+        #expect(
+            SayItServiceIdentifiers.selectionAgentBundle
+                == "sh.sayit.mac.selection-helper.local"
+        )
+#else
+        #expect(SayItServiceIdentifiers.applicationBundle == "sh.sayit.mac")
+        #expect(
+            SayItServiceIdentifiers.selectionAgentBundle
+                == "sh.sayit.mac.selection-helper"
+        )
+#endif
+    }
+
+    @Test
     func selectionServiceMessagesRoundTripThroughJSON() throws {
         let responses: [SelectionServiceResponse] = [
             .authorizationStatus(isTrusted: true),

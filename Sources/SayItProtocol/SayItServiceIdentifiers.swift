@@ -14,9 +14,17 @@ public enum SayItServiceIdentifiers {
     public static let selectionMachService = "sh.sayit.mac.selection.xpc"
 #endif
     public static let launchAgentPlist = "sh.sayit.mac.agent.plist"
+#if DEBUG || SAYIT_LOCAL_BUILD
+    public static let applicationBundle = "sh.sayit.mac.local"
+#else
     public static let applicationBundle = "sh.sayit.mac"
+#endif
     public static let agentBundle = "sh.sayit.mac.agent"
+#if DEBUG || SAYIT_LOCAL_BUILD
+    public static let selectionAgentBundle = "sh.sayit.mac.selection-helper.local"
+#else
     public static let selectionAgentBundle = "sh.sayit.mac.selection-helper"
+#endif
     public static let commandLineBundle = "sh.sayit.mac.cli"
     public static let trustedClientBundleIdentifiers = [
         applicationBundle,
