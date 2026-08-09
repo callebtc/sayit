@@ -507,14 +507,15 @@
   var RAMP = [" ", ".", "·", ":", ";", "~", "=", "+", "*", "#", "%", "@"];
   var BUCKETS = 14;
   var alphas = [];
+  var inkBase = "228,226,220";
 
   function buildAlphas() {
     var light = document.documentElement.dataset.theme === "light";
-    var base = light ? "26,26,24" : "228,226,220";
-    var max = light ? 0.32 : 0.26;
+    inkBase = light ? "26,26,24" : "228,226,220";
+    var max = light ? 0.44 : 0.40;
     alphas = [];
     for (var i = 0; i <= BUCKETS; i++) {
-      alphas.push("rgba(" + base + "," + (Math.pow(i / BUCKETS, 1.6) * max).toFixed(3) + ")");
+      alphas.push("rgba(" + inkBase + "," + (Math.pow(i / BUCKETS, 1.25) * max).toFixed(3) + ")");
     }
   }
 
@@ -551,30 +552,114 @@
   window.addEventListener("resize", resize);
   resize();
 
-  // Pointer with spring smoothing (decorative tracking needs momentum)
-  var tx = W / 2, ty = H / 2;   // target
-  var sx = tx, sy = ty;         // spring position
-  var svx = 0, svy = 0;
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // Pointer, spring-smoothed (decorative tracking needs momentum)
+  var tx = W / 2, ty = H / 2;
+  var sx = tx, sy = ty, svx = 0, svy = 0;
+  var lastTx = tx, lastTy = ty, moveAcc = 0;
 
   window.addEventListener("pointermove", function (e) {
     tx = e.clientX;
     ty = e.clientY;
+    moveAcc += Math.abs(tx - lastTx) + Math.abs(ty - lastTy);
+    lastTx = tx; lastTy = ty;
+    if (moveAcc > 150) {              // gliding through the field sheds rings
+      moveAcc = 0;
+      spawnRipple(tx, ty, 0.32, 8);
+    }
   }, { passive: true });
 
-  // Peter de Jong attractor: a dynamical system drifting through the field
+  window.addEventListener("pointerdown", function (e) {
+    spawnRipple(e.clientX, e.clientY, 1.0, 11);
+    spawnWord(e.clientX / CELL, e.clientY / CELL);
+  });
+
+  // Expanding wavefronts
+  var ripples = [];
+
+  function spawnRipple(x, y, amp, speed) {
+    ripples.push({ gx: x / CELL, gy: y / CELL, age: 0, amp: amp, speed: speed });
+    if (ripples.length > 7) ripples.shift();
+  }
+
+  // Plane & radial waves whose direction, speed, amplitude and frequency
+  // all drift slowly toward new random targets every few seconds
+  function Wave(kind) {
+    this.kind = kind;
+    this.theta = this.thetaT = rand(0, Math.PI * 2);
+    this.k = this.kT = rand(0.18, 0.42);
+    this.omega = this.omegaT = rand(0.5, 1.3);
+    this.amp = this.ampT = rand(0.5, 0.95);
+    this.decay = this.decayT = rand(0.02, 0.04);
+    this.phase = rand(0, Math.PI * 2);
+    this.ox = this.oxT = rand(0.15, 0.85);
+    this.oy = this.oyT = rand(0.2, 0.8);
+    this.ct = Math.cos(this.theta);
+    this.st = Math.sin(this.theta);
+    this.ttl = rand(6, 14);
+  }
+
+  Wave.prototype.retarget = function () {
+    this.thetaT += rand(-0.9, 0.9);
+    this.kT = Math.min(0.5, Math.max(0.14, this.kT + rand(-0.1, 0.1)));
+    this.omegaT = Math.min(1.6, Math.max(0.3, this.omegaT + rand(-0.4, 0.4)));
+    this.ampT = Math.min(1.0, Math.max(0.35, this.ampT + rand(-0.25, 0.25)));
+    this.decayT = Math.min(0.05, Math.max(0.015, this.decayT + rand(-0.01, 0.01)));
+    if (this.kind === "radial") {
+      this.oxT = rand(0.1, 0.9);
+      this.oyT = rand(0.12, 0.88);
+    }
+    this.ttl = rand(7, 15);
+  };
+
+  Wave.prototype.update = function (dt) {
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.retarget();
+    var f = 1 - Math.pow(0.5, dt / 2.5);          // ~2.5s half-life toward target
+    this.theta += (this.thetaT - this.theta) * f;
+    this.k += (this.kT - this.k) * f;
+    this.omega += (this.omegaT - this.omega) * f;
+    this.amp += (this.ampT - this.amp) * f;
+    this.decay += (this.decayT - this.decay) * f;
+    this.ox += (this.oxT - this.ox) * f * 0.6;
+    this.oy += (this.oyT - this.oy) * f * 0.6;
+    this.phase += this.omega * dt;                // continuous under speed changes
+    this.ct = Math.cos(this.theta);
+    this.st = Math.sin(this.theta);
+  };
+
+  Wave.prototype.sample = function (gx, gy) {
+    if (this.kind === "plane") {
+      return Math.sin((gx * this.ct + gy * this.st) * this.k + this.phase) * this.amp;
+    }
+    var dx = gx - this.ox * cols, dy = gy - this.oy * rows;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    return Math.sin(d * this.k - this.phase) * Math.exp(-d * this.decay) * this.amp;
+  };
+
+  var waves = [new Wave("plane"), new Wave("plane"), new Wave("plane"), new Wave("radial")];
+
+  // Peter de Jong attractor: a dynamical system drifting through the field,
+  // radiating rings whose strength follows how fast the system moves
   var DJ_A = 1.4, DJ_B = -2.3, DJ_C = 2.4, DJ_D = -2.1;
   var djx = 0.1, djy = 0.0;
-  var trail = [];               // recent attractor positions, screen space
+  var ahead = { x: W / 2, y: H / 2 };
+  var emitAmp = 0, pulsePhase = 0;
+  var trail = [];
   var TRAIL_MAX = 64;
 
-  function stepAttractor() {
+  function stepAttractor(dt) {
     var nx = Math.sin(DJ_A * djy) - Math.cos(DJ_B * djx);
     var ny = Math.sin(DJ_C * djx) - Math.cos(DJ_D * djy);
+    var speed = Math.sqrt((nx - djx) * (nx - djx) + (ny - djy) * (ny - djy));
     djx = nx; djy = ny;
-    return {
-      x: (nx / 2.3) * (W * 0.42) + W / 2,
-      y: (ny / 2.3) * (H * 0.42) + H / 2
-    };
+    ahead.x = (nx / 2.3) * (W * 0.42) + W / 2;
+    ahead.y = (ny / 2.3) * (H * 0.42) + H / 2;
+    emitAmp += (Math.min(speed * 1.1, 1.15) - emitAmp) * (1 - Math.pow(0.5, dt / 1.2));
+    pulsePhase += dt * (1.2 + emitAmp * 2.2);
+    trail.push({ x: ahead.x, y: ahead.y });
+    if (trail.length > TRAIL_MAX) trail.shift();
   }
 
   function splat(gx, gy, weight) {
@@ -588,51 +673,125 @@
     }
   }
 
-  function drawFrame(t) {
-    // Spring toward pointer
+  // Real words surfacing in the field: text inside the sound waves
+  var WORD_LIST = [
+    "sayit", "speak", "listen", "voice", "waves", "echo", "aloud",
+    "whisper", "sound", "read", "tone", "hum", "audio", "text",
+    "phrase", "murmur", "chatter", "narrate"
+  ];
+  var words = [];
+  var wordTimer = 1.2;
+
+  function spawnWord(gx, gy) {
+    if (words.length >= 8) words.shift();
+    var w = {
+      text: WORD_LIST[(Math.random() * WORD_LIST.length) | 0],
+      x: typeof gx === "number" ? gx : rand(3, Math.max(4, cols - 14)),
+      y: typeof gy === "number" ? gy : rand(4, Math.max(5, rows - 6)),
+      vx: rand(-0.5, 0.5),
+      vy: rand(-0.25, 0.25),
+      turn: rand(2, 5),
+      age: 0,
+      life: rand(9, 17),
+      seed: rand(0, Math.PI * 2)
+    };
+    w.x = Math.max(1, Math.min(w.x, cols - w.text.length - 1));
+    w.y = Math.max(1, Math.min(w.y, rows - 2));
+    words.push(w);
+  }
+
+  function updateWords(dt) {
+    wordTimer -= dt;
+    if (wordTimer <= 0) {
+      wordTimer = rand(2.4, 4.6);
+      if (Math.random() < 0.35) spawnWord(ahead.x / CELL, ahead.y / CELL); // the system speaks
+      else spawnWord();
+    }
+    for (var i = words.length - 1; i >= 0; i--) {
+      var w = words[i];
+      w.age += dt;
+      w.turn -= dt;
+      if (w.turn <= 0) {
+        w.turn = rand(2, 5);
+        w.vx = rand(-0.5, 0.5);
+        w.vy = rand(-0.25, 0.25);
+      }
+      w.x += w.vx * dt;
+      w.y += w.vy * dt;
+      if (w.x < 1) { w.x = 1; w.vx = Math.abs(w.vx); }
+      if (w.x > cols - w.text.length - 1) { w.x = cols - w.text.length - 1; w.vx = -Math.abs(w.vx); }
+      if (w.y < 1) { w.y = 1; w.vy = Math.abs(w.vy); }
+      if (w.y > rows - 2) { w.y = rows - 2; w.vy = -Math.abs(w.vy); }
+      if (w.age > w.life) words.splice(i, 1);
+    }
+  }
+
+  function drawWords(t, mgx, mgy) {
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var fi = Math.min(w.age / 1.6, 1);
+      var fo = Math.min((w.life - w.age) / 2.4, 1);
+      var a = 0.34 * fi * fi * (3 - 2 * fi) * fo * fo * (3 - 2 * fo);
+      var dxm = w.x - mgx, dym = w.y - mgy;
+      a += Math.exp(-(dxm * dxm + dym * dym) / 90) * 0.30;   // pointer curiosity
+      if (a <= 0.01) continue;
+      ctx.fillStyle = "rgba(" + inkBase + "," + Math.min(a, 0.62).toFixed(3) + ")";
+      for (var j = 0; j < w.text.length; j++) {
+        var bob = Math.round(Math.sin(t * 1.1 + j * 0.8 + w.seed) * 0.9);
+        ctx.fillText(w.text[j], (w.x + j) * CELL + CELL / 2, (w.y + bob) * CELL + CELL / 2);
+      }
+    }
+  }
+
+  function drawFrame(t, dt) {
     svx += (tx - sx) * 0.028; svx *= 0.86; sx += svx;
     svy += (ty - sy) * 0.028; svy *= 0.86; sy += svy;
     var mgx = sx / CELL, mgy = sy / CELL;
 
-    // Attractor trail
+    for (var wi = 0; wi < waves.length; wi++) waves[wi].update(dt);
+    stepAttractor(dt);
+    updateWords(dt);
+    for (var ri = ripples.length - 1; ri >= 0; ri--) {
+      ripples[ri].age += dt;
+      if (ripples[ri].age > 2.6) ripples.splice(ri, 1);
+    }
+
     trailGrid.fill(0);
-    trail.push(stepAttractor());
-    if (trail.length > TRAIL_MAX) trail.shift();
     for (var i = 0; i < trail.length; i++) {
-      var age = i / trail.length;             // 0 oldest → 1 newest
-      splat(trail[i].x / CELL, trail[i].y / CELL, age * age * 0.42);
+      var age = i / trail.length;
+      splat(trail[i].x / CELL, trail[i].y / CELL, age * age * 0.35);
     }
 
     ctx.clearRect(0, 0, W, H);
 
-    var cgx = cols / 2, cgy = rows / 2;
-    var t1 = t * 0.8, t2 = t * 0.6, t3 = t * 0.45, t4 = t * 1.4;
+    var agx = ahead.x / CELL, agy = ahead.y / CELL;
 
     for (var y = 0; y < rows; y++) {
-      var gy = y;
-      var dcy = gy - cgy;
-      var mdy = gy - mgy;
       for (var x = 0; x < cols; x++) {
-        var gx = x;
+        var v = 0;
+        for (var k = 0; k < waves.length; k++) v += waves[k].sample(x, y);
 
-        // 2D interference waves
-        var v = Math.sin(gx * 0.50 + t1) * 0.9
-              + Math.sin(gy * 0.78 - t2) * 0.7
-              + Math.sin((gx + gy) * 0.30 + t3) * 0.6;
-
-        // radial ripple from center, decaying outward
-        var dcx = gx - cgx;
-        var rd = Math.sqrt(dcx * dcx + dcy * dcy);
-        v += Math.sin(rd * 0.50 - t4) * Math.exp(-rd * 0.028) * 1.5;
-
-        var val = (v + 2.2) / 6.4;
+        // rings radiating from the dynamical system
+        var adx = x - agx, ady = y - agy;
+        var ad = Math.sqrt(adx * adx + ady * ady);
+        v += Math.sin(ad * 0.55 - pulsePhase) * Math.exp(-ad * 0.05) * emitAmp;
 
         // pointer bump (fluid coupling)
-        var mdx = gx - mgx;
-        val += Math.exp(-(mdx * mdx + mdy * mdy) / 16) * 0.85;
+        var mdx = x - mgx, mdy = y - mgy;
+        var bump = Math.exp(-(mdx * mdx + mdy * mdy) / 16) * 0.9;
 
-        // attractor trail
-        val += trailGrid[y * cols + x];
+        // expanding wavefronts from pointer motion and clicks
+        var ring = 0;
+        for (var r = 0; r < ripples.length; r++) {
+          var rp = ripples[r];
+          var rdx = x - rp.gx, rdy = y - rp.gy;
+          var rd = Math.sqrt(rdx * rdx + rdy * rdy);
+          var front = rp.age * rp.speed;
+          var band = Math.exp(-(rd - front) * (rd - front) / 5);
+          ring += Math.sin((rd - front) * 0.8) * band * rp.amp * Math.exp(-rp.age * 1.1);
+        }
+
+        var val = 0.30 + v * 0.16 + bump + ring * 0.5 + trailGrid[y * cols + x];
 
         if (val < 0.05) continue;
         if (val > 1) val = 1;
@@ -643,17 +802,25 @@
         ctx.fillText(RAMP[ci], x * CELL + CELL / 2, y * CELL + CELL / 2);
       }
     }
+
+    drawWords(t, mgx, mgy);
   }
 
   if (reduceMotion) {
-    drawFrame(0);
+    spawnWord(); spawnWord(); spawnWord();
+    for (var m = 0; m < words.length; m++) words[m].age = words[m].life * 0.45;
+    drawFrame(0, 0.016);
   } else {
-    var last = 0;
+    spawnWord(); spawnWord();
+    var last = 0, prevT = 0;
     var start = performance.now();
     var loop = function (now) {
       if (now - last > 33) {                  // ~30 fps is plenty for ambience
         last = now;
-        drawFrame((now - start) / 1000);
+        var t = (now - start) / 1000;
+        var dt = Math.min(t - prevT, 0.1);
+        prevT = t;
+        drawFrame(t, dt);
       }
       requestAnimationFrame(loop);
     };
