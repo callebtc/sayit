@@ -497,8 +497,8 @@
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ------------------------------------------------------------------ */
-  /* Murmuration field: slow ASCII waves, a Lorenz attractor the pointer */
-  /* steers, and words that live inside the dynamical system             */
+  /* A medium where waves propagate: random disturbances rain into a 2D  */
+  /* wave field, the pointer is a force, and words diffuse on the grid   */
   /* ------------------------------------------------------------------ */
 
   var canvas = document.getElementById("field");
@@ -509,24 +509,25 @@
   var BUCKETS = 28;
   var alphas = [];
   var inkBase = "228,226,220";
-  var wordMax = 0.12;
+  var letterMax = 0.5;
 
   function buildAlphas() {
     var light = document.documentElement.dataset.theme === "light";
     inkBase = light ? "26,26,24" : "228,226,220";
-    var max = light ? 0.24 : 0.20;
-    wordMax = light ? 0.26 : 0.22;
+    var max = light ? 0.38 : 0.34;
+    letterMax = light ? 0.55 : 0.5;
     alphas = [];
     for (var i = 0; i <= BUCKETS; i++) {
-      alphas.push("rgba(" + inkBase + "," + (Math.pow(i / BUCKETS, 1.5) * max).toFixed(3) + ")");
+      alphas.push("rgba(" + inkBase + "," + (Math.pow(i / BUCKETS, 1.4) * max).toFixed(3) + ")");
     }
   }
 
   buildAlphas();
 
   var W = 0, H = 0, cols = 0, rows = 0;
-  var trailGrid = new Float32Array(0);
   var smoothGrid = new Float32Array(0);   // per-cell temporal low-pass: kills flicker
+  var simCur = new Float32Array(0);       // medium state, sized by resize()
+  var simPrev = new Float32Array(0);
 
   // 5x5 gaussian splat kernel for the attractor trail
   var KERNEL = [];
@@ -550,8 +551,9 @@
     ctx.textBaseline = "middle";
     cols = Math.ceil(W / CELL);
     rows = Math.ceil(H / CELL);
-    trailGrid = new Float32Array(cols * rows);
     smoothGrid = new Float32Array(cols * rows);
+    simCur = new Float32Array(cols * rows);
+    simPrev = new Float32Array(cols * rows);
     for (var si = 0; si < smoothGrid.length; si++) smoothGrid[si] = 0.28;
   }
 
@@ -563,136 +565,74 @@
   // Pointer, spring-smoothed (decorative tracking needs momentum)
   var tx = W / 2, ty = H / 2;
   var sx = tx, sy = ty, svx = 0, svy = 0;
-  var lastTx = tx, lastTy = ty, moveAcc = 0;
+  var psx = sx, psy = sy, pointerSeen = false;
 
   window.addEventListener("pointermove", function (e) {
     tx = e.clientX;
     ty = e.clientY;
-    moveAcc += Math.abs(tx - lastTx) + Math.abs(ty - lastTy);
-    lastTx = tx; lastTy = ty;
-    if (moveAcc > 150) {              // gliding through the field sheds rings
-      moveAcc = 0;
-      spawnRipple(tx, ty, 0.20, 7);
-    }
+    pointerSeen = true;
   }, { passive: true });
 
   window.addEventListener("pointerdown", function (e) {
-    spawnRipple(e.clientX, e.clientY, 0.65, 10);
-    spawnWord(e.clientX + rand(-30, 30), e.clientY + rand(-30, 30));
+    disturb(e.clientX / CELL, e.clientY / CELL, 2.4);
+    spawnWord(e.clientX / CELL, e.clientY / CELL);
   });
 
-  // Expanding wavefronts
-  var ripples = [];
+  // The medium: a discrete 2D wave equation living on the render grid.
+  // cur/prev swap each step; the next state is written into prev.
+  var C2 = 0.24;                        // wave speed² (stability requires < 0.5)
+  var DAMP = 0.995;                     // slow energy loss
 
-  function spawnRipple(x, y, amp, speed) {
-    ripples.push({ gx: x / CELL, gy: y / CELL, age: 0, amp: amp, speed: speed });
-    if (ripples.length > 6) ripples.shift();
-  }
-
-  // Plane & radial waves whose direction, speed, amplitude and frequency
-  // all drift slowly toward new random targets every few seconds
-  function Wave(kind) {
-    this.kind = kind;
-    this.theta = this.thetaT = rand(0, Math.PI * 2);
-    this.k = this.kT = rand(0.14, 0.30);
-    this.omega = this.omegaT = rand(0.10, 0.35);
-    this.amp = this.ampT = rand(0.45, 0.80);
-    this.decay = this.decayT = rand(0.02, 0.035);
-    this.phase = rand(0, Math.PI * 2);
-    this.ox = this.oxT = rand(0.15, 0.85);
-    this.oy = this.oyT = rand(0.2, 0.8);
-    this.ct = Math.cos(this.theta);
-    this.st = Math.sin(this.theta);
-    this.ttl = rand(8, 16);
-  }
-
-  Wave.prototype.retarget = function () {
-    this.thetaT += rand(-0.7, 0.7);
-    this.kT = Math.min(0.34, Math.max(0.12, this.kT + rand(-0.06, 0.06)));
-    this.omegaT = Math.min(0.45, Math.max(0.08, this.omegaT + rand(-0.12, 0.12)));
-    this.ampT = Math.min(0.85, Math.max(0.35, this.ampT + rand(-0.15, 0.15)));
-    this.decayT = Math.min(0.04, Math.max(0.015, this.decayT + rand(-0.008, 0.008)));
-    if (this.kind === "radial") {
-      this.oxT = rand(0.1, 0.9);
-      this.oyT = rand(0.12, 0.88);
-    }
-    this.ttl = rand(9, 17);
-  };
-
-  Wave.prototype.update = function (dt) {
-    this.ttl -= dt;
-    if (this.ttl <= 0) this.retarget();
-    var f = 1 - Math.pow(0.5, dt / 2.5);          // ~2.5s half-life toward target
-    this.theta += (this.thetaT - this.theta) * f;
-    this.k += (this.kT - this.k) * f;
-    this.omega += (this.omegaT - this.omega) * f;
-    this.amp += (this.ampT - this.amp) * f;
-    this.decay += (this.decayT - this.decay) * f;
-    this.ox += (this.oxT - this.ox) * f * 0.6;
-    this.oy += (this.oyT - this.oy) * f * 0.6;
-    this.phase += this.omega * dt;                // continuous under speed changes
-    this.ct = Math.cos(this.theta);
-    this.st = Math.sin(this.theta);
-  };
-
-  Wave.prototype.sample = function (gx, gy) {
-    if (this.kind === "plane") {
-      return Math.sin((gx * this.ct + gy * this.st) * this.k + this.phase) * this.amp;
-    }
-    var dx = gx - this.ox * cols, dy = gy - this.oy * rows;
-    var d = Math.sqrt(dx * dx + dy * dy);
-    return Math.sin(d * this.k - this.phase) * Math.exp(-d * this.decay) * this.amp;
-  };
-
-  var waves = [new Wave("plane"), new Wave("plane"), new Wave("plane"), new Wave("radial")];
-
-  // Lorenz attractor: a smooth dynamical system at the heart of the field.
-  // The pointer feeds back into the system itself — horizontal position
-  // steers ρ across the chaos threshold, vertical position steers σ.
-  var lx = 0.6, ly = 0.4, lz = 24;
-  var lorenzAcc = 0;
-  var head = { x: W / 2, y: H / 2 };
-  var emitAmp = 0.3, pulsePhase = 0;
-  var trail = [];
-  var TRAIL_MAX = 110;
-
-  function stepAttractor(dt) {
-    lorenzAcc = Math.min(lorenzAcc + dt, 0.06);
-    var sigma = 10 + (sy / Math.max(H, 1) - 0.5) * 5;    // pointer y → σ
-    var rho = 26 + (sx / Math.max(W, 1) - 0.5) * 9;      // pointer x → ρ
-    var beta = 8 / 3;
-    var dx = 0, dy = 0, dz = 0;
-    while (lorenzAcc >= 0.004) {
-      lorenzAcc -= 0.004;
-      dx = sigma * (ly - lx);
-      dy = lx * (rho - lz) - ly;
-      dz = lx * ly - beta * lz;
-      lx += dx * 0.004; ly += dy * 0.004; lz += dz * 0.004;
-    }
-    var sc = Math.min(W, H) / 62;
-    head.x = W / 2 + lx * sc;
-    head.y = H / 2 + ly * sc;
-    var sp = Math.sqrt(dx * dx + dy * dy);
-    var inst = Math.min(0.22 + sp * 0.0016, 0.7);
-    emitAmp += (inst - emitAmp) * (1 - Math.exp(-dt * 1.4));
-    pulsePhase += dt * (0.8 + emitAmp * 1.3);
-    trail.push({ x: head.x, y: head.y });
-    if (trail.length > TRAIL_MAX) trail.shift();
-  }
-
-  function splat(gx, gy, weight) {
+  // drop energy into the medium through the shared gaussian kernel
+  function disturb(gx, gy, amp) {
     for (var i = 0; i < KERNEL.length; i++) {
       var k = KERNEL[i];
       var x = Math.round(gx) + k.dx;
       var y = Math.round(gy) + k.dy;
-      if (x >= 0 && x < cols && y >= 0 && y < rows) {
-        trailGrid[y * cols + x] += weight * k.w;
+      if (x > 0 && x < cols - 1 && y > 0 && y < rows - 1) {
+        simCur[y * cols + x] += amp * k.w * 0.24;
       }
     }
   }
 
-  // Words living in the system: advected by the field's current, drawn
-  // toward the attractor, stirred by the pointer, leaving a faint wake
+  // random disturbances keep the medium alive
+  var rainTimer = 0.3;
+
+  function updateRain(dt) {
+    rainTimer -= dt;
+    if (rainTimer <= 0) {
+      rainTimer = rand(0.4, 1.0);
+      var amp = rand(0.5, 1.3) * (Math.random() < 0.5 ? -1 : 1);
+      disturb(rand(4, cols - 5), rand(4, rows - 5), amp);
+    }
+  }
+
+  // the pointer is a force: moving it presses energy into the medium,
+  // standing still leaves a faint dent
+  function stirPointer() {
+    if (!pointerSeen) return;
+    var speed = Math.sqrt((sx - psx) * (sx - psx) + (sy - psy) * (sy - psy));
+    psx = sx; psy = sy;
+    var press = -Math.min(speed * 0.012, 0.55) - 0.003;
+    disturb(sx / CELL, sy / CELL, press);
+  }
+
+  function stepMedium() {
+    for (var y = 1; y < rows - 1; y++) {
+      var rb = y * cols;
+      for (var x = 1; x < cols - 1; x++) {
+        var i = rb + x;
+        simPrev[i] = (2 * simCur[i] - simPrev[i]
+          + C2 * (simCur[i - 1] + simCur[i + 1] + simCur[i - cols] + simCur[i + cols]
+          - 4 * simCur[i])) * DAMP;
+      }
+    }
+    var tmp = simCur; simCur = simPrev; simPrev = tmp;
+  }
+
+  // Words are born at random cells of the grid and slowly diffuse: each
+  // letter is a particle riding the medium's gradients and shoved by the
+  // pointer, until the word scatters back into the waves
   var WORD_LIST = [
     "say it", "speak", "listen", "aloud", "out loud", "voice", "echo",
     "whisper", "murmur", "cadence", "resonate", "read to me", "softly",
@@ -700,97 +640,86 @@
     "phrase", "sound", "waves", "offline", "private", "local", "hum"
   ];
   var words = [];
-  var wordTimer = 0.5;
-  var WORD_MAX = 14;
+  var wordTimer = 0.4;
+  var WORD_MAX = 12;
 
-  function spawnWord(px, py) {
+  function spawnWord(gx, gy) {
     if (words.length >= WORD_MAX) words.shift();
-    words.push({
-      text: WORD_LIST[(Math.random() * WORD_LIST.length) | 0],
-      x: typeof px === "number" ? px : rand(40, Math.max(60, W - 160)),
-      y: typeof py === "number" ? py : rand(60, Math.max(80, H - 120)),
-      vx: 0, vy: 0,
-      age: 0,
-      life: rand(13, 21),
-      alpha: 0
-    });
+    var text = WORD_LIST[(Math.random() * WORD_LIST.length) | 0];
+    var bx = typeof gx === "number" ? gx : rand(3, Math.max(4, cols - text.length - 4));
+    var by = typeof gy === "number" ? gy : rand(4, Math.max(5, rows - 5));
+    var letters = [];
+    for (var i = 0; i < text.length; i++) {
+      letters.push({
+        ch: text[i],
+        gx: bx + i,
+        gy: by,
+        vx: rand(-0.30, 0.30),            // diffusion: letters drift apart
+        vy: rand(-0.18, 0.18)
+      });
+    }
+    words.push({ letters: letters, age: 0, life: rand(13, 22), alpha: 0 });
   }
 
-  // Slow scalar potential; its curl gives the current the words ride on
-  function potential(x, y, t) {
-    return Math.sin(x * 0.0058 + t * 0.20)
-         + Math.sin(y * 0.0071 - t * 0.16) * 0.85
-         + Math.sin((x + y) * 0.0031 + t * 0.12) * 0.6;
-  }
-
-  var flow = { x: 0, y: 0 };
-
-  function flowAt(x, y, t) {
-    var e = 30;
-    var gx = (potential(x + e, y, t) - potential(x - e, y, t)) / (2 * e);
-    var gy = (potential(x, y + e, t) - potential(x, y - e, t)) / (2 * e);
-    flow.x = -gy * 2300;                    // tangential to the isolines
-    flow.y = gx * 2300;
-    return flow;
-  }
-
-  function updateWords(dt, t) {
+  function updateWords(dt, mgx, mgy) {
     wordTimer -= dt;
     if (wordTimer <= 0) {
-      wordTimer = rand(1.8, 3.4);
-      if (Math.random() < 0.4) spawnWord(head.x + rand(-40, 40), head.y + rand(-40, 40));
-      else spawnWord();
+      wordTimer = rand(1.8, 3.2);
+      spawnWord();
     }
     for (var i = words.length - 1; i >= 0; i--) {
       var w = words[i];
       w.age += dt;
       if (w.age > w.life) { words.splice(i, 1); continue; }
 
-      var f = flowAt(w.x, w.y, t);
-      var tvx = f.x, tvy = f.y;
+      var fi = Math.min(w.age / 2.2, 1);
+      var fo = Math.min((w.life - w.age) / 4.0, 1);
+      w.alpha = letterMax * fi * fi * (3 - 2 * fi) * fo * fo * (3 - 2 * fo);
 
-      // gentle pull toward the attractor — words gather where the system lives
-      var hx = head.x - w.x, hy = head.y - w.y;
-      var hd = Math.sqrt(hx * hx + hy * hy) || 1;
-      var pull = Math.min(hd * 0.02, 18);
-      tvx += (hx / hd) * pull;
-      tvy += (hy / hd) * pull;
+      for (var j = 0; j < w.letters.length; j++) {
+        var l = w.letters[j];
 
-      // the pointer stirs the same current back: swirl around the cursor
-      var mx = w.x - sx, my = w.y - sy;
-      var mr = Math.sqrt(mx * mx + my * my) || 1;
-      if (mr < 460) {
-        var fall = Math.exp(-mr / 230);
-        tvx += (-my / mr) * 85 * fall - (mx / mr) * 9 * Math.exp(-mr / 280);
-        tvy += ( mx / mr) * 85 * fall - (my / mr) * 9 * Math.exp(-mr / 280);
+        // surf the medium's gradients
+        var cx = Math.max(1, Math.min(cols - 2, Math.round(l.gx)));
+        var cy = Math.max(1, Math.min(rows - 2, Math.round(l.gy)));
+        var ci2 = cy * cols + cx;
+        l.vx += (simCur[ci2 - 1] - simCur[ci2 + 1]) * 1.4 * dt;
+        l.vy += (simCur[ci2 - cols] - simCur[ci2 + cols]) * 1.4 * dt;
+
+        // the pointer is a force here too: it shoves letters away
+        var mx = l.gx - mgx, my = l.gy - mgy;
+        var mr = Math.sqrt(mx * mx + my * my) || 1;
+        if (mr < 14) {
+          var F = 50 * Math.exp(-mr / 5);
+          l.vx += (mx / mr) * F * dt;
+          l.vy += (my / mr) * F * dt;
+        }
+
+        var drag = Math.max(0, 1 - 1.1 * dt);
+        l.vx *= drag; l.vy *= drag;
+        l.gx += l.vx * dt;
+        l.gy += l.vy * dt;
+
+        if (l.gx < -6) l.gx = cols + 5; else if (l.gx > cols + 6) l.gx = -5;
+        if (l.gy < -6) l.gy = rows + 5; else if (l.gy > rows + 6) l.gy = -5;
+
+        if (w.alpha > 0.02) disturb(l.gx, l.gy, w.alpha * 0.06);  // faint wake
       }
-
-      var ease = 1 - Math.exp(-dt * 2.4);
-      w.vx += (tvx - w.vx) * ease;
-      w.vy += (tvy - w.vy) * ease;
-      w.x += w.vx * dt;
-      w.y += w.vy * dt;
-
-      var m = 90;                           // soft wrap at the edges
-      if (w.x < -m) w.x = W + m - 1; else if (w.x > W + m) w.x = -m + 1;
-      if (w.y < -m) w.y = H + m - 1; else if (w.y > H + m) w.y = -m + 1;
-
-      var fi = Math.min(w.age / 2.4, 1);
-      var fo = Math.min((w.life - w.age) / 3.2, 1);
-      w.alpha = wordMax * fi * fi * (3 - 2 * fi) * fo * fo * (3 - 2 * fo);
     }
   }
 
-  function drawWords() {
-    ctx.font = "11px ui-monospace, 'SF Mono', Menlo, monospace";
+  function drawLetters(mgx, mgy) {
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
-      var a = w.alpha;
-      var mx = w.x - sx, my = w.y - sy;
-      a += Math.exp(-(mx * mx + my * my) / 16000) * 0.05;  // pointer curiosity
-      if (a <= 0.008) continue;
-      ctx.fillStyle = "rgba(" + inkBase + "," + Math.min(a, 0.5).toFixed(3) + ")";
-      ctx.fillText(w.text, w.x, w.y);
+      if (w.alpha <= 0.008) continue;
+      for (var j = 0; j < w.letters.length; j++) {
+        var l = w.letters[j];
+        var a = w.alpha;
+        var mx = l.gx - mgx, my = l.gy - mgy;
+        a += Math.exp(-(mx * mx + my * my) / 20) * 0.16;   // the cursor energizes
+        ctx.fillStyle = "rgba(" + inkBase + "," + Math.min(a, 0.85).toFixed(3) + ")";
+        ctx.fillText(l.ch, (Math.round(l.gx) + 0.5) * CELL, (Math.round(l.gy) + 0.5) * CELL);
+      }
     }
   }
 
@@ -799,59 +728,20 @@
     svy += (ty - sy) * 0.028; svy *= 0.86; sy += svy;
     var mgx = sx / CELL, mgy = sy / CELL;
 
-    for (var wi = 0; wi < waves.length; wi++) waves[wi].update(dt);
-    stepAttractor(dt);
-    updateWords(dt, t);
-    for (var ri = ripples.length - 1; ri >= 0; ri--) {
-      ripples[ri].age += dt;
-      if (ripples[ri].age > 3.5) ripples.splice(ri, 1);
-    }
-
-    trailGrid.fill(0);
-    for (var i = 0; i < trail.length; i++) {
-      var age = i / trail.length;
-      splat(trail[i].x / CELL, trail[i].y / CELL, age * age * 0.20);
-    }
-    for (var wd = 0; wd < words.length; wd++) {
-      if (words[wd].alpha > 0.01) {
-        splat(words[wd].x / CELL, words[wd].y / CELL, words[wd].alpha * 0.8); // wake
-      }
-    }
+    stirPointer();
+    updateRain(dt);
+    updateWords(dt, mgx, mgy);
+    stepMedium();
 
     ctx.clearRect(0, 0, W, H);
-    ctx.font = "12px ui-monospace, 'SF Mono', Menlo, monospace";
 
-    var bgx = head.x / CELL, bgy = head.y / CELL;
     var k1 = 1 - Math.exp(-dt * 7);         // low-pass coefficient, ~140ms
 
     for (var y = 0; y < rows; y++) {
       var rowBase = y * cols;
       for (var x = 0; x < cols; x++) {
-        var v = 0;
-        for (var k = 0; k < waves.length; k++) v += waves[k].sample(x, y);
-
-        // rings radiating from the dynamical system
-        var adx = x - bgx, ady = y - bgy;
-        var ad = Math.sqrt(adx * adx + ady * ady);
-        v += Math.sin(ad * 0.5 - pulsePhase) * Math.exp(-ad * 0.045) * emitAmp * 0.5;
-
-        // faint pointer presence
-        var mdx = x - mgx, mdy = y - mgy;
-        var bump = Math.exp(-(mdx * mdx + mdy * mdy) / 18) * 0.20;
-
-        // expanding wavefronts from pointer motion and clicks
-        var ring = 0;
-        for (var r = 0; r < ripples.length; r++) {
-          var rp = ripples[r];
-          var rdx = x - rp.gx, rdy = y - rp.gy;
-          var rd = Math.sqrt(rdx * rdx + rdy * rdy);
-          var front = rp.age * rp.speed;
-          var band = Math.exp(-(rd - front) * (rd - front) / 5);
-          ring += Math.sin((rd - front) * 0.8) * band * rp.amp * Math.exp(-rp.age * 0.9);
-        }
-
         var idx = rowBase + x;
-        var val = 0.28 + v * 0.15 + bump + ring * 0.3 + trailGrid[idx];
+        var val = 0.28 + simCur[idx] * 0.55;
 
         // temporal smoothing: values glide instead of popping
         var sm = smoothGrid[idx] + (val - smoothGrid[idx]) * k1;
@@ -868,23 +758,28 @@
       }
     }
 
-    drawWords();
+    drawLetters(mgx, mgy);
   }
 
   if (reduceMotion) {
-    for (var wu = 0; wu < 240; wu++) stepAttractor(0.016);
+    for (var wu = 0; wu < 8; wu++) disturb(rand(4, cols - 5), rand(4, rows - 5), rand(0.6, 1.2));
+    for (var wu2 = 0; wu2 < 50; wu2++) stepMedium();
     spawnWord(); spawnWord(); spawnWord(); spawnWord();
     for (var m = 0; m < words.length; m++) words[m].age = words[m].life * 0.5;
-    drawFrame(0, 0.016);
+    drawFrame(0, 0.033);
   } else {
-    spawnWord(); spawnWord(); spawnWord(); spawnWord();
+    for (var s0 = 0; s0 < 4; s0++) disturb(rand(4, cols - 5), rand(4, rows - 5), rand(0.6, 1.2));
+    spawnWord(); spawnWord(); spawnWord();
+    var last = 0;
     var prev = performance.now();
     var start = prev;
     var loop = function (now) {
+      requestAnimationFrame(loop);
+      if (now - last < 33) return;          // 30 fps: plenty for a calm medium
+      last = now;
       var dt = Math.min((now - prev) / 1000, 0.05);
       prev = now;
       drawFrame((now - start) / 1000, dt);
-      requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
   }
