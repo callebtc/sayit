@@ -86,9 +86,11 @@
   .page {
     position: relative;
     z-index: 2;
+    height: 100vh;
     height: 100dvh;
     display: grid;
     grid-template-rows: auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr);   /* never wider than the viewport */
   }
 
   /* ---------- header ---------- */
@@ -229,6 +231,7 @@
     letter-spacing: -0.045em;
     line-height: 1.0;
     max-width: 12ch;
+    text-wrap: balance;
   }
 
   .sub {
@@ -370,10 +373,37 @@
   }
 
   @media (max-width: 720px) {
-    .features { grid-template-columns: 1fr; gap: 16px; }
-    .feature p { max-width: none; }
-    footer { padding-bottom: 18px; }
-    .fineprint { margin-top: 14px; }
+    header { padding: 16px 18px; }
+    .brand span { font-size: 14px; }
+    .stars { padding: 6px 11px; }
+
+    main { padding: 0 20px; }
+    .eyebrow { font-size: 10.5px; letter-spacing: 0.18em; margin-bottom: 20px; }
+    h1 { font-size: clamp(38px, 11.5vw, 56px); }
+    .sub { margin-top: 18px; font-size: 15px; }
+    .cta { margin-top: 24px; flex-direction: column; gap: 10px; width: 100%; }
+    .btn { width: min(300px, 100%); justify-content: center; }
+    .micro { margin-top: 14px; font-size: 10.5px; padding: 0 10px; text-wrap: balance; }
+
+    footer { padding: 0 20px 14px; }
+    .features { grid-template-columns: 1fr; gap: 10px; padding-top: 12px; }
+    .feature .idx { display: inline; margin-right: 8px; }
+    .feature h2 { display: inline; font-size: 13px; }
+    .feature p { max-width: none; margin-top: 3px; font-size: 12px; }
+    .fineprint { display: none; }
+  }
+
+  /* short phones: fold the descriptions so everything stays on one screen */
+  @media (max-width: 720px) and (max-height: 720px) {
+    .feature p { display: none; }
+  }
+
+  /* landscape phones: hero only */
+  @media (max-height: 520px) {
+    .features { display: none; }
+    .fineprint { margin-top: 0; }
+    .eyebrow { margin-bottom: 12px; }
+    .cta { margin-top: 20px; }
   }
 
   /* ---------- entrance ---------- */
