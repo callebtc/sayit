@@ -9,8 +9,9 @@ targets include `SayItHTTP/`, `SayItCLI/`, `SayItAgent/`, and
 `SayItSelectionAgent/`. Tests mirror these modules under `Tests/*Tests/`;
 fixtures belong beside their suite. App resources live in
 `Sources/SayIt/Resources/`, configuration in `Config/`, build automation in
-`Scripts/`, and README media in `public/`. Treat `project.yml` as the source of
-truth for the generated `SayIt.xcodeproj`.
+`Scripts/`, and README media in `public/`. The static landing page lives in
+`public/index.html` (self-contained, no build step). Treat `project.yml` as the
+source of truth for the generated `SayIt.xcodeproj`.
 
 ## Build, Test, and Development Commands
 
