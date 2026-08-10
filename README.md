@@ -116,47 +116,6 @@ automatically.
 
 Tests run with `swift test --disable-sandbox`.
 
-## Make a release
-
-The release workflow is automated, but publishing to GitHub is deliberately
-separate. The script builds and tests the app, applies Developer ID signatures
-with secure timestamps, creates the DMG, submits it to Apple's notarization
-service, staples the ticket, mounts the result, and audits its signatures and
-contents. Before packaging, it also launches the signed app in a non-interactive
-smoke-test mode and verifies the production selected-text helper over XPC
-without requesting Accessibility access.
-
-One time only:
-
-1. Copy `.env.release.example` to `.env.release`, set the Developer ID
-   Application identity, and set the GitHub latest-release API URL. A
-   certificate SHA-1 fingerprint avoids ambiguity when Keychain contains
-   multiple certificates with the same display name. The update URL is
-   injected only into built app bundles and is not stored in tracked project
-   configuration.
-2. Store App Store Connect notarization credentials in Keychain:
-
-   ```sh
-   xcrun notarytool store-credentials "sayit-notary" \
-     --apple-id "YOUR_APPLE_ID" \
-     --team-id "YOUR_TEAM_ID" \
-     --password "YOUR_APP_SPECIFIC_PASSWORD"
-   ```
-
-For each release, update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in
-`project.yml`, commit that release state, then run:
-
-```sh
-SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh 0.1.0
-```
-
-Replace `0.1.0` with the committed marketing version. The explicit environment
-flag authorizes that run's upload to Apple. The script stops if the Git
-worktree is dirty, a test or signature check fails, notarization is rejected,
-or the mounted DMG contains a local user path. It prints the final DMG path and
-SHA-256 checksum but does not create a GitHub release or upload anything to
-GitHub.
-
 ## More screenshots
 
 [Voice cloning](public/resources/cloning.png)
