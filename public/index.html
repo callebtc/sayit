@@ -42,6 +42,7 @@
     --line: rgba(242, 241, 237, 0.10);
     --line-strong: rgba(242, 241, 237, 0.22);
     --veil: rgba(10, 10, 11, 0.72);
+    --bg-veil: rgba(10, 10, 11, 0.86);
     --chip: rgba(10, 10, 11, 0.4);
     --focus: rgba(242, 241, 237, 0.7);
     --icon-filter: invert(0.94);
@@ -59,6 +60,7 @@
     --line: rgba(23, 23, 20, 0.12);
     --line-strong: rgba(23, 23, 20, 0.28);
     --veil: rgba(246, 245, 241, 0.78);
+    --bg-veil: rgba(246, 245, 241, 0.88);
     --chip: rgba(246, 245, 241, 0.55);
     --focus: rgba(23, 23, 20, 0.55);
     --icon-filter: none;
@@ -68,14 +70,22 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    height: 100%;
-    overflow-x: hidden;
     background: var(--bg);
     color: var(--fg);
     font-family: var(--sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     transition: background-color 300ms ease, color 300ms ease;
+  }
+
+  html {
+    min-height: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    position: relative;
+    min-height: 100%;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -85,10 +95,12 @@
   ::selection { background: var(--fg); color: var(--bg); }
 
   #field {
-    position: fixed;
-    inset: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
     display: block;
     z-index: 0;
+    pointer-events: none;
   }
 
   .veil {
@@ -97,7 +109,7 @@
     z-index: 1;
     pointer-events: none;
     background:
-      radial-gradient(ellipse 90% 70% at 50% 46%, transparent 40%, var(--veil) 100%);
+      radial-gradient(ellipse 90% 82% at 50% 46%, transparent 52%, var(--veil) 100%);
   }
 
   .page {
@@ -428,7 +440,7 @@
   .showcase {
     position: relative;
     z-index: 2;
-    background: var(--bg);
+    background: var(--bg-veil);   /* translucent: the wave field whispers through */
     border-top: 1px solid var(--line);
     transition: background-color 300ms ease;
   }
@@ -494,6 +506,9 @@
   [data-theme="dark"] .shot .img-dark { display: block; }
   [data-theme="dark"] .shot .img-light { display: none; }
 
+  /* optical centering: the models window sits a touch lower than the player */
+  .shot-models { transform: translateY(clamp(10px, 1.5vw, 20px)); }
+
   .shot figcaption {
     margin-top: 14px;
     font-family: var(--mono);
@@ -519,7 +534,7 @@
     .shots { display: block; padding-bottom: 0; }
     .shot { height: auto; }
     .shot img { width: 100%; height: auto; }
-    .shot-models { margin-top: 28px; }
+    .shot-models { transform: none; margin-top: 28px; }
   }
 
   /* ---------- scroll reveal ---------- */
@@ -701,7 +716,6 @@
   "use strict";
 
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var heroVisible = true;
 
   /* ------------------------------------------------------------------ */
   /* A medium where waves propagate: random disturbances rain into a 2D  */
@@ -731,7 +745,7 @@
 
   buildAlphas();
 
-  var W = 0, H = 0, cols = 0, rows = 0;
+  var W = 0, H = 0, VH = 0, cols = 0, rows = 0;
   var smoothGrid = new Float32Array(0);   // per-cell temporal low-pass: kills flicker
   var simCur = new Float32Array(0);       // medium state, sized by resize()
   var simPrev = new Float32Array(0);
@@ -747,7 +761,8 @@
   function resize() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth;
-    H = window.innerHeight;
+    VH = window.innerHeight;
+    H = Math.max(VH, document.body.offsetHeight);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + "px";
@@ -756,8 +771,11 @@
     ctx.font = "12px ui-monospace, 'SF Mono', Menlo, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    cols = Math.ceil(W / CELL);
-    rows = Math.ceil(H / CELL);
+    var newCols = Math.ceil(W / CELL);
+    var newRows = Math.ceil(H / CELL);
+    if (newCols === cols && newRows === rows) return;   // keep the medium's state
+    cols = newCols;
+    rows = newRows;
     smoothGrid = new Float32Array(cols * rows);
     simCur = new Float32Array(cols * rows);
     simPrev = new Float32Array(cols * rows);
@@ -765,6 +783,7 @@
   }
 
   window.addEventListener("resize", resize);
+  window.addEventListener("load", resize);   // image layout settles after load
   resize();
 
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -781,8 +800,9 @@
   }, { passive: true });
 
   window.addEventListener("pointerdown", function (e) {
-    disturb(e.clientX / CELL, e.clientY / CELL, 2.4);
-    spawnWord(e.clientX / CELL, e.clientY / CELL);
+    var gy = (e.clientY + window.scrollY) / CELL;
+    disturb(e.clientX / CELL, gy, 2.4);
+    spawnWord(e.clientX / CELL, gy);
   });
 
   // The medium: a discrete 2D wave equation living on the render grid.
@@ -802,7 +822,7 @@
     }
   }
 
-  // random disturbances keep the medium alive
+  // random disturbances keep the visible part of the page alive
   var rainTimer = 0.3;
 
   function updateRain(dt) {
@@ -810,7 +830,9 @@
     if (rainTimer <= 0) {
       rainTimer = rand(0.4, 1.0);
       var amp = rand(0.5, 1.3) * (Math.random() < 0.5 ? -1 : 1);
-      disturb(rand(4, cols - 5), rand(4, rows - 5), amp);
+      var yA = Math.max(4, window.scrollY / CELL + 2);
+      var yB = Math.min(rows - 3, (window.scrollY + VH) / CELL - 2);
+      disturb(rand(4, cols - 5), rand(yA, Math.max(yA + 1, yB)), amp);
     }
   }
 
@@ -821,7 +843,7 @@
     var speed = Math.sqrt((sx - psx) * (sx - psx) + (sy - psy) * (sy - psy));
     psx = sx; psy = sy;
     var press = -Math.min(speed * 0.012, 0.55) - 0.003;
-    disturb(sx / CELL, sy / CELL, press);
+    disturb(sx / CELL, (sy + window.scrollY) / CELL, press);
   }
 
   function stepMedium() {
@@ -848,13 +870,15 @@
   ];
   var words = [];
   var wordTimer = 0.4;
-  var WORD_MAX = 12;
+  var WORD_MAX = 16;
 
   function spawnWord(gx, gy) {
     if (words.length >= WORD_MAX) words.shift();
     var text = WORD_LIST[(Math.random() * WORD_LIST.length) | 0];
     var bx = typeof gx === "number" ? gx : rand(3, Math.max(4, cols - text.length - 4));
-    var by = typeof gy === "number" ? gy : rand(4, Math.max(5, rows - 5));
+    var visA = 4 + (window.scrollY || 0) / CELL;
+    var visB = Math.min(rows - 5, visA + VH / CELL - 8);
+    var by = typeof gy === "number" ? gy : rand(visA, Math.max(visA + 1, visB));
     var letters = [];
     for (var i = 0; i < text.length; i++) {
       letters.push({
@@ -915,17 +939,19 @@
     }
   }
 
-  function drawLetters(mgx, mgy) {
+  function drawLetters(mgx, mgy, sc) {
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
       if (w.alpha <= 0.008) continue;
       for (var j = 0; j < w.letters.length; j++) {
         var l = w.letters[j];
+        var py = (Math.round(l.gy) + 0.5) * CELL;
+        if (py < sc - CELL || py > sc + VH + CELL) continue;
         var a = w.alpha;
         var mx = l.gx - mgx, my = l.gy - mgy;
         a += Math.exp(-(mx * mx + my * my) / 20) * 0.16;   // the cursor energizes
         ctx.fillStyle = "rgba(" + inkBase + "," + Math.min(a, 0.85).toFixed(3) + ")";
-        ctx.fillText(l.ch, (Math.round(l.gx) + 0.5) * CELL, (Math.round(l.gy) + 0.5) * CELL);
+        ctx.fillText(l.ch, (Math.round(l.gx) + 0.5) * CELL, py);
       }
     }
   }
@@ -933,18 +959,23 @@
   function drawFrame(t, dt) {
     svx += (tx - sx) * 0.028; svx *= 0.86; sx += svx;
     svy += (ty - sy) * 0.028; svy *= 0.86; sy += svy;
-    var mgx = sx / CELL, mgy = sy / CELL;
+    var sc = window.scrollY || 0;
+    var off = sc / CELL;
+    var mgx = sx / CELL, mgy = off + sy / CELL;
 
     stirPointer();
     updateRain(dt);
     updateWords(dt, mgx, mgy);
     stepMedium();
 
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, sc, W, VH);
 
     var k1 = 1 - Math.exp(-dt * 7);         // low-pass coefficient, ~140ms
 
-    for (var y = 0; y < rows; y++) {
+    var y0 = Math.max(0, Math.floor(off) - 1);
+    var y1 = Math.min(rows - 1, Math.ceil(off + VH / CELL) + 1);
+
+    for (var y = y0; y <= y1; y++) {
       var rowBase = y * cols;
       for (var x = 0; x < cols; x++) {
         var idx = rowBase + x;
@@ -965,7 +996,7 @@
       }
     }
 
-    drawLetters(mgx, mgy);
+    drawLetters(mgx, mgy, sc);
   }
 
   if (reduceMotion) {
@@ -974,6 +1005,7 @@
     spawnWord(); spawnWord(); spawnWord(); spawnWord();
     for (var m = 0; m < words.length; m++) words[m].age = words[m].life * 0.5;
     drawFrame(0, 0.033);
+    window.addEventListener("scroll", function () { drawFrame(0, 0.016); }, { passive: true });
   } else {
     for (var s0 = 0; s0 < 4; s0++) disturb(rand(4, cols - 5), rand(4, rows - 5), rand(0.6, 1.2));
     spawnWord(); spawnWord(); spawnWord();
@@ -986,7 +1018,6 @@
       last = now;
       var dt = Math.min((now - prev) / 1000, 0.05);
       prev = now;
-      if (!heroVisible) return;             // field sleeps below the fold
       drawFrame((now - start) / 1000, dt);
     };
     requestAnimationFrame(loop);
@@ -1004,11 +1035,6 @@
 
   var revealEls = document.querySelectorAll(".reveal, .shot");
   for (var ri = 0; ri < revealEls.length; ri++) revealObserver.observe(revealEls[ri]);
-
-  var heroObserver = new IntersectionObserver(function (entries) {
-    heroVisible = entries[0].isIntersecting;
-  }, { threshold: 0.02 });
-  heroObserver.observe(document.querySelector(".page"));
 
   /* ------------------------------------------------------------------ */
   /* Theme toggle: explicit choice persists, otherwise follow the system */
