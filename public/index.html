@@ -69,13 +69,17 @@
 
   html, body {
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
     background: var(--bg);
     color: var(--fg);
     font-family: var(--sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     transition: background-color 300ms ease, color 300ms ease;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
   }
 
   ::selection { background: var(--fg); color: var(--bg); }
@@ -419,6 +423,116 @@
     .cta { margin-top: 20px; }
   }
 
+  /* ---------- showcase ---------- */
+
+  .showcase {
+    position: relative;
+    z-index: 2;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    transition: background-color 300ms ease;
+  }
+
+  .showcase-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(90px, 16vh, 150px) 28px clamp(80px, 13vh, 130px);
+  }
+
+  .showcase .eyebrow { margin-bottom: 20px; }
+
+  .showcase-title {
+    font-size: clamp(32px, 4.4vw, 56px);
+    font-weight: 640;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+
+  .showcase-sub {
+    margin-top: 20px;
+    max-width: 56ch;
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--fg-muted);
+  }
+
+  .shots {
+    margin-top: clamp(54px, 9vh, 92px);
+    padding-bottom: clamp(36px, 5vw, 60px);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: clamp(24px, 3vw, 44px);
+    /* one shared height so both windows match: sum of aspect ratios is 2.201 */
+    --h: min(470px, calc((min(1124px, 100vw - 56px) - 44px) / 2.201));
+  }
+
+  .shot {
+    margin: 0;
+    clip-path: inset(0 0 100% 0);
+    opacity: 0;
+    transition: clip-path 900ms cubic-bezier(0.77, 0, 0.175, 1), opacity 500ms ease;
+    transition-delay: var(--rd, 0ms);
+  }
+
+  .shot.is-in { clip-path: inset(0 0 0 0); opacity: 1; }
+
+  .shot img {
+    display: block;
+    width: auto;
+    height: var(--h);
+    transform: scale(1.05);
+    transition: transform 1200ms var(--ease-out);
+    transition-delay: var(--rd, 0ms);
+  }
+
+  .shot.is-in img { transform: scale(1); }
+
+  /* shadows are baked into the transparent PNGs; dark mode swaps the asset */
+  .shot .img-dark { display: none; }
+
+  [data-theme="dark"] .shot .img-dark { display: block; }
+  [data-theme="dark"] .shot .img-light { display: none; }
+
+  .shot figcaption {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-muted);
+  }
+
+  .shot figcaption .idx { color: var(--fg-faint); margin-right: 10px; }
+
+  .closing {
+    margin-top: clamp(40px, 7vh, 72px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+  }
+
+  .closing p { color: var(--fg-muted); font-size: 15px; }
+
+  @media (max-width: 860px) {
+    .shots { display: block; padding-bottom: 0; }
+    .shot { height: auto; }
+    .shot img { width: 100%; height: auto; }
+    .shot-models { margin-top: 28px; }
+  }
+
+  /* ---------- scroll reveal ---------- */
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 560ms ease, transform 560ms var(--ease-out);
+    transition-delay: var(--rd, 0ms);
+  }
+
+  .reveal.is-in { opacity: 1; transform: none; }
+
   /* ---------- entrance ---------- */
 
   .rise {
@@ -443,6 +557,9 @@
     .theme-toggle { transition: border-color 160ms ease, color 160ms ease; }
     .theme-toggle svg { transition: opacity 180ms ease; transform: none; }
     html, body { transition: none; }
+    .reveal { transform: none; transition: opacity 300ms ease; transition-delay: 0ms; }
+    .shot { clip-path: inset(0 0 0 0); transition: opacity 300ms ease; transition-delay: 0ms; }
+    .shot img { transform: none; transition: none; }
   }
 </style>
 </head>
@@ -486,8 +603,8 @@
       your words never leave the machine.
     </p>
     <div class="cta rise" style="--d:330ms">
-      <a class="btn btn-primary" id="downloadBtn"
-         href="https://github.com/callebtc/sayit/releases/download/v0.1.3/SayIt-0.1.3.dmg"
+      <a class="btn btn-primary js-download"
+         href="https://github.com/callebtc/sayit/releases/download/v1.0.0/SayIt-1.0.0.dmg"
          rel="noopener">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M2.5 13.5h11"/>
@@ -503,7 +620,8 @@
     </div>
     <p class="micro rise" style="--d:400ms">
       macOS 15+ · Apple silicon · Free &amp; open source ·
-      <a href="https://github.com/callebtc/sayit/releases" target="_blank" rel="noopener" id="versionNote">v0.1.3</a>
+      <a href="https://github.com/callebtc/sayit/releases" target="_blank" rel="noopener" id="versionNote">v1.0.0</a> ·
+      <a href="#how">see it in action</a>
     </p>
   </main>
 
@@ -533,11 +651,57 @@
 
 </div>
 
+<section class="showcase" id="how">
+  <div class="showcase-inner">
+    <p class="eyebrow reveal">A first look</p>
+    <h2 class="showcase-title reveal" style="--rd:70ms">Press a hotkey. It&nbsp;reads.</h2>
+    <p class="showcase-sub reveal" style="--rd:140ms">
+      The player floats in your menu bar — follow the spoken word, scrub the
+      waveform, change the speed. Models download once from Hugging Face and
+      speak offline from then on.
+    </p>
+
+    <div class="shots">
+      <figure class="shot shot-player" style="--rd:120ms">
+        <img class="img-light" src="resources/player.png"
+             alt="SayIt's menu-bar player showing a waveform, playback controls, and the spoken text with the current word highlighted"
+             width="812" height="850" loading="lazy" decoding="async">
+        <img class="img-dark" src="resources/player-dark.png"
+             alt="" aria-hidden="true"
+             width="812" height="850" loading="lazy" decoding="async">
+        <figcaption><span class="idx">01</span>The menu-bar player — waveform, seek, speed, history.</figcaption>
+      </figure>
+      <figure class="shot shot-models" style="--rd:280ms">
+        <img class="img-light" src="resources/models.png"
+             alt="SayIt's model library listing open MLX models with sizes, licenses, and download buttons"
+             width="1744" height="1400" loading="lazy" decoding="async">
+        <img class="img-dark" src="resources/models-dark.png"
+             alt="" aria-hidden="true"
+             width="1744" height="1400" loading="lazy" decoding="async">
+        <figcaption><span class="idx">02</span>The model library — open models, one download away.</figcaption>
+      </figure>
+    </div>
+
+    <div class="closing reveal">
+      <p>Free, open source, and yours.</p>
+      <a class="btn btn-primary js-download"
+         href="https://github.com/callebtc/sayit/releases/download/v1.0.0/SayIt-1.0.0.dmg"
+         rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M2.5 13.5h11"/>
+        </svg>
+        Download for macOS
+      </a>
+    </div>
+  </div>
+</section>
+
 <script>
 (function () {
   "use strict";
 
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var heroVisible = true;
 
   /* ------------------------------------------------------------------ */
   /* A medium where waves propagate: random disturbances rain into a 2D  */
@@ -822,10 +986,29 @@
       last = now;
       var dt = Math.min((now - prev) / 1000, 0.05);
       prev = now;
+      if (!heroVisible) return;             // field sleeps below the fold
       drawFrame((now - start) / 1000, dt);
     };
     requestAnimationFrame(loop);
   }
+
+  // Scroll reveals, once per element, 100px before entering the viewport
+  var revealObserver = new IntersectionObserver(function (entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) {
+        entries[i].target.classList.add("is-in");
+        revealObserver.unobserve(entries[i].target);
+      }
+    }
+  }, { rootMargin: "0px 0px -100px 0px", threshold: 0 });
+
+  var revealEls = document.querySelectorAll(".reveal, .shot");
+  for (var ri = 0; ri < revealEls.length; ri++) revealObserver.observe(revealEls[ri]);
+
+  var heroObserver = new IntersectionObserver(function (entries) {
+    heroVisible = entries[0].isIntersecting;
+  }, { threshold: 0.02 });
+  heroObserver.observe(document.querySelector(".page"));
 
   /* ------------------------------------------------------------------ */
   /* Theme toggle: explicit choice persists, otherwise follow the system */
@@ -900,14 +1083,13 @@
     .then(function (rel) {
       var asset = (rel.assets || []).find(function (a) { return /\.dmg$/i.test(a.name); });
       if (asset) {
-        document.getElementById("downloadBtn").href = asset.browser_download_url;
+        var dls = document.querySelectorAll(".js-download");
+        for (var d = 0; d < dls.length; d++) dls[d].href = asset.browser_download_url;
         var note = document.getElementById("versionNote");
         if (note && rel.tag_name) note.textContent = rel.tag_name;
       }
     })
-    .catch(function () {
-      document.getElementById("downloadBtn").href = MOCK_DMG; // mock stays
-    });
+    .catch(function () { /* mocked DMG links stay */ });
 })();
 </script>
 
