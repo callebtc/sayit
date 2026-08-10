@@ -96,8 +96,9 @@
 
   #field {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     display: block;
     z-index: 0;
     pointer-events: none;
@@ -762,11 +763,9 @@
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = window.innerWidth;
     VH = window.innerHeight;
-    H = Math.max(VH, document.body.offsetHeight);
+    H = Math.ceil(Math.max(VH, document.body.getBoundingClientRect().height));
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
-    canvas.style.width = W + "px";
-    canvas.style.height = H + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.font = "12px ui-monospace, 'SF Mono', Menlo, monospace";
     ctx.textAlign = "center";
@@ -784,6 +783,7 @@
 
   window.addEventListener("resize", resize);
   window.addEventListener("load", resize);   // image layout settles after load
+  if ("ResizeObserver" in window) new ResizeObserver(resize).observe(document.body);
   resize();
 
   function rand(a, b) { return a + Math.random() * (b - a); }
