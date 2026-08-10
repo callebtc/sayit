@@ -34,30 +34,23 @@ struct SelectedTextReader {
             return .unavailable
         }
 
-        for delay in Self.retryDelays {
-            if delay != .zero {
-                try? await Task.sleep(for: delay)
+        return await SelectionCaptureFlow.perform(
+            retryDelays: Self.retryDelays,
+            accessibilitySelection: {
+                guard NSWorkspace.shared.frontmostApplication?
+                    .processIdentifier == processIdentifier else {
+                    return .unavailable
+                }
+                return selectedText(
+                    inApplication: AXUIElementCreateApplication(
+                        processIdentifier
+                    )
+                )
+            },
+            copiedSelection: {
+                await copiedSelection(from: processIdentifier)
             }
-            guard NSWorkspace.shared.frontmostApplication?
-                .processIdentifier == processIdentifier else {
-                return .unavailable
-            }
-
-            let response = selectedText(
-                inApplication: AXUIElementCreateApplication(processIdentifier)
-            )
-            switch response {
-            case .selectedText:
-                return await copiedSelection(
-                    from: processIdentifier
-                ) ?? .unavailable
-            case .noSelection:
-                continue
-            default:
-                return response
-            }
-        }
-        return .noSelection
+        )
     }
 
     @MainActor

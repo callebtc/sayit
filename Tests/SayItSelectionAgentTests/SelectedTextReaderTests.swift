@@ -31,6 +31,94 @@ struct SelectedTextReaderTests {
         #expect(content.richText == richText)
     }
 
+    @Test("Copies when accessibility cannot expose selected text")
+    func copyFallbackForMissingAccessibilitySelection() async {
+        var events: [String] = []
+        let copiedContent = PasteboardContent(
+            plainText: "Selected Safari text"
+        )
+
+        let response = await SelectionCaptureFlow.perform(
+            retryDelays: [.zero, .zero, .zero],
+            accessibilitySelection: {
+                events.append("accessibility")
+                return .noSelection
+            },
+            copiedSelection: {
+                events.append("copy")
+                return .selectedContent(copiedContent)
+            }
+        )
+
+        #expect(response == .selectedContent(copiedContent))
+        #expect(events == ["accessibility", "copy"])
+    }
+
+    @Test("Retries accessibility after the copy fallback finds no text")
+    func retriesAfterEmptyCopyFallback() async {
+        var events: [String] = []
+
+        let response = await SelectionCaptureFlow.perform(
+            retryDelays: [.zero, .zero, .zero],
+            accessibilitySelection: {
+                events.append("accessibility")
+                return .noSelection
+            },
+            copiedSelection: {
+                events.append("copy")
+                return nil
+            }
+        )
+
+        #expect(response == .noSelection)
+        #expect(
+            events == [
+                "accessibility",
+                "copy",
+                "accessibility",
+                "accessibility"
+            ]
+        )
+    }
+
+    @Test("Keeps accessibility text when copying is unavailable")
+    func accessibilityTextFallback() async {
+        var copyAttempts = 0
+
+        let response = await SelectionCaptureFlow.perform(
+            retryDelays: [.zero],
+            accessibilitySelection: {
+                .selectedText("Selected text")
+            },
+            copiedSelection: {
+                copyAttempts += 1
+                return nil
+            }
+        )
+
+        #expect(response == .selectedText("Selected text"))
+        #expect(copyAttempts == 1)
+    }
+
+    @Test("Does not copy after a terminal accessibility response")
+    func preservesTerminalAccessibilityResponse() async {
+        var copyAttempts = 0
+
+        let response = await SelectionCaptureFlow.perform(
+            retryDelays: [.zero],
+            accessibilitySelection: {
+                .selectionTooLong(maximumCharacters: 10)
+            },
+            copiedSelection: {
+                copyAttempts += 1
+                return nil
+            }
+        )
+
+        #expect(response == .selectionTooLong(maximumCharacters: 10))
+        #expect(copyAttempts == 0)
+    }
+
     @Test("Searches beyond eight accessibility ancestors")
     func deepAncestorSelection() {
         let result = firstValueAlongAncestorChain(

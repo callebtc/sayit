@@ -212,6 +212,7 @@
 		75B29160347063B38D732AF2 /* SemanticVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213D3079BD6E17DF56258F3C /* SemanticVersionTests.swift */; };
 		76903DE1E3B650737C2E4C40 /* TextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6779E36EE1B11B74EFC4C4 /* TextParser.swift */; };
 		773D97FBBC1137FED7BFF3F9 /* AudioArchiveResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5168863C71F245E6BAFF50 /* AudioArchiveResult.swift */; };
+		7782272A296C90DAF6E114E1 /* SelectionCaptureFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE4174D1D4EB7E48D19724DA /* SelectionCaptureFlow.swift */; };
 		77B3B40567911D25AC57322E /* SynthesisPerformanceEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C509233A0D24A11DE540B5D0 /* SynthesisPerformanceEstimator.swift */; };
 		77B8B9371B4D99503D77282A /* PCMTransitionRamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88DD8273A61DB36431C6EBF /* PCMTransitionRamp.swift */; };
 		7856CCAA37B79FD97834762B /* BackendPlaybackControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C71504F663D18FC89EA4403 /* BackendPlaybackControlling.swift */; };
@@ -1084,6 +1085,7 @@
 		BA18E0AFEFF10C13815F3D6D /* APITokenScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenScope.swift; sourceTree = "<group>"; };
 		BB95F4768AD968BE1C4CBCD1 /* SayItStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItStyles.swift; sourceTree = "<group>"; };
 		BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DiagnosticEvent+Snapshot.swift"; sourceTree = "<group>"; };
+		BE4174D1D4EB7E48D19724DA /* SelectionCaptureFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionCaptureFlow.swift; sourceTree = "<group>"; };
 		BFAB456E7038F355490CF803 /* OnboardingModelDownloadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelDownloadView.swift; sourceTree = "<group>"; };
 		C159E47E305909312F3675A5 /* ResumeCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeCommand.swift; sourceTree = "<group>"; };
 		C18D316474D0C21D880BE963 /* VoiceCloneWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneWizard.swift; sourceTree = "<group>"; };
@@ -1658,6 +1660,7 @@
 				431BE087EDC0779B11802FCC /* SayItXPCClient.swift */,
 				79157408B606A6A97170DB7F /* SayItXPCClientError.swift */,
 				9AE1191A01FC022FE06707AD /* SayItXPCProtocol.swift */,
+				BE4174D1D4EB7E48D19724DA /* SelectionCaptureFlow.swift */,
 				C98C1A12E2DC7F92DBA7E752 /* SelectionXPCClient.swift */,
 				50EA89207CD21E6E529CB681 /* SelectionXPCClientError.swift */,
 				D6D93C5659F280CDC01DED16 /* SelectionXPCProtocol.swift */,
@@ -2783,6 +2786,7 @@
 				E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */,
 				4E3AC9A759280B1F3A00E23F /* SayItXPCClientError.swift in Sources */,
 				A7412271ED12DDEA24E130CB /* SayItXPCProtocol.swift in Sources */,
+				7782272A296C90DAF6E114E1 /* SelectionCaptureFlow.swift in Sources */,
 				CD4D84FCED018D6C296478B2 /* SelectionXPCClient.swift in Sources */,
 				0B92349141E9FE818E7E82D7 /* SelectionXPCClientError.swift in Sources */,
 				4FD0DD8E0B54DA4C877B6D47 /* SelectionXPCProtocol.swift in Sources */,
