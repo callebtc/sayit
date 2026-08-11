@@ -2,11 +2,6 @@ import SwiftUI
 
 struct MenuBarRootView: View {
     @Environment(AppState.self) private var state
-    private let clipboardTimer = Timer.publish(
-        every: 1,
-        on: .main,
-        in: .common
-    ).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -30,7 +25,7 @@ struct MenuBarRootView: View {
                     .transition(.opacity)
             } else if state.playback.state != .idle {
                 Divider()
-                PlaybackSectionView()
+                PlaybackSectionView(isPresented: state.isMenuPresented)
                     .padding(.horizontal, DesignTokens.generousSpacing)
                     .padding(.bottom, DesignTokens.compactSpacing)
                 SpeechLyricsView(
@@ -68,9 +63,11 @@ struct MenuBarRootView: View {
         }
         .frame(width: DesignTokens.popoverWidth)
         .animation(.smooth(duration: 0.3), value: section)
-        .onAppear(perform: state.refreshClipboardState)
-        .onReceive(clipboardTimer) { _ in
-            state.refreshClipboardState()
+        .background {
+            MenuPresentationObserver(
+                onChange: state.setMenuPresented
+            )
+            .frame(width: 0, height: 0)
         }
     }
 

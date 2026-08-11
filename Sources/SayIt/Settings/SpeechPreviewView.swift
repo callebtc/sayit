@@ -35,7 +35,9 @@ struct SpeechPreviewView: View {
 
             if state.playback.state != .idle {
                 Divider()
-                PlaybackSectionView()
+                PlaybackSectionView(
+                    isPresented: state.isAppWindowPresented
+                )
                     .transition(
                         .opacity.combined(with: .move(edge: .top))
                     )

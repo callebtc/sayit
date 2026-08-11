@@ -63,7 +63,10 @@ final class BackgroundServiceController {
     }
 
     func refresh() {
-        status = service.status
+        let currentStatus = service.status
+        if status != currentStatus {
+            status = currentStatus
+        }
     }
 
     func ensureRunning() async {

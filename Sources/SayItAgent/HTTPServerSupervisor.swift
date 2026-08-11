@@ -1,59 +1,52 @@
 import Foundation
 import SayItBackend
 import SayItHTTP
-import SayItProtocol
 
 @MainActor
 final class HTTPServerSupervisor {
     private let backend: SayItBackendService
-    private var monitorTask: Task<Void, Never>?
     private var serverTask: Task<Void, Never>?
     private var activePort: Int?
+    private var isStarted = false
 
     init(backend: SayItBackendService) {
         self.backend = backend
     }
 
     func start() {
-        guard monitorTask == nil else { return }
-        monitorTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.synchronize()
-                try? await Task.sleep(for: .seconds(1))
-            }
+        guard !isStarted else { return }
+        isStarted = true
+        backend.setHTTPServiceConfigurationHandler { [weak self] configuration in
+            self?.synchronize(configuration)
         }
     }
 
     func stop() {
-        monitorTask?.cancel()
-        monitorTask = nil
+        guard isStarted else { return }
+        isStarted = false
+        backend.setHTTPServiceConfigurationHandler(nil)
         serverTask?.cancel()
         serverTask = nil
         activePort = nil
     }
 
-    private func synchronize() async {
-        let response = await backend.handle(
-            ServiceRequest(command: .snapshot)
-        )
-        guard case .snapshot(let snapshot) = response else { return }
-
-        guard snapshot.settings.httpEnabled else {
+    private func synchronize(_ configuration: HTTPServiceConfiguration) {
+        guard configuration.isEnabled else {
             serverTask?.cancel()
             serverTask = nil
             activePort = nil
             return
         }
-        guard activePort != snapshot.settings.httpPort || serverTask == nil else {
+        guard activePort != configuration.port || serverTask == nil else {
             return
         }
 
         serverTask?.cancel()
-        activePort = snapshot.settings.httpPort
+        activePort = configuration.port
         do {
             let server = try SayItHTTPServer(
                 backend: backend,
-                port: snapshot.settings.httpPort
+                port: configuration.port
             )
             serverTask = Task {
                 do {
@@ -68,9 +61,10 @@ final class HTTPServerSupervisor {
             }
         } catch {
             activePort = nil
-            await backend.reportHTTPServiceError(
-                "HTTP API could not start: \(error.localizedDescription)"
-            )
+            let message = "HTTP API could not start: \(error.localizedDescription)"
+            Task {
+                await backend.reportHTTPServiceError(message)
+            }
         }
     }
 }

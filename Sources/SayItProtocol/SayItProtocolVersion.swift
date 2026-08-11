@@ -1,5 +1,5 @@
 import Foundation
 
 public enum SayItProtocolVersion {
-    public static let current = 6
+    public static let current = 7
 }

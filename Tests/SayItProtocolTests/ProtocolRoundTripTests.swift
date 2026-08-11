@@ -54,7 +54,7 @@ struct ProtocolRoundTripTests {
             from: SayItWireCodec.encode(request)
         )
         #expect(decodedRequest == request)
-        #expect(SayItProtocolVersion.current == 6)
+        #expect(SayItProtocolVersion.current == 7)
     }
 
     @Test
@@ -103,6 +103,27 @@ struct ProtocolRoundTripTests {
             return
         }
         #expect(sequence == 42)
+    }
+
+    @Test("Waiting event requests preserve revision and playback cadence")
+    func waitingEventRequestsRoundTripThroughJSON() throws {
+        let request = ServiceRequest(
+            command: .waitForEvents(after: 42, playbackInterval: 0.25)
+        )
+        let data = try SayItWireCodec.encode(request)
+        let decoded = try SayItWireCodec.decode(
+            ServiceRequest.self,
+            from: data
+        )
+        guard case .waitForEvents(
+            let sequence,
+            let playbackInterval
+        ) = decoded.command else {
+            Issue.record("Expected a waiting event request")
+            return
+        }
+        #expect(sequence == 42)
+        #expect(playbackInterval == 0.25)
     }
 
     @Test
