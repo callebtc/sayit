@@ -37,6 +37,9 @@ stay on your Mac.
   minutes by default).
 - **Local by design.** Synthesis works offline after model download. There is no
   analytics, cloud inference, or passive clipboard monitoring.
+- **Hear your coding agent work.** The bundled
+  [Say It agent skill](skills/sayit/SKILL.md) provides live, hands-free spoken
+  progress updates while an agent works.
 
 ## Clone your voice
 
@@ -74,6 +77,14 @@ sayit resume
 ```
 
 Run `sayit --help` to see all commands and options.
+
+### Coding-agent voice mode
+
+Add the bundled [Say It agent skill](skills/sayit/SKILL.md) to a compatible
+agent's skills directory, then ask it to “use Say It while you work.” The agent
+will narrate meaningful progress and its final handoff without blocking the
+underlying task, while keeping concise written updates for details you may need
+to copy.
 
 ## Architecture
 
