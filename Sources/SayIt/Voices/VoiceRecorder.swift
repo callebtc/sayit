@@ -28,9 +28,13 @@ enum VoiceMicrophoneAccess: Equatable {
 @MainActor
 @Observable
 final class VoiceRecorder {
+    private static let startupProbeDelay: Duration = .seconds(1)
+
     private var engine: AVAudioEngine?
     private var sink: VoiceRecordingSink?
     private var meterTask: Task<Void, Never>?
+    private var startupRecoveryTask: Task<Void, Never>?
+    private var recordingGeneration = 0
 
     private(set) var access = VoiceMicrophoneAccess.unknown
     private(set) var isRecording = false
@@ -76,12 +80,21 @@ final class VoiceRecorder {
         stop()
         errorMessage = nil
         recordingURL = nil
+        let generation = recordingGeneration
+        try startAttempt(destination: destination)
+        scheduleStartupRecovery(
+            destination: destination,
+            generation: generation
+        )
+    }
+
+    private func startAttempt(destination: URL) throws {
         let engine = AVAudioEngine()
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard (1...8).contains(format.channelCount),
-              format.sampleRate.isFinite,
-              (8_000...384_000).contains(format.sampleRate) else {
+        let hardwareFormat = input.inputFormat(forBus: 0)
+        guard (1...8).contains(hardwareFormat.channelCount),
+              hardwareFormat.sampleRate.isFinite,
+              (8_000...384_000).contains(hardwareFormat.sampleRate) else {
             access = .noDevice
             throw VoiceRecordingError.noAudioDevice
         }
@@ -89,6 +102,9 @@ final class VoiceRecorder {
             at: destination.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
         let sink = VoiceRecordingSink(destination: destination)
         input.installTap(
             onBus: 0,
@@ -112,6 +128,11 @@ final class VoiceRecorder {
         level = 0
         peak = 0
         duration = 0
+        startMetering()
+    }
+
+    private func startMetering() {
+        meterTask?.cancel()
         meterTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, let reading = self.sink?.reading else {
@@ -130,15 +151,59 @@ final class VoiceRecorder {
         }
     }
 
+    private func scheduleStartupRecovery(
+        destination: URL,
+        generation: Int
+    ) {
+        // A cold macOS input can start without delivering live samples. Rebuild
+        // it once after the device has had time to finish activating.
+        startupRecoveryTask?.cancel()
+        startupRecoveryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: Self.startupProbeDelay)
+            } catch {
+                return
+            }
+            guard let self,
+                  self.recordingGeneration == generation,
+                  self.isRecording,
+                  let reading = self.sink?.reading,
+                  Self.needsStartupRecovery(
+                    frameCount: reading.frameCount,
+                    peak: reading.peak
+                  ) else {
+                return
+            }
+            self.startupRecoveryTask = nil
+            self.restartAfterColdStartup(destination: destination)
+        }
+    }
+
+    private func restartAfterColdStartup(destination: URL) {
+        finishCurrentAttempt()
+        do {
+            try startAttempt(destination: destination)
+        } catch {
+            errorMessage = error.localizedDescription
+            recordingURL = nil
+            isRecording = false
+            refreshAccess()
+        }
+    }
+
+    nonisolated static func needsStartupRecovery(
+        frameCount: AVAudioFramePosition,
+        peak: Float
+    ) -> Bool {
+        frameCount == 0 || peak == 0
+    }
+
     @discardableResult
     func stop() -> URL? {
-        meterTask?.cancel()
-        meterTask = nil
-        if let engine {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
-        let finalReading = sink?.finish()
+        recordingGeneration &+= 1
+        startupRecoveryTask?.cancel()
+        startupRecoveryTask = nil
+        let finalReading = finishCurrentAttempt()
         if let reading = finalReading {
             level = reading.level
             peak = reading.peak
@@ -152,11 +217,23 @@ final class VoiceRecorder {
         } else {
             nil
         }
-        engine = nil
-        sink = nil
         isRecording = false
         recordingURL = completedURL
         return completedURL
+    }
+
+    @discardableResult
+    private func finishCurrentAttempt() -> VoiceRecordingSink.Reading? {
+        meterTask?.cancel()
+        meterTask = nil
+        if let engine {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
+        let finalReading = sink?.finish()
+        engine = nil
+        sink = nil
+        return finalReading
     }
 
     nonisolated static func tapHandler(

@@ -42,6 +42,22 @@ struct VoiceRecordingSinkTests {
         #expect(reading.errorMessage?.contains("changed audio format") == true)
     }
 
+    @Test("Cold or digitally silent input requests startup recovery")
+    func silentStartupRecoveryPolicy() {
+        #expect(
+            VoiceRecorder.needsStartupRecovery(frameCount: 0, peak: 0)
+        )
+        #expect(
+            VoiceRecorder.needsStartupRecovery(frameCount: 1_024, peak: 0)
+        )
+        #expect(
+            !VoiceRecorder.needsStartupRecovery(
+                frameCount: 1_024,
+                peak: 0.000_001
+            )
+        )
+    }
+
     private static func buffer(
         sampleRate: Double
     ) throws -> AVAudioPCMBuffer {

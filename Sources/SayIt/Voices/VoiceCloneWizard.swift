@@ -386,7 +386,7 @@ struct VoiceCloneWizard: View {
 
     private var statusKey: Int {
         if analysis != nil { return 1 }
-        if recordingError != nil { return 2 }
+        if recordingError != nil || recorder.errorMessage != nil { return 2 }
         return recorder.isRecording ? 3 : 0
     }
 
@@ -401,14 +401,14 @@ struct VoiceCloneWizard: View {
             .foregroundStyle(.green)
             .transition(.opacity)
             .accessibilityLabel("Recording accepted")
-        } else if let recordingError {
-            Label(recordingError, systemImage: "exclamationmark.triangle")
+        } else if let message = recordingError ?? recorder.errorMessage {
+            Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
                 .foregroundStyle(.red)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .transition(.opacity)
-                .accessibilityLabel("Recording problem: \(recordingError)")
+                .accessibilityLabel("Recording problem: \(message)")
         } else {
             Text(
                 recorder.isRecording
