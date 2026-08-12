@@ -946,6 +946,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private func synchronizeMLXIfLoaded() {
         guard loadedModel != nil || retainedReferenceAudio != nil else { return }
         Stream.gpu.synchronize()
+        Memory.clearCache()
     }
 
     private func scheduleIdleUnload(for operationID: UInt64) {
