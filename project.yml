@@ -223,6 +223,7 @@ targets:
         com.apple.security.application-groups:
           - group.sh.sayit.mac
     dependencies:
+      - target: SayItCore
       - target: SayItProtocol
       - target: SayItXPC
       - package: ArgumentParser

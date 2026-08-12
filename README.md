@@ -74,17 +74,30 @@ printf 'Read standard input' | sayit
 sayit status
 sayit pause
 sayit resume
+sayit skill path
 ```
 
 Run `sayit --help` to see all commands and options.
 
 ### Coding-agent voice mode
 
-Add the bundled [Say It agent skill](skills/sayit/SKILL.md) to a compatible
-agent's skills directory, then ask it to “use Say It while you work.” The agent
-will narrate meaningful progress and its final handoff without blocking the
-underlying task, while keeping concise written updates for details you may need
-to copy.
+Ask a compatible coding agent to load the skill file returned by:
+
+```sh
+sayit skill path
+```
+
+A good generic prompt is:
+
+```text
+Load the Say It skill and use it for live spoken updates. Run `sayit skill path` to get the skill path.
+```
+
+The [Say It agent skill](skills/sayit/SKILL.md) narrates meaningful progress
+and the final handoff without blocking the underlying task, while keeping
+concise written updates for details you may need to copy. Resolve the path
+again after upgrading Say It so the guidance stays aligned with the installed
+CLI.
 
 ## Architecture
 
