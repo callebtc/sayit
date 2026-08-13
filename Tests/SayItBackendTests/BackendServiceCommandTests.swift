@@ -344,6 +344,48 @@ struct BackendServiceCommandTests {
         #expect(await sleepRecorder.recordedDurations().isEmpty)
     }
 
+    @Test("External playback controls wake paused event requests")
+    func externalPlaybackControlsWakePausedEventRequests() async throws {
+        let sleepGate = BackendEventSleepGate()
+        let fixture = try ServiceFixture { duration in
+            try await sleepGate.sleep(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .play))
+            )
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .pause))
+            )
+        )
+        let paused = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let response = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: paused.revision,
+                        playbackInterval: 0.25
+                    )
+                )
+            )
+        }
+        await sleepGate.waitUntilSleeping()
+        fixture.playback.play()
+        fixture.playback.notifyExternalControl()
+
+        let event = try #require(try events(await response.value).first)
+        await sleepGate.resume()
+        #expect(event.id > paused.revision)
+        #expect(event.snapshot.playback.state == "playing")
+    }
+
     @Test("History mutations publish a service event")
     func historyMutationsPublishRevision() async throws {
         let fixture = try ServiceFixture(seedVoiceAndHistory: true)
@@ -2386,6 +2428,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
 @MainActor
 private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
+    var onExternalControl: (@MainActor () -> Void)?
     private(set) var state: PlaybackState = .idle
     private(set) var elapsed: TimeInterval = 0
     private(set) var generatedDuration: TimeInterval = 0
@@ -2470,6 +2513,10 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
 
     func finishForTesting() {
         state = .finished
+    }
+
+    func notifyExternalControl() {
+        onExternalControl?()
     }
 
     func archive(

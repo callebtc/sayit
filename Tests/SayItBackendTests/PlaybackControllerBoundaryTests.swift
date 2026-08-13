@@ -96,7 +96,7 @@ struct PlaybackControllerBoundaryTests {
             PlaybackController.TimelineDriver { duration in
                 try await sleeper.sleep(for: duration)
             }
-        weak var weakTimeline = timeline
+        weak let weakTimeline = timeline
 
         timeline?.start {}
         await waitForRequests(1, from: sleeper)

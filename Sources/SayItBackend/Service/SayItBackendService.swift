@@ -172,6 +172,10 @@ public final class SayItBackendService: SayItService {
         playback.onFailure = { [weak self] message in
             self?.recordFailure(message)
         }
+        playback.onExternalControl = { [weak self] in
+            guard let self else { return }
+            self.revision &+= 1
+        }
     }
 
     public func start() async {

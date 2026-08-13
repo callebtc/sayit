@@ -55,6 +55,9 @@ final class PlaybackController: BackendPlaybackControlling {
     @ObservationIgnored
     var onFailure: (@MainActor (String) -> Void)?
 
+    @ObservationIgnored
+    var onExternalControl: (@MainActor () -> Void)?
+
     private(set) var state: PlaybackState = .idle
     private(set) var elapsed: TimeInterval = 0
     private(set) var generatedDuration: TimeInterval = 0
@@ -1050,11 +1053,19 @@ final class PlaybackController: BackendPlaybackControlling {
     private func configureRemoteCommands() {
         let commands = MPRemoteCommandCenter.shared()
         commands.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.play() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.play()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.pause() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.pause()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.togglePlayPauseCommand.addTarget { [weak self] _ in
@@ -1065,17 +1076,23 @@ final class PlaybackController: BackendPlaybackControlling {
                 } else {
                     self.play()
                 }
+                self.onExternalControl?()
             }
             return .success
         }
         commands.stopCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.stop() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.stop()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.nextTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1083,6 +1100,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1093,6 +1111,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1103,6 +1122,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1110,7 +1130,11 @@ final class PlaybackController: BackendPlaybackControlling {
             guard let position = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
-            Task { @MainActor in self?.seek(to: position.positionTime) }
+            Task { @MainActor in
+                guard let self else { return }
+                self.seek(to: position.positionTime)
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.changePlaybackRateCommand.supportedPlaybackRates = [
@@ -1124,7 +1148,9 @@ final class PlaybackController: BackendPlaybackControlling {
                 return .commandFailed
             }
             Task { @MainActor in
-                self?.rate = Double(rateEvent.playbackRate)
+                guard let self else { return }
+                self.rate = Double(rateEvent.playbackRate)
+                self.onExternalControl?()
             }
             return .success
         }
