@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MenuBarLabel: View {
     @Environment(AppState.self) private var state
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isActive: Bool {
         state.playback.state == .playing
@@ -11,31 +10,29 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        Group {
-            if isActive, !reduceMotion {
-                icon
-                    .phaseAnimator([1.0, 0.4]) { view, phase in
-                        view.opacity(phase)
-                    } animation: { _ in
-                        .easeInOut(duration: 0.8)
-                    }
-            } else {
-                icon
+        icon
+            .opacity(isActive ? 0.72 : 1)
+            .overlay(alignment: .bottomTrailing) {
+                if isActive {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                }
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            if state.errorMessage != nil {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 6, height: 6)
-                    .accessibilityHidden(true)
+            .overlay(alignment: .topTrailing) {
+                if state.errorMessage != nil {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                }
             }
-        }
-        .accessibilityLabel("Say It")
-        .accessibilityValue(state.statusText)
-        .background {
-            AppWindowCoordinator()
-        }
+            .accessibilityLabel("Say It")
+            .accessibilityValue(state.statusText)
+            .background {
+                AppWindowCoordinator()
+            }
     }
 
     private var icon: some View {

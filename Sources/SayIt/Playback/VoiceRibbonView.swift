@@ -10,6 +10,7 @@ struct VoiceRibbonView: View {
     let estimatedDuration: TimeInterval
     let isPlaying: Bool
     let isBuffering: Bool
+    let isPresented: Bool
     let onSeek: (TimeInterval) -> Void
 
     private var totalDuration: TimeInterval {
@@ -30,9 +31,22 @@ struct VoiceRibbonView: View {
         generation < 0.999
     }
 
+    nonisolated static func shouldPauseTimeline(
+        isPresented: Bool,
+        isProcessing: Bool
+    ) -> Bool {
+        !isPresented || !isProcessing
+    }
+
     var body: some View {
         TimelineView(
-            .animation(minimumInterval: 1.0 / 30.0, paused: !isProcessing)
+            .animation(
+                minimumInterval: 1.0 / 15.0,
+                paused: Self.shouldPauseTimeline(
+                    isPresented: isPresented,
+                    isProcessing: isProcessing
+                )
+            )
         ) { timeline in
             RibbonCanvas(
                 amplitudes: amplitudes,
@@ -78,6 +92,7 @@ struct VoiceRibbonView: View {
         }
         .padding(.bottom, 13)
         .onChange(of: progress, initial: true) { oldValue, newValue in
+            guard isPresented else { return }
             let isJump = newValue < oldValue || abs(newValue - oldValue) > 0.03
             if isPlaying, !isJump {
                 let target = min(newValue + (newValue - oldValue), 1)
@@ -91,14 +106,24 @@ struct VoiceRibbonView: View {
             }
         }
         .onChange(of: isPlaying) { _, playing in
-            guard !playing else { return }
+            guard isPresented, !playing else { return }
             withAnimation(.smooth(duration: 0.2)) {
                 smoothedProgress = progress
             }
         }
         .onChange(of: generation, initial: true) { _, newValue in
+            guard isPresented else { return }
             withAnimation(.smooth(duration: 0.6)) {
                 smoothedGeneration = newValue
+            }
+        }
+        .onChange(of: isPresented, initial: true) { _, presented in
+            guard presented else { return }
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                smoothedProgress = progress
+                smoothedGeneration = generation
             }
         }
         .accessibilityElement(children: .ignore)

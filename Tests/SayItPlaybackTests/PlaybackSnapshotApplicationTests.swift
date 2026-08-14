@@ -46,11 +46,76 @@ struct PlaybackSnapshotApplicationTests {
         #expect(controller.spokenChunks.count == 1)
     }
 
-    @Test("Coalesced service revisions are monotonically accepted")
-    func acceptsCoalescedRevisions() {
+    @Test("Event revisions advance monotonically within one connection")
+    func appliesMonotonicEventRevisions() {
         #expect(AppState.shouldApplyEvent(id: 12, after: 7))
         #expect(!AppState.shouldApplyEvent(id: 7, after: 7))
         #expect(!AppState.shouldApplyEvent(id: 6, after: 7))
+        #expect(AppState.shouldApplyEvent(id: 6, after: nil))
+    }
+
+    @Test("Delayed service responses cannot replace newer state")
+    func rejectsDelayedServiceResponses() {
+        #expect(
+            AppState.isServiceStateRequestCurrent(
+                requestedRevision: 7,
+                currentRevision: 7,
+                requestedGeneration: 3,
+                currentGeneration: 3
+            )
+        )
+        #expect(
+            !AppState.isServiceStateRequestCurrent(
+                requestedRevision: 7,
+                currentRevision: 8,
+                requestedGeneration: 3,
+                currentGeneration: 3
+            )
+        )
+        #expect(
+            !AppState.isServiceStateRequestCurrent(
+                requestedRevision: 7,
+                currentRevision: nil,
+                requestedGeneration: 3,
+                currentGeneration: 4
+            )
+        )
+    }
+
+    @Test("Playback refresh cadence follows visible playback surfaces")
+    func playbackRefreshCadence() {
+        #expect(
+            AppState.playbackRefreshInterval(
+                isPlaybackSurfacePresented: false
+            ) == 1
+        )
+        #expect(
+            AppState.playbackRefreshInterval(
+                isPlaybackSurfacePresented: true
+            ) == 0.25
+        )
+    }
+
+    @Test("Ribbon animation pauses while hidden or fully generated")
+    func ribbonAnimationVisibilityPolicy() {
+        #expect(
+            VoiceRibbonView.shouldPauseTimeline(
+                isPresented: false,
+                isProcessing: true
+            )
+        )
+        #expect(
+            VoiceRibbonView.shouldPauseTimeline(
+                isPresented: true,
+                isProcessing: false
+            )
+        )
+        #expect(
+            !VoiceRibbonView.shouldPauseTimeline(
+                isPresented: true,
+                isProcessing: true
+            )
+        )
     }
 
     @Test("Completed onboarding stays dismissed without requiring a model")

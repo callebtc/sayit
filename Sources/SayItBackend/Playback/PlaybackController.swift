@@ -24,7 +24,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private let timePitch = AVAudioUnitTimePitch()
-    private var timelineTask: Task<Void, Never>?
+    private let timeline = TimelineDriver()
     private var audioConfigurationTask: Task<Void, Never>?
     private var audioConfigurationRecoveryTask: Task<Void, Never>?
     private var completionWatchdogTask: Task<Void, Never>?
@@ -54,6 +54,9 @@ final class PlaybackController: BackendPlaybackControlling {
 
     @ObservationIgnored
     var onFailure: (@MainActor (String) -> Void)?
+
+    @ObservationIgnored
+    var onExternalControl: (@MainActor () -> Void)?
 
     private(set) var state: PlaybackState = .idle
     private(set) var elapsed: TimeInterval = 0
@@ -120,7 +123,6 @@ final class PlaybackController: BackendPlaybackControlling {
         timePitch.pitch = 0
         timePitch.overlap = Self.highQualityTimePitchOverlap
         configureRemoteCommands()
-        startTimeline()
         monitorAudioConfiguration()
     }
 
@@ -209,6 +211,7 @@ final class PlaybackController: BackendPlaybackControlling {
         lastStablePlaybackTime = elapsed
         cancelAudioConfigurationRecovery()
         player.pause()
+        stopTimeline()
         state = .paused
         updateNowPlaying()
     }
@@ -242,6 +245,7 @@ final class PlaybackController: BackendPlaybackControlling {
                 from: currentPlaybackTime(),
                 requestedDuration: duration
             )
+            stopTimeline()
             state = .paused
             try await Task.sleep(for: actualDuration)
         } catch {
@@ -448,6 +452,7 @@ final class PlaybackController: BackendPlaybackControlling {
         failureMessage = nil
         state = .playing
         lastStablePlaybackTime = elapsed
+        startTimeline()
         scheduleCompletionWatchdog()
         updateNowPlaying()
     }
@@ -614,6 +619,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func invalidateScheduledAudio() {
+        stopTimeline()
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         scheduleGeneration &+= 1
@@ -780,17 +786,16 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func startTimeline() {
-        timelineTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard let self else { return }
-                if self.state == .playing {
-                    self.elapsed = self.currentPlaybackTime()
-                    self.lastStablePlaybackTime = self.elapsed
-                    self.updateNowPlaying(throttleTimeline: true)
-                }
-            }
+        timeline.start { [weak self] in
+            guard let self, self.state == .playing else { return }
+            self.elapsed = self.currentPlaybackTime()
+            self.lastStablePlaybackTime = self.elapsed
+            self.updateNowPlaying(throttleTimeline: true)
         }
+    }
+
+    private func stopTimeline() {
+        timeline.stop()
     }
 
     private func monitorAudioConfiguration() {
@@ -958,6 +963,7 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func reportFailure(_ error: Error, shouldResume: Bool = false) {
         cancelAudioConfigurationRecovery()
+        stopTimeline()
         if shouldResume {
             elapsed = currentPlaybackTime()
         }
@@ -1047,11 +1053,19 @@ final class PlaybackController: BackendPlaybackControlling {
     private func configureRemoteCommands() {
         let commands = MPRemoteCommandCenter.shared()
         commands.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.play() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.play()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.pause() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.pause()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.togglePlayPauseCommand.addTarget { [weak self] _ in
@@ -1062,17 +1076,23 @@ final class PlaybackController: BackendPlaybackControlling {
                 } else {
                     self.play()
                 }
+                self.onExternalControl?()
             }
             return .success
         }
         commands.stopCommand.addTarget { [weak self] _ in
-            Task { @MainActor in self?.stop() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.stop()
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.nextTrackCommand.addTarget { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1080,6 +1100,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1090,6 +1111,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1100,6 +1122,7 @@ final class PlaybackController: BackendPlaybackControlling {
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1107,7 +1130,11 @@ final class PlaybackController: BackendPlaybackControlling {
             guard let position = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
-            Task { @MainActor in self?.seek(to: position.positionTime) }
+            Task { @MainActor in
+                guard let self else { return }
+                self.seek(to: position.positionTime)
+                self.onExternalControl?()
+            }
             return .success
         }
         commands.changePlaybackRateCommand.supportedPlaybackRates = [
@@ -1121,7 +1148,9 @@ final class PlaybackController: BackendPlaybackControlling {
                 return .commandFailed
             }
             Task { @MainActor in
-                self?.rate = Double(rateEvent.playbackRate)
+                guard let self else { return }
+                self.rate = Double(rateEvent.playbackRate)
+                self.onExternalControl?()
             }
             return .success
         }
@@ -1142,5 +1171,69 @@ final class PlaybackController: BackendPlaybackControlling {
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
             MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? rate : 0
         ]
+    }
+}
+
+extension PlaybackController {
+    @MainActor
+    final class TimelineDriver {
+        typealias Sleep = @Sendable (Duration) async throws -> Void
+
+        static let interval = Duration.milliseconds(250)
+
+        private let sleep: Sleep
+        private var task: Task<Void, Never>?
+        private var generation: UInt64 = 0
+
+        var isActive: Bool {
+            task != nil
+        }
+
+        init(
+            sleep: @escaping Sleep = { duration in
+                try await Task.sleep(for: duration)
+            }
+        ) {
+            self.sleep = sleep
+        }
+
+        deinit {
+            task?.cancel()
+        }
+
+        func start(
+            onTick: @escaping @MainActor @Sendable () -> Void
+        ) {
+            guard task == nil else { return }
+            generation &+= 1
+            let activeGeneration = generation
+            let sleep = self.sleep
+            task = Task { @MainActor [weak self] in
+                do {
+                    while !Task.isCancelled {
+                        try await sleep(Self.interval)
+                        try Task.checkCancellation()
+                        guard self?.generation == activeGeneration else {
+                            return
+                        }
+                        onTick()
+                    }
+                } catch {
+                    // Cancellation and clock failures both end this cadence.
+                }
+                self?.clearIfCurrent(activeGeneration)
+            }
+        }
+
+        func stop() {
+            generation &+= 1
+            task?.cancel()
+            task = nil
+        }
+
+        private func clearIfCurrent(_ completedGeneration: UInt64) {
+            guard generation == completedGeneration else { return }
+            task = nil
+        }
     }
 }

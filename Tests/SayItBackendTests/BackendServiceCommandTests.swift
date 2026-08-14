@@ -15,6 +15,7 @@ struct BackendServiceCommandTests {
         let beforeStart = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         )
+        #expect(beforeStart.revision != 0)
         #expect(beforeStart.statusText == "Starting service")
 
         await fixture.service.start()
@@ -51,7 +52,7 @@ struct BackendServiceCommandTests {
                 .init(command: .events(after: started.revision))
             )
         )
-        #expect(failureEvents.last?.snapshot.playback.includesContent == false)
+        #expect(failureEvents.last?.snapshot.playback.includesContent == true)
         let failed = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         )
@@ -68,6 +69,416 @@ struct BackendServiceCommandTests {
         )
         #expect(cleared.lastError == nil)
         #expect(cleared.statusText == "Ready to speak")
+    }
+
+    @Test("Waiting event requests resume when service state changes")
+    func waitingEventsResumeOnRevision() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let waitingResponse = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: started.revision,
+                        playbackInterval: 1
+                    )
+                )
+            )
+        }
+        await Task.yield()
+        await fixture.service.reportServiceError("Transport failed")
+
+        let received = try events(await waitingResponse.value)
+        #expect(received.last?.id ?? 0 > started.revision)
+        #expect(received.last?.snapshot.lastError == "Transport failed")
+        #expect(received.last?.snapshot.playback.includesContent == false)
+    }
+
+    @Test("Canceling a waiting event request returns promptly")
+    func waitingEventsHonorCancellation() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let waitingResponse = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: started.revision,
+                        playbackInterval: 1
+                    )
+                )
+            )
+        }
+        await Task.yield()
+        waitingResponse.cancel()
+
+        let response = await waitingResponse.value
+        #expect(try failure(response).code == "service.request_canceled")
+    }
+
+    @Test("A revision from an earlier service process resynchronizes immediately")
+    func waitingEventsResynchronizeFutureRevision() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        let earlierProcessRevision = started.revision &+ 1_000
+
+        let waitingResponse = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: earlierProcessRevision,
+                        playbackInterval: 1
+                    )
+                )
+            )
+        }
+        await Task.yield()
+        await fixture.service.reportServiceError("Transport failed")
+
+        let received = try events(await waitingResponse.value)
+        guard let event = received.first else {
+            Issue.record("Expected a resynchronization event")
+            return
+        }
+        #expect(received.count == 1)
+        #expect(event.id == started.revision)
+        #expect(event.id < earlierProcessRevision)
+        #expect(event.snapshot.statusText == "Ready to speak")
+        #expect(event.snapshot.playback.includesContent)
+    }
+
+    @Test("Immediate waiting-event resynchronization includes playback content")
+    func waitingEventsImmediateResynchronizationIncludesContent() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        await fixture.service.reportServiceError("Transport failed")
+
+        let response = await fixture.service.handle(
+            .init(
+                command: .waitForEvents(
+                    after: started.revision,
+                    playbackInterval: 1
+                )
+            )
+        )
+        let event = try #require(try events(response).first)
+
+        #expect(event.snapshot.lastError == "Transport failed")
+        #expect(event.snapshot.playback.includesContent)
+    }
+
+    @Test("One service revision builds one event snapshot for all readers")
+    func eventSnapshotsAreCachedPerRevision() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let started = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        let buildsBefore = fixture.service.eventSnapshotBuildCount
+        await fixture.service.reportServiceError("Transport failed")
+
+        let first = try events(
+            await fixture.service.handle(
+                .init(command: .events(after: started.revision))
+            )
+        )
+        let second = try events(
+            await fixture.service.handle(
+                .init(command: .events(after: started.revision))
+            )
+        )
+
+        #expect(first.first?.id == second.first?.id)
+        #expect(fixture.service.eventSnapshotBuildCount == buildsBefore + 1)
+    }
+
+    @Test("Active playback emits a bounded cadence heartbeat")
+    func activePlaybackCadenceHeartbeat() async throws {
+        let sleepRecorder = BackendEventSleepRecorder()
+        let fixture = try ServiceFixture { duration in
+            await sleepRecorder.record(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .play))
+            )
+        )
+        let playing = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let response = await fixture.service.handle(
+            .init(
+                command: .waitForEvents(
+                    after: playing.revision,
+                    playbackInterval: 0.01
+                )
+            )
+        )
+        let heartbeat = try #require(try events(response).first)
+
+        #expect(heartbeat.id > playing.revision)
+        #expect(heartbeat.snapshot.playback.state == "playing")
+        #expect(
+            await sleepRecorder.recordedDurations() == [.milliseconds(100)]
+        )
+    }
+
+    @Test("Idle event heartbeat does not synthesize a revision")
+    func idleEventHeartbeatIsSilent() async throws {
+        let sleepRecorder = BackendEventSleepRecorder()
+        let fixture = try ServiceFixture { duration in
+            await sleepRecorder.record(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let idle = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let response = await fixture.service.handle(
+            .init(
+                command: .waitForEvents(
+                    after: idle.revision,
+                    playbackInterval: 0.25
+                )
+            )
+        )
+
+        #expect(try events(response).isEmpty)
+        #expect(
+            await sleepRecorder.recordedDurations() == [.seconds(30)]
+        )
+        let afterHeartbeat = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(afterHeartbeat.revision == idle.revision)
+    }
+
+    @Test("A playback transition during the cadence publishes its final state")
+    func playbackTransitionDuringCadencePublishes() async throws {
+        let sleepGate = BackendEventSleepGate()
+        let fixture = try ServiceFixture { duration in
+            try await sleepGate.sleep(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .play))
+            )
+        )
+        let playing = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let response = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: playing.revision,
+                        playbackInterval: 0.25
+                    )
+                )
+            )
+        }
+        await sleepGate.waitUntilSleeping()
+        fixture.playback.finishForTesting()
+        await sleepGate.resume()
+
+        let event = try #require(try events(await response.value).first)
+        #expect(event.id > playing.revision)
+        #expect(event.snapshot.playback.state == "finished")
+    }
+
+    @Test("A playback transition between requests publishes immediately")
+    func playbackTransitionBetweenRequestsPublishes() async throws {
+        let sleepRecorder = BackendEventSleepRecorder()
+        let fixture = try ServiceFixture { duration in
+            await sleepRecorder.record(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .play))
+            )
+        )
+        let playing = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        fixture.playback.finishForTesting()
+
+        let response = await fixture.service.handle(
+            .init(
+                command: .waitForEvents(
+                    after: playing.revision,
+                    playbackInterval: 0.25
+                )
+            )
+        )
+        let event = try #require(try events(response).first)
+
+        #expect(event.id > playing.revision)
+        #expect(event.snapshot.playback.state == "finished")
+        #expect(await sleepRecorder.recordedDurations().isEmpty)
+    }
+
+    @Test("External playback controls wake paused event requests")
+    func externalPlaybackControlsWakePausedEventRequests() async throws {
+        let sleepGate = BackendEventSleepGate()
+        let fixture = try ServiceFixture { duration in
+            try await sleepGate.sleep(duration)
+        }
+        defer { fixture.remove() }
+        await fixture.service.start()
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .play))
+            )
+        )
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .pause))
+            )
+        )
+        let paused = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        let response = Task { @MainActor in
+            await fixture.service.handle(
+                .init(
+                    command: .waitForEvents(
+                        after: paused.revision,
+                        playbackInterval: 0.25
+                    )
+                )
+            )
+        }
+        await sleepGate.waitUntilSleeping()
+        fixture.playback.play()
+        fixture.playback.notifyExternalControl()
+
+        let event = try #require(try events(await response.value).first)
+        await sleepGate.resume()
+        #expect(event.id > paused.revision)
+        #expect(event.snapshot.playback.state == "playing")
+    }
+
+    @Test("History mutations publish a service event")
+    func historyMutationsPublishRevision() async throws {
+        let fixture = try ServiceFixture(seedVoiceAndHistory: true)
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let historyID = try #require(fixture.historyID)
+        let before = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .toggleHistoryPinned(historyID))
+                )
+            )
+        )
+        let published = try events(
+            await fixture.service.handle(
+                .init(command: .events(after: before.revision))
+            )
+        )
+
+        let event = try #require(published.first)
+        #expect(event.id > before.revision)
+        #expect(event.snapshot.historyRevision > before.historyRevision)
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .deleteHistory(historyID))
+                )
+            )
+        )
+        let deletion = try #require(
+            try events(
+                await fixture.service.handle(
+                    .init(command: .events(after: event.id))
+                )
+            ).first
+        )
+        #expect(deletion.id > event.id)
+        #expect(
+            deletion.snapshot.historyRevision
+                > event.snapshot.historyRevision
+        )
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .clearHistory))
+            )
+        )
+        let cleared = try #require(
+            try events(
+                await fixture.service.handle(
+                    .init(command: .events(after: deletion.id))
+                )
+            ).first
+        )
+        #expect(cleared.id > deletion.id)
+        #expect(
+            cleared.snapshot.historyRevision
+                > deletion.snapshot.historyRevision
+        )
+    }
+
+    @Test("Clearing diagnostics publishes a service event")
+    func clearingDiagnosticsPublishesRevision() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let before = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(.init(command: .clearDiagnostics))
+            )
+        )
+        let event = try #require(
+            try events(
+                await fixture.service.handle(
+                    .init(command: .events(after: before.revision))
+                )
+            ).first
+        )
+
+        #expect(event.id > before.revision)
+        #expect(
+            event.snapshot.diagnosticsRevision
+                > before.diagnosticsRevision
+        )
     }
 
     @Test("Playback commands forward state and validate rates")
@@ -142,6 +553,18 @@ struct BackendServiceCommandTests {
         let original = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         ).settings
+        var httpConfigurations: [HTTPServiceConfiguration] = []
+        fixture.service.setHTTPServiceConfigurationHandler {
+            httpConfigurations.append($0)
+        }
+        #expect(
+            httpConfigurations == [
+                HTTPServiceConfiguration(
+                    isEnabled: original.httpEnabled,
+                    port: original.httpPort
+                )
+            ]
+        )
 
         var invalidCases: [(BackendSettingsSnapshot, String)] = []
         var value = original
@@ -203,6 +626,13 @@ struct BackendServiceCommandTests {
         #expect(fixture.playback.forwardSkipInterval == 42)
         #expect(fixture.playback.showTitleInNowPlaying)
         #expect(
+            httpConfigurations.last
+                == HTTPServiceConfiguration(
+                    isEnabled: true,
+                    port: 49_999
+                )
+        )
+        #expect(
             try snapshot(
                 await fixture.service.handle(.init(command: .snapshot))
             ).settings == updated
@@ -214,6 +644,13 @@ struct BackendServiceCommandTests {
         )
         #expect(httpFailure.httpServiceError == "Port occupied")
         #expect(!httpFailure.settings.httpEnabled)
+        #expect(
+            httpConfigurations.last
+                == HTTPServiceConfiguration(
+                    isEnabled: false,
+                    port: 49_999
+                )
+        )
     }
 
     @Test("Submission validation and queue commands are deterministic")
@@ -382,6 +819,61 @@ struct BackendServiceCommandTests {
                 == [0]
         )
 
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Repeated buffering audio publishes changed playback content")
+    func repeatedBufferingAudioPublishesContent() async throws {
+        let eventGate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: eventGate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let text = String(repeating: "A complete sentence. ", count: 180)
+
+        _ = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: text,
+                            source: .preview,
+                            modelID: fixture.seedModelID,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        for _ in 0..<300 {
+            guard fixture.playback.generatedDuration < 1 else { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(fixture.playback.generatedDuration == 1)
+        let afterFirstChunk = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+
+        await eventGate.releaseNext()
+        for _ in 0..<300 {
+            guard fixture.playback.generatedDuration < 2 else { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(fixture.playback.generatedDuration == 2)
+        let event = try #require(
+            try events(
+                await fixture.service.handle(
+                    .init(command: .events(after: afterFirstChunk.revision))
+                )
+            ).first
+        )
+
+        #expect(event.snapshot.playback.generatedDuration == 2)
+        #expect(event.snapshot.playback.includesContent)
+        await eventGate.releaseNext()
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
@@ -1557,9 +2049,11 @@ private final class ServiceFixture {
     init(
         seedVoiceAndHistory: Bool = false,
         synthesizesAudio: Bool = false,
+        synthesisEventGate: BackendSynthesisEventGate? = nil,
         downloadCatalog: ModelCatalog? = nil,
         downloadSession: URLSession? = nil,
-        dependencyPreparationGate: DependencyPreparationGate? = nil
+        dependencyPreparationGate: DependencyPreparationGate? = nil,
+        eventSleep: ServiceEventHub.Sleep? = nil
     ) throws {
         root = FileManager.default.temporaryDirectory.appending(
             path: "SayItServiceTests-\(UUID().uuidString)",
@@ -1578,6 +2072,7 @@ private final class ServiceFixture {
         playback = RecordingBackendPlayback()
         synthesizer = DeterministicSynthesizer(
             synthesizesAudio: synthesizesAudio,
+            eventGate: synthesisEventGate,
             dependencyPreparationGate: dependencyPreparationGate
         )
         let modelManager: ModelManager?
@@ -1597,7 +2092,8 @@ private final class ServiceFixture {
             playback: playback,
             synthesizer: synthesizer,
             catalogOverride: downloadCatalog,
-            modelManagerOverride: modelManager
+            modelManagerOverride: modelManager,
+            eventSleep: eventSleep
         )
     }
 
@@ -1734,6 +2230,72 @@ private final class ServiceFixture {
     }
 }
 
+private actor BackendEventSleepRecorder {
+    private var durations: [Duration] = []
+
+    func record(_ duration: Duration) {
+        durations.append(duration)
+    }
+
+    func recordedDurations() -> [Duration] {
+        durations
+    }
+}
+
+private actor BackendEventSleepGate {
+    private var isSleeping = false
+    private var startedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func sleep(_ duration: Duration) async throws {
+        _ = duration
+        isSleeping = true
+        let waiters = startedWaiters
+        startedWaiters.removeAll(keepingCapacity: false)
+        for waiter in waiters {
+            waiter.resume()
+        }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func waitUntilSleeping() async {
+        guard !isSleeping else { return }
+        await withCheckedContinuation { continuation in
+            startedWaiters.append(continuation)
+        }
+    }
+
+    func resume() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+private actor BackendSynthesisEventGate {
+    private var permits = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if permits > 0 {
+            permits -= 1
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func releaseNext() {
+        guard !waiters.isEmpty else {
+            permits += 1
+            return
+        }
+        waiters.removeFirst().resume()
+    }
+}
+
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
     private(set) var requestedLanguages: [String?] = []
@@ -1741,13 +2303,16 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var referenceTranscripts: [String?] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
+    private let eventGate: BackendSynthesisEventGate?
     private let dependencyPreparationGate: DependencyPreparationGate?
 
     init(
         synthesizesAudio: Bool = false,
+        eventGate: BackendSynthesisEventGate? = nil,
         dependencyPreparationGate: DependencyPreparationGate? = nil
     ) {
         self.synthesizesAudio = synthesizesAudio
+        self.eventGate = eventGate
         self.dependencyPreparationGate = dependencyPreparationGate
     }
 
@@ -1769,6 +2334,35 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
             targetCharacterCount: 2_000,
             hardCharacterLimit: 2_500
         ).chunks(for: request.cleanedText.text)
+        if let eventGate, chunks.count >= 2 {
+            return AsyncThrowingStream { continuation in
+                Task {
+                    continuation.yield(.modelLoaded(request.model.id))
+                    for (index, chunk) in chunks.prefix(2).enumerated() {
+                        if index > 0 {
+                            await eventGate.wait()
+                        }
+                        continuation.yield(
+                            .chunkStarted(index: index, chunk: chunk)
+                        )
+                        continuation.yield(
+                            .audio(
+                                AudioChunk(
+                                    requestID: request.id,
+                                    index: index,
+                                    samples: [0.1],
+                                    sampleRate: 1,
+                                    startsParagraph: chunk.startsParagraph
+                                )
+                            )
+                        )
+                    }
+                    await eventGate.wait()
+                    continuation.yield(.completed)
+                    continuation.finish()
+                }
+            }
+        }
         return AsyncThrowingStream { continuation in
             continuation.yield(.modelLoaded(request.model.id))
             for (index, chunk) in chunks.enumerated() {
@@ -1834,6 +2428,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
 @MainActor
 private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
+    var onExternalControl: (@MainActor () -> Void)?
     private(set) var state: PlaybackState = .idle
     private(set) var elapsed: TimeInterval = 0
     private(set) var generatedDuration: TimeInterval = 0
@@ -1914,6 +2509,14 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
 
     func finishBuffering() {
         state = .playing
+    }
+
+    func finishForTesting() {
+        state = .finished
+    }
+
+    func notifyExternalControl() {
+        onExternalControl?()
     }
 
     func archive(

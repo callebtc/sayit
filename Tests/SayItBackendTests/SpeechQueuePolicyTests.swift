@@ -620,6 +620,7 @@ struct SpeechQueuePolicyTests {
 @MainActor
 private final class MockPlaybackController: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
+    var onExternalControl: (@MainActor () -> Void)?
     private(set) var state: PlaybackState = .idle
     private(set) var elapsed: TimeInterval = 0
     private(set) var generatedDuration: TimeInterval = 0
