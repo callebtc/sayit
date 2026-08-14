@@ -532,7 +532,16 @@ struct BackendServiceCommandTests {
         )
         #expect(fixture.playback.volume == 1.5)
 
-        for volume in [0.19, 2.01, Double.nan, Double.infinity] {
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .setVolume(0))
+                )
+            )
+        )
+        #expect(fixture.playback.volume == 0)
+
+        for volume in [-0.01, 2.01, Double.nan, Double.infinity] {
             let response = await fixture.service.handle(
                 .init(command: .setVolume(volume))
             )
@@ -577,7 +586,7 @@ struct BackendServiceCommandTests {
         value.playbackRate = 0.4
         invalidCases.append((value, "settings.invalid_playback_rate"))
         value = original
-        value.volume = 0.1
+        value.volume = -0.1
         invalidCases.append((value, "settings.invalid_volume"))
         value = original
         value.chunkCharacterTarget = 0
@@ -604,6 +613,7 @@ struct BackendServiceCommandTests {
 
         var updated = original
         updated.playbackRate = 1.5
+        updated.volume = 0
         updated.rewindInterval = 7
         updated.forwardInterval = 42
         updated.showNowPlayingTitles = true
@@ -622,6 +632,7 @@ struct BackendServiceCommandTests {
             )
         )
         #expect(fixture.playback.rate == 1.5)
+        #expect(fixture.playback.volume == 0)
         #expect(fixture.playback.backwardSkipInterval == 7)
         #expect(fixture.playback.forwardSkipInterval == 42)
         #expect(fixture.playback.showTitleInNowPlaying)
