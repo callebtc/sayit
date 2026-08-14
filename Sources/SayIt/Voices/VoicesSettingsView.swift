@@ -48,10 +48,14 @@ struct VoicesSettingsView: View {
 
                     if !isSelectedModelActive {
                         Button(
-                            "Use \(model.displayName) for Speech",
-                            action: selectModelForSpeech
+                            selectedModelActionTitle(for: model),
+                            action: activateSelectedModel
                         )
-                        .disabled(!isSelectedModelInstalled)
+                        .disabled(
+                            !state.isServiceOnline
+                                || (!isSelectedModelInstalled
+                                    && state.modelInstallIsBusy)
+                        )
                     }
                 }
             }
@@ -211,6 +215,16 @@ struct VoicesSettingsView: View {
         settings.activeModelID == selectedModelID
     }
 
+    private func selectedModelActionTitle(
+        for model: ModelDescriptor
+    ) -> String {
+        if isSelectedModelInstalled {
+            "Use \(model.displayName) for Speech"
+        } else {
+            "Download and Use \(model.displayName) for Speech"
+        }
+    }
+
     private var isCreationUnavailable: Bool {
         !isSelectedModelInstalled
             || isPlaybackBusy
@@ -241,11 +255,16 @@ struct VoicesSettingsView: View {
             ?? .automaticStable
     }
 
-    private func selectModelForSpeech() {
-        guard let model = selectedModel, isSelectedModelInstalled else {
-            return
+    private func activateSelectedModel() {
+        guard let model = selectedModel else { return }
+        if isSelectedModelInstalled {
+            state.selectModel(model)
+        } else {
+            state.installModel(
+                model.id,
+                selectAfterInstallation: true
+            )
         }
-        state.selectModel(model)
     }
 
     private func moveVoice(_ draggedID: UUID, before targetID: UUID) {
