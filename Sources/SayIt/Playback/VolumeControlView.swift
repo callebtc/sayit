@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct VolumeControlView: View {
-    static let minimumVolume = 0.2
+    static let minimumVolume = 0.0
     static let maximumVolume = 2.0
 
     @Environment(AppState.self) private var state
@@ -39,6 +39,8 @@ struct VolumeControlView: View {
 
     static func symbol(for volume: Double) -> String {
         switch volume {
+        case 0:
+            return "speaker.slash.fill"
         case ..<0.75:
             return "speaker.wave.1.fill"
         case ..<1.5:
@@ -59,14 +61,14 @@ struct VolumeControlView: View {
         )
     }
 
-    private static func position(forVolume volume: Double) -> Double {
+    static func position(forVolume volume: Double) -> Double {
         if volume <= 1 {
             return (volume - minimumVolume) / (1 - minimumVolume) * 0.5
         }
         return 0.5 + (volume - 1) / (maximumVolume - 1) * 0.5
     }
 
-    private static func volume(forPosition position: Double) -> Double {
+    static func volume(forPosition position: Double) -> Double {
         if position <= 0.5 {
             return minimumVolume + position * 2 * (1 - minimumVolume)
         }

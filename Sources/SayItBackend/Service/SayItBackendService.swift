@@ -2192,7 +2192,7 @@ public final class SayItBackendService: SayItService {
         guard validated == volume else {
             throw ServiceFailure(
                 code: "playback.invalid_volume",
-                message: "Volume must be between 0.2 and 2."
+                message: "Volume must be between 0 and 2."
             )
         }
         playback.volume = validated
@@ -2867,10 +2867,10 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
-        guard (0.2...2).contains(settings.volume) else {
+        guard (0...2).contains(settings.volume) else {
             throw ServiceFailure(
                 code: "settings.invalid_volume",
-                message: "Volume must be between 0.2 and 2."
+                message: "Volume must be between 0 and 2."
             )
         }
         guard (1...5_000).contains(settings.chunkCharacterTarget) else {
@@ -3049,7 +3049,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func validatedVolume(_ value: Double) -> Double {
-        min(max(value, 0.2), 2)
+        min(max(value, 0), 2)
     }
 
     private func nonEmpty(_ value: String) -> String? {
