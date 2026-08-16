@@ -1256,7 +1256,8 @@ final class AppState {
             return
         }
         lastServiceRevision = snapshot.revision
-        activeJobID = snapshot.activeJob?.id
+        activeJobID = snapshot.confirmationJobs.first?.id
+            ?? snapshot.activeJob?.id
         let onlineConnection = ServiceConnectionState.online(
             version: snapshot.serviceVersion
         )
@@ -1297,8 +1298,8 @@ final class AppState {
         if httpAPIErrorMessage != snapshot.httpServiceError {
             httpAPIErrorMessage = snapshot.httpServiceError
         }
-        let awaitsConfirmation =
-            snapshot.activeJob?.state == .awaitingConfirmation
+        let awaitsConfirmation = !snapshot.confirmationJobs.isEmpty
+            || snapshot.activeJob?.state == .awaitingConfirmation
         if needsLongTextConfirmation != awaitsConfirmation {
             needsLongTextConfirmation = awaitsConfirmation
         }

@@ -42,7 +42,7 @@ struct SpeechQueuePolicyTests {
     }
 
     @Test
-    func queuePoliciesPreserveFIFOAndCancelReplacedWork() async throws {
+    func replacementCancelsParkedConfirmationWork() async throws {
         let root = FileManager.default.temporaryDirectory.appending(
             path: UUID().uuidString,
             directoryHint: .isDirectory
@@ -79,7 +79,10 @@ struct SpeechQueuePolicyTests {
                 ServiceRequest(
                     command: .submit(
                         SpeechSubmission(
-                            text: "First queued speech",
+                            text: String(
+                                repeating: "First pending speech. ",
+                                count: 5_000
+                            ),
                             source: .frontend
                         )
                     )
@@ -91,7 +94,10 @@ struct SpeechQueuePolicyTests {
                 ServiceRequest(
                     command: .submit(
                         SpeechSubmission(
-                            text: "Second queued speech",
+                            text: String(
+                                repeating: "Second pending speech. ",
+                                count: 5_000
+                            ),
                             source: .frontend
                         )
                     )
@@ -99,12 +105,22 @@ struct SpeechQueuePolicyTests {
             )
         )
 
+        try await waitForState(
+            .awaitingConfirmation,
+            jobID: firstQueued.id,
+            service: service
+        )
+        try await waitForState(
+            .awaitingConfirmation,
+            jobID: secondQueued.id,
+            service: service
+        )
         let queuedSnapshot = try snapshot(
             await service.handle(ServiceRequest(command: .snapshot))
         )
         #expect(
-            queuedSnapshot.queuedJobs.map(\.id)
-                == [firstQueued.id, secondQueued.id]
+            Set(queuedSnapshot.confirmationJobs.map(\.id))
+                == Set([active.id, firstQueued.id, secondQueued.id])
         )
 
         let replacement = try submittedJob(
@@ -123,11 +139,20 @@ struct SpeechQueuePolicyTests {
                 )
             )
         )
-        let replacementSnapshot = try snapshot(
+        try await waitForState(
+            .awaitingConfirmation,
+            jobID: replacement.id,
+            service: service
+        )
+        let confirmedReplacementSnapshot = try snapshot(
             await service.handle(ServiceRequest(command: .snapshot))
         )
-        #expect(replacementSnapshot.activeJob?.id == replacement.id)
-        #expect(replacementSnapshot.queuedJobs.isEmpty)
+        #expect(confirmedReplacementSnapshot.activeJob == nil)
+        #expect(
+            confirmedReplacementSnapshot.confirmationJobs.map(\.id)
+                == [replacement.id]
+        )
+        #expect(confirmedReplacementSnapshot.queuedJobs.isEmpty)
 
         let jobs = try jobList(
             await service.handle(ServiceRequest(command: .jobs))
@@ -502,7 +527,10 @@ struct SpeechQueuePolicyTests {
         let serviceSnapshot = try snapshot(
             await restored.handle(ServiceRequest(command: .snapshot))
         )
-        #expect(serviceSnapshot.activeJob?.id == freshServiceJob.id)
+        #expect(serviceSnapshot.activeJob == nil)
+        #expect(
+            serviceSnapshot.confirmationJobs.map(\.id) == [freshServiceJob.id]
+        )
     }
 
     private func waitForState(
@@ -621,7 +649,13 @@ struct SpeechQueuePolicyTests {
 private final class MockPlaybackController: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
     var onExternalControl: (@MainActor () -> Void)?
-    private(set) var state: PlaybackState = .idle
+    var onStateChange: (@MainActor (PlaybackState) -> Void)?
+    private(set) var state: PlaybackState = .idle {
+        didSet {
+            guard state != oldValue else { return }
+            onStateChange?(state)
+        }
+    }
     private(set) var elapsed: TimeInterval = 0
     private(set) var generatedDuration: TimeInterval = 0
     private(set) var estimatedDuration: TimeInterval = 0

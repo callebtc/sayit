@@ -27,7 +27,7 @@ enum PlaybackError: LocalizedError {
         case .noOutputDevice:
             "No audio output device is available. Connect one and try again."
         case .couldNotStartEngine:
-            "Say It could not start audio playback. Check the current output device and try again."
+            "macOS could not start audio playback on the current output device. Reconnect or switch the device and try again."
         case .unsupportedAudioFile:
             "This history audio file could not be read."
         }

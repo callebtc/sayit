@@ -4,12 +4,27 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 app_root="$project_root/Build/DerivedData-Local/Build/Products/Release/SayIt.app"
 cli="$app_root/Contents/Helpers/SayItCLI.app/Contents/MacOS/sayit"
-bundle_identifier="sh.sayit.mac"
+bundle_identifier="sh.sayit.mac.local"
 launch_services="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 if [ ! -x "$app_root/Contents/MacOS/SayIt" ] || [ ! -x "$cli" ]; then
     echo "No runnable Release build was found. Run ./rebuild.sh first." >&2
     exit 1
+fi
+
+# Keep a previously installed development CLI pointed at the local app that
+# this script launches. Leave production installs and unrelated commands alone.
+path_cli=$(command -v sayit 2>/dev/null || true)
+if [ -n "$path_cli" ] && [ -L "$path_cli" ]; then
+    linked_cli=$(readlink "$path_cli")
+    case "$linked_cli" in
+        "$project_root"/Build/*/SayIt.app/Contents/Helpers/SayItCLI.app/Contents/MacOS/sayit)
+            if [ "$linked_cli" != "$cli" ]; then
+                ln -sfn "$cli" "$path_cli"
+                echo "Updated the development sayit command: $path_cli"
+            fi
+            ;;
+    esac
 fi
 
 if pgrep -x SayIt >/dev/null 2>&1; then

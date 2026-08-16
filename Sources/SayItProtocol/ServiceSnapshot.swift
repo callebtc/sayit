@@ -9,6 +9,8 @@ public struct ServiceSnapshot: Codable, Sendable {
     public let httpServiceError: String?
     public let activeJob: SpeechJob?
     public let queuedJobs: [SpeechJob]
+    public let confirmationJobs: [SpeechJob]
+    public let queueBlock: QueueBlockSnapshot?
     public let playback: PlaybackSnapshot
     public let download: DownloadSnapshot?
     public let modelInstallError: ModelInstallErrorSnapshot?
@@ -29,6 +31,8 @@ public struct ServiceSnapshot: Codable, Sendable {
         httpServiceError: String? = nil,
         activeJob: SpeechJob?,
         queuedJobs: [SpeechJob],
+        confirmationJobs: [SpeechJob] = [],
+        queueBlock: QueueBlockSnapshot? = nil,
         playback: PlaybackSnapshot,
         download: DownloadSnapshot?,
         modelInstallError: ModelInstallErrorSnapshot? = nil,
@@ -48,6 +52,8 @@ public struct ServiceSnapshot: Codable, Sendable {
         self.httpServiceError = httpServiceError
         self.activeJob = activeJob
         self.queuedJobs = queuedJobs
+        self.confirmationJobs = confirmationJobs
+        self.queueBlock = queueBlock
         self.playback = playback
         self.download = download
         self.modelInstallError = modelInstallError
@@ -69,6 +75,8 @@ public struct ServiceSnapshot: Codable, Sendable {
         case httpServiceError
         case activeJob
         case queuedJobs
+        case confirmationJobs
+        case queueBlock
         case playback
         case download
         case modelInstallError
@@ -108,6 +116,14 @@ public struct ServiceSnapshot: Codable, Sendable {
         queuedJobs = try container.decode(
             [SpeechJob].self,
             forKey: .queuedJobs
+        )
+        confirmationJobs = try container.decodeIfPresent(
+            [SpeechJob].self,
+            forKey: .confirmationJobs
+        ) ?? []
+        queueBlock = try container.decodeIfPresent(
+            QueueBlockSnapshot.self,
+            forKey: .queueBlock
         )
         playback = try container.decode(
             PlaybackSnapshot.self,

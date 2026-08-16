@@ -384,6 +384,8 @@ struct ProtocolRoundTripTests {
         legacyJSON["httpServiceError"] = nil
         legacyJSON["voicesRevision"] = nil
         legacyJSON["voiceStudio"] = nil
+        legacyJSON["confirmationJobs"] = nil
+        legacyJSON["queueBlock"] = nil
         let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
 
         let decoded = try SayItWireCodec.decode(
@@ -394,6 +396,47 @@ struct ProtocolRoundTripTests {
         #expect(decoded.httpServiceError == nil)
         #expect(decoded.voicesRevision == 0)
         #expect(decoded.voiceStudio == nil)
+        #expect(decoded.confirmationJobs.isEmpty)
+        #expect(decoded.queueBlock == nil)
+    }
+
+    @Test
+    func queueBlockingMetadataRoundTrips() throws {
+        let confirmation = SpeechJob(
+            source: .frontend,
+            title: "Needs confirmation",
+            state: .awaitingConfirmation
+        )
+        let snapshot = ServiceSnapshot(
+            serviceVersion: "1.0",
+            revision: 1,
+            statusText: "Playback is paused",
+            lastError: nil,
+            activeJob: nil,
+            queuedJobs: [],
+            confirmationJobs: [confirmation],
+            queueBlock: QueueBlockSnapshot(
+                reason: .playbackPaused,
+                jobID: confirmation.id,
+                message: "Playback is paused."
+            ),
+            playback: PlaybackSnapshot(state: "paused"),
+            download: nil,
+            installedModelIDs: [],
+            settings: BackendSettingsSnapshot(),
+            modelsRevision: 0,
+            historyRevision: 0,
+            diagnosticsRevision: 0
+        )
+
+        let decoded = try SayItWireCodec.decode(
+            ServiceSnapshot.self,
+            from: SayItWireCodec.encode(snapshot)
+        )
+
+        #expect(decoded.confirmationJobs.map(\.id) == [confirmation.id])
+        #expect(decoded.queueBlock?.reason == .playbackPaused)
+        #expect(decoded.queueBlock?.jobID == confirmation.id)
     }
 
     @Test

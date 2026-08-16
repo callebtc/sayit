@@ -42,6 +42,15 @@ public final class SayItBackendService: SayItService {
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
     private var activeRequest: SpeechRequest?
+    private var playbackCompletionJobID: UUID?
+    private var playbackCompletionContinuation: CheckedContinuation<
+        PlaybackState,
+        Never
+    >?
+    private var synthesisWatchdogTask: Task<Void, Never>?
+    private var synthesisWatchdogJobID: UUID?
+    private var stalledJobIDs: Set<UUID> = []
+    private let synthesisStallTimeout: Duration
     private var statusText = "Starting service"
     private var errorMessage: String?
     private var httpServiceError: String?
@@ -97,11 +106,13 @@ public final class SayItBackendService: SayItService {
         synthesizer: (any BackendSpeechSynthesizing)? = nil,
         catalogOverride: ModelCatalog? = nil,
         modelManagerOverride: ModelManager? = nil,
-        eventSleep: ServiceEventHub.Sleep? = nil
+        eventSleep: ServiceEventHub.Sleep? = nil,
+        synthesisStallTimeout: Duration = .seconds(300)
     ) throws {
         self.directories = directories
         self.serviceVersion = serviceVersion
         self.playback = playback
+        self.synthesisStallTimeout = synthesisStallTimeout
         if let eventSleep {
             eventHub = ServiceEventHub(sleep: eventSleep)
         } else {
@@ -176,6 +187,9 @@ public final class SayItBackendService: SayItService {
             guard let self else { return }
             self.revision &+= 1
         }
+        playback.onStateChange = { [weak self] state in
+            self?.playbackStateDidChange(state)
+        }
     }
 
     public func start() async {
@@ -232,6 +246,9 @@ public final class SayItBackendService: SayItService {
 
         cancelQueuedJobs()
         await cancelActiveJob(startNext: false)
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
         await cancelVoiceStudio()
         await installTask?.value
         _ = await transitionTask?.result
@@ -1487,6 +1504,24 @@ public final class SayItBackendService: SayItService {
             finishJob(id, state: .failed, errorCode: "job.missing")
             return
         }
+
+        if let cleaned = pending.cleanedText {
+            do {
+                try await speak(
+                    id: id,
+                    cleaned: cleaned,
+                    submission: pending.submission
+                )
+            } catch is CancellationError {
+                if !stalledJobIDs.contains(id) {
+                    finishJob(id, state: .canceled)
+                }
+            } catch {
+                await recordJobFailure(id: id, error: error)
+            }
+            return
+        }
+
         updateJob(id, state: .parsing, progress: 0.02)
         statusText = "Cleaning text"
 
@@ -1505,42 +1540,35 @@ public final class SayItBackendService: SayItService {
             if cleaned.requiresLongTextConfirmation,
                !pending.submission.permitsLongText {
                 updateJob(id, state: .awaitingConfirmation, progress: 0.05)
-                statusText = "Long text needs confirmation"
+                activeJobID = nil
                 jobTask = nil
+                statusText = "Long text needs confirmation"
+                persistJobJournal()
+                startNextJobIfNeeded()
                 return
             }
             try await speak(id: id, cleaned: cleaned, submission: pending.submission)
         } catch is CancellationError {
-            finishJob(id, state: .canceled)
+            if !stalledJobIDs.contains(id) {
+                finishJob(id, state: .canceled)
+            }
         } catch {
             await recordJobFailure(id: id, error: error)
         }
     }
 
     private func confirmJob(_ id: UUID) throws {
-        guard activeJobID == id,
-              jobsByID[id]?.state == .awaitingConfirmation,
-              let pending = pendingJobs[id],
-              let cleaned = pending.cleanedText else {
+        guard jobsByID[id]?.state == .awaitingConfirmation,
+              pendingJobs[id]?.cleanedText != nil else {
             throw ServiceFailure(
                 code: "job.not_awaiting_confirmation",
                 message: "This job is not waiting for confirmation."
             )
         }
-        jobTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await self.speak(
-                    id: id,
-                    cleaned: cleaned,
-                    submission: pending.submission
-                )
-            } catch is CancellationError {
-                self.finishJob(id, state: .canceled)
-            } catch {
-                await self.recordJobFailure(id: id, error: error)
-            }
-        }
+        updateJob(id, state: .queued, progress: 0.05)
+        queuedJobIDs.append(id)
+        persistJobJournal()
+        startNextJobIfNeeded()
     }
 
     private func resolveVoice(
@@ -1731,20 +1759,29 @@ public final class SayItBackendService: SayItService {
         statusText = "Preparing speech"
         errorMessage = nil
 
+        armSynthesisWatchdog(for: id)
+        defer { stopSynthesisWatchdog(for: id) }
         let stream = await synthesizer.synthesize(request)
         for try await event in stream {
             try Task.checkCancellation()
+            armSynthesisWatchdog(for: id)
             try await handleSynthesisEvent(event, request: request)
         }
 
-        while playback.state == .playing
-            || playback.state == .paused
-            || playback.state == .buffering
-            || playback.state == .preparing {
-            try Task.checkCancellation()
-            try await Task.sleep(for: .milliseconds(250))
+        stopSynthesisWatchdog(for: id)
+        let terminalState = await waitForPlaybackCompletion(jobID: id)
+        try Task.checkCancellation()
+        switch terminalState {
+        case .finished:
+            finishJob(id, state: .completed)
+        case .failed:
+            throw ServiceFailure(
+                code: "playback.failed",
+                message: errorMessage ?? "Audio playback failed."
+            )
+        default:
+            throw CancellationError()
         }
-        finishJob(id, state: .completed)
     }
 
     private func handleSynthesisEvent(
@@ -1856,6 +1893,7 @@ public final class SayItBackendService: SayItService {
         queuedJobIDs.removeAll { $0 == id }
         pendingJobs[id] = nil
         finishQueuedJob(id, state: .canceled)
+        startNextJobIfNeeded()
     }
 
     private func cancelActiveJob(
@@ -1879,6 +1917,8 @@ public final class SayItBackendService: SayItService {
         let task = jobTask
         let request = activeRequest
         task?.cancel()
+        resumePlaybackCompletion(for: id, with: .idle)
+        stopSynthesisWatchdog(for: id)
         jobTask = nil
         activeRequest = nil
         activeJobID = nil
@@ -1903,7 +1943,11 @@ public final class SayItBackendService: SayItService {
     }
 
     private func cancelQueuedJobs() {
-        for id in queuedJobIDs {
+        let confirmationJobIDs = pendingJobs.keys.filter {
+            jobsByID[$0]?.state == .awaitingConfirmation
+        }
+        let canceledIDs = Set(queuedJobIDs).union(confirmationJobIDs)
+        for id in canceledIDs {
             pendingJobs[id] = nil
             finishQueuedJob(id, state: .canceled)
         }
@@ -1925,6 +1969,9 @@ public final class SayItBackendService: SayItService {
             errorMessage: errorMessage
         )
         pendingJobs[id] = nil
+        stalledJobIDs.remove(id)
+        resumePlaybackCompletion(for: id, with: playback.state)
+        stopSynthesisWatchdog(for: id)
         activeJobID = nil
         activeRequest = nil
         jobTask = nil
@@ -1979,9 +2026,16 @@ public final class SayItBackendService: SayItService {
     }
 
     private func recordJobFailure(id: UUID, error: Error) async {
+        guard activeJobID == id else { return }
         playback.stop()
-        let errorCode = (error as? ServiceFailure)?.code
-            ?? "synthesis.failed"
+        let errorCode: String
+        if let failure = error as? ServiceFailure {
+            errorCode = failure.code
+        } else if error is PlaybackError {
+            errorCode = "playback.failed"
+        } else {
+            errorCode = "synthesis.failed"
+        }
         if let request = activeRequest, request.source != .preview {
             try? history.markIncomplete(
                 id: request.id,
@@ -1994,7 +2048,9 @@ public final class SayItBackendService: SayItService {
         await diagnostics.record(
             DiagnosticEvent(
                 severity: .error,
-                category: .synthesis,
+                category: errorCode.hasPrefix("playback.")
+                    ? .playback
+                    : .synthesis,
                 code: errorCode,
                 modelID: activeRequest?.model.id
             )
@@ -2060,6 +2116,104 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
+    private func playbackStateDidChange(_ state: PlaybackState) {
+        switch state {
+        case .playing:
+            updateActiveJobState(.playing)
+        case .paused:
+            updateActiveJobState(.paused)
+        case .buffering:
+            updateActiveJobState(.buffering)
+        default:
+            break
+        }
+        revision &+= 1
+        if state == .finished || state == .failed {
+            if let id = activeJobID {
+                resumePlaybackCompletion(for: id, with: state)
+            } else {
+                startNextJobIfNeeded()
+            }
+        }
+    }
+
+    private func waitForPlaybackCompletion(
+        jobID: UUID
+    ) async -> PlaybackState {
+        if playback.state == .finished
+            || playback.state == .failed
+            || playback.state == .idle {
+            return playback.state
+        }
+        return await withCheckedContinuation { continuation in
+            playbackCompletionJobID = jobID
+            playbackCompletionContinuation = continuation
+        }
+    }
+
+    private func resumePlaybackCompletion(
+        for jobID: UUID,
+        with state: PlaybackState
+    ) {
+        guard playbackCompletionJobID == jobID else { return }
+        let continuation = playbackCompletionContinuation
+        playbackCompletionJobID = nil
+        playbackCompletionContinuation = nil
+        continuation?.resume(returning: state)
+    }
+
+    private func armSynthesisWatchdog(for jobID: UUID) {
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogJobID = jobID
+        let timeout = synthesisStallTimeout
+        synthesisWatchdogTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: timeout)
+            } catch {
+                return
+            }
+            await self?.synthesisDidStall(jobID)
+        }
+    }
+
+    private func stopSynthesisWatchdog(for jobID: UUID) {
+        guard synthesisWatchdogJobID == jobID else { return }
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
+    }
+
+    private func synthesisDidStall(_ jobID: UUID) async {
+        guard activeJobID == jobID else { return }
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
+        stalledJobIDs.insert(jobID)
+        jobTask?.cancel()
+        playback.stop()
+        await synthesizer.cancelCurrentRequest()
+        guard activeJobID == jobID else {
+            stalledJobIDs.remove(jobID)
+            return
+        }
+        let message = "Speech generation stopped making progress."
+        errorMessage = message
+        await diagnostics.record(
+            DiagnosticEvent(
+                severity: .error,
+                category: .synthesis,
+                code: "synthesis.stalled",
+                modelID: activeRequest?.model.id
+            )
+        )
+        diagnosticsRevision &+= 1
+        finishJob(
+            jobID,
+            state: .failed,
+            errorCode: "synthesis.stalled",
+            errorMessage: message
+        )
+    }
+
     private func currentServiceEvent() -> ServiceEvent {
         if let cachedServiceEvent,
            cachedServiceEvent.id == revision {
@@ -2101,6 +2255,14 @@ public final class SayItBackendService: SayItService {
             httpServiceError: httpServiceError,
             activeJob: activeJob,
             queuedJobs: queuedJobIDs.compactMap { jobsByID[$0] },
+            confirmationJobs: jobOrder.compactMap { id in
+                guard let job = jobsByID[id],
+                      job.state == .awaitingConfirmation else {
+                    return nil
+                }
+                return job
+            },
+            queueBlock: queueBlockSnapshot,
             playback: PlaybackSnapshot(
                 state: playback.state.rawValue,
                 elapsed: playback.elapsed,
@@ -2684,6 +2846,7 @@ public final class SayItBackendService: SayItService {
             )
         }
         await cancelActiveJob(startNext: false)
+        cancelQueuedJobs()
         try playback.playFile(
             at: url,
             title: item.title,
@@ -3066,6 +3229,42 @@ public final class SayItBackendService: SayItService {
         guard playback.generatedDuration > 0 else { return 0.2 }
         return min(max(playback.elapsed / playback.generatedDuration, 0.2), 0.99)
     }
+
+    private var queueBlockSnapshot: QueueBlockSnapshot? {
+        guard !queuedJobIDs.isEmpty,
+              let activeJob = activeJobID.flatMap({ jobsByID[$0] }) else {
+            return nil
+        }
+        if playback.state == .paused {
+            return QueueBlockSnapshot(
+                reason: .playbackPaused,
+                jobID: activeJob.id,
+                message: "Playback is paused. Resume, clear, or interrupt it to continue the queue."
+            )
+        }
+        switch activeJob.state {
+        case .paused:
+            return QueueBlockSnapshot(
+                reason: .playbackPaused,
+                jobID: activeJob.id,
+                message: "Playback is paused. Resume, clear, or interrupt it to continue the queue."
+            )
+        case .awaitingConfirmation:
+            return QueueBlockSnapshot(
+                reason: .awaitingConfirmation,
+                jobID: activeJob.id,
+                message: "A speech job is waiting for long-text confirmation."
+            )
+        case .parsing, .preparing, .synthesizing, .buffering:
+            return QueueBlockSnapshot(
+                reason: .synthesisInProgress,
+                jobID: activeJob.id,
+                message: "Another speech job is still being prepared."
+            )
+        default:
+            return nil
+        }
+    }
 }
 
 private extension ServiceSnapshot {
@@ -3079,6 +3278,8 @@ private extension ServiceSnapshot {
             httpServiceError: httpServiceError,
             activeJob: activeJob,
             queuedJobs: queuedJobs,
+            confirmationJobs: confirmationJobs,
+            queueBlock: queueBlock,
             playback: PlaybackSnapshot(
                 state: playback.state,
                 elapsed: playback.elapsed,

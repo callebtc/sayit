@@ -6,6 +6,7 @@ import SayItProtocol
 protocol BackendPlaybackControlling: PlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)? { get set }
     var onExternalControl: (@MainActor () -> Void)? { get set }
+    var onStateChange: (@MainActor (PlaybackState) -> Void)? { get set }
     var state: PlaybackState { get }
     var elapsed: TimeInterval { get }
     var generatedDuration: TimeInterval { get }
