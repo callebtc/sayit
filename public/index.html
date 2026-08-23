@@ -635,9 +635,7 @@
       </a>
     </div>
     <p class="micro rise" style="--d:400ms">
-      macOS 15+ · Apple silicon · Free &amp; open source ·
-      <a href="https://github.com/callebtc/sayit/releases" target="_blank" rel="noopener" id="versionNote">v0.1.4</a> ·
-      <a href="#how">see it in action</a>
+      macOS 15+ · Apple silicon · Free &amp; open source
     </p>
   </main>
 
@@ -1109,8 +1107,6 @@
       if (asset) {
         var dls = document.querySelectorAll(".js-download");
         for (var d = 0; d < dls.length; d++) dls[d].href = asset.browser_download_url;
-        var note = document.getElementById("versionNote");
-        if (note && rel.tag_name) note.textContent = rel.tag_name;
       }
     })
     .catch(function () { /* mocked DMG links stay */ });
