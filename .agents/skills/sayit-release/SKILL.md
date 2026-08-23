@@ -184,14 +184,25 @@ release_version=1.2.3
 release_tag="v$release_version"
 release_commit=$(git rev-parse HEAD)
 release_dmg="Build/SayIt-$release_version.dmg"
+release_upload_dir=$(mktemp -d "${TMPDIR:-/tmp}/sayit-release-upload.XXXXXX")
+release_upload_dmg="$release_upload_dir/SayIt.dmg"
 ```
 
-Recheck the artifact checksum and repository state. Then create a draft release
-against the exact reviewed commit:
+Recheck the artifact checksum and repository state. Copy the approved artifact
+to the stable public asset name and verify that the copy is byte-identical:
+
+```sh
+cp "$release_dmg" "$release_upload_dmg"
+cmp "$release_dmg" "$release_upload_dmg"
+```
+
+Then create a draft release against the exact reviewed commit. The stable asset
+name keeps `/releases/latest/download/SayIt.dmg` valid across releases while the
+local production artifact remains versioned:
 
 ```sh
 gh release create "$release_tag" \
-  "$release_dmg#Say It $release_version for macOS" \
+  "$release_upload_dmg#Say It $release_version for macOS" \
   --target "$release_commit" \
   --draft \
   --title "Say It $release_version" \
@@ -217,12 +228,12 @@ Confirm that:
 - the tag is the requested version;
 - the target is the reviewed release commit;
 - the release is still a draft;
-- exactly the intended DMG asset is attached; and
+- exactly one intended DMG asset named `SayIt.dmg` is attached; and
 - no local path or private identifier appears in the title, notes, or label.
 
 For higher assurance, download the draft asset to an explicit temporary
 directory and compare its SHA-256 with the local approved artifact. Remove only
-that validated temporary directory afterward.
+that validated temporary directory and `release_upload_dir` afterward.
 
 ## Publish the GitHub release
 
