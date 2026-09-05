@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 24)
+        #expect(catalog.models.count == 23)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -69,12 +69,11 @@ struct ModelCatalogTests {
             $0.capabilities.requiresReferenceAudio
         }
 
-        #expect(gated.count == 5)
+        #expect(gated.count == 4)
         #expect(gated.map(\.id.rawValue).sorted() == [
             "echo-base",
             "fish-s2-pro-8bit",
             "index-tts",
-            "index-tts-15",
             "moss-nano-100m",
         ])
         #expect(gated.allSatisfy { !$0.isSelectable })
@@ -204,6 +203,16 @@ struct ModelCatalogTests {
         #expect(chatterboxMultilingual.capabilities.languageSelection)
         #expect(chatterboxMultilingual.capabilities.voiceCloning)
         #expect(!chatterboxMultilingual.capabilities.requiresReferenceAudio)
+
+        let breeze = try #require(models["breeze-2-4bit"])
+        #expect(breeze.stability == .experimental)
+        #expect(breeze.isSelectable)
+        #expect(breeze.capabilities.voiceDescription)
+        #expect(!breeze.capabilities.streaming)
+        #expect(breeze.playbackMode == .buffered)
+        #expect(!breeze.license.commercialUseAllowed)
+        #expect(breeze.license.requiresAcceptance)
+        #expect(models["index-tts-15"] == nil)
 
         let kokoro = try #require(models["kokoro-bf16"])
         #expect(!kokoro.capabilities.supportsVoiceDiscovery)

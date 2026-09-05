@@ -2,7 +2,8 @@
 
 This branch evaluates Breeze TTS 2, IndexTTS 1.5, Supertonic 3, and VoxCPM2.
 Vireo is tracked separately because its weights require Hugging Face access.
-These are experiments, not production support claims.
+Only Breeze is added to the app catalog, with experimental status. The other
+candidates remain evaluation evidence and are not integrated.
 
 ## Isolation
 
@@ -49,9 +50,7 @@ also applies. Preserve the complete products directory, including its
 
 ```sh
 Build/ModelAudit/venv/bin/python Scripts/audit-tts-model.py breeze --download-only
-Build/ModelAudit/venv/bin/python Scripts/audit-tts-model.py index --download-only
 Build/ModelAudit/venv/bin/python Scripts/audit-swift-model.py breeze
-Build/ModelAudit/venv/bin/python Scripts/audit-swift-model.py index
 ```
 
 The Swift runner imports the pinned local snapshots through `ModelManager` into
@@ -60,7 +59,10 @@ English, a longer passage, Chinese, and reference audio where supported.
 Each case is a fresh test process, so Swift measurements include model loading.
 Failed short synthesis stops that model's remaining cases for diagnosis.
 
-To investigate the IndexTTS reading failures independently of the Swift path,
+The historical native IndexTTS results were recorded at commit `ba1618a`,
+which contains the temporary catalog entry and Swift runner used for that test.
+The final catalog excludes IndexTTS 1.5. To investigate its reading failures
+independently of the Swift path,
 run `audit-tts-model.py index`. It uses the same snapshot and synthetic reference
 through Python, with only a local tokenizer-path override in an ignored copy of
 the configuration. The original snapshot is preserved.

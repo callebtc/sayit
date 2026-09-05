@@ -75,7 +75,7 @@ def execute(template, key, name, values):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("model", choices=["breeze", "index"])
+    parser.add_argument("model", choices=["breeze"])
     parser.add_argument("--case", choices=["all", "import", "short", "long", "chinese", "clone"], default="all")
     args = parser.parse_args()
     products = AUDIT / "TestProducts"
@@ -86,7 +86,7 @@ def main():
         raise SystemExit("Build the SayItBackendTests scheme for testing first.")
     (AUDIT / "results").mkdir(exist_ok=True)
     (AUDIT / "audio").mkdir(exist_ok=True)
-    model_id = "breeze-2-4bit" if args.model == "breeze" else "index-tts-15"
+    model_id = "breeze-2-4bit"
     if args.case in ("all", "import"):
         ok = execute(templates[0], args.model, "import", {
             "SAYIT_MODEL_AUDIT_IMPORT_ID": model_id,
@@ -97,8 +97,7 @@ def main():
     models = Path.home() / "Library" / "Application Support" / "Say It Model Audit" / "Models"
     cases = [("short", texts.SHORT, "en"), ("long", texts.LONG, "en"),
              ("chinese", texts.CHINESE, "zh")]
-    if args.model == "breeze":
-        cases.append(("clone", texts.SHORT, "en"))
+    cases.append(("clone", texts.SHORT, "en"))
     failures = 0
     for name, text, language in cases:
         if args.case not in ("all", name):
@@ -109,7 +108,7 @@ def main():
                "SAYIT_MODEL_AUDIT_LANGUAGE": language,
                "SAYIT_MODEL_AUDIT_VOICE_DESCRIPTION": "A calm, clear adult voice with natural pacing.",
                "SAYIT_MODEL_AUDIT_OUTPUT": str(AUDIT / "audio" / f"{args.model}-{name}-swift.wav")}
-        if args.model == "index" or name == "clone":
+        if name == "clone":
             env.update(SAYIT_MODEL_AUDIT_REFERENCE=str(AUDIT / "audio" / "reference.wav"),
                        SAYIT_MODEL_AUDIT_REFERENCE_TEXT=texts.SHORT)
         if not execute(templates[0], args.model, name, env):

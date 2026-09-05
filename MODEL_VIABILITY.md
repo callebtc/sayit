@@ -1,13 +1,14 @@
 # TTS model viability — September 5, 2026
 
-Three candidates merit further work: **Supertonic 3 for lightweight reading,
-VoxCPM2 for multilingual voice features, and Breeze TTS 2 as a native Swift
-experiment. IndexTTS 1.5 should not be recommended on these results.** Vireo
-could not be tested because the available Hugging Face access was unauthorized.
+**Decision: add only Breeze TTS 2 as experimental.** Keep the existing
+recommended models and the native `mlx-audio-swift` architecture. Supertonic 3
+and VoxCPM2 would require separate backend or porting work, which is outside
+this change. IndexTTS 1.5 is excluded because of apparent reading omissions;
+Vireo could not be tested because Hugging Face access was unauthorized.
 
-This experiment uses the `codex/tts-model-viability` branch and an isolated
-**Say It Model Audit** app. The existing development app and production
-background service remained running. No remote branch or release was published.
+The evaluation used an isolated **Say It Model Audit** app alongside the
+existing development app and production background service. Only Breeze is
+added to the bundled catalog. The other candidates remain research findings.
 
 ## Measured results
 
@@ -100,6 +101,7 @@ No new agreement was accepted. No inference or compatibility claim is made.
 
 [Machine-readable results](Scripts/ModelAudit/results.json),
 [reproduction instructions](Scripts/ModelAudit/README.md), and
-[local listening page](Build/ModelAudit/listen.html) are included in the worktree.
+local listening page (`Build/ModelAudit/listen.html`) are available in the
+evaluation worktree. The listening page and audio are not part of this PR.
 Downloaded weights, audio, build products, and raw logs remain in ignored local
 directories; the branch records only code, synthetic-text metrics, and findings.
