@@ -32,9 +32,11 @@ struct TextParser: Sendable {
             parsed = cleanPlainText(plainText)
         } else if let html = payload.html {
             if options.stripHTML {
-                parsed = (try cleanHTML(html), "HTML", 0)
+                let cleaned = try cleanHTML(html)
+                parsed = (cleaned.text, "HTML", cleaned.removedCodeBlocks)
             } else if let raw = decodeHTMLSource(html) {
-                parsed = (raw, "HTML", 0)
+                let cleaned = removeHTMLCodeBlocks(from: raw)
+                parsed = (cleaned.text, "HTML", cleaned.removedCodeBlocks)
             } else {
                 throw TextIngestionError.invalidRepresentation
             }
@@ -93,14 +95,25 @@ struct TextParser: Sendable {
     ) {
         let detectionInput = sanitize(input)
 
-        if options.stripHTML,
+        let hasFences = detectionInput.range(
+            of: #"(?m)^[ \t]*(`{3,}|~{3,})"#,
+            options: .regularExpression
+        ) != nil
+
+        // Code examples may contain HTML. Classify their enclosing fences first.
+        if !hasFences, options.stripHTML,
            looksLikeHTML(detectionInput),
            let data = detectionInput.data(using: .utf8),
            let html = try? cleanHTML(data) {
-            return (html, "HTML", 0)
+            return (html.text, "HTML", html.removedCodeBlocks)
         }
 
-        if looksLikeMarkdown(detectionInput) {
+        if !hasFences, !options.stripHTML, looksLikeHTML(detectionInput) {
+            let cleaned = removeHTMLCodeBlocks(from: input)
+            return (cleaned.text, "HTML", cleaned.removedCodeBlocks)
+        }
+
+        if hasFences || looksLikeMarkdown(detectionInput) {
             if options.stripMarkdown {
                 let stripped = stripMarkdownBlocks(from: detectionInput)
                 let parsed = parseMarkdown(stripped.text)
@@ -116,10 +129,19 @@ struct TextParser: Sendable {
     }
 
     private func parseMarkdown(_ input: String) -> String {
-        input
-            .components(separatedBy: "\n")
-            .map(cleanMarkdownLine)
-            .joined(separator: "\n")
+        var fence: String?
+        return input.components(separatedBy: "\n").map { line in
+            if let open = fence {
+                if closesFence(line, openedBy: open) { fence = nil }
+                // Code removal is off: preserve its contents verbatim.
+                return line
+            }
+            if let open = openingFence(in: line) {
+                fence = open
+                return line
+            }
+            return cleanMarkdownLine(line)
+        }.joined(separator: "\n")
     }
 
     private func cleanMarkdownLine(_ line: String) -> String {
@@ -142,6 +164,28 @@ struct TextParser: Sendable {
         }
         working = replacingMatches(in: working, pattern: #"^#{1,6}\s+"#, with: "")
         working = replacingMatches(in: working, pattern: #"^>\s?"#, with: "")
+        return prefix + cleanMarkdownCodeSpans(working)
+    }
+
+    private func cleanMarkdownCodeSpans(_ input: String) -> String {
+        guard let expression = try? NSRegularExpression(
+            pattern: #"(?<![\\`])(`+)(?!`)(.+?)\1(?!`)"#
+        ) else { return cleanMarkdownInline(input) }
+        var output = ""
+        var cursor = input.startIndex
+        for match in expression.matches(in: input, range: NSRange(input.startIndex..., in: input)) {
+            guard let range = Range(match.range, in: input),
+                  let literal = Range(match.range(at: 2), in: input) else { continue }
+            output += cleanMarkdownInline(String(input[cursor..<range.lowerBound]))
+            output += input[literal]
+            cursor = range.upperBound
+        }
+        output += cleanMarkdownInline(String(input[cursor...]))
+        return output
+    }
+
+    private func cleanMarkdownInline(_ input: String) -> String {
+        var working = input
         working = replacingMatches(
             in: working,
             pattern: #"!\[([^\]]*)\]\([^)]+\)"#,
@@ -152,24 +196,27 @@ struct TextParser: Sendable {
             pattern: #"\[([^\]]+)\]\([^)]+\)"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"`([^`]*)`"#, with: "$1")
-        working = replacingMatches(in: working, pattern: #"\*\*([^*]+)\*\*"#, with: "$1")
+        working = replacingMatches(in: working, pattern: #"(?<!\\)\*\*([^*]+)(?<!\\)\*\*"#, with: "$1")
         working = replacingMatches(
             in: working,
-            pattern: #"(?<!\w)__([^_]+)__(?!\w)"#,
+            pattern: #"(?<![\w\\])__([^_]+)(?<!\\)__(?!\w)"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"\*([^*]+)\*"#, with: "$1")
+        working = replacingMatches(in: working, pattern: #"(?<!\\)\*([^*]+)(?<!\\)\*"#, with: "$1")
         working = replacingMatches(
             in: working,
-            pattern: #"(?<!\w)_([^_]+)_(?!\w)"#,
+            pattern: #"(?<![\w\\])_([^_]+)(?<!\\)_(?!\w)"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"~~([^~]+)~~"#, with: "$1")
-        return prefix + working
+        working = replacingMatches(in: working, pattern: #"(?<!\\)~~([^~]+)(?<!\\)~~"#, with: "$1")
+        return working
     }
 
-    private func cleanHTML(_ data: Data) throws -> String {
+    // The importer is injectable so boundary preservation is tested on failure too.
+    func cleanHTML(
+        _ data: Data,
+        using importer: (Data) throws -> String = TextParser.readHTML
+    ) throws -> (text: String, removedCodeBlocks: Int) {
         guard var source = decodeHTMLSource(data) else {
             throw TextIngestionError.invalidRepresentation
         }
@@ -178,10 +225,16 @@ struct TextParser: Sendable {
             in: source,
             pattern: #"(?is)<!--.*?-->|<(script|style|head|noscript|template|svg|canvas|iframe|object)\b[^>]*>.*?</\1>"#
         )
+        let codeCleanup = removeHTMLCodeBlocks(from: source)
+        source = codeCleanup.text
+        // Importers can discard <br> inside lists or collapse whitespace. Use a
+        // collision-free text marker and restore it after either extraction path.
+        var boundary = "SAYITBOUNDARY" + UUID().uuidString
+        while source.contains(boundary) { boundary += "X" }
         source = replacingMatches(
             in: source,
             pattern: #"(?i)</?(p|div|main|section|article|header|footer|nav|aside|h[1-6]|blockquote|pre|address|figure|figcaption|details|summary|fieldset|legend|dl|dt|dd|ul|ol|table|caption|form)\b[^>]*>"#,
-            with: "<br><br>"
+            with: boundary + boundary
         )
         source = replacingMatches(
             in: source,
@@ -191,17 +244,17 @@ struct TextParser: Sendable {
         source = replacingMatches(
             in: source,
             pattern: #"(?i)</(li|tr)\s*>"#,
-            with: "<br>"
+            with: boundary
         )
         source = replacingMatches(
             in: source,
             pattern: #"(?i)<br\b[^>]*>"#,
-            with: "<br>"
+            with: boundary
         )
         source = replacingMatches(
             in: source,
             pattern: #"(?i)<hr\b[^>]*>"#,
-            with: "<br><br>"
+            with: boundary + boundary
         )
         source = replacingMatches(
             in: source,
@@ -217,25 +270,42 @@ struct TextParser: Sendable {
         guard let cleanedData = source.data(using: .utf8) else {
             throw TextIngestionError.invalidRepresentation
         }
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue
-        ]
+        let extracted: String
         do {
-            let attributed = try NSAttributedString(
-                data: cleanedData,
-                options: options,
-                documentAttributes: nil
-            )
-            return attributed.string
+            extracted = try importer(cleanedData)
         } catch {
             let withoutTags = replacingMatches(
                 in: source,
                 pattern: #"(?s)<[^>]+>"#,
                 with: ""
             )
-            return decodeCommonHTMLEntities(in: withoutTags)
+            extracted = decodeCommonHTMLEntities(in: withoutTags)
         }
+        return (extracted.replacing(boundary, with: "\n"), codeCleanup.removedCodeBlocks)
+    }
+
+    private func removeHTMLCodeBlocks(from source: String) -> (text: String, removedCodeBlocks: Int) {
+        guard options.stripCodeBlocks,
+              let expression = try? NSRegularExpression(pattern: #"(?is)<pre\b[^>]*>.*?</pre\s*>"#) else {
+            return (source, 0)
+        }
+        let range = NSRange(source.startIndex..., in: source)
+        let count = expression.numberOfMatches(in: source, range: range)
+        let text = expression.stringByReplacingMatches(
+            in: source, range: range, withTemplate: "<br><br>"
+        )
+        return (text, count)
+    }
+
+    private static func readHTML(_ data: Data) throws -> String {
+        try NSAttributedString(
+            data: data,
+            options: [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue
+            ],
+            documentAttributes: nil
+        ).string
     }
 
     private func cleanRichText(_ data: Data) throws -> String {
@@ -284,17 +354,38 @@ struct TextParser: Sendable {
         text: String,
         removedCodeBlocks: Int
     ) {
-        let expression = try? NSRegularExpression(
-            pattern: #"(?ms)^[ \t]*(```|~~~).*?^[ \t]*\1[ \t]*$"#
-        )
-        let range = NSRange(input.startIndex..., in: input)
-        let count = expression?.numberOfMatches(in: input, range: range) ?? 0
-        let withoutBlocks = expression?.stringByReplacingMatches(
-            in: input,
-            range: range,
-            withTemplate: "\n"
-        ) ?? input
-        return (withoutBlocks, count)
+        var fence: String?
+        var count = 0
+        var lines: [String] = []
+        for line in input.components(separatedBy: "\n") {
+            if let open = fence {
+                if closesFence(line, openedBy: open) {
+                    fence = nil
+                    lines.append("")
+                }
+            } else if let open = openingFence(in: line) {
+                fence = open
+                count += 1
+                lines.append("")
+            } else {
+                lines.append(line)
+            }
+        }
+        return (lines.joined(separator: "\n"), count)
+    }
+
+    private func openingFence(in line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard let first = trimmed.first, first == "`" || first == "~" else {
+            return nil
+        }
+        let fence = trimmed.prefix(while: { $0 == first })
+        return fence.count >= 3 ? String(fence) : nil
+    }
+
+    private func closesFence(_ line: String, openedBy fence: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.count >= fence.count && trimmed.allSatisfy { $0 == fence.first }
     }
 
     private func normalize(_ input: String) -> String {
@@ -342,29 +433,19 @@ struct TextParser: Sendable {
             pattern: #"\n+"#,
             with: "\n"
         )
-        value = replacingMatches(
-            in: value,
-            pattern: #"([\p{Ll}\p{Nd}]\.[\"'’”)\]]*)(?=\p{Lu})"#,
-            with: "$1 "
-        )
-        value = replacingMatches(
-            in: value,
-            pattern: #"([!?…][\"'’”)\]]*)(?=\p{Lu})"#,
-            with: "$1 "
-        )
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func looksLikeHTML(_ text: String) -> Bool {
         text.range(
-            of: #"<(html|body|p|div|article|section|h[1-6]|ul|ol|li|br|table)\b"#,
+            of: #"<(html|body|p|div|article|section|h[1-6]|ul|ol|li|br|table|pre)\b"#,
             options: [.regularExpression, .caseInsensitive]
         ) != nil
     }
 
     private func looksLikeMarkdown(_ text: String) -> Bool {
         text.range(
-            of: #"(?m)^(#{1,6}\s|[-*+]\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*"#,
+            of: #"(?m)^(#{1,6}\s|[-*+]\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|\*[^*\n]+\*|(?<!\w)_{1,2}[^_\n]+_{1,2}(?!\w)|~~[^~\n]+~~|`[^`\n]+`"#,
             options: .regularExpression
         ) != nil
     }

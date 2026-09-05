@@ -103,7 +103,7 @@ struct TextCleanerTests {
         #expect(result.text.hasSuffix("Final paragraph."))
     }
 
-    @Test("Website whitespace and missing sentence spaces are repaired")
+    @Test("Website whitespace is repaired without guessing sentence boundaries")
     func repairsWebsiteTextArtifacts() async throws {
         let input = """
         First\u{00A0}sentence.\u{2029}Second soft\u{00AD}hyphen sentence.\u{FFFC}Third sentence!Next one?Final one.\u{2028}Last line.
@@ -114,7 +114,7 @@ struct TextCleanerTests {
 
         #expect(
             result.text
-                == "First sentence.\nSecond softhyphen sentence. Third sentence! Next one? Final one.\nLast line."
+                == "First sentence.\nSecond softhyphen sentence. Third sentence!Next one?Final one.\nLast line."
         )
     }
 

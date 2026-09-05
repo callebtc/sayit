@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SpeechLyricsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let text: String
     let chunks: [PlaybackTextChunk]
@@ -14,6 +15,12 @@ struct SpeechLyricsView: View {
     var onSeek: ((TimeInterval) -> Void)?
 
     @State private var tokenization = SpeechReaderDocument.empty
+    @State private var readerLayout = SpeechReaderLayout.empty
+    @State private var contentWidth: Double = 0
+    @State private var laidOutWidth: Double = 0
+    @State private var laidOutTypography: SpeechReaderTypography?
+    @State private var pendingScrollWord: Int?
+    @State private var layoutRevision = 0
     @State private var isFollowing = true
     @State private var wordFrames: [Int: CGRect] = [:]
     @State private var scrollMetrics = ScrollMetrics()
@@ -21,7 +28,7 @@ struct SpeechLyricsView: View {
     @State private var visibleWordIDs: Set<Int> = []
     @State private var hasMeasuredVisibleWords = false
 
-    private typealias Block = SpeechReaderDocument.Block
+    private typealias Block = SpeechReaderLayout.Block
     private typealias WordToken = SpeechReaderDocument.Word
 
     private struct ScrollMetrics: Equatable {
@@ -30,10 +37,25 @@ struct SpeechLyricsView: View {
         var containerHeight: Double = 1
     }
 
-    private static let naturalSpaceWidth: Double = {
-        let font = NSFont.preferredFont(forTextStyle: .callout)
-        return Double((" " as NSString).size(withAttributes: [.font: font]).width)
-    }()
+    private struct WordGeometry: Equatable {
+        let frame: CGRect
+        let layoutRevision: Int
+    }
+
+    private var typography: SpeechReaderTypography {
+        SpeechReaderTypography(font: NSFont.preferredFont(forTextStyle: .callout))
+    }
+
+    private struct LayoutRequest: Equatable, Sendable {
+        let text: String
+        let width: Double
+        let typography: SpeechReaderTypography
+        let dynamicTypeSize: DynamicTypeSize
+    }
+
+    private var layoutRequest: LayoutRequest {
+        LayoutRequest(text: text, width: contentWidth, typography: typography, dynamicTypeSize: dynamicTypeSize)
+    }
 
     private var activeTokenization: SpeechReaderDocument? {
         guard tokenization.sourceText == text else {
@@ -43,7 +65,7 @@ struct SpeechLyricsView: View {
     }
 
     private var blocks: [Block] {
-        activeTokenization?.blocks ?? []
+        activeTokenization == nil ? [] : readerLayout.blocks
     }
 
     private var tokens: [WordToken] {
@@ -95,26 +117,13 @@ struct SpeechLyricsView: View {
                     hasMeasuredVisibleWords = false
                     attachFollow()
                 }
-                .task(id: text) {
-                    guard activeTokenization == nil else { return }
-                    let source = text
-                    let work = Task.detached(priority: .userInitiated) {
-                        try SpeechReaderDocument.build(source)
-                    }
-                    do {
-                        let document = try await withTaskCancellationHandler {
-                            try await work.value
-                        } onCancel: {
-                            work.cancel()
-                        }
-                        try Task.checkCancellation()
-                        tokenization = document
-                        attachFollow()
-                    } catch is CancellationError {
-                        // A new document or dismissal invalidates this result.
-                    } catch {
-                        tokenization = .empty
-                    }
+                .onGeometryChange(for: Double.self) { geometry in
+                    max(0, geometry.size.width - 8)
+                } action: { width in
+                    contentWidth = width
+                }
+                .task(id: layoutRequest) {
+                    await updateLayout(layoutRequest)
                 }
         }
         .accessibilityElement(children: .ignore)
@@ -125,7 +134,7 @@ struct SpeechLyricsView: View {
     private var scrollContent: some View {
         let currentWordIndex = currentWordIndex
         return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 6) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(blocks) { block in
                     blockView(
                         for: block,
@@ -144,23 +153,56 @@ struct SpeechLyricsView: View {
         for block: Block,
         currentWordIndex: Int?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            WordsFlowLayout(
-                horizontalSpacing: Self.naturalSpaceWidth,
-                verticalSpacing: 3
-            ) {
-                ForEach(block.words) { token in
-                    wordView(
-                        for: token,
-                        currentWordIndex: currentWordIndex
-                    )
-                }
+        SpeechReaderBlockLayout(block: block, width: laidOutWidth) {
+            ForEach(block.placements) { placement in
+                wordView(for: tokens[placement.id], currentWordIndex: currentWordIndex)
             }
+        }
+        .padding(.top, block.spacingBefore)
+        .overlay(alignment: .bottom) {
             if showsBlockSeparators, block.id != blocks.last?.id {
-                ChunkMarkerView()
+                ChunkMarkerView().allowsHitTesting(false)
             }
         }
         .id(block.id)
+    }
+
+    private func updateLayout(_ request: LayoutRequest) async {
+        guard request.width > 0 else { return }
+        let existing = activeTokenization
+        // Width changes retain a source word, never an obsolete visual block ID.
+        let anchor = isFollowing ? currentWordIndex : visibleWordIDs.min()
+        let work = Task.detached(priority: .userInitiated) {
+            let document = try existing ?? SpeechReaderDocument.build(request.text)
+            let layout = try request.typography.layout(document: document, width: request.width)
+            return (document, layout)
+        }
+        do {
+            let (document, layout) = try await withTaskCancellationHandler {
+                try await work.value
+            } onCancel: {
+                work.cancel()
+            }
+            try Task.checkCancellation()
+            wordFrames = [:]
+            visibleWordIDs = []
+            hasMeasuredVisibleWords = false
+            tokenization = document
+            readerLayout = layout
+            laidOutWidth = request.width
+            laidOutTypography = request.typography
+            layoutRevision &+= 1
+            let target = isFollowing ? currentWordIndex : anchor
+            pendingScrollWord = target
+            if let target, let blockID = layout.blockID(forWord: target) {
+                scrollPosition.scrollTo(id: blockID, anchor: .top)
+            }
+        } catch is CancellationError {
+            // A newer width, document, or dismissal invalidates this result.
+        } catch {
+            tokenization = .empty
+            readerLayout = .empty
+        }
     }
 
     private var currentWord: String {
@@ -192,7 +234,7 @@ struct SpeechLyricsView: View {
         // the position. Never use accumulated height estimates for distant seeks.
         if !visibleWordIDs.contains(wordIndex) {
             scrollPosition.scrollTo(
-                id: tokens[wordIndex].blockID,
+                id: readerLayout.blockID(forWord: wordIndex) ?? wordIndex,
                 anchor: UnitPoint(x: 0.5, y: 0.42)
             )
         }
@@ -263,13 +305,14 @@ struct SpeechLyricsView: View {
         for token: WordToken,
         currentWordIndex: Int?
     ) -> some View {
+        let revision = layoutRevision
         let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
         let seekTime = startTime(for: token)
         let isProcessed = seekTime.isFinite && seekTime < generatedDuration
         let canSeek = onSeek != nil && isProcessed
         return Text(token.text)
-            .font(.callout)
+            .font(Font((laidOutTypography ?? typography).font))
             .foregroundStyle(
                 wordColor(isCurrent: isCurrent, isPast: isPast, isProcessed: isProcessed)
             )
@@ -294,21 +337,36 @@ struct SpeechLyricsView: View {
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isCurrent)
             .id(Self.scrollID(forWord: token.id))
-            .onGeometryChange(for: CGRect.self) { geometry in
-                geometry.frame(in: .scrollView(axis: .vertical))
-            } action: { frame in
+            .onGeometryChange(for: WordGeometry.self) { geometry in
+                WordGeometry(
+                    frame: geometry.frame(in: .scrollView(axis: .vertical)),
+                    layoutRevision: revision
+                )
+            } action: { measurement in
+                guard measurement.layoutRevision == layoutRevision else { return }
+                let frame = measurement.frame
                 wordFrames[token.id] = frame
+                // Reflow may retain a view whose visibility did not change. Its
+                // new geometry must still repopulate the visible-word set.
+                let visibleHeight = max(0, min(frame.maxY, scrollMetrics.containerHeight) - max(frame.minY, 0))
+                setWordVisibility(token.id, isVisible: visibleHeight >= frame.height * 0.5)
+                if pendingScrollWord == token.id {
+                    pendingScrollWord = nil
+                    if !isFollowing {
+                        scrollPosition.scrollTo(y: max(0, scrollMetrics.offset + frame.minY))
+                    }
+                }
                 followWordFrame(frame, wordID: token.id)
             }
             .onDisappear {
+                guard revision == layoutRevision else { return }
                 wordFrames.removeValue(forKey: token.id)
                 visibleWordIDs.remove(token.id)
             }
             .onScrollVisibilityChange(threshold: 0.5) { isVisible in
+                guard revision == layoutRevision else { return }
                 setWordVisibility(token.id, isVisible: isVisible)
             }
-            .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
-            .layoutValue(key: JoinsPreviousKey.self, value: token.joinsPrevious)
     }
 
     private func setWordVisibility(_ id: Int, isVisible: Bool) {
@@ -377,107 +435,4 @@ struct SpeechLyricsView: View {
     private static func scrollID(forWord id: Int) -> String { "word-\(id)" }
 
 
-}
-
-private struct JoinsPreviousKey: LayoutValueKey {
-    static let defaultValue = false
-}
-
-private struct NewlinesBeforeKey: LayoutValueKey {
-    static let defaultValue = 0
-}
-
-private struct WordsFlowLayout: Layout {
-    var horizontalSpacing: Double = 3.5
-    var verticalSpacing: Double = 3
-    var paragraphSpacing: Double = 8
-
-    func sizeThatFits(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout [Double: Arrangement]
-    ) -> CGSize {
-        cachedArrangement(proposal: proposal, subviews: subviews, cache: &cache).size
-    }
-
-    func placeSubviews(
-        in bounds: CGRect,
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout [Double: Arrangement]
-    ) {
-        let arrangement = cachedArrangement(
-            proposal: proposal, subviews: subviews, cache: &cache
-        )
-        for (index, subview) in subviews.enumerated() {
-            let position = arrangement.positions[index]
-            let size = arrangement.sizes[index]
-            subview.place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                anchor: .topLeading,
-                proposal: ProposedViewSize(width: size.width, height: size.height)
-            )
-        }
-    }
-
-    struct Arrangement {
-        var size: CGSize
-        var positions: [CGPoint]
-        var sizes: [CGSize]
-    }
-
-    func makeCache(subviews: Subviews) -> [Double: Arrangement] { [:] }
-
-    func updateCache(_ cache: inout [Double: Arrangement], subviews: Subviews) {
-        cache.removeAll(keepingCapacity: true)
-    }
-
-    private func cachedArrangement(
-        proposal: ProposedViewSize,
-        subviews: Subviews,
-        cache: inout [Double: Arrangement]
-    ) -> Arrangement {
-        let width = proposal.width ?? .infinity
-        if let arrangement = cache[width] { return arrangement }
-        let arrangement = arrange(proposal: proposal, subviews: subviews)
-        // Resizing must not retain an arrangement for every intermediate width.
-        if cache.count >= 3 { cache.removeAll(keepingCapacity: true) }
-        cache[width] = arrangement
-        return arrangement
-    }
-
-    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> Arrangement {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var sizes: [CGSize] = []
-        var x: Double = 0
-        var y: Double = 0
-        var rowHeight: Double = 0
-        var maxX: Double = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0, subview[JoinsPreviousKey.self] { x -= horizontalSpacing }
-            let newlines = subview[NewlinesBeforeKey.self]
-            if !positions.isEmpty, newlines > 0 {
-                x = 0
-                y += rowHeight + verticalSpacing
-                    + (newlines > 1 ? paragraphSpacing : 0)
-                rowHeight = 0
-            } else if x > 0, x + size.width > maxWidth {
-                x = 0
-                y += rowHeight + verticalSpacing
-                rowHeight = 0
-            }
-            positions.append(CGPoint(x: x, y: y))
-            sizes.append(size)
-            rowHeight = max(rowHeight, size.height)
-            x += size.width + horizontalSpacing
-            maxX = max(maxX, x - horizontalSpacing)
-        }
-        return Arrangement(
-            size: CGSize(width: maxX, height: y + rowHeight),
-            positions: positions,
-            sizes: sizes
-        )
-    }
 }

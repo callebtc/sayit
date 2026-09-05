@@ -5,18 +5,13 @@ import Testing
 
 @Suite("Speech lyrics")
 struct SpeechLyricsViewTests {
-    @Test("Long documents have bounded display blocks before any audio exists")
-    func boundedBlocks() throws {
+    @Test("Long documents retain stable source tokens before any audio exists")
+    func longDocumentTokens() throws {
         let text = String(repeating: "one two three four five. ", count: 20_000)
         let document = try SpeechReaderDocument.build(text)
         #expect(document.tokens.count == 100_000)
-        #expect(document.blocks.count > 3_000)
-        #expect(document.blocks.allSatisfy {
-            $0.words.count <= SpeechReaderDocument.maximumWordsPerBlock
-                && $0.words.reduce(0, { $0 + $1.text.count })
-                    <= SpeechReaderDocument.maximumCharactersPerBlock
-        })
         #expect(document.tokens.map(\.id) == Array(0..<100_000))
+        #expect(document.tokens.last?.sourceRange.upperBound == text.count - 1)
     }
 
     @Test("A single enormous word cannot create an unbounded layout item")
@@ -36,7 +31,6 @@ struct SpeechLyricsViewTests {
         let document = try SpeechReaderDocument.build(text)
         #expect(document.tokens.map(\.text) == ["👨‍👩‍👧‍👦", "Café", "Café", "e\u{301}", "fin"])
         #expect(document.tokens[2].newlinesBefore == 2)
-        #expect(document.blocks.count == 2)
         for token in document.tokens {
             let start = text.index(text.startIndex, offsetBy: token.sourceRange.lowerBound)
             let end = text.index(start, offsetBy: token.sourceRange.count)
