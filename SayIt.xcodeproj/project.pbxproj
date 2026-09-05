@@ -203,6 +203,7 @@
 		690DD7FC6DABD5D8A65B7A48 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
 		69CE3A628AAE1587B7976D71 /* VoiceStudioSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEFBFB440C0388E52C0DEC /* VoiceStudioSnapshot.swift */; };
 		6B2A2003079910D0A146A378 /* SayItHTTPServer+PlaybackRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */; };
+		6B8EA518D4DB7702985F43FA /* RegisteredServiceStartup.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB5BBA9182ED3B21E5A1465 /* RegisteredServiceStartup.swift */; };
 		6C69A69B7EEEEBDFFFF0952E /* DiagnosticSeverity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810121170E2B03BC942F9CF3 /* DiagnosticSeverity.swift */; };
 		6C9383ACB1F0BB34CD533B11 /* VoiceRecordingError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BFC2964BF2ABF447564986 /* VoiceRecordingError.swift */; };
 		6D7BC63EED554722AFF0B04F /* PauseCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4527699AF5875AD4FC468DF5 /* PauseCommand.swift */; };
@@ -1202,6 +1203,7 @@
 		F99A0DD56B5957ED88693CD6 /* ServiceResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceResponse.swift; sourceTree = "<group>"; };
 		FB00365B7888BA872FDEED0C /* ModelInstallationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallationTests.swift; sourceTree = "<group>"; };
 		FB3A6AAC6675A003A0ACE47C /* ExportedFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportedFile.swift; sourceTree = "<group>"; };
+		FBB5BBA9182ED3B21E5A1465 /* RegisteredServiceStartup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisteredServiceStartup.swift; sourceTree = "<group>"; };
 		FCA4C656CF4B6B4016530003 /* GlobalHotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyManager.swift; sourceTree = "<group>"; };
 		FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisError.swift; sourceTree = "<group>"; };
 		FE13E5BA1B40745372B9772E /* HistoryItemSnapshot+ServiceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HistoryItemSnapshot+ServiceSnapshot.swift"; sourceTree = "<group>"; };
@@ -2126,6 +2128,7 @@
 				E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */,
 				E06D692230E118EA04CC2F5E /* CommandLineInstallController.swift */,
 				C93B7EC837D3B6837807659B /* DevelopmentServiceLauncher.swift */,
+				FBB5BBA9182ED3B21E5A1465 /* RegisteredServiceStartup.swift */,
 				B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */,
 				73C68503A5952C88A89C91E4 /* TriggerSource+SpeechJobSource.swift */,
 			);
@@ -3123,6 +3126,7 @@
 				72474B2BF09C76E00F3ED617 /* RecentHistoryRowView.swift in Sources */,
 				BE86A8D46C752BA2CA27C7EC /* RecentHistoryView.swift in Sources */,
 				2BEF190D834CDA9DE81A8AF9 /* RecommendedOnboardingModelView.swift in Sources */,
+				6B8EA518D4DB7702985F43FA /* RegisteredServiceStartup.swift in Sources */,
 				435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */,
 				98E075B62EF1F0140D7056EF /* SayItStyles.swift in Sources */,
 				7C1CD00B82E7BD882C630F91 /* SelectionAccessSettingsView.swift in Sources */,
@@ -3642,7 +3646,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -3660,7 +3664,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.4;
+				MARKETING_VERSION = 0.1.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
@@ -4018,7 +4022,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = D7AHD3GLH6;
@@ -4041,7 +4045,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.4;
+				MARKETING_VERSION = 0.1.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

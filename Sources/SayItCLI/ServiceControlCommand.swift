@@ -87,6 +87,9 @@ struct ServiceStatusCommand: AsyncParsableCommand {
             CLIOutput.standard(
                 "Running · version \(snapshot.serviceVersion)"
             )
+        } catch let failure as ServiceFailure {
+            CLIOutput.status(failure.message)
+            throw CLIExitCode.rejected
         } catch {
             CLIOutput.status("Say It background service is not running.")
             throw CLIExitCode.unavailable
@@ -133,9 +136,11 @@ enum CLIServiceJob {
 
     private static func candidates() -> [URL] {
         var urls: [URL] = []
-        let executable = URL(
+        // argv[0] can be just "sayit" when launched through PATH. It is not
+        // necessarily a filesystem path, especially inside the CLI sandbox.
+        let executable = (Bundle.main.executableURL ?? URL(
             fileURLWithPath: CommandLine.arguments[0]
-        ).resolvingSymlinksInPath()
+        )).resolvingSymlinksInPath()
         urls.append(
             executable
                 .deletingLastPathComponent()
