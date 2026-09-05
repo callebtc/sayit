@@ -18,6 +18,15 @@ public struct TextChunker: Sendable {
         for text: String,
         separatesParagraphs: Bool = false
     ) -> [SpeechChunk] {
+        chunks(for: text, separatesParagraphs: separatesParagraphs, checkingCancellation: {})
+    }
+
+    public func chunks(
+        for text: String,
+        separatesParagraphs: Bool = false,
+        checkingCancellation: () throws -> Void
+    ) rethrows -> [SpeechChunk] {
+        try checkingCancellation()
         var output: [SpeechChunk] = []
         var buffer: SpeechChunk?
 
@@ -32,7 +41,8 @@ public struct TextChunker: Sendable {
             buffer = nil
         }
 
-        for paragraph in paragraphs(in: text) {
+        for paragraph in try paragraphs(in: text, checkingCancellation: checkingCancellation) {
+            try checkingCancellation()
             let sentences = sentences(
                 in: text,
                 within: paragraph.range,
@@ -41,9 +51,10 @@ public struct TextChunker: Sendable {
             var isFirstSentence = true
 
             for sentence in sentences {
+                try checkingCancellation()
                 if sentence.text.count > hardCharacterLimit {
                     flush()
-                    for piece in splitOversized(sentence) {
+                    for piece in try splitOversized(sentence, checkingCancellation: checkingCancellation) {
                         output.append(
                             piece.reidentified(
                                 as: output.count,
@@ -88,13 +99,30 @@ public struct TextChunker: Sendable {
         separatesParagraphs: Bool = false,
         fitting fits: (String) throws -> Bool
     ) rethrows -> [SpeechChunk] {
+        try chunks(
+            for: text, separatesParagraphs: separatesParagraphs,
+            checkingCancellation: {}, fitting: fits
+        )
+    }
+
+    public func chunks(
+        for text: String,
+        separatesParagraphs: Bool = false,
+        checkingCancellation: () throws -> Void,
+        fitting fits: (String) throws -> Bool
+    ) rethrows -> [SpeechChunk] {
         var output: [SpeechChunk] = []
 
-        for chunk in chunks(
+        for chunk in try chunks(
             for: text,
-            separatesParagraphs: separatesParagraphs
+            separatesParagraphs: separatesParagraphs,
+            checkingCancellation: checkingCancellation
         ) {
-            let pieces = try fittingPieces(for: chunk, fits: fits)
+            try checkingCancellation()
+            let pieces = try fittingPieces(for: chunk) { candidate in
+                try checkingCancellation()
+                return try fits(candidate)
+            }
             for (index, piece) in pieces.enumerated() {
                 output.append(
                     piece.reidentified(
@@ -122,38 +150,42 @@ public struct TextChunker: Sendable {
     }
 
     private func paragraphs(
-        in text: String
-    ) -> [(range: Range<String.Index>, sourceOffset: Int)] {
+        in text: String,
+        checkingCancellation: () throws -> Void
+    ) rethrows -> [(range: Range<String.Index>, sourceOffset: Int)] {
         var output: [(
             range: Range<String.Index>,
             sourceOffset: Int
         )] = []
         var paragraphStart = text.startIndex
         var cursor = text.startIndex
+        var characterOffset = 0
+        var paragraphOffset = 0
 
         func appendParagraph(endingAt end: String.Index) {
             guard paragraphStart < end else { return }
             output.append(
                 (
                     paragraphStart..<end,
-                    text.distance(
-                        from: text.startIndex,
-                        to: paragraphStart
-                    )
+                    paragraphOffset
                 )
             )
         }
 
         while cursor < text.endIndex {
+            if characterOffset.isMultiple(of: 1_024) { try checkingCancellation() }
             guard text[cursor] == "\n" else {
                 cursor = text.index(after: cursor)
+                characterOffset += 1
                 continue
             }
             appendParagraph(endingAt: cursor)
             repeat {
                 cursor = text.index(after: cursor)
+                characterOffset += 1
             } while cursor < text.endIndex && text[cursor] == "\n"
             paragraphStart = cursor
+            paragraphOffset = characterOffset
         }
         appendParagraph(endingAt: text.endIndex)
         return output
@@ -218,7 +250,8 @@ public struct TextChunker: Sendable {
         ]
     }
 
-    private func fittingPieces(
+    /// Fit one prepared chunk without reprocessing the rest of the document.
+    public func fittingPieces(
         for chunk: SpeechChunk,
         fits: (String) throws -> Bool
     ) rethrows -> [SpeechChunk] {
@@ -242,18 +275,20 @@ public struct TextChunker: Sendable {
         return output
     }
 
-    private func splitOversized(_ chunk: SpeechChunk) -> [SpeechChunk] {
+    private func splitOversized(
+        _ chunk: SpeechChunk,
+        checkingCancellation: () throws -> Void
+    ) rethrows -> [SpeechChunk] {
         var output: [SpeechChunk] = []
         var remainder = chunk.text.startIndex..<chunk.text.endIndex
+        var remainderOffset = 0
 
-        while chunk.text.distance(
-            from: remainder.lowerBound,
-            to: remainder.upperBound
-        ) > hardCharacterLimit {
-            let proposedEnd = chunk.text.index(
-                remainder.lowerBound,
-                offsetBy: hardCharacterLimit
-            )
+        while let proposedEnd = chunk.text.index(
+            remainder.lowerBound,
+            offsetBy: hardCharacterLimit,
+            limitedBy: remainder.upperBound
+        ), proposedEnd < remainder.upperBound {
+            try checkingCancellation()
             let searchRange = remainder.lowerBound..<proposedEnd
             let boundaryIndex = chunk.text[searchRange].lastIndex(where: {
                 $0.isWhitespace || $0 == "," || $0 == ";"
@@ -269,17 +304,28 @@ public struct TextChunker: Sendable {
                     chunk.slice(
                         id: output.count,
                         textRange: pieceRange,
+                        characterRange: (
+                            remainderOffset + chunk.text.distance(
+                                from: remainder.lowerBound, to: pieceRange.lowerBound
+                            )
+                        )..<(remainderOffset + chunk.text.distance(
+                            from: remainder.lowerBound, to: pieceRange.upperBound
+                        )),
                         startsParagraph: output.isEmpty
                             && chunk.startsParagraph
                     )
                 )
             }
+            remainderOffset += chunk.text.distance(
+                from: remainder.lowerBound, to: breakIndex
+            )
             remainder = breakIndex..<remainder.upperBound
             while remainder.lowerBound < remainder.upperBound,
                   chunk.text[remainder.lowerBound].isWhitespace {
                 remainder = chunk.text.index(
                     after: remainder.lowerBound
                 )..<remainder.upperBound
+                remainderOffset += 1
             }
         }
 
@@ -291,6 +337,13 @@ public struct TextChunker: Sendable {
                 chunk.slice(
                     id: output.count,
                     textRange: finalRange,
+                    characterRange: (
+                        remainderOffset + chunk.text.distance(
+                            from: remainder.lowerBound, to: finalRange.lowerBound
+                        )
+                    )..<(remainderOffset + chunk.text.distance(
+                        from: remainder.lowerBound, to: finalRange.upperBound
+                    )),
                     startsParagraph: output.isEmpty
                         && chunk.startsParagraph
                 )
@@ -388,12 +441,17 @@ public struct TextChunker: Sendable {
         midpointOffset: Int,
         matching predicate: (Character) -> Bool
     ) -> String.Index? {
-        text[range].indices
-            .filter { predicate(text[$0]) }
-            .min {
-                abs(text.distance(from: text.startIndex, to: $0) - midpointOffset)
-                    < abs(text.distance(from: text.startIndex, to: $1) - midpointOffset)
+        var offset = text.distance(from: text.startIndex, to: range.lowerBound)
+        var best: String.Index?
+        var bestDistance = Int.max
+        for index in text[range].indices {
+            let distance = abs(offset - midpointOffset)
+            if predicate(text[index]), distance < bestDistance {
+                best = index
+                bestDistance = distance
             }
-            .map { text.index(after: $0) }
+            offset += 1
+        }
+        return best.map { text.index(after: $0) }
     }
 }

@@ -696,7 +696,11 @@ private final class MockPlaybackController: BackendPlaybackControlling {
     }
 
     func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        spokenChunks.append(chunk)
+        if let last = spokenChunks.last, last.textStart == chunk.textStart {
+            spokenChunks[spokenChunks.count - 1] = chunk
+        } else {
+            spokenChunks.append(chunk)
+        }
     }
 
     func play() {
