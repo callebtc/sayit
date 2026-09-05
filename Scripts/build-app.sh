@@ -114,4 +114,5 @@ fi
 
 codesign --verify --deep --strict "$app_root"
 "$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
+"$project_root/Scripts/validate-package-linkage.sh" "$app_root"
 echo "$app_root"

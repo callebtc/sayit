@@ -21,6 +21,19 @@ struct PCMStreamConditioner: Sendable {
         )
     }
 
+    var retainedFrameCount: Int { pendingTail.count }
+
+    func speechStartFrameOffset(
+        logicalChunkIndex: Int,
+        startsParagraph: Bool,
+        paragraphPauseFrameCount: Int
+    ) -> Int {
+        guard let currentLogicalChunkIndex,
+              currentLogicalChunkIndex != logicalChunkIndex,
+              startsParagraph, paragraphPauseFrameCount > 0 else { return 0 }
+        return pendingTail.count + paragraphPauseFrameCount
+    }
+
     mutating func append(
         _ samples: [Float],
         logicalChunkIndex: Int,

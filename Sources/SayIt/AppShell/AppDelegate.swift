@@ -22,7 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSWindow.didExposeNotification,
             NSWindow.willCloseNotification,
             NSWindow.didMiniaturizeNotification,
-            NSWindow.didDeminiaturizeNotification
+            NSWindow.didDeminiaturizeNotification,
+            NSWindow.didChangeOcclusionStateNotification
         ] {
             center.addObserver(
                 forName: name,
@@ -93,8 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 let hasVisibleWindow = NSApp.windows.contains { window in
-                    window.isVisible && window.canBecomeMain
+                    window.isVisible
+                        && !window.isMiniaturized
+                        && window.canBecomeMain
                 }
+                AppState.shared.setAppWindowPresented(hasVisibleWindow)
                 let target: NSApplication.ActivationPolicy =
                     hasVisibleWindow ? .regular : .accessory
                 if NSApp.activationPolicy() != target {

@@ -3,6 +3,7 @@ import Foundation
 public enum ServiceCommand: Codable, Sendable {
     case snapshot
     case events(after: UInt64)
+    case waitForEvents(after: UInt64, playbackInterval: TimeInterval)
     case submit(SpeechSubmission)
     case jobs
     case confirmJob(UUID)

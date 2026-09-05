@@ -61,6 +61,24 @@ struct AppSettingsTests {
         #expect(restoredSettings.speakingPace == .fast)
     }
 
+    @Test("Silent playback volume persists")
+    @MainActor
+    func silentPlaybackVolumePersists() throws {
+        let suiteName = "SayItTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.volume == 1)
+
+        settings.volume = 0
+
+        let restoredSettings = AppSettings(defaults: defaults)
+        #expect(restoredSettings.volume == 0)
+    }
+
     @Test("Voice selections persist independently for each model")
     @MainActor
     func voiceSelectionsPersistPerModel() throws {

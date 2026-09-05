@@ -25,6 +25,7 @@ final class SpeechItem {
     var stateRawValue: String
     var failureCode: String?
     var isPinned: Bool
+    var playbackTimingData: Data?
 
     init(
         id: UUID,

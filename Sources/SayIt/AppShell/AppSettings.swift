@@ -302,8 +302,9 @@ final class AppSettings {
         ) ?? .natural
         let storedRate = defaults.double(forKey: Key.playbackRate)
         playbackRate = storedRate == 0 ? 1 : storedRate
-        let storedVolume = defaults.double(forKey: Key.volume)
-        volume = storedVolume == 0 ? 1 : storedVolume
+        volume = defaults.object(forKey: Key.volume) == nil
+            ? 1
+            : defaults.double(forKey: Key.volume)
         let storedRewind = defaults.double(forKey: Key.rewindInterval)
         rewindInterval = storedRewind == 0 ? 15 : storedRewind
         let storedForward = defaults.double(forKey: Key.forwardInterval)

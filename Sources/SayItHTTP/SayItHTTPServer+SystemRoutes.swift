@@ -75,25 +75,20 @@ extension SayItHTTPServer {
                     body: .init { writer in
                         var lastRevision = requestedRevision
                         while !Task.isCancelled {
-                            let events = await backend.events(
-                                after: lastRevision
-                            )
-                            for event in events {
-                                let data = try SayItWireCodec.encode(event)
-                                let json = String(decoding: data, as: UTF8.self)
-                                let payload = """
-                                id: \(event.id)
-                                event: snapshot
-                                data: \(json)
-
-
-                                """
-                                try await writer.write(
-                                    ByteBuffer(string: payload)
+                            let response = await backend.handle(
+                                ServiceRequest(
+                                    command: .waitForEvents(
+                                        after: lastRevision,
+                                        playbackInterval: 1
+                                    )
                                 )
-                                lastRevision = event.id
-                            }
-                            try await Task.sleep(for: .milliseconds(100))
+                            )
+                            guard !Task.isCancelled else { break }
+                            try await ServiceEventSSEWriter.write(
+                                response,
+                                lastRevision: &lastRevision,
+                                to: &writer
+                            )
                         }
                         try await writer.finish(nil)
                     }

@@ -63,21 +63,26 @@ final class BackgroundServiceController {
     }
 
     func refresh() {
-        status = service.status
+        let currentStatus = service.status
+        if status != currentStatus {
+            status = currentStatus
+        }
     }
 
     func ensureRunning() async {
         guard !isUserDisabled else { return }
         await perform {
             await legacyCleanupIfNeeded()
-            writeParentProcessFile()
             #if DEBUG || SAYIT_LOCAL_BUILD
+            writeParentProcessFile()
             try await ensureDevelopmentServiceRunning()
             #else
-            if status == .enabled, parentProcessFileMatches {
-                return
-            }
-            try await restartRegisteredService()
+            try await RegisteredServiceStartup.ensureRunning(
+                isEnabled: service.status == .enabled,
+                parentProcessMatches: { parentProcessFileMatches },
+                writeParentProcess: { writeParentProcessFile() },
+                restart: { try await restartRegisteredService() }
+            )
             #endif
         }
     }

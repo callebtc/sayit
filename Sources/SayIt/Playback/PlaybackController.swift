@@ -35,16 +35,41 @@ final class PlaybackController {
     var commandHandler: ((ServiceCommand) -> Void)?
 
     func apply(_ snapshot: PlaybackSnapshot) {
-        state = PlaybackState(rawValue: snapshot.state) ?? .idle
-        elapsed = snapshot.elapsed
-        generatedDuration = snapshot.generatedDuration
-        estimatedDuration = snapshot.estimatedDuration
-        if snapshot.includesContent {
+        let nextState = PlaybackState(rawValue: snapshot.state) ?? .idle
+        if state != nextState {
+            state = nextState
+        }
+        if elapsed != snapshot.elapsed {
+            elapsed = snapshot.elapsed
+        }
+        if generatedDuration != snapshot.generatedDuration {
+            generatedDuration = snapshot.generatedDuration
+        }
+        if estimatedDuration != snapshot.estimatedDuration {
+            estimatedDuration = snapshot.estimatedDuration
+        }
+        if snapshot.includesWaveform, amplitudes != snapshot.amplitudes {
             amplitudes = snapshot.amplitudes
-            currentTitle = snapshot.currentTitle
-            modelID = snapshot.modelID.map { ModelID($0) }
-            spokenText = snapshot.spokenText
-            spokenChunks = snapshot.spokenChunks
+        }
+        if snapshot.includesTiming,
+           snapshot.timingStartIndex >= 0,
+           snapshot.timingStartIndex <= spokenChunks.count {
+            let start = snapshot.timingStartIndex
+            if start != 0 || spokenChunks != snapshot.spokenChunks {
+                spokenChunks.replaceSubrange(start..., with: snapshot.spokenChunks)
+            }
+        }
+        if snapshot.includesContent {
+            if currentTitle != snapshot.currentTitle {
+                currentTitle = snapshot.currentTitle
+            }
+            let nextModelID = snapshot.modelID.map { ModelID($0) }
+            if modelID != nextModelID {
+                modelID = nextModelID
+            }
+            if spokenText != snapshot.spokenText {
+                spokenText = snapshot.spokenText
+            }
         }
         if rate != snapshot.rate {
             let handler = commandHandler

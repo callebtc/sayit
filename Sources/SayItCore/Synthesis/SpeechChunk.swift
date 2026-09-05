@@ -53,13 +53,14 @@ public struct SpeechChunk: Identifiable, Equatable, Sendable {
     func slice(
         id: Int,
         textRange: Range<String.Index>,
+        characterRange: Range<Int>? = nil,
         startsParagraph: Bool
     ) -> SpeechChunk {
-        let lowerOffset = text.distance(
+        let lowerOffset = characterRange?.lowerBound ?? text.distance(
             from: text.startIndex,
             to: textRange.lowerBound
         )
-        let upperOffset = text.distance(
+        let upperOffset = characterRange?.upperBound ?? text.distance(
             from: text.startIndex,
             to: textRange.upperBound
         )

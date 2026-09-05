@@ -2,6 +2,7 @@ import Foundation
 
 import Observation
 import SayItCore
+import SayItProtocol
 import SwiftData
 
 @MainActor
@@ -54,9 +55,11 @@ final class HistoryStore {
         id: UUID,
         duration: TimeInterval,
         audioRelativePath: String,
-        audioByteCount: Int64
+        audioByteCount: Int64,
+        spokenChunks: [PlaybackTextChunk] = []
     ) throws {
         guard let item = try item(with: id) else { return }
+        item.playbackTimingData = try JSONEncoder().encode(spokenChunks)
         item.duration = duration
         item.audioRelativePath = audioRelativePath
         item.audioByteCount = audioByteCount
@@ -66,6 +69,26 @@ final class HistoryStore {
         try reload()
     }
 
+    func playbackTiming(id: UUID) throws -> [PlaybackTextChunk] {
+        guard let item = try item(with: id), let data = item.playbackTimingData,
+              let chunks = try? JSONDecoder().decode([PlaybackTextChunk].self, from: data)
+        else { return [] }
+        // Missing/corrupt timing must never prevent replaying a valid recording.
+        var textEnd = 0
+        var audioStart: TimeInterval = 0
+        for chunk in chunks {
+            guard chunk.textStart >= textEnd, chunk.textEnd > chunk.textStart,
+                  chunk.textEnd <= item.characterCount,
+                  chunk.audioStart.isFinite, chunk.audioStart >= audioStart,
+                  chunk.audioStart <= item.duration,
+                  let end = chunk.audioEnd, end.isFinite,
+                  end >= chunk.audioStart, end <= item.duration else { return [] }
+            textEnd = chunk.textEnd
+            audioStart = chunk.audioStart
+        }
+        return chunks
+    }
+
     func markIncomplete(id: UUID, state: SpeechItemState, code: String? = nil) throws {
         guard let item = try item(with: id) else { return }
         if let relativePath = item.audioRelativePath {
@@ -73,6 +96,7 @@ final class HistoryStore {
                 at: directories.historyAudio.appending(path: relativePath)
             )
         }
+        item.playbackTimingData = nil
         item.audioRelativePath = nil
         item.audioByteCount = 0
         item.duration = 0

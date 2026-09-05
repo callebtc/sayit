@@ -42,10 +42,56 @@ public final class SayItBackendService: SayItService {
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
     private var activeRequest: SpeechRequest?
+    private var playbackCompletionJobID: UUID?
+    private var playbackCompletionContinuation: CheckedContinuation<
+        PlaybackState,
+        Never
+    >?
+    private var synthesisWatchdogTask: Task<Void, Never>?
+    private var synthesisWatchdogJobID: UUID?
+    private var stalledJobIDs: Set<UUID> = []
+    private let synthesisStallTimeout: Duration
     private var statusText = "Starting service"
     private var errorMessage: String?
     private var httpServiceError: String?
-    private var revision: UInt64 = 0
+    private var httpServiceConfigurationHandler: (
+        @MainActor (HTTPServiceConfiguration) -> Void
+    )?
+    private let eventHub: ServiceEventHub
+    private var revision = UInt64.random(in: 1...UInt64(Int64.max)) {
+        didSet {
+            guard revision != oldValue else { return }
+            cachedServiceEvent = nil
+            lastPublishedPlaybackState = playback.state
+            let playbackContent = currentPlaybackContent
+            if lastPlaybackContent != playbackContent {
+                lastPlaybackContent = playbackContent
+                playbackContentRevision = revision
+            }
+            if lastAmplitudes != playback.amplitudes {
+                lastAmplitudes = playback.amplitudes
+                waveformRevision = revision
+            }
+            let chunks = playback.spokenChunks
+            if lastSpokenChunks != chunks {
+                // Only the last existing anchor can be finalized; text resets
+                // invalidate every anchor, even when the next text is identical.
+                var common = min(lastSpokenChunks.count, chunks.count)
+                if playbackContentRevision == revision { common = 0 }
+                while common > 0 && lastSpokenChunks[common - 1] != chunks[common - 1] {
+                    common -= 1
+                }
+                timingRevisions.replaceSubrange(
+                    common...,
+                    with: repeatElement(revision, count: chunks.count - common)
+                )
+                if chunks.isEmpty || common == 0 { timingResetRevision = revision }
+                timingRevision = revision
+                lastSpokenChunks = chunks
+            }
+            eventHub.publish(revision)
+        }
+    }
     private var modelsRevision: UInt64 = 0
     private var historyRevision: UInt64 = 0
     private var diagnosticsRevision: UInt64 = 0
@@ -54,10 +100,17 @@ public final class SayItBackendService: SayItService {
     private var voiceStudioSnapshot: VoiceStudioSnapshot?
     private var voiceDraftsByID: [UUID: VoiceDraftCandidate] = [:]
     private var voiceCloneDraft: VoiceCloneDraft?
-    private var lastProgressRevisionDate = Date.distantPast
-    private var lastReplayProgressTick: Int?
     private var lastPlaybackContent: PlaybackContentState?
+    private var lastPublishedPlaybackState: PlaybackState?
     private var playbackContentRevision: UInt64 = 0
+    private var waveformRevision: UInt64 = 0
+    private var timingRevision: UInt64 = 0
+    private var timingResetRevision: UInt64 = 0
+    private var lastAmplitudes: [Float] = []
+    private var lastSpokenChunks: [PlaybackTextChunk] = []
+    private var timingRevisions: [UInt64] = []
+    private var cachedServiceEvent: ServiceEvent?
+    private(set) var eventSnapshotBuildCount = 0
     private var isModelTransitionInProgress = false
     private var isShuttingDown = false
     private let serviceVersion: String
@@ -79,11 +132,19 @@ public final class SayItBackendService: SayItService {
         playback: any BackendPlaybackControlling,
         synthesizer: (any BackendSpeechSynthesizing)? = nil,
         catalogOverride: ModelCatalog? = nil,
-        modelManagerOverride: ModelManager? = nil
+        modelManagerOverride: ModelManager? = nil,
+        eventSleep: ServiceEventHub.Sleep? = nil,
+        synthesisStallTimeout: Duration = .seconds(300)
     ) throws {
         self.directories = directories
         self.serviceVersion = serviceVersion
         self.playback = playback
+        self.synthesisStallTimeout = synthesisStallTimeout
+        if let eventSleep {
+            eventHub = ServiceEventHub(sleep: eventSleep)
+        } else {
+            eventHub = ServiceEventHub()
+        }
         setenv("HF_HUB_CACHE", directories.hubCache.path, 1)
 
         let catalog = if let catalogOverride {
@@ -149,6 +210,13 @@ public final class SayItBackendService: SayItService {
         playback.onFailure = { [weak self] message in
             self?.recordFailure(message)
         }
+        playback.onExternalControl = { [weak self] in
+            guard let self else { return }
+            self.revision &+= 1
+        }
+        playback.onStateChange = { [weak self] state in
+            self?.playbackStateDidChange(state)
+        }
     }
 
     public func start() async {
@@ -205,6 +273,9 @@ public final class SayItBackendService: SayItService {
 
         cancelQueuedJobs()
         await cancelActiveJob(startNext: false)
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
         await cancelVoiceStudio()
         await installTask?.value
         _ = await transitionTask?.result
@@ -230,7 +301,12 @@ public final class SayItBackendService: SayItService {
             return .failure(
                 ServiceFailure(
                     code: "protocol.version_mismatch",
-                    message: "The client and service use incompatible protocol versions."
+                    message: """
+                    The client uses protocol \(request.protocolVersion), but \
+                    the service uses protocol \(SayItProtocolVersion.current). \
+                    Quit all copies of Say It and reopen the app that matches \
+                    your CLI.
+                    """
                 )
             )
         }
@@ -258,11 +334,41 @@ public final class SayItBackendService: SayItService {
     }
 
     public func events(after sequence: UInt64) async -> [ServiceEvent] {
-        let snapshot = makeSnapshot(playbackContentAfter: sequence)
-        guard snapshot.revision > sequence else { return [] }
-        return [
-            ServiceEvent(id: snapshot.revision, snapshot: snapshot)
-        ]
+        synchronizePlaybackStateRevision()
+        guard revision != sequence else { return [] }
+        return [currentServiceEvent()]
+    }
+
+    private func waitForEvents(
+        after sequence: UInt64,
+        playbackInterval: TimeInterval
+    ) async throws -> [ServiceEvent] {
+        synchronizePlaybackStateRevision()
+        if revision != sequence {
+            let event = currentServiceEvent()
+            return [project(event, after: sequence)]
+        }
+
+        let requestedInterval = playbackInterval.isFinite
+            ? playbackInterval
+            : 1
+        let interval = min(max(requestedInterval, 0.1), 5)
+        let wasPlaying = playback.state == .playing
+        let timeout: Duration = wasPlaying
+            ? .milliseconds(Int64((interval * 1_000).rounded()))
+            : .seconds(30)
+        try await eventHub.wait(
+            after: sequence,
+            currentRevision: revision,
+            timeout: timeout
+        )
+        try Task.checkCancellation()
+
+        if revision == sequence, wasPlaying {
+            revision &+= 1
+        }
+        guard revision != sequence else { return [] }
+        return [project(currentServiceEvent(), after: sequence)]
     }
 
     public func authorize(
@@ -286,11 +392,19 @@ public final class SayItBackendService: SayItService {
         diagnosticsRevision &+= 1
     }
 
+    public func setHTTPServiceConfigurationHandler(
+        _ handler: (@MainActor (HTTPServiceConfiguration) -> Void)?
+    ) {
+        httpServiceConfigurationHandler = handler
+        handler?(httpServiceConfiguration)
+    }
+
     public func reportHTTPServiceError(_ message: String) async {
         await waitForPendingModelTransitions()
         var settings = settingsStore.value
         settings.httpEnabled = false
         try? settingsStore.update(settings)
+        httpServiceConfigurationHandler?(httpServiceConfiguration)
         httpServiceError = message
         revision &+= 1
         await diagnostics.record(
@@ -310,9 +424,17 @@ public final class SayItBackendService: SayItService {
     private func handle(_ command: ServiceCommand) async throws -> ServiceResponse {
         switch command {
         case .snapshot:
+            synchronizePlaybackStateRevision()
             return .snapshot(makeSnapshot())
         case .events(let sequence):
             return .events(await events(after: sequence))
+        case .waitForEvents(let sequence, let playbackInterval):
+            return .events(
+                try await waitForEvents(
+                    after: sequence,
+                    playbackInterval: playbackInterval
+                )
+            )
         case .submit(let submission):
             return .job(try await submit(submission))
         case .jobs:
@@ -456,14 +578,17 @@ public final class SayItBackendService: SayItService {
         case .toggleHistoryPinned(let id):
             try history.togglePinned(id: id)
             historyRevision &+= 1
+            revision &+= 1
             return .accepted
         case .deleteHistory(let id):
             try history.remove(id: id)
             historyRevision &+= 1
+            revision &+= 1
             return .accepted
         case .clearHistory:
             try history.removeAll()
             historyRevision &+= 1
+            revision &+= 1
             return .accepted
         case .diagnostics:
             let events = await diagnostics.events()
@@ -473,6 +598,7 @@ public final class SayItBackendService: SayItService {
         case .clearDiagnostics:
             try await diagnostics.clear()
             diagnosticsRevision &+= 1
+            revision &+= 1
             return .accepted
         case .updateSettings(let settings):
             try await updateSettings(settings)
@@ -1405,6 +1531,24 @@ public final class SayItBackendService: SayItService {
             finishJob(id, state: .failed, errorCode: "job.missing")
             return
         }
+
+        if let cleaned = pending.cleanedText {
+            do {
+                try await speak(
+                    id: id,
+                    cleaned: cleaned,
+                    submission: pending.submission
+                )
+            } catch is CancellationError {
+                if !stalledJobIDs.contains(id) {
+                    finishJob(id, state: .canceled)
+                }
+            } catch {
+                await recordJobFailure(id: id, error: error)
+            }
+            return
+        }
+
         updateJob(id, state: .parsing, progress: 0.02)
         statusText = "Cleaning text"
 
@@ -1423,42 +1567,35 @@ public final class SayItBackendService: SayItService {
             if cleaned.requiresLongTextConfirmation,
                !pending.submission.permitsLongText {
                 updateJob(id, state: .awaitingConfirmation, progress: 0.05)
-                statusText = "Long text needs confirmation"
+                activeJobID = nil
                 jobTask = nil
+                statusText = "Long text needs confirmation"
+                persistJobJournal()
+                startNextJobIfNeeded()
                 return
             }
             try await speak(id: id, cleaned: cleaned, submission: pending.submission)
         } catch is CancellationError {
-            finishJob(id, state: .canceled)
+            if !stalledJobIDs.contains(id) {
+                finishJob(id, state: .canceled)
+            }
         } catch {
             await recordJobFailure(id: id, error: error)
         }
     }
 
     private func confirmJob(_ id: UUID) throws {
-        guard activeJobID == id,
-              jobsByID[id]?.state == .awaitingConfirmation,
-              let pending = pendingJobs[id],
-              let cleaned = pending.cleanedText else {
+        guard jobsByID[id]?.state == .awaitingConfirmation,
+              pendingJobs[id]?.cleanedText != nil else {
             throw ServiceFailure(
                 code: "job.not_awaiting_confirmation",
                 message: "This job is not waiting for confirmation."
             )
         }
-        jobTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await self.speak(
-                    id: id,
-                    cleaned: cleaned,
-                    submission: pending.submission
-                )
-            } catch is CancellationError {
-                self.finishJob(id, state: .canceled)
-            } catch {
-                await self.recordJobFailure(id: id, error: error)
-            }
-        }
+        updateJob(id, state: .queued, progress: 0.05)
+        queuedJobIDs.append(id)
+        persistJobJournal()
+        startNextJobIfNeeded()
     }
 
     private func resolveVoice(
@@ -1649,25 +1786,29 @@ public final class SayItBackendService: SayItService {
         statusText = "Preparing speech"
         errorMessage = nil
 
+        armSynthesisWatchdog(for: id)
+        defer { stopSynthesisWatchdog(for: id) }
         let stream = await synthesizer.synthesize(request)
         for try await event in stream {
             try Task.checkCancellation()
+            armSynthesisWatchdog(for: id)
             try await handleSynthesisEvent(event, request: request)
         }
 
-        while playback.state == .playing
-            || playback.state == .paused
-            || playback.state == .buffering
-            || playback.state == .preparing {
-            try Task.checkCancellation()
-            if playback.state == .paused {
-                updateJob(id, state: .paused, progress: playbackProgress)
-            } else {
-                updateJob(id, state: .playing, progress: playbackProgress)
-            }
-            try await Task.sleep(for: .milliseconds(100))
+        stopSynthesisWatchdog(for: id)
+        let terminalState = await waitForPlaybackCompletion(jobID: id)
+        try Task.checkCancellation()
+        switch terminalState {
+        case .finished:
+            finishJob(id, state: .completed)
+        case .failed:
+            throw ServiceFailure(
+                code: "playback.failed",
+                message: errorMessage ?? "Audio playback failed."
+            )
+        default:
+            throw CancellationError()
         }
-        finishJob(id, state: .completed)
     }
 
     private func handleSynthesisEvent(
@@ -1687,7 +1828,8 @@ public final class SayItBackendService: SayItService {
         case .chunkStarted(_, let chunk):
             registerSpokenChunk(chunk)
         case .audio(let chunk):
-            flushPendingSpokenChunk()
+            let revisionBeforeAudio = revision
+            flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
             spokenAudioCursor = playback.generatedDuration
             if playback.shouldStartWhenBuffered {
@@ -1698,7 +1840,11 @@ public final class SayItBackendService: SayItService {
                 statusText = "Buffering"
                 updateJob(request.id, state: .buffering, progress: 0.2)
             }
+            if revision == revisionBeforeAudio {
+                revision &+= 1
+            }
         case .metrics(let metrics):
+            finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
             playback.observeSynthesisMetrics(metrics)
             if playback.shouldStartWhenBuffered {
                 playback.play()
@@ -1721,6 +1867,7 @@ public final class SayItBackendService: SayItService {
             )
             diagnosticsRevision &+= 1
         case .completed:
+            finalizeSpokenChunk(audioEnd: playback.generatedDuration)
             playback.finishBuffering()
             statusText = "Playing"
             updateJob(request.id, state: .playing, progress: playbackProgress)
@@ -1734,6 +1881,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func archiveCompletedRequest(_ request: SpeechRequest) async throws {
+        let spokenChunks = playback.spokenChunks
         do {
             let archive = try await playback.archive(using: audioArchive)
             do {
@@ -1741,7 +1889,8 @@ public final class SayItBackendService: SayItService {
                     id: request.id,
                     duration: archive.duration,
                     audioRelativePath: archive.relativePath,
-                    audioByteCount: archive.byteCount
+                    audioByteCount: archive.byteCount,
+                    spokenChunks: spokenChunks
                 )
                 historyRevision &+= 1
             } catch {
@@ -1775,6 +1924,7 @@ public final class SayItBackendService: SayItService {
         queuedJobIDs.removeAll { $0 == id }
         pendingJobs[id] = nil
         finishQueuedJob(id, state: .canceled)
+        startNextJobIfNeeded()
     }
 
     private func cancelActiveJob(
@@ -1798,6 +1948,8 @@ public final class SayItBackendService: SayItService {
         let task = jobTask
         let request = activeRequest
         task?.cancel()
+        resumePlaybackCompletion(for: id, with: .idle)
+        stopSynthesisWatchdog(for: id)
         jobTask = nil
         activeRequest = nil
         activeJobID = nil
@@ -1822,7 +1974,11 @@ public final class SayItBackendService: SayItService {
     }
 
     private func cancelQueuedJobs() {
-        for id in queuedJobIDs {
+        let confirmationJobIDs = pendingJobs.keys.filter {
+            jobsByID[$0]?.state == .awaitingConfirmation
+        }
+        let canceledIDs = Set(queuedJobIDs).union(confirmationJobIDs)
+        for id in canceledIDs {
             pendingJobs[id] = nil
             finishQueuedJob(id, state: .canceled)
         }
@@ -1844,6 +2000,9 @@ public final class SayItBackendService: SayItService {
             errorMessage: errorMessage
         )
         pendingJobs[id] = nil
+        stalledJobIDs.remove(id)
+        resumePlaybackCompletion(for: id, with: playback.state)
+        stopSynthesisWatchdog(for: id)
         activeJobID = nil
         activeRequest = nil
         jobTask = nil
@@ -1876,18 +2035,17 @@ public final class SayItBackendService: SayItService {
     ) {
         guard var job = jobsByID[id], !job.state.isTerminal else { return }
         let previousState = job.state
+        let boundedProgress = min(max(progress, 0), 1)
+        guard state != previousState || boundedProgress != job.progress else {
+            return
+        }
         if job.startedAt == nil, state != .queued {
             job.startedAt = .now
         }
         job.state = state
-        job.progress = min(max(progress, 0), 1)
+        job.progress = boundedProgress
         jobsByID[id] = job
-        let now = Date.now
-        if state != previousState
-            || now.timeIntervalSince(lastProgressRevisionDate) >= 0.1 {
-            revision &+= 1
-            lastProgressRevisionDate = now
-        }
+        revision &+= 1
         if state != previousState {
             persistJobJournal()
         }
@@ -1899,9 +2057,16 @@ public final class SayItBackendService: SayItService {
     }
 
     private func recordJobFailure(id: UUID, error: Error) async {
+        guard activeJobID == id else { return }
         playback.stop()
-        let errorCode = (error as? ServiceFailure)?.code
-            ?? "synthesis.failed"
+        let errorCode: String
+        if let failure = error as? ServiceFailure {
+            errorCode = failure.code
+        } else if error is PlaybackError {
+            errorCode = "playback.failed"
+        } else {
+            errorCode = "synthesis.failed"
+        }
         if let request = activeRequest, request.source != .preview {
             try? history.markIncomplete(
                 id: request.id,
@@ -1914,7 +2079,9 @@ public final class SayItBackendService: SayItService {
         await diagnostics.record(
             DiagnosticEvent(
                 severity: .error,
-                category: .synthesis,
+                category: errorCode.hasPrefix("playback.")
+                    ? .playback
+                    : .synthesis,
                 code: errorCode,
                 modelID: activeRequest?.model.id
             )
@@ -1945,54 +2112,200 @@ public final class SayItBackendService: SayItService {
         pendingSpokenSourceRange = range
     }
 
-    private func flushPendingSpokenChunk() {
+    private func finalizeSpokenChunk(audioEnd: TimeInterval) {
+        guard let chunk = playback.spokenChunks.last, chunk.audioEnd == nil else { return }
+        playback.appendSpokenChunk(PlaybackTextChunk(
+            textStart: chunk.textStart,
+            textEnd: chunk.textEnd,
+            audioStart: chunk.audioStart,
+            audioEnd: max(audioEnd, chunk.audioStart)
+        ))
+        revision &+= 1
+    }
+
+    private func flushPendingSpokenChunk(speechStartOffset: TimeInterval) {
         guard let range = pendingSpokenSourceRange else {
             return
         }
         pendingSpokenSourceRange = nil
+        finalizeSpokenChunk(audioEnd: spokenAudioCursor)
         playback.appendSpokenChunk(
             PlaybackTextChunk(
                 textStart: range.lowerBound,
                 textEnd: range.upperBound,
-                audioStart: spokenAudioCursor
+                audioStart: spokenAudioCursor + max(speechStartOffset, 0)
             )
         )
         lastRecordedTextEnd = range.upperBound
     }
 
-    private func makeSnapshot(
-        playbackContentAfter sequence: UInt64? = nil
-    ) -> ServiceSnapshot {
-        if activeJobID == nil, playback.state == .playing {
-            let tick = Int(playback.elapsed * 10)
-            if tick != lastReplayProgressTick {
-                lastReplayProgressTick = tick
-                revision &+= 1
-            }
-        } else {
-            lastReplayProgressTick = nil
+    private var currentPlaybackContent: PlaybackContentState {
+        PlaybackContentState(
+            currentTitle: playback.currentTitle,
+            modelID: playback.currentModelID,
+            spokenText: playback.spokenText
+        )
+    }
+
+    private func synchronizePlaybackStateRevision() {
+        let currentState = playback.state
+        guard let lastPublishedPlaybackState else {
+            self.lastPublishedPlaybackState = currentState
+            return
         }
+        guard lastPublishedPlaybackState != currentState else { return }
+        revision &+= 1
+    }
+
+    private func playbackStateDidChange(_ state: PlaybackState) {
+        switch state {
+        case .playing:
+            updateActiveJobState(.playing)
+        case .paused:
+            updateActiveJobState(.paused)
+        case .buffering:
+            updateActiveJobState(.buffering)
+        default:
+            break
+        }
+        revision &+= 1
+        if state == .finished || state == .failed {
+            if let id = activeJobID {
+                resumePlaybackCompletion(for: id, with: state)
+            } else {
+                startNextJobIfNeeded()
+            }
+        }
+    }
+
+    private func waitForPlaybackCompletion(
+        jobID: UUID
+    ) async -> PlaybackState {
+        if playback.state == .finished
+            || playback.state == .failed
+            || playback.state == .idle {
+            return playback.state
+        }
+        return await withCheckedContinuation { continuation in
+            playbackCompletionJobID = jobID
+            playbackCompletionContinuation = continuation
+        }
+    }
+
+    private func resumePlaybackCompletion(
+        for jobID: UUID,
+        with state: PlaybackState
+    ) {
+        guard playbackCompletionJobID == jobID else { return }
+        let continuation = playbackCompletionContinuation
+        playbackCompletionJobID = nil
+        playbackCompletionContinuation = nil
+        continuation?.resume(returning: state)
+    }
+
+    private func armSynthesisWatchdog(for jobID: UUID) {
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogJobID = jobID
+        let timeout = synthesisStallTimeout
+        synthesisWatchdogTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: timeout)
+            } catch {
+                return
+            }
+            await self?.synthesisDidStall(jobID)
+        }
+    }
+
+    private func stopSynthesisWatchdog(for jobID: UUID) {
+        guard synthesisWatchdogJobID == jobID else { return }
+        synthesisWatchdogTask?.cancel()
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
+    }
+
+    private func synthesisDidStall(_ jobID: UUID) async {
+        guard activeJobID == jobID else { return }
+        synthesisWatchdogTask = nil
+        synthesisWatchdogJobID = nil
+        stalledJobIDs.insert(jobID)
+        jobTask?.cancel()
+        playback.stop()
+        await synthesizer.cancelCurrentRequest()
+        guard activeJobID == jobID else {
+            stalledJobIDs.remove(jobID)
+            return
+        }
+        let message = "Speech generation stopped making progress."
+        errorMessage = message
+        await diagnostics.record(
+            DiagnosticEvent(
+                severity: .error,
+                category: .synthesis,
+                code: "synthesis.stalled",
+                modelID: activeRequest?.model.id
+            )
+        )
+        diagnosticsRevision &+= 1
+        finishJob(
+            jobID,
+            state: .failed,
+            errorCode: "synthesis.stalled",
+            errorMessage: message
+        )
+    }
+
+    private func currentServiceEvent() -> ServiceEvent {
+        if let cachedServiceEvent,
+           cachedServiceEvent.id == revision {
+            return cachedServiceEvent
+        }
+        eventSnapshotBuildCount &+= 1
+        let event = ServiceEvent(id: revision, snapshot: makeSnapshot())
+        cachedServiceEvent = event
+        return event
+    }
+
+    private func project(
+        _ event: ServiceEvent,
+        after sequence: UInt64
+    ) -> ServiceEvent {
+        guard sequence > 0, sequence < event.id else { return event }
+        let includesText = playbackContentRevision > sequence
+        let includesTiming = timingRevision > sequence || includesText
+        let timingStart = includesText || timingResetRevision > sequence
+            ? 0
+            : firstTimingChange(after: sequence)
+        return ServiceEvent(
+            id: event.id,
+            snapshot: event.snapshot.projectingPlayback(
+                includesContent: includesText,
+                includesWaveform: waveformRevision > sequence || includesText,
+                includesTiming: includesTiming,
+                timingStartIndex: timingStart
+            )
+        )
+    }
+
+    private func firstTimingChange(after sequence: UInt64) -> Int {
+        var lower = 0
+        var upper = timingRevisions.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if timingRevisions[middle] <= sequence { lower = middle + 1 }
+            else { upper = middle }
+        }
+        return lower
+    }
+
+    private func makeSnapshot() -> ServiceSnapshot {
         var activeJob = activeJobID.flatMap { jobsByID[$0] }
         if var job = activeJob, playback.state == .playing {
             job.state = .playing
             job.progress = playbackProgress
             activeJob = job
         }
-        let playbackContent = PlaybackContentState(
-            currentTitle: playback.currentTitle,
-            modelID: playback.currentModelID,
-            amplitudes: playback.amplitudes,
-            spokenText: playback.spokenText,
-            spokenChunks: playback.spokenChunks
-        )
-        if lastPlaybackContent != playbackContent {
-            lastPlaybackContent = playbackContent
-            revision &+= 1
-            playbackContentRevision = revision
-        }
-        let includesPlaybackContent = sequence.map {
-            playbackContentRevision > $0
-        } ?? true
+        let playbackContent = currentPlaybackContent
         return ServiceSnapshot(
             serviceVersion: serviceVersion,
             revision: revision,
@@ -2001,6 +2314,14 @@ public final class SayItBackendService: SayItService {
             httpServiceError: httpServiceError,
             activeJob: activeJob,
             queuedJobs: queuedJobIDs.compactMap { jobsByID[$0] },
+            confirmationJobs: jobOrder.compactMap { id in
+                guard let job = jobsByID[id],
+                      job.state == .awaitingConfirmation else {
+                    return nil
+                }
+                return job
+            },
+            queueBlock: queueBlockSnapshot,
             playback: PlaybackSnapshot(
                 state: playback.state.rawValue,
                 elapsed: playback.elapsed,
@@ -2008,22 +2329,12 @@ public final class SayItBackendService: SayItService {
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
                 volume: playback.volume,
-                currentTitle: includesPlaybackContent
-                    ? playbackContent.currentTitle
-                    : "",
-                modelID: includesPlaybackContent
-                    ? playbackContent.modelID
-                    : nil,
-                amplitudes: includesPlaybackContent
-                    ? playbackContent.amplitudes
-                    : [],
-                spokenText: includesPlaybackContent
-                    ? playbackContent.spokenText
-                    : "",
-                spokenChunks: includesPlaybackContent
-                    ? playbackContent.spokenChunks
-                    : [],
-                includesContent: includesPlaybackContent
+                currentTitle: playbackContent.currentTitle,
+                modelID: playbackContent.modelID,
+                amplitudes: playback.amplitudes,
+                spokenText: playbackContent.spokenText,
+                spokenChunks: playback.spokenChunks,
+                includesContent: true
             ),
             download: downloadProgress?.serviceSnapshot,
             modelInstallError: modelInstallError,
@@ -2102,7 +2413,7 @@ public final class SayItBackendService: SayItService {
         guard validated == volume else {
             throw ServiceFailure(
                 code: "playback.invalid_volume",
-                message: "Volume must be between 0.2 and 2."
+                message: "Volume must be between 0 and 2."
             )
         }
         playback.volume = validated
@@ -2594,12 +2905,16 @@ public final class SayItBackendService: SayItService {
             )
         }
         await cancelActiveJob(startNext: false)
+        cancelQueuedJobs()
         try playback.playFile(
             at: url,
             title: item.title,
             modelID: item.modelID.rawValue
         )
         playback.setSpokenText(item.cleanedText)
+        for chunk in try history.playbackTiming(id: id) {
+            playback.appendSpokenChunk(chunk)
+        }
         spokenTextCharacterCount = item.cleanedText.count
         lastRecordedTextEnd = 0
         playbackContext = PlaybackContext(
@@ -2777,10 +3092,10 @@ public final class SayItBackendService: SayItService {
                 message: "Playback rate must be between 0.5 and 2."
             )
         }
-        guard (0.2...2).contains(settings.volume) else {
+        guard (0...2).contains(settings.volume) else {
             throw ServiceFailure(
                 code: "settings.invalid_volume",
-                message: "Volume must be between 0.2 and 2."
+                message: "Volume must be between 0 and 2."
             )
         }
         guard (1...5_000).contains(settings.chunkCharacterTarget) else {
@@ -2814,6 +3129,7 @@ public final class SayItBackendService: SayItService {
         if settings.httpEnabled != previousSettings.httpEnabled
             || settings.httpPort != previousSettings.httpPort {
             httpServiceError = nil
+            httpServiceConfigurationHandler?(httpServiceConfiguration)
         }
         applyPlaybackSettings(settings)
         await synthesizer.updateConfiguration(
@@ -2843,6 +3159,14 @@ public final class SayItBackendService: SayItService {
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+    }
+
+    private var httpServiceConfiguration: HTTPServiceConfiguration {
+        let settings = settingsStore.value
+        return HTTPServiceConfiguration(
+            isEnabled: settings.httpEnabled,
+            port: settings.httpPort
+        )
     }
 
     private static func textCleaningOptions(
@@ -2950,7 +3274,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func validatedVolume(_ value: Double) -> Double {
-        min(max(value, 0.2), 2)
+        min(max(value, 0), 2)
     }
 
     private func nonEmpty(_ value: String) -> String? {
@@ -2966,5 +3290,90 @@ public final class SayItBackendService: SayItService {
     private var playbackProgress: Double {
         guard playback.generatedDuration > 0 else { return 0.2 }
         return min(max(playback.elapsed / playback.generatedDuration, 0.2), 0.99)
+    }
+
+    private var queueBlockSnapshot: QueueBlockSnapshot? {
+        guard !queuedJobIDs.isEmpty,
+              let activeJob = activeJobID.flatMap({ jobsByID[$0] }) else {
+            return nil
+        }
+        if playback.state == .paused {
+            return QueueBlockSnapshot(
+                reason: .playbackPaused,
+                jobID: activeJob.id,
+                message: "Playback is paused. Resume, clear, or interrupt it to continue the queue."
+            )
+        }
+        switch activeJob.state {
+        case .paused:
+            return QueueBlockSnapshot(
+                reason: .playbackPaused,
+                jobID: activeJob.id,
+                message: "Playback is paused. Resume, clear, or interrupt it to continue the queue."
+            )
+        case .awaitingConfirmation:
+            return QueueBlockSnapshot(
+                reason: .awaitingConfirmation,
+                jobID: activeJob.id,
+                message: "A speech job is waiting for long-text confirmation."
+            )
+        case .parsing, .preparing, .synthesizing, .buffering:
+            return QueueBlockSnapshot(
+                reason: .synthesisInProgress,
+                jobID: activeJob.id,
+                message: "Another speech job is still being prepared."
+            )
+        default:
+            return nil
+        }
+    }
+}
+
+private extension ServiceSnapshot {
+    func projectingPlayback(
+        includesContent: Bool,
+        includesWaveform: Bool,
+        includesTiming: Bool,
+        timingStartIndex: Int
+    ) -> ServiceSnapshot {
+        ServiceSnapshot(
+            protocolVersion: protocolVersion,
+            serviceVersion: serviceVersion,
+            revision: revision,
+            statusText: statusText,
+            lastError: lastError,
+            httpServiceError: httpServiceError,
+            activeJob: activeJob,
+            queuedJobs: queuedJobs,
+            confirmationJobs: confirmationJobs,
+            queueBlock: queueBlock,
+            playback: PlaybackSnapshot(
+                state: playback.state,
+                elapsed: playback.elapsed,
+                generatedDuration: playback.generatedDuration,
+                estimatedDuration: playback.estimatedDuration,
+                rate: playback.rate,
+                volume: playback.volume,
+                currentTitle: includesContent ? playback.currentTitle : "",
+                modelID: includesContent ? playback.modelID : nil,
+                amplitudes: includesWaveform ? playback.amplitudes : [],
+                spokenText: includesContent ? playback.spokenText : "",
+                spokenChunks: includesTiming
+                    ? Array(playback.spokenChunks.dropFirst(timingStartIndex)) : [],
+                includesContent: includesContent,
+                includesWaveform: includesWaveform,
+                includesTiming: includesTiming,
+                timingStartIndex: timingStartIndex
+            ),
+            download: download,
+            modelInstallError: modelInstallError,
+            installedModelIDs: installedModelIDs,
+            settings: settings,
+            modelsRevision: modelsRevision,
+            historyRevision: historyRevision,
+            diagnosticsRevision: diagnosticsRevision,
+            voicesRevision: voicesRevision,
+            voiceStudio: voiceStudio
+        )
     }
 }

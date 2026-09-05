@@ -42,7 +42,7 @@ struct SpeakCommand: AsyncParsableCommand {
         exclusivity: .exclusive,
         help: "Choose enqueue, interrupt, or replace-all queue behavior."
     )
-    var queuePolicy: CLIQueuePolicy = .enqueue
+    var queuePolicy: CLIQueuePolicy = .interrupt
 
     @Flag(name: .long, help: "Return as soon as the job is accepted.")
     var detach = false
@@ -168,6 +168,7 @@ struct SpeakCommand: AsyncParsableCommand {
         interruptMonitor: InterruptMonitor
     ) async throws {
         var lastState: SpeechJobState?
+        var lastQueueBlock: QueueBlockReason?
         while true {
             if await interruptMonitor.consume() {
                 _ = try? await service.call(.cancelJob(id))
@@ -185,6 +186,17 @@ struct SpeakCommand: AsyncParsableCommand {
             if lastState != job.state, !json {
                 CLIOutput.status(job.state.rawValue)
                 lastState = job.state
+            }
+            if job.state == .queued, !json {
+                let snapshotResponse = try await service.call(.snapshot)
+                if case .snapshot(let snapshot) = snapshotResponse,
+                   let queueBlock = snapshot.queueBlock,
+                   queueBlock.reason != lastQueueBlock {
+                    CLIOutput.status(queueBlock.message)
+                    lastQueueBlock = queueBlock.reason
+                }
+            } else {
+                lastQueueBlock = nil
             }
             if job.state == .awaitingConfirmation {
                 _ = try? await service.call(.cancelJob(id))

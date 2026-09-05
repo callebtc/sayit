@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlaybackSectionView: View {
     @Environment(AppState.self) private var state
+    let isPresented: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
@@ -25,6 +26,7 @@ struct PlaybackSectionView: View {
                     estimatedDuration: state.playback.estimatedDuration,
                     isPlaying: state.playback.state == .playing,
                     isBuffering: state.playback.state == .buffering,
+                    isPresented: isPresented,
                     onSeek: state.playback.seek
                 )
                 .transition(.opacity)

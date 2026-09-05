@@ -13,6 +13,10 @@ public struct PlaybackSnapshot: Codable, Sendable {
     public let spokenText: String
     public let spokenChunks: [PlaybackTextChunk]
     public let includesContent: Bool
+    public let includesWaveform: Bool
+    public let includesTiming: Bool
+    /// Replace the timing suffix from this index; zero also handles reset/replay.
+    public let timingStartIndex: Int
 
     public init(
         state: String = "idle",
@@ -26,7 +30,10 @@ public struct PlaybackSnapshot: Codable, Sendable {
         amplitudes: [Float] = [],
         spokenText: String = "",
         spokenChunks: [PlaybackTextChunk] = [],
-        includesContent: Bool = true
+        includesContent: Bool = true,
+        includesWaveform: Bool? = nil,
+        includesTiming: Bool? = nil,
+        timingStartIndex: Int = 0
     ) {
         self.state = state
         self.elapsed = elapsed
@@ -40,6 +47,9 @@ public struct PlaybackSnapshot: Codable, Sendable {
         self.spokenText = spokenText
         self.spokenChunks = spokenChunks
         self.includesContent = includesContent
+        self.includesWaveform = includesWaveform ?? includesContent
+        self.includesTiming = includesTiming ?? includesContent
+        self.timingStartIndex = timingStartIndex
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -55,6 +65,9 @@ public struct PlaybackSnapshot: Codable, Sendable {
         case spokenText
         case spokenChunks
         case includesContent
+        case includesWaveform
+        case includesTiming
+        case timingStartIndex
     }
 
     public init(from decoder: any Decoder) throws {
@@ -93,5 +106,10 @@ public struct PlaybackSnapshot: Codable, Sendable {
             Bool.self,
             forKey: .includesContent
         ) ?? true
+        includesWaveform = try container.decodeIfPresent(Bool.self, forKey: .includesWaveform)
+            ?? includesContent
+        includesTiming = try container.decodeIfPresent(Bool.self, forKey: .includesTiming)
+            ?? includesContent
+        timingStartIndex = try container.decodeIfPresent(Int.self, forKey: .timingStartIndex) ?? 0
     }
 }

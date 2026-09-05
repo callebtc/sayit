@@ -619,8 +619,8 @@
       your words never leave the machine.
     </p>
     <div class="cta rise" style="--d:330ms">
-      <a class="btn btn-primary js-download"
-         href="https://github.com/callebtc/sayit/releases/download/v1.0.0/SayIt-1.0.0.dmg"
+      <a class="btn btn-primary"
+         href="https://github.com/callebtc/sayit/releases/latest/download/SayIt.dmg"
          rel="noopener">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M2.5 13.5h11"/>
@@ -635,9 +635,7 @@
       </a>
     </div>
     <p class="micro rise" style="--d:400ms">
-      macOS 15+ · Apple silicon · Free &amp; open source ·
-      <a href="https://github.com/callebtc/sayit/releases" target="_blank" rel="noopener" id="versionNote">v1.0.0</a> ·
-      <a href="#how">see it in action</a>
+      macOS 15+ · Apple silicon · Free &amp; open source
     </p>
   </main>
 
@@ -700,8 +698,8 @@
 
     <div class="closing reveal">
       <p>Free, open source, and yours.</p>
-      <a class="btn btn-primary js-download"
-         href="https://github.com/callebtc/sayit/releases/download/v1.0.0/SayIt-1.0.0.dmg"
+      <a class="btn btn-primary"
+         href="https://github.com/callebtc/sayit/releases/latest/download/SayIt.dmg"
          rel="noopener">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M2.5 13.5h11"/>
@@ -1070,12 +1068,10 @@
   applyTheme(rootEl.dataset.theme === "light" ? "light" : "dark", false);
 
   /* ------------------------------------------------------------------ */
-  /* GitHub: live star count + point the download at the latest release  */
+  /* GitHub: live star count                                            */
   /* ------------------------------------------------------------------ */
 
   var REPO = "callebtc/sayit";
-  var MOCK_DMG = "https://github.com/" + REPO + "/releases/download/v0.1.3/SayIt-0.1.3.dmg";
-
   function formatCount(n) {
     if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
     return String(n);
@@ -1103,19 +1099,6 @@
     })
     .catch(function () { /* counter stays as an en-dash placeholder */ });
 
-  // Upgrade the mocked DMG link to the real latest release, once one exists.
-  fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function (rel) {
-      var asset = (rel.assets || []).find(function (a) { return /\.dmg$/i.test(a.name); });
-      if (asset) {
-        var dls = document.querySelectorAll(".js-download");
-        for (var d = 0; d < dls.length; d++) dls[d].href = asset.browser_download_url;
-        var note = document.getElementById("versionNote");
-        if (note && rel.tag_name) note.textContent = rel.tag_name;
-      }
-    })
-    .catch(function () { /* mocked DMG links stay */ });
 })();
 </script>
 
