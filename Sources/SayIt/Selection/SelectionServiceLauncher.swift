@@ -4,7 +4,7 @@ import SayItXPC
 
 enum SelectionServiceLauncher {
 #if DEBUG || SAYIT_LOCAL_BUILD
-    private static let label = "sh.sayit.mac.selection.debug"
+    private static let label = SayItServiceIdentifiers.selectionMachService
 #else
     private static let label = "sh.sayit.mac.selection-helper"
 #endif
@@ -27,10 +27,12 @@ enum SelectionServiceLauncher {
     }
 
     private static func removeLegacyJobIfNeeded() {
+#if !SAYIT_MODEL_AUDIT_BUILD
         guard ServiceJobManager.printJob(label: legacyLabel)?.status == 0 else {
             return
         }
         try? ServiceJobManager.shutdown(label: legacyLabel)
+#endif
     }
 
     private static func jobManager(agentURL: URL) -> ServiceJobManager {

@@ -3,6 +3,7 @@
 # Swift Package Manager
 .build/
 .swiftpm/
+__pycache__/
 
 # Xcode
 Build/

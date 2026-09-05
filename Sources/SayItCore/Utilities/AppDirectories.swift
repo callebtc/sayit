@@ -74,12 +74,17 @@ public struct AppDirectories: Sendable {
 
 #if DEBUG || SAYIT_LOCAL_BUILD
     private static func debugServiceDirectories() throws -> AppDirectories {
+#if SAYIT_MODEL_AUDIT_BUILD
+        let directoryName = "Say It Model Audit"
+#else
+        let directoryName = "Say It Service (Debug)"
+#endif
         let support = URL.applicationSupportDirectory.appending(
-            path: "Say It Service (Debug)",
+            path: directoryName,
             directoryHint: .isDirectory
         )
         let caches = URL.cachesDirectory.appending(
-            path: "Say It Service (Debug)",
+            path: directoryName,
             directoryHint: .isDirectory
         )
         return try create(applicationSupport: support, caches: caches)

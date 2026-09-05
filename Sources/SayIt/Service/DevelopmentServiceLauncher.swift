@@ -4,7 +4,7 @@ import SayItProtocol
 import SayItXPC
 
 enum DevelopmentServiceLauncher {
-    private static let label = "sh.sayit.mac.agent.debug"
+    private static let label = SayItServiceIdentifiers.machService
 
     static func ensureRunning(agentURL: URL) async throws {
         try await jobManager(agentURL: agentURL).ensureRunning()
@@ -21,6 +21,7 @@ enum DevelopmentServiceLauncher {
     }
 
     static func removeLegacyJobIfNeeded() {
+#if !SAYIT_MODEL_AUDIT_BUILD
         let legacyLabel = "com.sayit.mac.agent"
         let legacyMachService = "com.sayit.mac.agent.debug"
         guard let existing = ServiceJobManager.printJob(label: legacyLabel),
@@ -32,6 +33,7 @@ enum DevelopmentServiceLauncher {
                 || existing.output.contains("\(legacyLabel).debug.log")
         guard isLegacyDevelopmentJob else { return }
         try? ServiceJobManager.shutdown(label: legacyLabel)
+#endif
     }
 
     private static func jobManager(agentURL: URL) -> ServiceJobManager {

@@ -1092,6 +1092,92 @@
       "stability": "unavailable",
       "testedMLXAudioVersion": "0.1.3",
       "testedDate": "2026-08-01"
+    },
+    {
+      "id": "breeze-2-4bit",
+      "displayName": "Breeze TTS 2 (Audit)",
+      "family": "Breeze TTS 2",
+      "repository": "mlx-community/Breeze-TTS-2-mlx-4bit",
+      "revision": "3a06d26b172ea4ae1da2f42d708383e9c79d5526",
+      "modelType": "breeze_tts",
+      "parameterCount": "3B",
+      "quantization": "4-bit",
+      "languages": [
+        "en",
+        "zh"
+      ],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": true,
+        "voiceCloning": true,
+        "streaming": false,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false
+      },
+      "playbackMode": "buffered",
+      "files": [],
+      "estimatedDiskBytes": 3042732998,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "mid",
+      "license": {
+        "identifier": "BreezeBlue Research and Non-Commercial",
+        "url": "https://huggingface.co/BreezeBlue/Breeze-TTS-2",
+        "commercialUseAllowed": false,
+        "requiresAcceptance": true
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 17,
+        "size": "medium",
+        "speed": "slow",
+        "note": "Experimental model audit: Swift produces audio after each complete text chunk."
+      },
+      "testedMLXAudioVersion": "bf14ae0",
+      "testedDate": "2026-09-05"
+    },
+    {
+      "id": "index-tts-15",
+      "displayName": "IndexTTS 1.5 (Audit)",
+      "family": "IndexTTS",
+      "repository": "mlx-community/IndexTTS-1.5",
+      "revision": "d163f13bc1816c20bd79d730cc88f866a2a43ceb",
+      "modelType": "indextts",
+      "parameterCount": "0.7B",
+      "quantization": "FP16",
+      "languages": [
+        "en",
+        "zh"
+      ],
+      "voices": [],
+      "defaultVoice": null,
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": false,
+        "voiceDescription": false,
+        "voiceCloning": true,
+        "streaming": false,
+        "longForm": true,
+        "languageSelection": true,
+        "requiresReferenceAudio": true
+      },
+      "playbackMode": "completeFirst",
+      "files": [],
+      "estimatedDiskBytes": 1434615142,
+      "estimatedPeakMemoryBytes": 8000000000,
+      "hardwareTier": "high",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/IndexTeam/IndexTTS-1.5",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "testedMLXAudioVersion": "bf14ae0",
+      "testedDate": "2026-09-05"
     }
   ]
 }

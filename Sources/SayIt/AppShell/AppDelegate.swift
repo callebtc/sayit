@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+#if !SAYIT_MODEL_AUDIT_BUILD
         do {
             try GlobalHotKeyManager.shared.register(
                 AppState.shared.settings.globalShortcut,
@@ -69,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "The Control–Option–S shortcut is already in use."
             )
         }
+#endif
         Task {
             await AppState.shared.startup()
         }

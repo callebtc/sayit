@@ -4,7 +4,11 @@ import SayItProtocol
 import Security
 
 actor APITokenStore {
+#if SAYIT_MODEL_AUDIT_BUILD
+    private static let service = "sh.sayit.mac.model-audit.api-tokens"
+#else
     private static let service = "sh.sayit.mac.api-tokens"
+#endif
 
     func create(
         name: String,

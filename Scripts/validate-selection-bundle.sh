@@ -22,6 +22,9 @@ case "$app_identifier" in
     sh.sayit.mac.local)
         expected_helper_identifier=sh.sayit.mac.selection-helper.local
         ;;
+    sh.sayit.mac.model-audit)
+        expected_helper_identifier=sh.sayit.mac.selection-helper.model-audit
+        ;;
     *)
         fail "the host app has an unexpected bundle identifier."
         ;;

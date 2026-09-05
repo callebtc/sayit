@@ -3,7 +3,11 @@ import Foundation
 import Security
 
 actor KeychainTokenStore {
+#if SAYIT_MODEL_AUDIT_BUILD
+    private let service = "sh.sayit.mac.model-audit.huggingface"
+#else
     private let service = "sh.sayit.mac.huggingface"
+#endif
     private let account = "token"
 
     func token() throws -> String? {

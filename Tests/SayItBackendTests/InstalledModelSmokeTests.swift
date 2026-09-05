@@ -5,6 +5,28 @@ import Testing
 
 @Suite("Installed model smoke tests", .serialized)
 struct InstalledModelSmokeTests {
+    @Test("Configured local snapshot imports into the isolated audit profile")
+    func configuredModelImportsSnapshot() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let modelID = auditValue("SAYIT_MODEL_AUDIT_IMPORT_ID", in: environment),
+              let source = auditValue("SAYIT_MODEL_AUDIT_IMPORT_SOURCE", in: environment) else {
+            return
+        }
+#if SAYIT_MODEL_AUDIT_BUILD
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let model = try #require(catalog.models.first { $0.id.rawValue == modelID })
+        let directories = try AppDirectories.shared(appGroupIdentifier: "app.sayit.audit")
+        let manager = ModelManager(
+            catalog: catalog, directories: directories, activeModelID: ModelID("model-audit")
+        )
+        try await manager.importLocalModel(model, from: URL(filePath: source))
+        #expect(await manager.installedURL(for: model.id) != nil)
+        print("MODEL_AUDIT_IMPORT_RESULT id=\(model.id.rawValue) imported=true")
+#else
+        Issue.record("Snapshot import requires SAYIT_MODEL_AUDIT_BUILD isolation.")
+#endif
+    }
+
     @Test("Configured model completes its production download")
     func configuredModelCompletesDownload() async throws {
         let environment = ProcessInfo.processInfo.environment
@@ -141,6 +163,8 @@ struct InstalledModelSmokeTests {
             let startedAt = ContinuousClock.now
             let stream = await synthesizer.synthesize(request)
             var samples: [Float] = []
+            var firstAudioSeconds: Double?
+            var audioEventCount = 0
             var sampleRate = 0.0
             var synthesizedChunks: [SpeechChunk] = []
             var chunkDurations: [Double] = []
@@ -149,6 +173,12 @@ struct InstalledModelSmokeTests {
                 case .chunkStarted(_, let chunk):
                     synthesizedChunks.append(chunk)
                 case .audio(let chunk):
+                    if firstAudioSeconds == nil {
+                        let elapsed = startedAt.duration(to: .now)
+                        firstAudioSeconds = Double(elapsed.components.seconds)
+                            + Double(elapsed.components.attoseconds) / 1e18
+                    }
+                    audioEventCount += 1
                     samples.append(contentsOf: chunk.samples)
                     sampleRate = chunk.sampleRate
                 case .metrics(let metrics):
@@ -178,7 +208,9 @@ struct InstalledModelSmokeTests {
                     + "voice=\(voiceName) "
                     + "samples=\(samples.count) rate=\(sampleRate) "
                     + "duration=\(audioDuration) peak=\(peak) rms=\(rms) "
-                    + "elapsed=\(seconds)"
+                    + "elapsed=\(seconds) firstAudio=\(firstAudioSeconds ?? -1) "
+                    + "audioEvents=\(audioEventCount) "
+                    + "rtf=\(audioDuration > 0 ? seconds / audioDuration : -1)"
             )
 
             #expect(samples.count > 1_000, "No audio for voice \(voiceName)")

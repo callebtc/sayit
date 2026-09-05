@@ -8,11 +8,11 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 22)
+        #expect(catalog.models.count == 24)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
-            $0.testedMLXAudioVersion == "0.1.3"
+            ["0.1.3", "bf14ae0"].contains($0.testedMLXAudioVersion)
         })
     }
 
@@ -69,11 +69,12 @@ struct ModelCatalogTests {
             $0.capabilities.requiresReferenceAudio
         }
 
-        #expect(gated.count == 4)
+        #expect(gated.count == 5)
         #expect(gated.map(\.id.rawValue).sorted() == [
             "echo-base",
             "fish-s2-pro-8bit",
             "index-tts",
+            "index-tts-15",
             "moss-nano-100m",
         ])
         #expect(gated.allSatisfy { !$0.isSelectable })
