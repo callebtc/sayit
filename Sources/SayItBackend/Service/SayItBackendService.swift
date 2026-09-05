@@ -274,7 +274,12 @@ public final class SayItBackendService: SayItService {
             return .failure(
                 ServiceFailure(
                     code: "protocol.version_mismatch",
-                    message: "The client and service use incompatible protocol versions."
+                    message: """
+                    The client uses protocol \(request.protocolVersion), but \
+                    the service uses protocol \(SayItProtocolVersion.current). \
+                    Quit all copies of Say It and reopen the app that matches \
+                    your CLI.
+                    """
                 )
             )
         }

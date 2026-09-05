@@ -45,6 +45,12 @@ struct BackendServiceCommandTests {
         #expect(
             try failure(mismatch).code == "protocol.version_mismatch"
         )
+        #expect(try failure(mismatch).message.contains("client uses protocol -1"))
+        #expect(
+            try failure(mismatch).message.contains(
+                "service uses protocol \(SayItProtocolVersion.current)"
+            )
+        )
 
         await fixture.service.reportServiceError("Transport failed")
         let failureEvents = try events(
