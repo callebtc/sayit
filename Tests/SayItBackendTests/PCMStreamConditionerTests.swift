@@ -4,6 +4,34 @@ import Testing
 
 @Suite("PCM stream conditioning")
 struct PCMStreamConditionerTests {
+    @Test("Speech timestamps account for the outgoing tail and paragraph silence once")
+    func speechStartOffsets() throws {
+        var conditioner = try PCMStreamConditioner(sampleRate: 1_000)
+        #expect(conditioner.speechStartFrameOffset(
+            logicalChunkIndex: 0, startsParagraph: true, paragraphPauseFrameCount: 500
+        ) == 0)
+        _ = try conditioner.append(
+            signal(count: 100, phase: 0), logicalChunkIndex: 0,
+            startsParagraph: true, paragraphPauseFrameCount: 0
+        )
+        #expect(conditioner.retainedFrameCount == 8)
+        #expect(conditioner.speechStartFrameOffset(
+            logicalChunkIndex: 1, startsParagraph: true, paragraphPauseFrameCount: 500
+        ) == 508)
+        _ = try conditioner.append(
+            signal(count: 100, phase: 100), logicalChunkIndex: 1,
+            startsParagraph: true, paragraphPauseFrameCount: 500
+        )
+        #expect(conditioner.speechStartFrameOffset(
+            logicalChunkIndex: 1, startsParagraph: true, paragraphPauseFrameCount: 500
+        ) == 0)
+        #expect(conditioner.speechStartFrameOffset(
+            logicalChunkIndex: 2, startsParagraph: false, paragraphPauseFrameCount: 0
+        ) == 0)
+        _ = conditioner.finish()
+        #expect(conditioner.retainedFrameCount == 0)
+    }
+
     @Test("Streaming fragments from one logical chunk preserve frame count")
     func contiguousFragments() throws {
         var conditioner = try PCMStreamConditioner(sampleRate: 1_000)

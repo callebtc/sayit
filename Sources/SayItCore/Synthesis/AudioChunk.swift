@@ -7,6 +7,7 @@ public struct AudioChunk: Identifiable, Sendable {
     public let samples: [Float]
     public let sampleRate: Double
     public let startsParagraph: Bool
+    public let speechStartOffset: TimeInterval
 
     public init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ public struct AudioChunk: Identifiable, Sendable {
         index: Int,
         samples: [Float],
         sampleRate: Double,
-        startsParagraph: Bool
+        startsParagraph: Bool,
+        speechStartOffset: TimeInterval = 0
     ) {
         self.id = id
         self.requestID = requestID
@@ -22,6 +24,7 @@ public struct AudioChunk: Identifiable, Sendable {
         self.samples = samples
         self.sampleRate = sampleRate
         self.startsParagraph = startsParagraph
+        self.speechStartOffset = speechStartOffset
     }
 
     public var duration: TimeInterval {

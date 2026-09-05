@@ -1,11 +1,62 @@
 import Foundation
 import SayItCore
+import SayItProtocol
+import SwiftData
 import Testing
 @testable import SayItBackend
 
 @Suite("Backend history storage", .serialized)
 @MainActor
 struct HistoryStoreTests {
+    @Test("Corrupt and out-of-bounds history timing safely falls back to unaligned replay")
+    func corruptTiming() throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItTimingTests")
+        defer { fixture.remove() }
+        let store = try HistoryStore(directories: fixture.directories)
+        let request = try makeRequest(text: "Short text", title: "Timing")
+        try store.begin(request)
+        try store.complete(id: request.id, duration: 2, audioRelativePath: "test.m4a", audioByteCount: 0)
+        let context = ModelContext(store.container)
+        let item = try #require(context.fetch(FetchDescriptor<SpeechItem>()).first)
+        for data in [
+            Data([0xff]),
+            try JSONEncoder().encode([
+                PlaybackTextChunk(textStart: 0, textEnd: 1000, audioStart: 0, audioEnd: 2)
+            ]),
+            try JSONEncoder().encode([
+                PlaybackTextChunk(textStart: 0, textEnd: 5, audioStart: 1, audioEnd: 0.5)
+            ])
+        ] {
+            item.playbackTimingData = data
+            try context.save()
+            let reloaded = try HistoryStore(directories: fixture.directories)
+            #expect(try reloaded.playbackTiming(id: request.id).isEmpty)
+        }
+    }
+
+    @Test("History persists uneven timing through reload and clears it on failure")
+    func durableTiming() throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItTimingTests")
+        defer { fixture.remove() }
+        let store = try HistoryStore(directories: fixture.directories)
+        let request = try makeRequest(text: "First passage. Second passage.", title: "Timing")
+        try store.begin(request)
+        #expect(try store.playbackTiming(id: request.id).isEmpty)
+        let anchors = [
+            PlaybackTextChunk(textStart: 0, textEnd: 14, audioStart: 0, audioEnd: 120),
+            PlaybackTextChunk(textStart: 15, textEnd: 30, audioStart: 121, audioEnd: 180)
+        ]
+        try store.complete(
+            id: request.id, duration: 180, audioRelativePath: "timing.m4a",
+            audioByteCount: 0, spokenChunks: anchors
+        )
+        let reloaded = try HistoryStore(directories: fixture.directories)
+        #expect(try reloaded.playbackTiming(id: request.id) == anchors)
+        try reloaded.markIncomplete(id: request.id, state: .failed)
+        #expect(try reloaded.playbackTiming(id: request.id).isEmpty)
+        #expect(try reloaded.playbackTiming(id: UUID()).isEmpty)
+    }
+
     @Test("History follows generating, completed, failed, and pinned states")
     func historyLifecycle() throws {
         let fixture = try TemporaryBackendFixture(prefix: "SayItHistoryTests")

@@ -5,6 +5,44 @@ import Testing
 @Suite("Playback snapshot application")
 @MainActor
 struct PlaybackSnapshotApplicationTests {
+    @Test("Waveform and timing suffix updates preserve text and earlier anchors")
+    func independentPayloads() {
+        let controller = PlaybackController()
+        let first = PlaybackTextChunk(textStart: 0, textEnd: 5, audioStart: 0)
+        controller.apply(PlaybackSnapshot(
+            spokenText: "first second", spokenChunks: [first]
+        ))
+        controller.apply(PlaybackSnapshot(
+            amplitudes: [0.5], includesContent: false, includesWaveform: true
+        ))
+        #expect(controller.spokenText == "first second")
+        #expect(controller.spokenChunks == [first])
+        #expect(controller.amplitudes == [0.5])
+        let finalized = PlaybackTextChunk(textStart: 0, textEnd: 5, audioStart: 0, audioEnd: 2)
+        let next = PlaybackTextChunk(textStart: 6, textEnd: 12, audioStart: 3)
+        controller.apply(PlaybackSnapshot(
+            spokenChunks: [finalized, next], includesContent: false, includesTiming: true
+        ))
+        let nextFinal = PlaybackTextChunk(textStart: 6, textEnd: 12, audioStart: 3, audioEnd: 6)
+        controller.apply(PlaybackSnapshot(
+            spokenChunks: [nextFinal], includesContent: false,
+            includesTiming: true, timingStartIndex: 1
+        ))
+        #expect(controller.spokenChunks == [finalized, nextFinal])
+        #expect(controller.spokenText == "first second")
+        #expect(controller.amplitudes == [0.5])
+        controller.apply(PlaybackSnapshot(
+            spokenChunks: [], includesContent: false,
+            includesTiming: true, timingStartIndex: 0
+        ))
+        #expect(controller.spokenChunks.isEmpty)
+        controller.apply(PlaybackSnapshot(
+            spokenChunks: [next], includesContent: false,
+            includesTiming: true, timingStartIndex: 4
+        ))
+        #expect(controller.spokenChunks.isEmpty)
+    }
+
     @Test("Timeline-only snapshots retain static playback content")
     func retainsContent() {
         let controller = PlaybackController()

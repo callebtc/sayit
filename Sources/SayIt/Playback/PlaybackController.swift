@@ -48,10 +48,18 @@ final class PlaybackController {
         if estimatedDuration != snapshot.estimatedDuration {
             estimatedDuration = snapshot.estimatedDuration
         }
-        if snapshot.includesContent {
-            if amplitudes != snapshot.amplitudes {
-                amplitudes = snapshot.amplitudes
+        if snapshot.includesWaveform, amplitudes != snapshot.amplitudes {
+            amplitudes = snapshot.amplitudes
+        }
+        if snapshot.includesTiming,
+           snapshot.timingStartIndex >= 0,
+           snapshot.timingStartIndex <= spokenChunks.count {
+            let start = snapshot.timingStartIndex
+            if start != 0 || spokenChunks != snapshot.spokenChunks {
+                spokenChunks.replaceSubrange(start..., with: snapshot.spokenChunks)
             }
+        }
+        if snapshot.includesContent {
             if currentTitle != snapshot.currentTitle {
                 currentTitle = snapshot.currentTitle
             }
@@ -61,9 +69,6 @@ final class PlaybackController {
             }
             if spokenText != snapshot.spokenText {
                 spokenText = snapshot.spokenText
-            }
-            if spokenChunks != snapshot.spokenChunks {
-                spokenChunks = snapshot.spokenChunks
             }
         }
         if rate != snapshot.rate {

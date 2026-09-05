@@ -363,7 +363,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceText = anchorText
         }
 
-        var chunks = try await chunks(for: request, model: loadedModel)
+        let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
+        var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
+            for: request.cleanedText.text,
+            separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
+            checkingCancellation: Task.checkCancellation
+        )
         var conditioner = try PCMStreamConditioner(
             sampleRate: Double(loadedModel.sampleRate)
         )
@@ -375,6 +380,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             if chunkCursor > 0, chunkDelay > 0 {
                 try await Task.sleep(for: .seconds(chunkDelay))
             }
+            // Fit only the next logical chunk. Phonemizing a whole article here
+            // would delay first audio even though the model consumes one chunk.
+            let pieces = try await fittingPieces(
+                for: chunks[chunkCursor], request: request, model: loadedModel
+            )
+            chunks.replaceSubrange(chunkCursor...chunkCursor, with: pieces)
             let chunk = chunks[chunkCursor]
             continuation.yield(
                 .chunkStarted(
@@ -418,6 +429,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         && chunkSamples == 0
                         ? Int(Double(loadedModel.sampleRate) * paragraphPause)
                         : 0
+                    let speechStartFrames = conditioner.speechStartFrameOffset(
+                        logicalChunkIndex: completedChunkCount,
+                        startsParagraph: chunk.startsParagraph,
+                        paragraphPauseFrameCount: pauseFrameCount
+                    )
                     let conditioned = try conditioner.append(
                         samples,
                         logicalChunkIndex: completedChunkCount,
@@ -431,7 +447,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         index: completedChunkCount,
                         samples: conditioned,
                         sampleRate: Double(loadedModel.sampleRate),
-                        startsParagraph: chunk.startsParagraph
+                        startsParagraph: chunk.startsParagraph,
+                        speechStartOffset: Double(speechStartFrames)
+                            / Double(loadedModel.sampleRate)
                     )
                     continuation.yield(.audio(audio))
                     chunkSamples += conditioned.count
@@ -516,6 +534,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         chunkIndex: completedChunkCount,
                         generationDuration: generationDuration,
                         audioDuration: Double(chunkSamples)
+                            / Double(loadedModel.sampleRate),
+                        trailingAudioDuration: Double(conditioner.retainedFrameCount)
                             / Double(loadedModel.sampleRate)
                     )
                 )
@@ -726,25 +746,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         return MLXArray(resampled)
     }
 
-    private func chunks(
-        for request: SpeechRequest,
+    private func fittingPieces(
+        for chunk: SpeechChunk,
+        request: SpeechRequest,
         model: SpeechGenerationModel
     ) async throws -> [SpeechChunk] {
-        let separatesParagraphs = request.voiceMode == .randomPerParagraph
+        guard let loadedTextProcessor else { return [chunk] }
         let modelType = request.model.modelType.lowercased()
-        if ["orpheus", "orpheus_tts"].contains(modelType) {
-            return Self.orpheusChunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: true
-            )
-        }
-        guard let loadedTextProcessor else {
-            return chunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: separatesParagraphs
-            )
-        }
-
         switch modelType {
         case "kokoro", "kokoro_tts":
             let language = request.language
@@ -756,10 +764,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 loadedTextProcessor as? KokoroMultilingualProcessor {
                 try await processor.prepare(for: language)
             }
-            return try chunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: separatesParagraphs
-            ) { text in
+            return try chunker.fittingPieces(for: chunk) { text in
+                try Task.checkCancellation()
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: language
@@ -773,10 +779,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     .config.plbert.maxPositionEmbeddings
                 ?? 512
             let tokenBudget = max(contextLength - 2, 1)
-            return try chunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: separatesParagraphs
-            ) { text in
+            return try chunker.fittingPieces(for: chunk) { text in
+                try Task.checkCancellation()
                 let processed = try loadedTextProcessor.process(
                     text: text,
                     language: request.language
@@ -784,10 +788,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 return processed.count <= tokenBudget
             }
         default:
-            return chunker.chunks(
-                for: request.cleanedText.text,
-                separatesParagraphs: separatesParagraphs
-            )
+            return [chunk]
         }
     }
 

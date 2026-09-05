@@ -68,6 +68,27 @@ public final class SayItBackendService: SayItService {
                 lastPlaybackContent = playbackContent
                 playbackContentRevision = revision
             }
+            if lastAmplitudes != playback.amplitudes {
+                lastAmplitudes = playback.amplitudes
+                waveformRevision = revision
+            }
+            let chunks = playback.spokenChunks
+            if lastSpokenChunks != chunks {
+                // Only the last existing anchor can be finalized; text resets
+                // invalidate every anchor, even when the next text is identical.
+                var common = min(lastSpokenChunks.count, chunks.count)
+                if playbackContentRevision == revision { common = 0 }
+                while common > 0 && lastSpokenChunks[common - 1] != chunks[common - 1] {
+                    common -= 1
+                }
+                timingRevisions.replaceSubrange(
+                    common...,
+                    with: repeatElement(revision, count: chunks.count - common)
+                )
+                if chunks.isEmpty || common == 0 { timingResetRevision = revision }
+                timingRevision = revision
+                lastSpokenChunks = chunks
+            }
             eventHub.publish(revision)
         }
     }
@@ -82,6 +103,12 @@ public final class SayItBackendService: SayItService {
     private var lastPlaybackContent: PlaybackContentState?
     private var lastPublishedPlaybackState: PlaybackState?
     private var playbackContentRevision: UInt64 = 0
+    private var waveformRevision: UInt64 = 0
+    private var timingRevision: UInt64 = 0
+    private var timingResetRevision: UInt64 = 0
+    private var lastAmplitudes: [Float] = []
+    private var lastSpokenChunks: [PlaybackTextChunk] = []
+    private var timingRevisions: [UInt64] = []
     private var cachedServiceEvent: ServiceEvent?
     private(set) var eventSnapshotBuildCount = 0
     private var isModelTransitionInProgress = false
@@ -316,15 +343,10 @@ public final class SayItBackendService: SayItService {
         after sequence: UInt64,
         playbackInterval: TimeInterval
     ) async throws -> [ServiceEvent] {
-        let matchedBeforePlaybackSynchronization = revision == sequence
         synchronizePlaybackStateRevision()
         if revision != sequence {
             let event = currentServiceEvent()
-            return [
-                matchedBeforePlaybackSynchronization
-                    ? project(event, after: sequence)
-                    : event
-            ]
+            return [project(event, after: sequence)]
         }
 
         let requestedInterval = playbackInterval.isFinite
@@ -1807,7 +1829,7 @@ public final class SayItBackendService: SayItService {
             registerSpokenChunk(chunk)
         case .audio(let chunk):
             let revisionBeforeAudio = revision
-            flushPendingSpokenChunk()
+            flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
             spokenAudioCursor = playback.generatedDuration
             if playback.shouldStartWhenBuffered {
@@ -1822,6 +1844,7 @@ public final class SayItBackendService: SayItService {
                 revision &+= 1
             }
         case .metrics(let metrics):
+            finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
             playback.observeSynthesisMetrics(metrics)
             if playback.shouldStartWhenBuffered {
                 playback.play()
@@ -1844,6 +1867,7 @@ public final class SayItBackendService: SayItService {
             )
             diagnosticsRevision &+= 1
         case .completed:
+            finalizeSpokenChunk(audioEnd: playback.generatedDuration)
             playback.finishBuffering()
             statusText = "Playing"
             updateJob(request.id, state: .playing, progress: playbackProgress)
@@ -1857,6 +1881,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func archiveCompletedRequest(_ request: SpeechRequest) async throws {
+        let spokenChunks = playback.spokenChunks
         do {
             let archive = try await playback.archive(using: audioArchive)
             do {
@@ -1864,7 +1889,8 @@ public final class SayItBackendService: SayItService {
                     id: request.id,
                     duration: archive.duration,
                     audioRelativePath: archive.relativePath,
-                    audioByteCount: archive.byteCount
+                    audioByteCount: archive.byteCount,
+                    spokenChunks: spokenChunks
                 )
                 historyRevision &+= 1
             } catch {
@@ -2086,16 +2112,28 @@ public final class SayItBackendService: SayItService {
         pendingSpokenSourceRange = range
     }
 
-    private func flushPendingSpokenChunk() {
+    private func finalizeSpokenChunk(audioEnd: TimeInterval) {
+        guard let chunk = playback.spokenChunks.last, chunk.audioEnd == nil else { return }
+        playback.appendSpokenChunk(PlaybackTextChunk(
+            textStart: chunk.textStart,
+            textEnd: chunk.textEnd,
+            audioStart: chunk.audioStart,
+            audioEnd: max(audioEnd, chunk.audioStart)
+        ))
+        revision &+= 1
+    }
+
+    private func flushPendingSpokenChunk(speechStartOffset: TimeInterval) {
         guard let range = pendingSpokenSourceRange else {
             return
         }
         pendingSpokenSourceRange = nil
+        finalizeSpokenChunk(audioEnd: spokenAudioCursor)
         playback.appendSpokenChunk(
             PlaybackTextChunk(
                 textStart: range.lowerBound,
                 textEnd: range.upperBound,
-                audioStart: spokenAudioCursor
+                audioStart: spokenAudioCursor + max(speechStartOffset, 0)
             )
         )
         lastRecordedTextEnd = range.upperBound
@@ -2105,9 +2143,7 @@ public final class SayItBackendService: SayItService {
         PlaybackContentState(
             currentTitle: playback.currentTitle,
             modelID: playback.currentModelID,
-            amplitudes: playback.amplitudes,
-            spokenText: playback.spokenText,
-            spokenChunks: playback.spokenChunks
+            spokenText: playback.spokenText
         )
     }
 
@@ -2234,14 +2270,32 @@ public final class SayItBackendService: SayItService {
         _ event: ServiceEvent,
         after sequence: UInt64
     ) -> ServiceEvent {
-        guard sequence < event.id,
-              playbackContentRevision <= sequence else {
-            return event
-        }
+        guard sequence > 0, sequence < event.id else { return event }
+        let includesText = playbackContentRevision > sequence
+        let includesTiming = timingRevision > sequence || includesText
+        let timingStart = includesText || timingResetRevision > sequence
+            ? 0
+            : firstTimingChange(after: sequence)
         return ServiceEvent(
             id: event.id,
-            snapshot: event.snapshot.omittingPlaybackContent
+            snapshot: event.snapshot.projectingPlayback(
+                includesContent: includesText,
+                includesWaveform: waveformRevision > sequence || includesText,
+                includesTiming: includesTiming,
+                timingStartIndex: timingStart
+            )
         )
+    }
+
+    private func firstTimingChange(after sequence: UInt64) -> Int {
+        var lower = 0
+        var upper = timingRevisions.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if timingRevisions[middle] <= sequence { lower = middle + 1 }
+            else { upper = middle }
+        }
+        return lower
     }
 
     private func makeSnapshot() -> ServiceSnapshot {
@@ -2277,9 +2331,9 @@ public final class SayItBackendService: SayItService {
                 volume: playback.volume,
                 currentTitle: playbackContent.currentTitle,
                 modelID: playbackContent.modelID,
-                amplitudes: playbackContent.amplitudes,
+                amplitudes: playback.amplitudes,
                 spokenText: playbackContent.spokenText,
-                spokenChunks: playbackContent.spokenChunks,
+                spokenChunks: playback.spokenChunks,
                 includesContent: true
             ),
             download: downloadProgress?.serviceSnapshot,
@@ -2858,6 +2912,9 @@ public final class SayItBackendService: SayItService {
             modelID: item.modelID.rawValue
         )
         playback.setSpokenText(item.cleanedText)
+        for chunk in try history.playbackTiming(id: id) {
+            playback.appendSpokenChunk(chunk)
+        }
         spokenTextCharacterCount = item.cleanedText.count
         lastRecordedTextEnd = 0
         playbackContext = PlaybackContext(
@@ -3273,7 +3330,12 @@ public final class SayItBackendService: SayItService {
 }
 
 private extension ServiceSnapshot {
-    var omittingPlaybackContent: ServiceSnapshot {
+    func projectingPlayback(
+        includesContent: Bool,
+        includesWaveform: Bool,
+        includesTiming: Bool,
+        timingStartIndex: Int
+    ) -> ServiceSnapshot {
         ServiceSnapshot(
             protocolVersion: protocolVersion,
             serviceVersion: serviceVersion,
@@ -3292,7 +3354,16 @@ private extension ServiceSnapshot {
                 estimatedDuration: playback.estimatedDuration,
                 rate: playback.rate,
                 volume: playback.volume,
-                includesContent: false
+                currentTitle: includesContent ? playback.currentTitle : "",
+                modelID: includesContent ? playback.modelID : nil,
+                amplitudes: includesWaveform ? playback.amplitudes : [],
+                spokenText: includesContent ? playback.spokenText : "",
+                spokenChunks: includesTiming
+                    ? Array(playback.spokenChunks.dropFirst(timingStartIndex)) : [],
+                includesContent: includesContent,
+                includesWaveform: includesWaveform,
+                includesTiming: includesTiming,
+                timingStartIndex: timingStartIndex
             ),
             download: download,
             modelInstallError: modelInstallError,

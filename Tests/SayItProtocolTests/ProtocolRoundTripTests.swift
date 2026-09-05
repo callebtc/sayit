@@ -3,6 +3,27 @@ import SayItProtocol
 import Testing
 
 struct ProtocolRoundTripTests {
+    @Test("Timing suffix metadata and optional audio ends survive wire encoding")
+    func playbackTimingRoundTrip() throws {
+        let chunk = PlaybackTextChunk(textStart: 100, textEnd: 200, audioStart: 12, audioEnd: 23)
+        let original = PlaybackSnapshot(
+            spokenChunks: [chunk], includesContent: false,
+            includesWaveform: false, includesTiming: true, timingStartIndex: 4
+        )
+        let decoded = try SayItWireCodec.decode(
+            PlaybackSnapshot.self, from: SayItWireCodec.encode(original)
+        )
+        #expect(decoded.spokenChunks == [chunk])
+        #expect(decoded.includesTiming)
+        #expect(!decoded.includesWaveform)
+        #expect(!decoded.includesContent)
+        #expect(decoded.timingStartIndex == 4)
+        let legacy = try SayItWireCodec.decode(PlaybackTextChunk.self, from: Data(
+            #"{"textStart":0,"textEnd":10,"audioStart":0}"#.utf8
+        ))
+        #expect(legacy.audioEnd == nil)
+    }
+
     @Test
     func applicationIdentityMatchesTheBuildMode() {
 #if DEBUG || SAYIT_LOCAL_BUILD
@@ -54,7 +75,7 @@ struct ProtocolRoundTripTests {
             from: SayItWireCodec.encode(request)
         )
         #expect(decodedRequest == request)
-        #expect(SayItProtocolVersion.current == 7)
+        #expect(SayItProtocolVersion.current == 8)
     }
 
     @Test
@@ -453,6 +474,9 @@ struct ProtocolRoundTripTests {
             JSONSerialization.jsonObject(with: encoded) as? [String: Any]
         )
         legacyJSON["includesContent"] = nil
+        legacyJSON["includesWaveform"] = nil
+        legacyJSON["includesTiming"] = nil
+        legacyJSON["timingStartIndex"] = nil
         let legacyData = try JSONSerialization.data(withJSONObject: legacyJSON)
 
         let decoded = try SayItWireCodec.decode(
@@ -461,6 +485,9 @@ struct ProtocolRoundTripTests {
         )
 
         #expect(decoded.includesContent)
+        #expect(decoded.includesTiming)
+        #expect(decoded.includesWaveform)
+        #expect(decoded.timingStartIndex == 0)
         #expect(decoded.spokenText == "Hello")
     }
 }

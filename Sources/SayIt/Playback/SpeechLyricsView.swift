@@ -13,33 +13,16 @@ struct SpeechLyricsView: View {
     var showsBlockSeparators = false
     var onSeek: ((TimeInterval) -> Void)?
 
-    @State private var tokenization = Tokenization()
+    @State private var tokenization = SpeechReaderDocument.empty
     @State private var isFollowing = true
     @State private var lastScrolledWord = -1
     @State private var scrollMetrics = ScrollMetrics()
-    @State private var scrollPosition = ScrollPosition()
+    @State private var scrollPosition = ScrollPosition(idType: Int.self)
     @State private var visibleWordIDs: Set<Int> = []
     @State private var hasMeasuredVisibleWords = false
 
-    private struct Block: Identifiable {
-        let id: Int
-        var words: [WordToken] = []
-    }
-
-    private struct WordToken: Identifiable {
-        let id: Int
-        let blockID: Int
-        let text: String
-        let timing: SpeechLyricsTimeline.Timing
-        var newlinesBefore: Int = 0
-    }
-
-    private struct Tokenization {
-        var sourceText = ""
-        var sourceChunks: [PlaybackTextChunk] = []
-        var blocks: [Block] = []
-        var tokens: [WordToken] = []
-    }
+    private typealias Block = SpeechReaderDocument.Block
+    private typealias WordToken = SpeechReaderDocument.Word
 
     private struct ScrollMetrics: Equatable {
         var offset: Double = 0
@@ -52,8 +35,8 @@ struct SpeechLyricsView: View {
         return Double((" " as NSString).size(withAttributes: [.font: font]).width)
     }()
 
-    private var activeTokenization: Tokenization? {
-        guard tokenization.sourceText == text, tokenization.sourceChunks == chunks else {
+    private var activeTokenization: SpeechReaderDocument? {
+        guard tokenization.sourceText == text else {
             return nil
         }
         return tokenization
@@ -68,7 +51,7 @@ struct SpeechLyricsView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
+        Group {
             scrollContent
                 .scrollPosition($scrollPosition)
                 .scrollIndicators(.never)
@@ -86,27 +69,45 @@ struct SpeechLyricsView: View {
                         scrollMetrics = metrics
                     }
                 )
-                .onChange(of: scrollPosition.isPositionedByUser) { _, byUser in
-                    guard byUser else { return }
+                .onScrollPhaseChange { _, phase in
+                    guard phase == .tracking || phase == .interacting else { return }
                     isFollowing = false
                 }
                 .overlay(alignment: .trailing) {
                     minimalScrollIndicator
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    followButton(proxy: proxy)
+                    followButton
                 }
                 .onChange(of: currentWordIndex, initial: true) { _, newValue in
-                    follow(newValue, proxy: proxy)
+                    follow(newValue)
                 }
                 .onAppear {
-                    attachFollow(proxy: proxy)
+                    attachFollow()
                 }
                 .onChange(of: text) { _, _ in
-                    attachFollow(proxy: proxy)
+                    attachFollow()
                 }
-                .onChange(of: chunks) { _, _ in
-                    rebuildTokens()
+                .task(id: text) {
+                    guard activeTokenization == nil else { return }
+                    let source = text
+                    let work = Task.detached(priority: .userInitiated) {
+                        try SpeechReaderDocument.build(source)
+                    }
+                    do {
+                        let document = try await withTaskCancellationHandler {
+                            try await work.value
+                        } onCancel: {
+                            work.cancel()
+                        }
+                        try Task.checkCancellation()
+                        tokenization = document
+                        attachFollow()
+                    } catch is CancellationError {
+                        // A new document or dismissal invalidates this result.
+                    } catch {
+                        tokenization = .empty
+                    }
                 }
         }
         .accessibilityElement(children: .ignore)
@@ -125,6 +126,7 @@ struct SpeechLyricsView: View {
                     )
                 }
             }
+            .scrollTargetLayout()
             .padding(.vertical, 24)
             .padding(.leading, 8)
         }
@@ -151,7 +153,7 @@ struct SpeechLyricsView: View {
                 ChunkMarkerView()
             }
         }
-        .id(Self.scrollID(forBlock: block.id))
+        .id(block.id)
     }
 
     private var currentWord: String {
@@ -159,32 +161,34 @@ struct SpeechLyricsView: View {
               tokens.indices.contains(index) else {
             return ""
         }
-        return tokens[index].text
+        guard let chunk = currentChunk else { return "" }
+        return tokens[index...]
+            .prefix { $0.sourceRange.lowerBound < chunk.textEnd }
+            .map(\.text).joined(separator: " ")
+    }
+
+    private var currentChunk: PlaybackTextChunk? {
+        guard showsHighlight, generatedDuration > 0,
+              let index = SpeechLyricsTimeline.chunkIndex(at: elapsed, chunks: chunks)
+        else { return nil }
+        return chunks[index]
     }
 
     private var currentWordIndex: Int? {
-        guard showsHighlight, generatedDuration > 0 else { return nil }
-        return SpeechLyricsTimeline.activeWordIndex(
-            at: elapsed + 0.08,
-            tokenCount: tokens.count
-        ) { index in
-            startTime(for: tokens[index])
-        }
+        guard let chunk = currentChunk else { return nil }
+        return activeTokenization?.wordIndex(atOrAfter: chunk.textStart)
     }
 
-    private func attachFollow(proxy: ScrollViewProxy) {
-        if activeTokenization == nil {
-            rebuildTokens()
-        }
+    private func attachFollow() {
         isFollowing = true
         lastScrolledWord = -1
         visibleWordIDs = []
         hasMeasuredVisibleWords = false
-        scrollPosition = ScrollPosition()
-        follow(currentWordIndex, proxy: proxy)
+        scrollPosition = ScrollPosition(idType: Int.self)
+        follow(currentWordIndex)
     }
 
-    private func follow(_ wordIndex: Int?, proxy: ScrollViewProxy) {
+    private func follow(_ wordIndex: Int?) {
         guard isFollowing, let wordIndex else { return }
         let blockID = wordIndex < tokens.count ? tokens[wordIndex].blockID : nil
         let lastBlockID = lastScrolledWord >= 0 && lastScrolledWord < tokens.count
@@ -193,16 +197,16 @@ struct SpeechLyricsView: View {
         let jumped = lastScrolledWord < 0 || abs(wordIndex - lastScrolledWord) > 4
         let blockChanged = blockID != lastBlockID
         guard jumped || blockChanged || wordIndex - lastScrolledWord >= 2 else { return }
-        let target = Self.scrollID(forWord: wordIndex)
-        if reduceMotion {
-            proxy.scrollTo(
-                target,
+        let target = blockID ?? 0
+        if reduceMotion || jumped || blockChanged {
+            scrollPosition.scrollTo(
+                id: target,
                 anchor: UnitPoint(x: 0.5, y: 0.42)
             )
         } else {
             withAnimation(.smooth(duration: 0.55)) {
-                proxy.scrollTo(
-                    target,
+                scrollPosition.scrollTo(
+                    id: target,
                     anchor: UnitPoint(x: 0.5, y: 0.42)
                 )
             }
@@ -210,11 +214,11 @@ struct SpeechLyricsView: View {
         lastScrolledWord = wordIndex
     }
 
-    private func followButton(proxy: ScrollViewProxy) -> some View {
+    private var followButton: some View {
         Button(
             "Resume following the spoken text",
             systemImage: "arrow.down.to.line",
-            action: { attachFollow(proxy: proxy) }
+            action: { attachFollow() }
         )
         .labelStyle(.iconOnly)
         .font(.system(size: 10, weight: .semibold))
@@ -260,7 +264,9 @@ struct SpeechLyricsView: View {
         for token: WordToken,
         currentWordIndex: Int?
     ) -> some View {
-        let isCurrent = token.id == currentWordIndex
+        let isCurrent = currentChunk.map {
+            token.sourceRange.overlaps($0.textStart..<$0.textEnd)
+        } ?? false
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
         let seekTime = startTime(for: token)
         let isProcessed = seekTime <= generatedDuration
@@ -276,7 +282,6 @@ struct SpeechLyricsView: View {
                     .padding(.horizontal, -2.5)
                     .padding(.vertical, -1.5)
             }
-            .scaleEffect(isCurrent ? 1.09 : 1)
             .contentShape(Rectangle())
             .onTapGesture {
                 guard canSeek else { return }
@@ -296,6 +301,7 @@ struct SpeechLyricsView: View {
                 setWordVisibility(token.id, isVisible: isVisible)
             }
             .layoutValue(key: NewlinesBeforeKey.self, value: token.newlinesBefore)
+            .layoutValue(key: JoinsPreviousKey.self, value: token.joinsPrevious)
     }
 
     private func setWordVisibility(_ id: Int, isVisible: Bool) {
@@ -348,133 +354,20 @@ struct SpeechLyricsView: View {
         )
     }
 
-    private func rebuildTokens() {
-        let blockRanges = Self.blockRanges(in: text, chunks: chunks)
-        var newBlocks: [Block] = []
-        var newTokens: [WordToken] = []
-        var index = 0
-        var chunkIndex = 0
-        var offsetCursor = text.startIndex
-        var offsetValue = 0
-        let textCount = text.count
-        for (blockID, range) in blockRanges.enumerated() {
-            var block = Block(id: blockID)
-            var previousUpper = range.lowerBound
-            for wordRange in Self.wordRanges(in: text, within: range) {
-                let offsetRange: Range<Int>
-                if offsetCursor <= wordRange.lowerBound {
-                    let leadingCount = text.distance(
-                        from: offsetCursor,
-                        to: wordRange.lowerBound
-                    )
-                    let wordCount = text.distance(
-                        from: wordRange.lowerBound,
-                        to: wordRange.upperBound
-                    )
-                    let lowerOffset = offsetValue + leadingCount
-                    offsetRange = lowerOffset..<(lowerOffset + wordCount)
-                    offsetCursor = wordRange.upperBound
-                    offsetValue = offsetRange.upperBound
-                } else {
-                    offsetRange = Self.offsetRange(
-                        for: wordRange,
-                        in: text
-                    )
-                }
-                let newlines = text[previousUpper..<wordRange.lowerBound]
-                    .reduce(0) { $0 + ($1 == "\n" ? 1 : 0) }
-                let token = WordToken(
-                    id: index,
-                    blockID: blockID,
-                    text: String(text[wordRange]),
-                    timing: SpeechLyricsTimeline.timing(
-                        forOffset: offsetRange.lowerBound,
-                        textCount: textCount,
-                        chunks: chunks,
-                        chunkIndex: &chunkIndex
-                    ),
-                    newlinesBefore: newlines
-                )
-                block.words.append(token)
-                newTokens.append(token)
-                previousUpper = wordRange.upperBound
-                index += 1
-            }
-            newBlocks.append(block)
-        }
-        tokenization = Tokenization(
-            sourceText: text,
-            sourceChunks: chunks,
-            blocks: newBlocks,
-            tokens: newTokens
-        )
-    }
-
     private func startTime(for token: WordToken) -> TimeInterval {
-        SpeechLyricsTimeline.startTime(
-            for: token.timing,
-            chunks: chunks,
-            generatedDuration: generatedDuration
+        SpeechLyricsTimeline.timing(
+            forOffset: token.sourceRange.lowerBound,
+            chunks: chunks
         )
     }
-
-    private static func scrollID(forBlock id: Int) -> String { "block-\(id)" }
 
     private static func scrollID(forWord id: Int) -> String { "word-\(id)" }
 
-    nonisolated static func blockRanges(
-        in text: String,
-        chunks: [PlaybackTextChunk]
-    ) -> [Range<String.Index>] {
-        guard !text.isEmpty else { return [] }
-        guard !chunks.isEmpty else { return [text.startIndex..<text.endIndex] }
-        let textCount = text.count
-        var offsetCursor = 0
-        var indexCursor = text.startIndex
-        var boundaries = [text.startIndex]
-        boundaries.reserveCapacity(chunks.count + 1)
-        for chunk in chunks {
-            guard chunk.textStart >= 0,
-                  chunk.textEnd > chunk.textStart,
-                  chunk.textEnd <= textCount,
-                  chunk.textStart >= offsetCursor,
-                  let boundary = text.index(
-                    indexCursor,
-                    offsetBy: chunk.textStart - offsetCursor,
-                    limitedBy: text.endIndex
-                  ) else {
-                continue
-            }
-            if boundary > boundaries[boundaries.count - 1] {
-                boundaries.append(boundary)
-            }
-            offsetCursor = chunk.textStart
-            indexCursor = boundary
-        }
-        if boundaries[boundaries.count - 1] < text.endIndex {
-            boundaries.append(text.endIndex)
-        }
-        return zip(boundaries, boundaries.dropFirst()).map {
-            $0.0..<$0.1
-        }
-    }
 
-    nonisolated static func wordRanges(
-        in text: String,
-        within range: Range<String.Index>
-    ) -> [Range<String.Index>] {
-        text[range].ranges(of: #/\S+/#).map { $0 }
-    }
+}
 
-    nonisolated static func offsetRange(
-        for range: Range<String.Index>,
-        in text: String
-    ) -> Range<Int> {
-        let lower = text.distance(from: text.startIndex, to: range.lowerBound)
-        let upper = text.distance(from: text.startIndex, to: range.upperBound)
-        return lower..<upper
-    }
-
+private struct JoinsPreviousKey: LayoutValueKey {
+    static let defaultValue = false
 }
 
 private struct NewlinesBeforeKey: LayoutValueKey {
@@ -489,18 +382,20 @@ private struct WordsFlowLayout: Layout {
     func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
-        cache: inout ()
+        cache: inout [Double: Arrangement]
     ) -> CGSize {
-        arrange(proposal: proposal, subviews: subviews).size
+        cachedArrangement(proposal: proposal, subviews: subviews, cache: &cache).size
     }
 
     func placeSubviews(
         in bounds: CGRect,
         proposal: ProposedViewSize,
         subviews: Subviews,
-        cache: inout ()
+        cache: inout [Double: Arrangement]
     ) {
-        let arrangement = arrange(proposal: proposal, subviews: subviews)
+        let arrangement = cachedArrangement(
+            proposal: proposal, subviews: subviews, cache: &cache
+        )
         for (index, subview) in subviews.enumerated() {
             let position = arrangement.positions[index]
             let size = arrangement.sizes[index]
@@ -512,10 +407,30 @@ private struct WordsFlowLayout: Layout {
         }
     }
 
-    private struct Arrangement {
+    struct Arrangement {
         var size: CGSize
         var positions: [CGPoint]
         var sizes: [CGSize]
+    }
+
+    func makeCache(subviews: Subviews) -> [Double: Arrangement] { [:] }
+
+    func updateCache(_ cache: inout [Double: Arrangement], subviews: Subviews) {
+        cache.removeAll(keepingCapacity: true)
+    }
+
+    private func cachedArrangement(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout [Double: Arrangement]
+    ) -> Arrangement {
+        let width = proposal.width ?? .infinity
+        if let arrangement = cache[width] { return arrangement }
+        let arrangement = arrange(proposal: proposal, subviews: subviews)
+        // Resizing must not retain an arrangement for every intermediate width.
+        if cache.count >= 3 { cache.removeAll(keepingCapacity: true) }
+        cache[width] = arrangement
+        return arrangement
     }
 
     private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> Arrangement {
@@ -528,6 +443,7 @@ private struct WordsFlowLayout: Layout {
         var maxX: Double = 0
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
+            if x > 0, subview[JoinsPreviousKey.self] { x -= horizontalSpacing }
             let newlines = subview[NewlinesBeforeKey.self]
             if !positions.isEmpty, newlines > 0 {
                 x = 0
