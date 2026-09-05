@@ -152,6 +152,7 @@ let package = Package(
         .executableTarget(
             name: "SayItCLI",
             dependencies: [
+                "SayItCore",
                 "SayItProtocol",
                 "SayItXPC",
                 .product(

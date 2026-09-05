@@ -18,6 +18,7 @@ struct SayItCommand: AsyncParsableCommand {
             ModelsCommand.self,
             VoicesCommand.self,
             HistoryCommand.self,
+            SkillCommand.self,
             ServiceControlCommand.self
         ],
         defaultSubcommand: SpeakCommand.self
