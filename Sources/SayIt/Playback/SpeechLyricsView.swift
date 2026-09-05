@@ -15,7 +15,7 @@ struct SpeechLyricsView: View {
 
     @State private var tokenization = SpeechReaderDocument.empty
     @State private var isFollowing = true
-    @State private var lastScrolledWord = -1
+    @State private var wordFrames: [Int: CGRect] = [:]
     @State private var scrollMetrics = ScrollMetrics()
     @State private var scrollPosition = ScrollPosition(idType: Int.self)
     @State private var visibleWordIDs: Set<Int> = []
@@ -73,6 +73,10 @@ struct SpeechLyricsView: View {
                     guard phase == .tracking || phase == .interacting else { return }
                     isFollowing = false
                 }
+                .onChange(of: scrollPosition.isPositionedByUser) { _, userPositioned in
+                    // Also cover wheel/keyboard scrolling without a tracking phase.
+                    if userPositioned { isFollowing = false }
+                }
                 .overlay(alignment: .trailing) {
                     minimalScrollIndicator
                 }
@@ -86,6 +90,9 @@ struct SpeechLyricsView: View {
                     attachFollow()
                 }
                 .onChange(of: text) { _, _ in
+                    wordFrames = [:]
+                    visibleWordIDs = []
+                    hasMeasuredVisibleWords = false
                     attachFollow()
                 }
                 .task(id: text) {
@@ -161,57 +168,49 @@ struct SpeechLyricsView: View {
               tokens.indices.contains(index) else {
             return ""
         }
-        guard let chunk = currentChunk else { return "" }
-        return tokens[index...]
-            .prefix { $0.sourceRange.lowerBound < chunk.textEnd }
-            .map(\.text).joined(separator: " ")
-    }
-
-    private var currentChunk: PlaybackTextChunk? {
-        guard showsHighlight, generatedDuration > 0,
-              let index = SpeechLyricsTimeline.chunkIndex(at: elapsed, chunks: chunks)
-        else { return nil }
-        return chunks[index]
+        return tokens[index].text
     }
 
     private var currentWordIndex: Int? {
-        guard let chunk = currentChunk else { return nil }
-        return activeTokenization?.wordIndex(atOrAfter: chunk.textStart)
+        guard showsHighlight, let document = activeTokenization else { return nil }
+        return SpeechLyricsTimeline.wordIndex(
+            at: elapsed, document: document, chunks: chunks,
+            generatedDuration: generatedDuration
+        )
     }
 
     private func attachFollow() {
         isFollowing = true
-        lastScrolledWord = -1
-        visibleWordIDs = []
-        hasMeasuredVisibleWords = false
-        scrollPosition = ScrollPosition(idType: Int.self)
         follow(currentWordIndex)
     }
 
     private func follow(_ wordIndex: Int?) {
         guard isFollowing, let wordIndex else { return }
-        let blockID = wordIndex < tokens.count ? tokens[wordIndex].blockID : nil
-        let lastBlockID = lastScrolledWord >= 0 && lastScrolledWord < tokens.count
-            ? tokens[lastScrolledWord].blockID
-            : nil
-        let jumped = lastScrolledWord < 0 || abs(wordIndex - lastScrolledWord) > 4
-        let blockChanged = blockID != lastBlockID
-        guard jumped || blockChanged || wordIndex - lastScrolledWord >= 2 else { return }
-        let target = blockID ?? 0
-        if reduceMotion || jumped || blockChanged {
+        guard tokens.indices.contains(wordIndex) else { return }
+        // Lazy stacks cannot resolve an offscreen word nested in a custom layout.
+        // First materialize its stable block; the word's geometry then refines
+        // the position. Never use accumulated height estimates for distant seeks.
+        if !visibleWordIDs.contains(wordIndex) {
             scrollPosition.scrollTo(
-                id: target,
+                id: tokens[wordIndex].blockID,
                 anchor: UnitPoint(x: 0.5, y: 0.42)
             )
-        } else {
-            withAnimation(.smooth(duration: 0.55)) {
-                scrollPosition.scrollTo(
-                    id: target,
-                    anchor: UnitPoint(x: 0.5, y: 0.42)
-                )
-            }
         }
-        lastScrolledWord = wordIndex
+        if let frame = wordFrames[wordIndex] {
+            followWordFrame(frame, wordID: wordIndex)
+        }
+    }
+
+    private func followWordFrame(_ frame: CGRect, wordID: Int) {
+        guard currentWordIndex == wordID else { return }
+        guard isFollowing,
+              let offset = SpeechReaderScroll.targetOffset(
+                wordFrame: frame, viewportHeight: scrollMetrics.containerHeight,
+                contentOffset: scrollMetrics.offset
+              ) else { return }
+        // Do not queue an animation per spoken word: a new word or seek must
+        // immediately supersede the old target. The comfort band avoids jitter.
+        scrollPosition.scrollTo(y: offset)
     }
 
     private var followButton: some View {
@@ -264,12 +263,10 @@ struct SpeechLyricsView: View {
         for token: WordToken,
         currentWordIndex: Int?
     ) -> some View {
-        let isCurrent = currentChunk.map {
-            token.sourceRange.overlaps($0.textStart..<$0.textEnd)
-        } ?? false
+        let isCurrent = token.id == currentWordIndex
         let isPast = currentWordIndex.map { token.id < $0 } ?? false
         let seekTime = startTime(for: token)
-        let isProcessed = seekTime <= generatedDuration
+        let isProcessed = seekTime.isFinite && seekTime < generatedDuration
         let canSeek = onSeek != nil && isProcessed
         return Text(token.text)
             .font(.callout)
@@ -295,8 +292,18 @@ struct SpeechLyricsView: View {
                     NSCursor.pop()
                 }
             }
-            .animation(.spring(response: 0.32, dampingFraction: 0.72), value: isCurrent)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isCurrent)
             .id(Self.scrollID(forWord: token.id))
+            .onGeometryChange(for: CGRect.self) { geometry in
+                geometry.frame(in: .scrollView(axis: .vertical))
+            } action: { frame in
+                wordFrames[token.id] = frame
+                followWordFrame(frame, wordID: token.id)
+            }
+            .onDisappear {
+                wordFrames.removeValue(forKey: token.id)
+                visibleWordIDs.remove(token.id)
+            }
             .onScrollVisibilityChange(threshold: 0.5) { isVisible in
                 setWordVisibility(token.id, isVisible: isVisible)
             }
@@ -355,9 +362,15 @@ struct SpeechLyricsView: View {
     }
 
     private func startTime(for token: WordToken) -> TimeInterval {
-        SpeechLyricsTimeline.timing(
-            forOffset: token.sourceRange.lowerBound,
-            chunks: chunks
+        if chunks.isEmpty {
+            return SpeechLyricsTimeline.legacyTiming(
+                forOffset: token.sourceRange.lowerBound,
+                textEnd: tokens.last?.sourceRange.upperBound ?? 0,
+                duration: generatedDuration
+            )
+        }
+        return SpeechLyricsTimeline.timing(
+            forOffset: token.sourceRange.lowerBound, chunks: chunks
         )
     }
 

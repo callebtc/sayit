@@ -8,10 +8,11 @@ mkdir -p "$probe_cache"
 python3 - "$probe_build/SpeechLyricsView.swift" <<'PY'
 import pathlib, sys
 source = pathlib.Path('Sources/SayIt/Playback/SpeechLyricsView.swift').read_text()
-source = source.replace('let isCurrent = currentChunk.map', 'LongTextProbe.wordViews += 1\n        let isCurrent = currentChunk.map')
+source = source.replace('let isCurrent = token.id', 'LongTextProbe.wordViews += 1\n        let isCurrent = token.id')
 source = source.replace('tokenization = document', 'tokenization = document\n                        LongTextProbe.tokenRebuilds += 1')
 source = source.replace('let maxWidth = proposal.width ?? .infinity', 'LongTextProbe.measuredWords += subviews.count\n        let maxWidth = proposal.width ?? .infinity')
-source = source.replace('lastScrolledWord = wordIndex', 'lastScrolledWord = wordIndex\n        LongTextProbe.followRequests += 1')
+source = source.replace('guard tokens.indices.contains(wordIndex) else { return }', 'guard tokens.indices.contains(wordIndex) else { return }\n        LongTextProbe.followRequests += 1')
+source = source.replace('guard currentWordIndex == wordID else { return }', 'guard currentWordIndex == wordID else { return }\n        LongTextProbe.activeWordID = wordID\n        LongTextProbe.activeWordFrame = frame')
 source = source.replace('scrollMetrics = metrics', 'scrollMetrics = metrics\n                        LongTextProbe.scrollOffset = metrics.offset')
 source = source.replace('visibleWordIDs.insert(id)', 'visibleWordIDs.insert(id)\n            LongTextProbe.visibleWords.insert(id)')
 source = source.replace('visibleWordIDs.remove(id)', 'visibleWordIDs.remove(id)\n            LongTextProbe.visibleWords.remove(id)')
@@ -27,6 +28,7 @@ swiftc -O -parse-as-library -I "$probe_build" -L "$probe_build" \
     -module-cache-path "$probe_cache" \
     "$probe_build/SpeechLyricsView.swift" \
     Sources/SayIt/Playback/SpeechLyricsTimeline.swift \
+    Sources/SayIt/Playback/SpeechReaderScroll.swift \
     Sources/SayIt/Playback/SpeechReaderDocument.swift \
     Sources/SayItCore/Synthesis/SpeechChunk.swift \
     Sources/SayItCore/Synthesis/TextChunker.swift \

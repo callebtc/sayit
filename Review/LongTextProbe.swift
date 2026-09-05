@@ -12,6 +12,8 @@ struct LongTextProbe {
     nonisolated(unsafe) static var followRequests = 0
     nonisolated(unsafe) static var visibleWords: Set<Int> = []
     nonisolated(unsafe) static var scrollOffset: Double = 0
+    nonisolated(unsafe) static var activeWordID = -1
+    nonisolated(unsafe) static var activeWordFrame = CGRect.zero
     @MainActor
     static func main() {
         setbuf(stdout, nil)
@@ -24,13 +26,12 @@ struct LongTextProbe {
             let document = try! SpeechReaderDocument.build(text)
             print("words=\(document.tokens.count) blocks=\(document.blocks.count) largestBlock=\(document.blocks.map { $0.words.count }.max() ?? 0) tokenize=\(start.duration(to: .now))")
         case "timing":
+            let document = try! SpeechReaderDocument.build(String(repeating: "one two three four five. ", count: 100))
             let chunks = [PlaybackTextChunk(textStart: 0, textEnd: 650, audioStart: 0)]
             for duration in [2.0, 10.0, 40.0] {
-                let selected = SpeechLyricsTimeline.chunkIndex(at: 1.5, chunks: chunks)
-                print("generated=\(duration)s selectedPassage=\(selected ?? -1) stableStart=\(SpeechLyricsTimeline.timing(forOffset: 325, chunks: chunks))")
+                let selected = SpeechLyricsTimeline.wordIndex(at: 1.5, document: document, chunks: chunks, generatedDuration: duration)
+                print("generated=\(duration)s selectedWord=\(selected ?? -1) stableMidpoint=\(SpeechLyricsTimeline.timing(forOffset: 325, chunks: chunks))")
             }
-            let anchors = [PlaybackTextChunk(textStart: 0, textEnd: 1000, audioStart: 0, audioEnd: 120), PlaybackTextChunk(textStart: 1000, textEnd: 2000, audioStart: 120, audioEnd: 180)]
-            print("restoredSecondPassage=\(SpeechLyricsTimeline.timing(forOffset: 1000, chunks: anchors)) legacyWithoutAnchors=\(SpeechLyricsTimeline.timing(forOffset: 1000, chunks: []))")
         case "chunker":
             let shape = CommandLine.arguments.dropFirst(3).first ?? "paragraphs"
             let text = shape == "paragraphs"
@@ -39,7 +40,7 @@ struct LongTextProbe {
             let start = ContinuousClock.now
             let chunks = TextChunker().chunks(for: text)
             print("shape=\(shape) count=\(count) chars=\(text.count) chunks=\(chunks.count) elapsed=\(start.duration(to: .now))")
-        case "render", "render-updates":
+        case "render", "render-updates", "render-words":
             _ = NSApplication.shared
             let text = String(repeating: "one two three four five. ", count: count / 5)
             let start = ContinuousClock.now
@@ -91,6 +92,32 @@ struct LongTextProbe {
                 precondition(tokenRebuilds == originalBuilds, "Audio changes retokenized the document")
                 precondition(followRequests >= 20, "Automatic scrolling disabled following")
                 print("20 streaming/seek updates tokenRebuilds=\(tokenRebuilds) followRequests=\(followRequests)")
+            }
+            if mode == "render-words" {
+                let document = try! SpeechReaderDocument.build(text)
+                let end = document.tokens.last!.sourceRange.upperBound
+                let anchors = [PlaybackTextChunk(textStart: 0, textEnd: end, audioStart: 0, audioEnd: Double(end))]
+                // Exercise line and block crossings, distant forward/backward seeks,
+                // and the final word, using actual production view geometry.
+                let targets = Array(0..<96) + [count - 100, 21, count - 1, 0, 75]
+                for target in targets {
+                    let time = Double(document.tokens[target].sourceRange.lowerBound) + 0.1
+                    host.rootView = SpeechLyricsView(
+                        text: text, chunks: anchors, elapsed: time,
+                        generatedDuration: Double(end), showsHighlight: true
+                    ).frame(width: 340, height: 150).background(Color.white).environment(\.colorScheme, .light)
+                    host.layoutSubtreeIfNeeded()
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+                    host.layoutSubtreeIfNeeded()
+                    let visible = activeWordID == target && activeWordFrame.minY >= 15 && activeWordFrame.maxY <= 135
+                    if !visible {
+                        print("calculated=\(SpeechLyricsTimeline.wordIndex(at: time, document: document, chunks: anchors, generatedDuration: Double(end)) ?? -1)")
+                        print("miss target=\(target) measured=\(activeWordID) frame=\(activeWordFrame) offset=\(scrollOffset)")
+                    }
+                    precondition(visible, "Active word did not enter the unfaded viewport")
+                }
+                precondition(tokenRebuilds == 1, "Word updates retokenized the document")
+                print("word follow targets=\(targets.count) all visible; tokenRebuilds=\(tokenRebuilds) measuredWords=\(measuredWords)")
             }
             if screenshot != nil || mode == "render-updates" {
                 RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.8))

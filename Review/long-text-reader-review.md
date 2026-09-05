@@ -1,5 +1,10 @@
 # Long-text playback and reader review
 
+This records the original findings on the base revision. See
+[the implementation and validation notes](long-text-validation.md) for the final
+fixes, including retained approximate word timing and its limits.
+
+
 Reviewed local `main` at `2d4fe15` in branch `codex/review-long-text-reader`.
 This is the initial review of that base commit, before implementation. See
 [changes and validation](long-text-validation.md) for the resulting behavior and
