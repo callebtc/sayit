@@ -24,7 +24,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
-            exact: "0.1.3"
+            revision: "bf14ae0c26e4e85553dd989571cae29d70fa6735"
         ),
         .package(
             url: "https://github.com/apple/swift-openapi-generator",

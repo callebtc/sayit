@@ -1,0 +1,32 @@
+{
+  "breeze": {
+    "repository": "mlx-community/Breeze-TTS-2-mlx-4bit",
+    "revision": "3a06d26b172ea4ae1da2f42d708383e9c79d5526",
+    "gated": false,
+    "repository_bytes": 3042732998
+  },
+  "index": {
+    "repository": "mlx-community/IndexTTS-1.5",
+    "revision": "d163f13bc1816c20bd79d730cc88f866a2a43ceb",
+    "gated": false,
+    "repository_bytes": 1434615142
+  },
+  "supertonic": {
+    "repository": "Supertone/supertonic-3",
+    "revision": "3cadd1ee6394adea1bd021217a0e650ede09a323",
+    "gated": false,
+    "repository_bytes": 414728474
+  },
+  "voxcpm": {
+    "repository": "mlx-community/VoxCPM2-8bit",
+    "revision": "d52725898a0675703f7f9ddc5a4d1a3cdbb99032",
+    "gated": false,
+    "repository_bytes": 3226617581
+  },
+  "vireo": {
+    "repository": "mchen04/Vireo-TTS-3B-MLX-mixed4bit",
+    "revision": "5e89446266c92994fe134c233a6ca53ad995e6c3",
+    "gated": "auto",
+    "repository_bytes": 2237576101
+  }
+}

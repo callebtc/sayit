@@ -3,6 +3,7 @@ import Foundation
 
 enum SupportedModelTypes {
     private static let aliases: [Set<String>] = [
+        ["breeze_tts", "breeze"],
         ["moss_tts_nano"],
         ["moss_tts", "moss_tts_delay", "moss_tts_local"],
         ["echo_tts", "echo"],

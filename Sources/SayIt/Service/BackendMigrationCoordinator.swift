@@ -8,6 +8,7 @@ actor BackendMigrationCoordinator {
     func migrate(
         settings: BackendSettingsSnapshot
     ) throws {
+#if !SAYIT_MODEL_AUDIT_BUILD
         let source = try AppDirectories.live()
         let destination = try AppDirectories.shared(
             appGroupIdentifier: SayItServiceIdentifiers.appGroup
@@ -63,6 +64,7 @@ actor BackendMigrationCoordinator {
             try? FileManager.default.removeItem(at: staging)
             throw error
         }
+#endif
     }
 
     private func stageContents(

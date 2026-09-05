@@ -77,15 +77,25 @@ build() {
 if [ "$sign_identity" = "-" ]; then
     # Xcode requires a provisioning profile for app-group entitlements, even
     # for an ad-hoc identity. Build unsigned, then sign the complete local app.
+    local_identifier=sh.sayit.mac.local
+    local_display_name="Say It Local"
+    local_selection_identifier=sh.sayit.mac.selection-helper.local
+    local_swift_flags=-DSAYIT_LOCAL_BUILD
+    if [ "${SAYIT_MODEL_AUDIT_BUILD:-0}" = "1" ]; then
+        local_identifier=sh.sayit.mac.model-audit
+        local_display_name="Say It Model Audit"
+        local_selection_identifier=sh.sayit.mac.selection-helper.model-audit
+        local_swift_flags="$local_swift_flags -DSAYIT_MODEL_AUDIT_BUILD"
+    fi
     build \
         CODE_SIGNING_ALLOWED=NO \
         CODE_SIGNING_REQUIRED=NO \
         ENABLE_HARDENED_RUNTIME=NO \
-        SAYIT_APP_BUNDLE_IDENTIFIER=sh.sayit.mac.local \
-        SAYIT_APP_DISPLAY_NAME="Say It Local" \
-        SAYIT_SELECTION_BUNDLE_IDENTIFIER=sh.sayit.mac.selection-helper.local \
-        SAYIT_SELECTION_DISPLAY_NAME="Say It Local Selected-Text Helper" \
-        SAYIT_LOCAL_SWIFT_FLAG=-DSAYIT_LOCAL_BUILD \
+        SAYIT_APP_BUNDLE_IDENTIFIER="$local_identifier" \
+        SAYIT_APP_DISPLAY_NAME="$local_display_name" \
+        SAYIT_SELECTION_BUNDLE_IDENTIFIER="$local_selection_identifier" \
+        SAYIT_SELECTION_DISPLAY_NAME="$local_display_name Selected-Text Helper" \
+        SAYIT_LOCAL_SWIFT_FLAG="$local_swift_flags" \
         SWIFT_COMPILATION_MODE="${SAYIT_SWIFT_COMPILATION_MODE:-singlefile}"
 
     codesign --force --deep --sign - "$app_root"
