@@ -3,6 +3,7 @@ import Foundation
 enum ServiceConnectionState: Equatable {
     case disabled
     case connecting
+    case recovering
     case online(version: String)
     case offline
     case updateRequired
@@ -13,6 +14,8 @@ enum ServiceConnectionState: Equatable {
             "Disabled"
         case .connecting:
             "Connecting"
+        case .recovering:
+            "Reconnecting"
         case .online:
             "Connected"
         case .offline:
@@ -24,7 +27,7 @@ enum ServiceConnectionState: Equatable {
 
     var showsRepair: Bool {
         switch self {
-        case .disabled, .offline, .updateRequired:
+        case .disabled, .offline, .updateRequired, .recovering:
             true
         case .connecting, .online:
             false

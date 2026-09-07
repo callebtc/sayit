@@ -17,10 +17,13 @@ struct ServiceRepairView: View {
             HStack {
                 Button("Service Settings…", action: openServiceSettings)
                 Spacer()
-                if state.backgroundService.isWorking {
+                if state.backgroundService.isWorking || state.serviceConnection == .recovering {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityLabel("Working")
+                } else if state.backgroundService.requiresApproval {
+                    Button("Open Login Items", action: state.backgroundService.openLoginItemsSettings)
+                        .buttonStyle(.borderedProminent)
                 } else {
                     Button(actionTitle, action: performRepair)
                         .buttonStyle(.borderedProminent)
@@ -30,22 +33,34 @@ struct ServiceRepairView: View {
     }
 
     private var title: String {
-        switch state.serviceConnection {
+        if state.backgroundService.requiresApproval { return "Allow background service" }
+        return switch state.serviceConnection {
         case .disabled:
             "Background service is off"
+        case .recovering:
+            "Reconnecting background service"
         case .updateRequired:
-            "Service update required"
+            "Service update needs attention"
         default:
             "Can’t reach the background service"
         }
     }
 
     private var detail: String {
-        switch state.serviceConnection {
+        if state.backgroundService.requiresApproval {
+            return "Allow Say It in Login Items & Extensions to continue."
+        }
+        if state.serviceConnection != .recovering,
+           let message = state.backgroundService.errorMessage {
+            return message
+        }
+        return switch state.serviceConnection {
         case .disabled:
             "Speech and playback are unavailable until the service is turned on."
+        case .recovering:
+            "Say It is restoring its connection automatically. This should only take a moment."
         case .updateRequired:
-            "The running service is out of date. Restart it to continue."
+            "The service still doesn’t match this app. Quit other copies of Say It, then try again."
         default:
             "Say It can’t connect to its speech service. Restart it to continue."
         }
@@ -56,13 +71,16 @@ struct ServiceRepairView: View {
     }
 
     private var symbol: String {
-        state.serviceConnection == .disabled
-            ? "power"
-            : "exclamationmark.triangle"
+        switch state.serviceConnection {
+        case .disabled: "power"
+        case .recovering: "arrow.clockwise"
+        default: "exclamationmark.triangle"
+        }
     }
 
     private var tint: Color {
-        state.serviceConnection == .disabled ? .secondary : .orange
+        state.serviceConnection == .disabled || state.serviceConnection == .recovering
+            ? .secondary : .orange
     }
 
     private func performRepair() {
