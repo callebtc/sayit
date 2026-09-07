@@ -12,7 +12,9 @@ extension DiagnosticSnapshot {
             modelID: modelID.map { ModelID($0) },
             durationMilliseconds: durationMilliseconds,
             byteCount: byteCount,
-            numericValue: numericValue
+            numericValue: numericValue,
+            errorDomain: errorDomain,
+            errorCode: errorCode
         )
     }
 }
