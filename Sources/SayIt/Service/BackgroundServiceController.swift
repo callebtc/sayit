@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import SayItCore
 import SayItProtocol
+import SayItXPC
 import ServiceManagement
 
 @MainActor
@@ -18,6 +19,7 @@ final class BackgroundServiceController {
     private(set) var status: SMAppService.Status
     private(set) var errorMessage: String?
     private(set) var isWorking = false
+    var isPreparingUpdate = false
     #if DEBUG || SAYIT_LOCAL_BUILD
     private(set) var isDevelopmentServiceRunning = false
     #endif
@@ -70,7 +72,7 @@ final class BackgroundServiceController {
     }
 
     func ensureRunning() async {
-        guard !isUserDisabled else { return }
+        guard !isPreparingUpdate, !isUserDisabled else { return }
         await perform {
             await legacyCleanupIfNeeded()
             #if DEBUG || SAYIT_LOCAL_BUILD
@@ -88,6 +90,7 @@ final class BackgroundServiceController {
     }
 
     func enable() async {
+        guard !isPreparingUpdate else { return }
         UserDefaults.standard.set(
             false,
             forKey: Self.userDisabledDefaultsKey
@@ -96,6 +99,7 @@ final class BackgroundServiceController {
     }
 
     func disable() async {
+        guard !isPreparingUpdate else { return }
         await perform {
             #if DEBUG || SAYIT_LOCAL_BUILD
             if DevelopmentServiceLauncher.isLoaded {
@@ -114,6 +118,7 @@ final class BackgroundServiceController {
     }
 
     func restart() async {
+        guard !isPreparingUpdate else { return }
         await perform {
             writeParentProcessFile()
             #if DEBUG || SAYIT_LOCAL_BUILD
@@ -122,6 +127,25 @@ final class BackgroundServiceController {
             try await restartRegisteredService()
             #endif
         }
+    }
+
+    func terminateForUpdate(deadline: Date) async throws {
+        // A user-triggered registration may already be in flight outside the
+        // polling task. Let it finish before removing the job it could recreate.
+        while isWorking {
+            guard Date.now < deadline else { throw ServiceJobTermination.StopError.timedOut }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        #if DEBUG || SAYIT_LOCAL_BUILD
+        let label = SayItServiceIdentifiers.machService
+        #else
+        let label = "sh.sayit.mac.agent"
+        #endif
+        try await ServiceJobTermination.stop(label: label, deadline: deadline)
+        #if DEBUG || SAYIT_LOCAL_BUILD
+        isDevelopmentServiceRunning = false
+        #endif
+        removeParentProcessFile()
     }
 
     func terminateForQuit() async {

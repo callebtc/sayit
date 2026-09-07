@@ -20,6 +20,10 @@ enum SelectionServiceLauncher {
         )
     }
 
+    static func terminateForUpdate(deadline: Date) async throws {
+        try await ServiceJobTermination.stop(label: label, deadline: deadline)
+    }
+
     static func unregister() throws {
         try jobManager(
             agentURL: URL(filePath: "/dev/null")

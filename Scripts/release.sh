@@ -23,7 +23,9 @@ uploads only to Apple's notarization service; it never publishes to GitHub.
 One-time configuration may be stored in .env.release:
   SAYIT_SIGN_IDENTITY='Developer ID Application identity or SHA-1 fingerprint'
   SAYIT_NOTARY_PROFILE='notarytool Keychain profile name'
-  SAYIT_UPDATE_API_URL='GitHub latest-release API URL'
+  SAYIT_UPDATE_FEED_URL='GitHub latest-release appcast asset URL'
+  SAYIT_UPDATE_KEY_FILE='.env containing the private Sparkle signing seed'
+  SAYIT_SPARKLE_TOOLS_DIR='Directory containing Sparkle release tools'
 EOF
 }
 
@@ -88,7 +90,7 @@ fi
 
 : "${SAYIT_SIGN_IDENTITY:?Set SAYIT_SIGN_IDENTITY in .env.release or the environment.}"
 : "${SAYIT_NOTARY_PROFILE:?Set SAYIT_NOTARY_PROFILE in .env.release or the environment.}"
-: "${SAYIT_UPDATE_API_URL:?Set SAYIT_UPDATE_API_URL in .env.release or the environment.}"
+SAYIT_UPDATE_FEED_URL=${SAYIT_UPDATE_FEED_URL:-https://github.com/callebtc/sayit/releases/latest/download/appcast.xml}
 
 if [ "$allow_notarization_upload" != "YES" ]; then
     echo "Apple notarization upload was not explicitly approved." >&2
@@ -118,7 +120,7 @@ echo "Building the signed release app…"
 SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
 SAYIT_DERIVED_DATA_PATH="$derived_data" \
 SAYIT_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
-SAYIT_UPDATE_API_URL="$SAYIT_UPDATE_API_URL" \
+SAYIT_UPDATE_FEED_URL="$SAYIT_UPDATE_FEED_URL" \
     "$project_root/Scripts/build-app.sh"
 
 if [ "$skip_tests" = "NO" ]; then
@@ -177,6 +179,15 @@ case "$build_number" in
 esac
 
 dmg_path="$build_root/SayIt-$version.dmg"
+[ ! -e "$build_root/Update-$version" ] \
+    || fail "the prepared update directory already exists; inspect it before retrying."
+update_key_file=${SAYIT_UPDATE_KEY_FILE:-$project_root/.env}
+embedded_update_key=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$app_root/Contents/Info.plist")
+file_update_key=$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+    xcrun swift "$project_root/Scripts/update-key.swift" public "$update_key_file")
+[ "$embedded_update_key" = "$file_update_key" ] \
+    || fail "the update signing key does not match the app."
+
 
 release_temp=$(mktemp -d "${TMPDIR:-/tmp}/sayit-release.XXXXXX")
 mountpoint="$release_temp/mount"
@@ -211,6 +222,7 @@ verify_release_code \
     "the selection helper"
 "$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
 "$project_root/Scripts/validate-package-linkage.sh" "$app_root"
+"$project_root/Scripts/validate-updater.sh" "$app_root" "$expected_team_id"
 
 find "$app_root" -type f -name '*.dylib' -print \
     | while IFS= read -r dylib_path; do
@@ -297,6 +309,7 @@ verify_release_code \
     "the mounted selection helper"
 "$project_root/Scripts/validate-selection-bundle.sh" "$mounted_app"
 "$project_root/Scripts/validate-package-linkage.sh" "$mounted_app"
+"$project_root/Scripts/validate-updater.sh" "$mounted_app" "$expected_team_id"
 
 find "$mounted_app" -type f -name '*.dylib' -print \
     | while IFS= read -r dylib_path; do
@@ -315,6 +328,9 @@ hdiutil detach "$mountpoint" >/dev/null
 mounted=NO
 hdiutil verify "$dmg_path"
 
+update_output="$build_root/Update-$version"
+"$project_root/Scripts/prepare-update-feed.sh" "$dmg_path" "$app_root" "$update_output"
+
 checksum=$(
     shasum -a 256 "$dmg_path" | awk '{print $1}'
 )
@@ -324,6 +340,7 @@ cat <<EOF
 Release artifact ready:
   Version: $version ($build_number)
   DMG: $dmg_path
+  Update assets: $update_output/SayIt.dmg and $update_output/appcast.xml
   SHA-256: $checksum
   Notarization submission: $notary_id
 

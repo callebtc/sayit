@@ -22,7 +22,9 @@ final class AppState {
 
     private let client = SayItXPCClient()
     private let migration = BackendMigrationCoordinator()
-    private let updateChecker = UpdateChecker()
+    let updates = UpdateController()
+    private(set) var isPreparingUpdate = false
+    private(set) var isPreparedForUpdate = false
     private var startupTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
@@ -65,9 +67,6 @@ final class AppState {
     private(set) var httpAPIErrorMessage: String?
     private(set) var apiTokenErrorMessage: String?
     private(set) var oneTimeTokenSecret: String?
-    private(set) var updateStatus = "Not checked yet"
-    private(set) var availableUpdateURL: URL?
-    private(set) var isCheckingForUpdates = false
     private(set) var clipboardHasNewText = false
     private(set) var isMenuPresented = false
     private(set) var isAppWindowPresented = false
@@ -85,6 +84,16 @@ final class AppState {
         isShowingOnboarding = Self.shouldPresentOnboarding(
             onboardingComplete: settings.onboardingComplete
         )
+        updates.prepareForInstallation = { [weak self] in
+            try await self?.prepareForUpdate()
+        }
+        updates.recoverFromInstallationFailure = { [weak self] in
+            await self?.recoverAfterCanceledUpdate()
+        }
+        updates.isUserInteracting = { [weak self] in
+            guard let self else { return false }
+            return isMenuPresented || (isAppWindowPresented && NSApp.isActive)
+        }
         settings.onBackendChange = { [weak self] in
             self?.scheduleBackendSettingsPush()
         }
@@ -94,6 +103,7 @@ final class AppState {
     }
 
     func startup() async {
+        guard !isPreparingUpdate else { return }
         if let startupTask {
             await startupTask.value
             return
@@ -126,12 +136,8 @@ final class AppState {
         }
 
         startPolling()
-        if settings.checkForUpdates,
-           settings.lastUpdateCheck.map({
-               Date.now.timeIntervalSince($0) > 24 * 60 * 60
-           }) ?? true {
-            checkForUpdates()
-        }
+        await selectionService.restoreAfterUpdate()
+        updates.start()
     }
 
     func readClipboard() {
@@ -146,6 +152,7 @@ final class AppState {
     }
 
     func speakSelectedText() {
+        guard !isPreparingUpdate else { return }
         guard selectionRequestTask == nil else { return }
         let targetApplication = NSWorkspace.shared.frontmostApplication
         clearPresentedError()
@@ -294,6 +301,7 @@ final class AppState {
     }
 
     func receive(_ payload: TextSourcePayload) {
+        guard !isPreparingUpdate else { return }
         let submission: SpeechSubmission
         if let html = payload.html {
             submission = makeSubmission(
@@ -332,6 +340,7 @@ final class AppState {
     func setMenuPresented(_ isPresented: Bool) {
         guard isMenuPresented != isPresented else { return }
         isMenuPresented = isPresented
+        if isPresented { updates.userDidInteract() }
         menuActivityTask?.cancel()
         menuActivityTask = nil
         guard isPresented else { return }
@@ -355,6 +364,7 @@ final class AppState {
     func setAppWindowPresented(_ isPresented: Bool) {
         guard isAppWindowPresented != isPresented else { return }
         isAppWindowPresented = isPresented
+        if isPresented && NSApp.isActive { updates.userDidInteract() }
     }
 
     func cancelCurrentRequest(preserveHistory: Bool = true) {
@@ -982,6 +992,7 @@ final class AppState {
     }
 
     func terminateBackgroundServiceForQuit() async {
+        guard !isPreparedForUpdate else { return }
         menuActivityTask?.cancel()
         menuActivityTask = nil
         isMenuPresented = false
@@ -1025,42 +1036,58 @@ final class AppState {
     }
 
     func checkForUpdates() {
-        guard !isCheckingForUpdates else { return }
-        isCheckingForUpdates = true
-        updateStatus = "Checking…"
-        availableUpdateURL = nil
-        Task {
-            defer {
-                isCheckingForUpdates = false
-            }
-            do {
-                let result = try await updateChecker.check(
-                    currentVersion: applicationVersion
-                )
-                settings.lastUpdateCheck = .now
-                switch result {
-                case .unconfigured:
-                    updateStatus = "Update feed not configured"
-                    availableUpdateURL = nil
-                case .noPublishedRelease:
-                    updateStatus = "No published releases yet"
-                    availableUpdateURL = nil
-                case .current:
-                    updateStatus = "Up to date"
-                    availableUpdateURL = nil
-                case .available(let version, let url):
-                    updateStatus = "Version \(version) is available"
-                    availableUpdateURL = url
-                }
-            } catch {
-                updateStatus = if let error = error as? LocalizedError {
-                    error.errorDescription ?? "Couldn’t check for updates"
-                } else {
-                    "Couldn’t check for updates"
-                }
-                availableUpdateURL = nil
-            }
+        updates.checkForUpdates()
+    }
+
+    private func prepareForUpdate() async throws {
+        guard !isPreparedForUpdate else { return }
+        guard !isPreparingUpdate else { throw ServiceJobTermination.StopError.failed }
+        isPreparingUpdate = true
+        backgroundService.isPreparingUpdate = true
+        selectionService.isPreparingUpdate = true
+        let deadline = Date.now.addingTimeInterval(15)
+        if selectionService.wasRunning {
+            UserDefaults.standard.set(true, forKey: "restoreSelectionAfterUpdate")
         }
+        NotificationCenter.default.post(name: .sayItWillInstallUpdate, object: nil)
+        voicePreview.stop()
+        menuActivityTask?.cancel()
+        pollingTask?.cancel()
+        settingsPushTask?.cancel()
+        modelSelectionTask?.cancel()
+        modelInstallRequestTask?.cancel()
+        serviceRepairTask?.cancel()
+        selectionRequestTask?.cancel()
+        await client.invalidate()
+        // Capture tasks before clearing their slots; cancellation-aware XPC calls
+        // are invalidated above so they cannot reconnect during preparation.
+        let pending = [menuActivityTask, pollingTask, settingsPushTask,
+                       modelSelectionTask, modelInstallRequestTask,
+                       serviceRepairTask, selectionRequestTask].compactMap { $0 }
+        try await UpdateTaskBarrier.wait(for: pending, until: deadline)
+        menuActivityTask = nil
+        pollingTask = nil
+        settingsPushTask = nil
+        modelSelectionTask = nil
+        modelInstallRequestTask = nil
+        serviceRepairTask = nil
+        selectionRequestTask = nil
+        try await selectionService.terminateForUpdate(deadline: deadline)
+        try await backgroundService.terminateForUpdate(deadline: deadline)
+        isPreparedForUpdate = true
+    }
+
+    private func recoverAfterCanceledUpdate() async {
+        isPreparingUpdate = false
+        backgroundService.isPreparingUpdate = false
+        selectionService.isPreparingUpdate = false
+        isPreparedForUpdate = false
+        pollingTask = nil
+        serviceRepairTask = nil
+        resetServiceRevisionTracking()
+        await backgroundService.ensureRunning()
+        await selectionService.restoreAfterUpdate()
+        startPolling()
     }
 
     var applicationDisplayVersion: String {
@@ -1086,7 +1113,7 @@ final class AppState {
     }
 
     private func startPolling() {
-        guard pollingTask == nil else { return }
+        guard !isPreparingUpdate, pollingTask == nil else { return }
         pollingTask = Task { [weak self] in
             var retryDelay = Duration.milliseconds(250)
             while !Task.isCancelled {
@@ -1133,7 +1160,7 @@ final class AppState {
     }
 
     private func scheduleServiceRepair() {
-        guard serviceRepairTask == nil,
+        guard !isPreparingUpdate, serviceRepairTask == nil,
               !backgroundService.isUserDisabled,
               !backgroundService.isWorking else {
             return
@@ -1557,6 +1584,7 @@ final class AppState {
     private func send(
         _ command: ServiceCommand
     ) async throws -> ServiceResponse {
+        guard !isPreparingUpdate else { throw CancellationError() }
         do {
             return try await client.send(command)
         } catch {

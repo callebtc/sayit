@@ -64,6 +64,7 @@ struct SettingsRootView: View {
                 AboutSettingsView()
             }
         }
+        .disabled(state.isPreparingUpdate)
         .formStyle(.grouped)
         .environment(state)
     }

@@ -8,6 +8,9 @@ options:
   groupSortPosition: top
 
 packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
   MLXAudio:
     url: https://github.com/Blaizzy/mlx-audio-swift.git
     revision: bf14ae0c26e4e85553dd989571cae29d70fa6735
@@ -32,6 +35,7 @@ packages:
 
 settings:
   base:
+    SAYIT_UPDATE_FEED_URL: https://github.com/callebtc/sayit/releases/latest/download/appcast.xml
     ARCHS: arm64
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
@@ -285,7 +289,15 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSUIElement: true
         NSMicrophoneUsageDescription: Say It uses the microphone only when you choose to record a local voice reference.
-        SayItUpdateAPIURL: "$(SAYIT_UPDATE_API_URL)"
+        SUFeedURL: "$(SAYIT_UPDATE_FEED_URL)"
+        SUPublicEDKey: aYJwSZLrVeSxVjJ71m9qondDl/zSMxFlWD8FIgtWrBE=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUAutomaticallyUpdate: false
+        SUAllowsAutomaticUpdates: false
+        SUEnableSystemProfiling: false
+        SUVerifyUpdateBeforeExtraction: true
+        SURequireSignedFeed: true
         NSServices:
           - NSMenuItem:
               default: Say It
@@ -311,6 +323,8 @@ targets:
         com.apple.security.device.audio-input: true
         com.apple.security.network.client: true
     dependencies:
+      - package: Sparkle
+        product: Sparkle
       - target: SayItBackend
         embed: true
       - target: SayItCore
@@ -402,35 +416,8 @@ targets:
           # removing their development metadata; Xcode signs the outer app last.
           if [[ "${CODE_SIGNING_ALLOWED:-NO}" == "YES" \
               && -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]]; then
-            find "${app_dir}" \
-              -type f \
-              -name '*.dylib' \
-              -exec /usr/bin/codesign \
-                --force \
-                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
-                ${timestamp_option} \
-                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
-                {} \;
-
-            find "${app_dir}" \
-              -type d \
-              -name '*.framework' \
-              -exec /usr/bin/codesign \
-                --force \
-                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
-                ${timestamp_option} \
-                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
-                {} \;
-
-            find "${app_dir}/Contents" \
-              -type d \
-              -name '*.app' \
-              -exec /usr/bin/codesign \
-                --force \
-                --sign "${EXPANDED_CODE_SIGN_IDENTITY}" \
-                ${timestamp_option} \
-                --preserve-metadata=identifier,entitlements,requirements,flags,runtime \
-                {} \;
+            "${SRCROOT}/Scripts/sign-embedded-code.sh" \
+              "${app_dir}" "${EXPANDED_CODE_SIGN_IDENTITY}"
           fi
 
   SayItCoreTests:
@@ -513,6 +500,9 @@ targets:
     sources:
       - path: Tests/SayItUpdateTests
       - path: Sources/SayIt/Updates
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true

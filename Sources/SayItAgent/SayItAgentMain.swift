@@ -8,6 +8,7 @@ import SayItProtocol
 struct SayItAgentMain {
     @MainActor
     static func main() async {
+        let termination = AgentTerminationMonitor()
         do {
             let directories = try AppDirectories.shared(
                 appGroupIdentifier: SayItServiceIdentifiers.appGroup
@@ -38,11 +39,12 @@ struct SayItAgentMain {
             let httpSupervisor = HTTPServerSupervisor(backend: backend)
             httpSupervisor.start()
 
-            await waitForTermination(parentPID: parentPID)
+            await termination.wait(parentPID: parentPID)
 
             listener.invalidate()
-            httpSupervisor.stop()
+            async let httpShutdown: Void = httpSupervisor.stopAndWait()
             await backend.shutdown()
+            await httpShutdown
             withExtendedLifetime(delegate) {}
         } catch {
             FileHandle.standardError.write(
@@ -59,16 +61,5 @@ struct SayItAgentMain {
             return nil
         }
         return parentPID
-    }
-
-    private static func waitForTermination(parentPID: pid_t?) async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            if let parentPID,
-               !ParentProcessFile.isAlive(parentPID) {
-                return
-            }
-        }
     }
 }

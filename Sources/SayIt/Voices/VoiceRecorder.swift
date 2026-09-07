@@ -35,6 +35,7 @@ final class VoiceRecorder {
     private var meterTask: Task<Void, Never>?
     private var startupRecoveryTask: Task<Void, Never>?
     private var recordingGeneration = 0
+    @ObservationIgnored private var updateObserver: (any NSObjectProtocol)?
 
     private(set) var access = VoiceMicrophoneAccess.unknown
     private(set) var isRecording = false
@@ -45,6 +46,11 @@ final class VoiceRecorder {
     private(set) var errorMessage: String?
 
     init() {
+        updateObserver = NotificationCenter.default.addObserver(
+            forName: .sayItWillInstallUpdate, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { _ = self?.stop() }
+        }
         refreshAccess()
     }
 

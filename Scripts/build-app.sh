@@ -15,7 +15,7 @@ module_cache="$build_root/ModuleCache"
 swiftpm_cache="$build_root/SwiftPMCache"
 app_root="$derived_data/Build/Products/Release/SayIt.app"
 disable_secure_timestamp="${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}"
-update_api_url="${SAYIT_UPDATE_API_URL:-}"
+update_feed_url="${SAYIT_UPDATE_FEED_URL:-https://github.com/callebtc/sayit/releases/latest/download/appcast.xml}"
 build_jobs="${SAYIT_BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}"
 clang_path_map="-ffile-prefix-map=$project_root=."
 swift_path_map="-file-prefix-map $project_root=."
@@ -69,7 +69,7 @@ build() {
         OTHER_CFLAGS="\$(inherited) $clang_path_map" \
         OTHER_CPLUSPLUSFLAGS="\$(inherited) $clang_path_map" \
         OTHER_SWIFT_FLAGS="\$(inherited) $swift_path_map" \
-        SAYIT_UPDATE_API_URL="$update_api_url" \
+        SAYIT_UPDATE_FEED_URL="$update_feed_url" \
         "$@" \
         build
 }
@@ -125,4 +125,5 @@ fi
 codesign --verify --deep --strict "$app_root"
 "$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
 "$project_root/Scripts/validate-package-linkage.sh" "$app_root"
+"$project_root/Scripts/validate-updater.sh" "$app_root"
 echo "$app_root"
