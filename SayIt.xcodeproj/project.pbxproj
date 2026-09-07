@@ -71,6 +71,7 @@
 		1E4E5EE514E9C49DC9A6A86F /* VolumeControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F098B9F2E3EC2751D04AA7FB /* VolumeControlView.swift */; };
 		1E6BFAC949F1B9472E9A8D07 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2837701977770F5911182C7A /* HistoryStore.swift */; };
 		1E86814254355D2846A4EC64 /* SayItAgentMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435BC42F39716B2AF01C14DE /* SayItAgentMain.swift */; };
+		1EDCA6216A9D92DCDBA6B1DC /* AutomaticServiceRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D552C59F9663203B2EA89D07 /* AutomaticServiceRecovery.swift */; };
 		1EF5F2DAFB45053DAAE3909A /* ModelDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4750990410DAB9D60949EB46 /* ModelDescriptor.swift */; };
 		2002F93C6ECAEBEEE465DB9E /* BackendSettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F09834048C48923731446A2 /* BackendSettingsSnapshot.swift */; };
 		2132BD3904587DAA3F093A71 /* ModelDownloadProgress+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */; };
@@ -308,6 +309,7 @@
 		9CC2E3B1434FA175E8BF6443 /* ErrorStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */; };
 		9D66CEC06590EB81EE8C74DA /* CLIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E887931831C3AE85FF36919 /* CLIService.swift */; };
 		9D79553A3026E9E8F217060E /* VoiceTuningPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FC6A210FCF43D5229088D8B /* VoiceTuningPolicy.swift */; };
+		9DDEB04C3E1653210F9FE036 /* LegacyServiceJobRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07212E2395ADB5C8FE650F5F /* LegacyServiceJobRecovery.swift */; };
 		9DEB2C5B9010F70FA0C1961B /* DiagnosticEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7735064352240AE621CA239 /* DiagnosticEvent.swift */; };
 		9E527BB986FDD54C6DEC79F1 /* ServiceRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394B28198A8E456598D193AE /* ServiceRequest.swift */; };
 		9E53C0660C5C2E5225CF95FC /* VoiceCloneDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC76CEA03D4FFD60C2E74C9D /* VoiceCloneDraft.swift */; };
@@ -833,6 +835,7 @@
 		065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceLauncher.swift; sourceTree = "<group>"; };
 		068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdempotencyEntry.swift; sourceTree = "<group>"; };
 		06D3781E8B2A6E11D7EB6509 /* BackendSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendSettingsStore.swift; sourceTree = "<group>"; };
+		07212E2395ADB5C8FE650F5F /* LegacyServiceJobRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyServiceJobRecovery.swift; sourceTree = "<group>"; };
 		077D725F6B2841CB8D718F24 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
 		087891890981FE4C0A6CD185 /* SpeechSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechSettingsView.swift; sourceTree = "<group>"; };
 		09411E6CD87597580A516EFA /* SayItSkill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItSkill.swift; sourceTree = "<group>"; };
@@ -1155,6 +1158,7 @@
 		D47CAB42068B3B8CA73B1C23 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		D48CC76FCF104B6EA0CCFFC3 /* VoiceProfileRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfileRecord.swift; sourceTree = "<group>"; };
 		D4A3C6644EA34D12746690E4 /* VoiceCandidateSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCandidateSnapshot.swift; sourceTree = "<group>"; };
+		D552C59F9663203B2EA89D07 /* AutomaticServiceRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticServiceRecovery.swift; sourceTree = "<group>"; };
 		D598DAD634E881BB35574A93 /* SelectionServiceResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceResponse.swift; sourceTree = "<group>"; };
 		D607DFF8375415948AC3F253 /* ReadClipboardButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadClipboardButton.swift; sourceTree = "<group>"; };
 		D6D3BCCF0B19E3B2BE3B50D2 /* ServiceEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceEvent.swift; sourceTree = "<group>"; };
@@ -1705,6 +1709,7 @@
 			isa = PBXGroup;
 			children = (
 				456A6147E5C1F299C5F70B42 /* AccessibilityAncestorSearch.swift */,
+				07212E2395ADB5C8FE650F5F /* LegacyServiceJobRecovery.swift */,
 				4CB8CB9BC1FD542C5625A758 /* PasteboardContentReader.swift */,
 				F2D4E715EB917ECA227B62A4 /* SayItClientValidator.swift */,
 				431BE087EDC0779B11802FCC /* SayItXPCClient.swift */,
@@ -2173,6 +2178,7 @@
 			isa = PBXGroup;
 			children = (
 				94B54572BE87DB532CD40C90 /* APITokenScope+Presentation.swift */,
+				D552C59F9663203B2EA89D07 /* AutomaticServiceRecovery.swift */,
 				6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */,
 				E2135A37E5DFE4E0E8E28571 /* BackgroundServiceController.swift */,
 				E06D692230E118EA04CC2F5E /* CommandLineInstallController.swift */,
@@ -2878,6 +2884,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				11F40A811AF89ADAF6D28E44 /* AccessibilityAncestorSearch.swift in Sources */,
+				9DDEB04C3E1653210F9FE036 /* LegacyServiceJobRecovery.swift in Sources */,
 				9F66410C6D5DB695997589D4 /* PasteboardContentReader.swift in Sources */,
 				5569E42F0E35EE45C24EB0AC /* SayItClientValidator.swift in Sources */,
 				E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */,
@@ -3131,6 +3138,7 @@
 				FFDA6AAAF51DAC39E8D32853 /* AppState.swift in Sources */,
 				B5677AD3CAE8F0FB0A6430A0 /* AppWindowCoordinator.swift in Sources */,
 				CC67ACDCB75B60616C77D4FD /* AppWindowID.swift in Sources */,
+				1EDCA6216A9D92DCDBA6B1DC /* AutomaticServiceRecovery.swift in Sources */,
 				8031E3C162346A93D6DC988C /* BackendMigrationCoordinator.swift in Sources */,
 				C50E440ECC9F62065458D0FF /* BackgroundServiceController.swift in Sources */,
 				095FA761C9C243B77733CAD1 /* CollapsibleModelSection.swift in Sources */,

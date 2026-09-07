@@ -31,6 +31,8 @@ final class AppState {
     private var modelInstallRequestTask: Task<Void, Never>?
     private var modelInstallRequestGeneration: UInt64 = 0
     private var serviceRepairTask: Task<Void, Never>?
+    private var automaticServiceRecovery = AutomaticServiceRecovery()
+    private var isTerminating = false
     private var selectionRequestTask: Task<Void, Never>?
     @ObservationIgnored
     private var menuActivityTask: Task<Void, Never>?
@@ -964,12 +966,10 @@ final class AppState {
     }
 
     func restartBackgroundService() {
-        Task {
-            resetServiceRevisionTracking()
-            await backgroundService.restart()
-            await client.invalidate()
-            serviceConnection = .connecting
-        }
+        scheduleServiceRepair(
+            afterMismatch: serviceConnection == .updateRequired,
+            automatically: false
+        )
     }
 
     func enableBackgroundService() {
@@ -982,6 +982,10 @@ final class AppState {
     }
 
     func terminateBackgroundServiceForQuit() async {
+        isTerminating = true
+        serviceRepairTask?.cancel()
+        await serviceRepairTask?.value
+        serviceRepairTask = nil
         menuActivityTask?.cancel()
         menuActivityTask = nil
         isMenuPresented = false
@@ -1090,7 +1094,7 @@ final class AppState {
         pollingTask = Task { [weak self] in
             var retryDelay = Duration.milliseconds(250)
             while !Task.isCancelled {
-                guard let self else { return }
+                guard let self, !self.isTerminating else { return }
                 self.backgroundService.refresh()
                 guard !self.backgroundService.isUserDisabled else {
                     if self.serviceConnection != .disabled {
@@ -1100,6 +1104,11 @@ final class AppState {
                     try? await Task.sleep(for: .seconds(1))
                     continue
                 }
+                // Do not reconnect to the old endpoint while replacing it.
+                if self.serviceRepairTask != nil || self.backgroundService.isWorking {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    continue
+                }
                 do {
                     try await self.synchronizeServiceState()
                     retryDelay = .milliseconds(250)
@@ -1107,15 +1116,20 @@ final class AppState {
                     return
                 } catch let failure as ServiceFailure
                     where failure.code == "protocol.version_mismatch" {
+                    guard !Task.isCancelled, self.serviceRepairTask == nil else { continue }
+                    self.resetServiceRevisionTracking()
+                    await self.client.invalidate()
                     if self.serviceConnection != .updateRequired {
                         self.serviceConnection = .updateRequired
                     }
                     if self.statusText != "Service update required" {
                         self.statusText = "Service update required"
                     }
+                    self.scheduleServiceRepair(afterMismatch: true)
                     try? await Task.sleep(for: .seconds(2))
                 } catch {
                     guard !Task.isCancelled else { return }
+                    guard self.serviceRepairTask == nil else { continue }
                     self.resetServiceRevisionTracking()
                     if self.serviceConnection != .offline {
                         self.serviceConnection = .offline
@@ -1132,19 +1146,54 @@ final class AppState {
         }
     }
 
-    private func scheduleServiceRepair() {
+    private func scheduleServiceRepair(
+        afterMismatch: Bool = false,
+        automatically: Bool = true
+    ) {
         guard serviceRepairTask == nil,
+              !isTerminating,
               !backgroundService.isUserDisabled,
-              !backgroundService.isWorking else {
+              !backgroundService.isWorking,
+              !backgroundService.requiresApproval else {
             return
         }
+        if automatically && !automaticServiceRecovery.beginAttempt() { return }
+        let failedState: ServiceConnectionState = afterMismatch ? .updateRequired : .offline
+        serviceConnection = .recovering
+        statusText = "Reconnecting background service…"
+        // Invalidate requests already in flight before yielding to the repair task.
+        resetServiceRevisionTracking()
         serviceRepairTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
-            guard let self, !Task.isCancelled else { return }
-            self.resetServiceRevisionTracking()
-            await self.backgroundService.ensureRunning()
-            await self.client.invalidate()
-            self.serviceRepairTask = nil
+            guard let self else { return }
+            defer { self.serviceRepairTask = nil }
+            do {
+                if automatically {
+                    try await Task.sleep(for: .seconds(1))
+                }
+                try Task.checkCancellation()
+                guard !self.backgroundService.isUserDisabled else {
+                    self.serviceConnection = .disabled
+                    return
+                }
+                await self.client.invalidate()
+                await self.backgroundService.restart()
+                try Task.checkCancellation()
+                self.resetServiceRevisionTracking()
+                await self.client.invalidate()
+                if self.backgroundService.errorMessage != nil {
+                    self.serviceConnection = failedState
+                    self.statusText = "Background service needs attention"
+                } else {
+                    // Registration isn't proof of health. Polling must obtain a
+                    // compatible snapshot before restoring playback or retry budget.
+                    self.serviceConnection = .recovering
+                    self.statusText = "Connecting to service"
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                self.serviceConnection = failedState
+            }
         }
     }
 
@@ -1185,7 +1234,21 @@ final class AppState {
         ) else {
             return
         }
+        try Self.validateServiceSnapshot(event.snapshot, applicationVersion: applicationVersion)
         apply(event.snapshot)
+    }
+
+    nonisolated static func validateServiceSnapshot(
+        _ snapshot: ServiceSnapshot,
+        applicationVersion: String
+    ) throws {
+        guard snapshot.protocolVersion == SayItProtocolVersion.current,
+              snapshot.serviceVersion == applicationVersion else {
+            throw ServiceFailure(
+                code: "protocol.version_mismatch",
+                message: "The background service does not match this version of Say It."
+            )
+        }
     }
 
     nonisolated static func shouldApplyEvent(
@@ -1227,6 +1290,7 @@ final class AppState {
     }
 
     private func reloadServiceSnapshot() async throws {
+        guard serviceRepairTask == nil, !backgroundService.isWorking else { return }
         let requestedRevision = lastServiceRevision
         let requestedGeneration = serviceConnectionGeneration
         let response = try await send(.snapshot)
@@ -1245,6 +1309,7 @@ final class AppState {
                 message: "The service returned an invalid state snapshot."
             )
         }
+        try Self.validateServiceSnapshot(snapshot, applicationVersion: applicationVersion)
         apply(snapshot)
     }
 
@@ -1255,6 +1320,7 @@ final class AppState {
         ) else {
             return
         }
+        automaticServiceRecovery.didConnect()
         lastServiceRevision = snapshot.revision
         activeJobID = snapshot.confirmationJobs.first?.id
             ?? snapshot.activeJob?.id
@@ -1557,10 +1623,13 @@ final class AppState {
     private func send(
         _ command: ServiceCommand
     ) async throws -> ServiceResponse {
+        let requestedGeneration = serviceConnectionGeneration
         do {
             return try await client.send(command)
         } catch {
-            if error is SayItXPCClientError {
+            if error is SayItXPCClientError,
+               requestedGeneration == serviceConnectionGeneration,
+               serviceRepairTask == nil {
                 modelIDToSelectAfterInstallation = nil
                 requestedModelInstallID = nil
                 resetServiceRevisionTracking()
