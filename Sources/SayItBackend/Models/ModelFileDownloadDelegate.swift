@@ -132,6 +132,12 @@ final class ModelFileDownloadDelegate: NSObject, URLSessionDownloadDelegate,
             }) else {
                 throw URLError(.cannotCreateFile)
             }
+            // Staging lives in Caches and can disappear during a long transfer.
+            // Recreate its parent while URLSession's temporary file is valid.
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }

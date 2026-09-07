@@ -158,7 +158,9 @@ struct ProtocolRoundTripTests {
             modelID: "kitten-mini-08",
             durationMilliseconds: 42,
             byteCount: 128,
-            numericValue: 3.5
+            numericValue: 3.5,
+            errorDomain: NSCocoaErrorDomain,
+            errorCode: 4
         )
 
         let decoded = try SayItWireCodec.decode(
@@ -170,6 +172,21 @@ struct ProtocolRoundTripTests {
         #expect(decoded.durationMilliseconds == 42)
         #expect(decoded.byteCount == 128)
         #expect(decoded.numericValue == 3.5)
+        #expect(decoded.errorDomain == NSCocoaErrorDomain)
+        #expect(decoded.errorCode == 4)
+
+        var legacy = try #require(
+            JSONSerialization.jsonObject(with: SayItWireCodec.encode(snapshot))
+                as? [String: Any]
+        )
+        legacy.removeValue(forKey: "errorDomain")
+        legacy.removeValue(forKey: "errorCode")
+        let legacyDecoded = try SayItWireCodec.decode(
+            DiagnosticSnapshot.self,
+            from: JSONSerialization.data(withJSONObject: legacy)
+        )
+        #expect(legacyDecoded.errorDomain == nil)
+        #expect(legacyDecoded.errorCode == nil)
     }
 
     @Test

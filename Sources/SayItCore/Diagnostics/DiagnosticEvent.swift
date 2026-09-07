@@ -10,6 +10,8 @@ public struct DiagnosticEvent: Codable, Identifiable, Equatable, Sendable {
     public let durationMilliseconds: Int?
     public let byteCount: Int64?
     public let numericValue: Double?
+    public let errorDomain: String?
+    public let errorCode: Int?
 
     public init(
         id: UUID = UUID(),
@@ -20,7 +22,9 @@ public struct DiagnosticEvent: Codable, Identifiable, Equatable, Sendable {
         modelID: ModelID? = nil,
         durationMilliseconds: Int? = nil,
         byteCount: Int64? = nil,
-        numericValue: Double? = nil
+        numericValue: Double? = nil,
+        errorDomain: String? = nil,
+        errorCode: Int? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -31,5 +35,7 @@ public struct DiagnosticEvent: Codable, Identifiable, Equatable, Sendable {
         self.durationMilliseconds = durationMilliseconds
         self.byteCount = byteCount
         self.numericValue = numericValue
+        self.errorDomain = errorDomain
+        self.errorCode = errorCode
     }
 }

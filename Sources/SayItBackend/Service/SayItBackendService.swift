@@ -2882,13 +2882,24 @@ public final class SayItBackendService: SayItService {
         )
         statusText = "Model download failed"
         revision &+= 1
+        let systemError = error as NSError
+        // Never export descriptions, userInfo, URLs, or arbitrary domains.
+        let diagnosticDomain: String? = switch systemError.domain {
+        case NSCocoaErrorDomain, NSURLErrorDomain, NSPOSIXErrorDomain:
+            systemError.domain
+        default:
+            nil
+        }
+        let diagnosticCode = diagnosticDomain == nil ? nil : systemError.code
         Task { [weak self] in
             guard let self else { return }
             await self.diagnostics.record(
                 DiagnosticEvent(
                     severity: .error,
                     category: .download,
-                    code: "model.install_failed"
+                    code: "model.install_failed",
+                    errorDomain: diagnosticDomain,
+                    errorCode: diagnosticCode
                 )
             )
             self.diagnosticsRevision &+= 1

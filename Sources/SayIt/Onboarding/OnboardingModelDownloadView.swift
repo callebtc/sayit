@@ -7,6 +7,22 @@ struct OnboardingModelDownloadView: View {
     let modelName: String
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            statusRow
+            if let failureMessage {
+                Text(failureMessage)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: DesignTokens.onboardingCardWidth)
+        .accessibilityElement(children: .contain)
+        .help(failureMessage ?? "")
+    }
+
+    private var statusRow: some View {
         HStack(spacing: 10) {
             Image(systemName: statusSymbol)
                 .symbolRenderingMode(.hierarchical)
@@ -32,7 +48,7 @@ struct OnboardingModelDownloadView: View {
                 )
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
-            } else {
+            } else if progress.state != .failed {
                 ProgressView()
                     .controlSize(.small)
                     .frame(width: 90)
@@ -43,10 +59,7 @@ struct OnboardingModelDownloadView: View {
             }
             actionButton
         }
-        .frame(maxWidth: DesignTokens.onboardingCardWidth)
-        .frame(height: 22)
-        .accessibilityElement(children: .contain)
-        .help(failureMessage ?? "")
+        .frame(minHeight: 22)
     }
 
     @ViewBuilder private var actionButton: some View {
@@ -89,8 +102,7 @@ struct OnboardingModelDownloadView: View {
         case .paused:
             "\(modelName) download paused"
         case .failed:
-            failureMessage.map { "Download failed: \($0)" }
-                ?? "\(modelName) download failed"
+            "Download failed"
         case .verifying:
             "Finishing \(modelName) setup"
         case .installed:
@@ -123,9 +135,9 @@ struct OnboardingModelDownloadView: View {
 
     private var showsDeterminateProgress: Bool {
         switch progress.state {
-        case .downloading, .paused, .failed:
+        case .downloading, .paused:
             true
-        case .notInstalled, .queued, .canceling, .verifying, .installed:
+        case .notInstalled, .queued, .canceling, .verifying, .installed, .failed:
             false
         }
     }

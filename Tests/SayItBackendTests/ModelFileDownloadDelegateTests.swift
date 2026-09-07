@@ -73,7 +73,7 @@ struct ModelFileDownloadDelegateTests {
         #expect(updates.first?.state == .downloading)
     }
 
-    @Test("Transport and destination failures are surfaced")
+    @Test("Missing staging folders recover; transport and destination failures surface")
     func transferFailures() async throws {
         let fixture = try TemporaryBackendFixture(
             prefix: "SayItDownloadTests"
@@ -98,8 +98,18 @@ struct ModelFileDownloadDelegateTests {
             )
         }
 
+        let recoveredDestination = fixture.root
+            .appending(path: "missing", directoryHint: .isDirectory)
+            .appending(path: "model.bin")
+        let stagingFolder = recoveredDestination.deletingLastPathComponent()
+        try FileManager.default.createDirectory(
+            at: stagingFolder,
+            withIntermediateDirectories: true
+        )
         let successfulSession = makeDownloadSession { request in
-            (
+            // Simulate staging disappearing after the transfer starts.
+            try? FileManager.default.removeItem(at: stagingFolder)
+            return (
                 HTTPURLResponse(
                     url: request.url ?? URL(string: "about:blank")!,
                     statusCode: 200,
@@ -110,9 +120,18 @@ struct ModelFileDownloadDelegateTests {
             )
         }
         defer { successfulSession.invalidateAndCancel() }
-        let impossibleDestination = fixture.root
-            .appending(path: "missing", directoryHint: .isDirectory)
-            .appending(path: "model.bin")
+        _ = try await makeDownloadDelegate().download(
+            using: successfulSession,
+            request: request,
+            resumeData: nil,
+            to: recoveredDestination,
+            resumeDataURL: fixture.root.appending(path: "move.resume")
+        )
+        #expect(try Data(contentsOf: recoveredDestination) == Data([1, 2, 3]))
+
+        let blockingFile = fixture.root.appending(path: "not-a-directory")
+        try Data([0]).write(to: blockingFile)
+        let impossibleDestination = blockingFile.appending(path: "model.bin")
         await #expect(throws: (any Error).self) {
             _ = try await makeDownloadDelegate().download(
                 using: successfulSession,

@@ -12,7 +12,9 @@ extension DiagnosticEvent {
             modelID: modelID?.rawValue,
             durationMilliseconds: durationMilliseconds,
             byteCount: byteCount,
-            numericValue: numericValue
+            numericValue: numericValue,
+            errorDomain: errorDomain,
+            errorCode: errorCode
         )
     }
 }

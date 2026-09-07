@@ -24,7 +24,7 @@ struct RecommendedOnboardingModelView: View {
             }
 
             statusRow
-                .frame(height: 26, alignment: .leading)
+                .frame(minHeight: 26, alignment: .leading)
         }
         .padding(DesignTokens.generousSpacing)
         .frame(maxWidth: DesignTokens.onboardingCardWidth)

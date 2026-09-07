@@ -48,13 +48,17 @@ struct BackendProjectionTests {
         let event = DiagnosticEvent(
             severity: .warning,
             category: .synthesis,
-            code: "synthesis.warning"
+            code: "synthesis.warning",
+            errorDomain: NSCocoaErrorDomain,
+            errorCode: 4
         )
         let diagnostic = event.serviceSnapshot
         #expect(diagnostic.id == event.id)
         #expect(diagnostic.severity == DiagnosticSeverity.warning.rawValue)
         #expect(diagnostic.category == DiagnosticCategory.synthesis.rawValue)
         #expect(diagnostic.code == "synthesis.warning")
+        #expect(diagnostic.errorDomain == NSCocoaErrorDomain)
+        #expect(diagnostic.errorCode == 4)
 
         let progress = ModelDownloadProgress(
             modelID: ModelID("model"),
