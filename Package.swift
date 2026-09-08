@@ -197,6 +197,10 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "SayItXPCTests",
+            dependencies: ["SayItXPC"]
+        ),
+        .testTarget(
             name: "SayItProtocolTests",
             dependencies: ["SayItProtocol"],
             swiftSettings: [

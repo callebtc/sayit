@@ -108,11 +108,11 @@ public struct ServiceJobManager: Sendable {
         try Self.shutdown(label: label)
     }
 
-    private static var domain: String {
+    static var domain: String {
         "gui/\(geteuid())"
     }
 
-    private static func run(
+    static func run(
         _ arguments: [String]
     ) throws -> (status: Int32, output: String) {
         let process = Process()
@@ -122,8 +122,8 @@ public struct ServiceJobManager: Sendable {
         process.standardOutput = output
         process.standardError = output
         try process.run()
-        process.waitUntilExit()
         let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
         return (
             process.terminationStatus,
             String(decoding: data, as: UTF8.self)

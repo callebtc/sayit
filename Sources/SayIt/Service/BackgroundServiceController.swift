@@ -20,6 +20,7 @@ final class BackgroundServiceController {
     private(set) var errorMessage: String?
     private(set) var isWorking = false
     var isPreparingUpdate = false
+    private var hasStartedService = false
     #if DEBUG || SAYIT_LOCAL_BUILD
     private(set) var isDevelopmentServiceRunning = false
     #endif
@@ -33,6 +34,14 @@ final class BackgroundServiceController {
         isDevelopmentServiceRunning
         #else
         status == .enabled || status == .requiresApproval
+        #endif
+    }
+
+    var requiresApproval: Bool {
+        #if DEBUG || SAYIT_LOCAL_BUILD
+        false
+        #else
+        status == .requiresApproval
         #endif
     }
 
@@ -53,7 +62,7 @@ final class BackgroundServiceController {
         case .notRegistered:
             "Off"
         case .enabled:
-            "Running"
+            "Registered"
         case .requiresApproval:
             "Approval required"
         case .notFound:
@@ -80,7 +89,7 @@ final class BackgroundServiceController {
             try await ensureDevelopmentServiceRunning()
             #else
             try await RegisteredServiceStartup.ensureRunning(
-                isEnabled: service.status == .enabled,
+                isEnabled: hasStartedService && service.status == .enabled,
                 parentProcessMatches: { parentProcessFileMatches },
                 writeParentProcess: { writeParentProcessFile() },
                 restart: { try await restartRegisteredService() }
@@ -100,6 +109,9 @@ final class BackgroundServiceController {
 
     func disable() async {
         guard !isPreparingUpdate else { return }
+        // Preserve the user's intent even if stopping the system job fails.
+        UserDefaults.standard.set(true, forKey: Self.userDisabledDefaultsKey)
+        hasStartedService = false
         await perform {
             #if DEBUG || SAYIT_LOCAL_BUILD
             if DevelopmentServiceLauncher.isLoaded {
@@ -107,13 +119,9 @@ final class BackgroundServiceController {
             }
             isDevelopmentServiceRunning = false
             #else
-            await unregisterAndWait()
+            try await unregisterAndWait()
             #endif
             removeParentProcessFile()
-            UserDefaults.standard.set(
-                true,
-                forKey: Self.userDisabledDefaultsKey
-            )
         }
     }
 
@@ -141,6 +149,8 @@ final class BackgroundServiceController {
         #else
         let label = "sh.sayit.mac.agent"
         #endif
+        // Recovery after a canceled installation must register the job again.
+        hasStartedService = false
         try await ServiceJobTermination.stop(label: label, deadline: deadline)
         #if DEBUG || SAYIT_LOCAL_BUILD
         isDevelopmentServiceRunning = false
@@ -172,7 +182,9 @@ final class BackgroundServiceController {
         errorMessage = nil
         do {
             try await work()
+            hasStartedService = !isUserDisabled
         } catch {
+            hasStartedService = false
             errorMessage = error.localizedDescription
         }
         refresh()
@@ -199,55 +211,30 @@ final class BackgroundServiceController {
     }
 
     private func restartRegisteredService() async throws {
-        await unregisterAndWait()
-        try await registerAndWait()
+        try await RegisteredServiceStartup.restart(
+            status: { service.status },
+            removeConflict: {
+                try await LegacyServiceJobRecovery.removeConflict(
+                    label: URL(filePath: SayItServiceIdentifiers.launchAgentPlist)
+                        .deletingPathExtension().lastPathComponent,
+                    machServiceName: SayItServiceIdentifiers.machService,
+                    agentURL: agentURL,
+                    bundledPlistURL: Bundle.main.bundleURL.appending(
+                        path: "Contents/Library/LaunchAgents/\(SayItServiceIdentifiers.launchAgentPlist)"
+                    )
+                )
+            },
+            unregister: { try await service.unregister() },
+            register: { try service.register() }
+        )
     }
 
-    private func unregisterAndWait() async {
-        guard service.status == .enabled
-            || service.status == .requiresApproval else {
-            return
-        }
-        do {
-            try await service.unregister()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        for _ in 0..<50 {
-            if service.status == .notRegistered {
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
+    private func unregisterAndWait() async throws {
+        try await RegisteredServiceStartup.unregisterAndWait(
+            status: { service.status },
+            unregister: { try await service.unregister() }
+        )
         refresh()
-    }
-
-    private func registerAndWait() async throws {
-        var lastError: Error?
-        for attempt in 0..<2 {
-            do {
-                if service.status != .enabled
-                    && service.status != .requiresApproval {
-                    try service.register()
-                }
-                lastError = nil
-            } catch {
-                lastError = error
-            }
-            for _ in 0..<50 {
-                if service.status == .enabled
-                    || service.status == .requiresApproval {
-                    refresh()
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(100))
-            }
-            if attempt == 0 {
-                await unregisterAndWait()
-            }
-        }
-        refresh()
-        throw lastError ?? ControllerError.registrationFailed
     }
 
     private var parentProcessFileMatches: Bool {
@@ -277,17 +264,6 @@ final class BackgroundServiceController {
         ).applicationSupport
     }
 
-    private enum ControllerError: LocalizedError {
-        case registrationFailed
-
-        var errorDescription: String? {
-            switch self {
-            case .registrationFailed:
-                "The background service could not be registered."
-            }
-        }
-    }
-
     #if DEBUG || SAYIT_LOCAL_BUILD
     private func ensureDevelopmentServiceRunning() async throws {
         try await DevelopmentServiceLauncher.ensureRunning(
@@ -295,6 +271,8 @@ final class BackgroundServiceController {
         )
         isDevelopmentServiceRunning = true
     }
+
+    #endif
 
     private var agentURL: URL {
         Bundle.main.bundleURL.appending(
@@ -304,5 +282,4 @@ final class BackgroundServiceController {
             """
         )
     }
-    #endif
 }
