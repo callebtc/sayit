@@ -8,6 +8,8 @@ options:
   groupSortPosition: top
 
 packages:
+  PlaybackDSP:
+    path: Packages/PlaybackDSP
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: 2.9.6
@@ -105,6 +107,8 @@ targets:
     sources:
       - path: Sources/SayItBackend
     dependencies:
+      - package: PlaybackDSP
+        product: PlaybackDSP
       - target: SayItCore
       - target: SayItProtocol
       - package: MLXAudio

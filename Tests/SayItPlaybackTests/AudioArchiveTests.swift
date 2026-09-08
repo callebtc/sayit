@@ -8,7 +8,7 @@ struct AudioArchiveTests {
     @Test("Playback uses high quality time stretching")
     @MainActor
     func playbackUsesHighQualityTimeStretching() {
-        #expect(PlaybackController.highQualityTimePitchOverlap == 32)
+        #expect(PlaybackController.timeStretchEngineName == "Signalsmith Stretch")
         #expect(
             PlaybackController.preferredStartBufferDuration(for: 1) == 1.2
         )
