@@ -57,18 +57,6 @@ struct MenuBarRootView: View {
             }
 
             Divider()
-            Button(
-                state.updates.hasUpdate ? "Update Now…" : "Check for Updates…",
-                systemImage: "arrow.down.circle"
-            ) {
-                if state.updates.hasUpdate { state.updates.updateNow() }
-                else { state.checkForUpdates() }
-            }
-            .buttonStyle(.plain)
-            .disabled(state.updates.phase == .unavailable)
-            .padding(.horizontal, DesignTokens.generousSpacing)
-            .padding(.vertical, DesignTokens.compactSpacing)
-            Divider()
             MenuFooterView()
                 .padding(.horizontal, DesignTokens.generousSpacing)
                 .padding(.vertical, DesignTokens.compactSpacing)
