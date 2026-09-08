@@ -203,6 +203,7 @@
 		65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */; };
 		660B9287719F72B11783D3C1 /* ResumeCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C159E47E305909312F3675A5 /* ResumeCommand.swift */; };
 		662931D02D9303078BB8AE62 /* VoiceTuningSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61809FAC6AB3B4223A714878 /* VoiceTuningSpace.swift */; };
+		673810EDC217C5CD2640A55A /* PlaybackRate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6517CAB9846FFD0FD879B897 /* PlaybackRate.swift */; };
 		690DD7FC6DABD5D8A65B7A48 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
 		69CE3A628AAE1587B7976D71 /* VoiceStudioSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AEFBFB440C0388E52C0DEC /* VoiceStudioSnapshot.swift */; };
 		6B2A2003079910D0A146A378 /* SayItHTTPServer+PlaybackRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */; };
@@ -382,6 +383,7 @@
 		C6CA386BB11586E35FBF163A /* ModelDescriptor+Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B643C036FE29C1A2C8547AC /* ModelDescriptor+Snapshot.swift */; };
 		C7258BC34FD32FA78F2560B8 /* CLIQueuePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F4790CC40B333B29FB16A3 /* CLIQueuePolicy.swift */; };
 		C805C1B80DD09A84D5ABFBFC /* PlaybackRateRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */; };
+		C86AA77F6187B37D1C05C2BB /* PlaybackRateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31DBDA88CF951671A7B102E3 /* PlaybackRateTests.swift */; };
 		C8AC9D0FE1CE408BF436056D /* VoiceOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8AE17E0ADBDD4860F7604D4 /* VoiceOnboardingView.swift */; };
 		C8E925354404857A13BA0E8C /* SayItHTTP.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */; };
 		C8FCEB8C93FE777FE1F6C463 /* JobsCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE20722F67E395754CEB06B /* JobsCommand.swift */; };
@@ -891,6 +893,7 @@
 		305232C320E9BF2C82FCF35C /* VoiceSynthesisMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSynthesisMode.swift; sourceTree = "<group>"; };
 		3083E18F1B28B31D261C1F00 /* SelectionServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionServiceController.swift; sourceTree = "<group>"; };
 		3143D35E528697F33A92BD89 /* StopCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopCommand.swift; sourceTree = "<group>"; };
+		31DBDA88CF951671A7B102E3 /* PlaybackRateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateTests.swift; sourceTree = "<group>"; };
 		3227F84E9C088DB4478DC861 /* CollapsibleModelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollapsibleModelSection.swift; sourceTree = "<group>"; };
 		336FF814DDD5418256DAC78D /* PCMStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMStore.swift; sourceTree = "<group>"; };
 		33B872F10E4B1D9A5C988561 /* SkipCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipCommand.swift; sourceTree = "<group>"; };
@@ -978,6 +981,7 @@
 		61A4DC744C75D2B42E40DFCC /* SayItService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItService.swift; sourceTree = "<group>"; };
 		6221BD9BAE2E457693E6687A /* PCMStoreSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMStoreSnapshot.swift; sourceTree = "<group>"; };
 		6262901F90523430DD888CF9 /* HTTPVoiceRouteIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPVoiceRouteIntegrationTests.swift; sourceTree = "<group>"; };
+		6517CAB9846FFD0FD879B897 /* PlaybackRate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRate.swift; sourceTree = "<group>"; };
 		66F395CE405E435EB38E630E /* ServiceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSettingsView.swift; sourceTree = "<group>"; };
 		6A47804F46DFB604995541E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		6A5886451094B9ED4FF135FE /* BackendMigrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendMigrationCoordinator.swift; sourceTree = "<group>"; };
@@ -1642,6 +1646,7 @@
 				500CEA9694EC96E4D63093B5 /* DownloadSpeedMeterTests.swift */,
 				EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */,
 				FB00365B7888BA872FDEED0C /* ModelInstallationTests.swift */,
+				31DBDA88CF951671A7B102E3 /* PlaybackRateTests.swift */,
 				F82A3C306187C92E98BA08E3 /* RetentionPlannerTests.swift */,
 				82F6D19637D2F9DF3BEDD30F /* SayItSkillTests.swift */,
 				E9B7FFC824443F2E0B9E50DB /* SpeakingPaceTests.swift */,
@@ -1825,6 +1830,7 @@
 			isa = PBXGroup;
 			children = (
 				119ABD163EB0CEAA78357FC2 /* PlaybackControlling.swift */,
+				6517CAB9846FFD0FD879B897 /* PlaybackRate.swift */,
 				9BFC5B0C7315AC02FFB29E20 /* PlaybackState.swift */,
 			);
 			path = Playback;
@@ -2990,6 +2996,7 @@
 				0209521932B78B218C2BF533 /* ParentProcessFile.swift in Sources */,
 				BA0E846F8D1DFC39EBE22B02 /* PlaybackControlling.swift in Sources */,
 				53DB45A73F558B1B14F40568 /* PlaybackMode.swift in Sources */,
+				673810EDC217C5CD2640A55A /* PlaybackRate.swift in Sources */,
 				E7773CBAD241FE2DF197C8E8 /* PlaybackState.swift in Sources */,
 				D35472040E92E56DCA04F3B2 /* RetentionCandidate.swift in Sources */,
 				92F7AFC98D4FD17999991ACA /* RetentionPeriod.swift in Sources */,
@@ -3083,6 +3090,7 @@
 				7F8C0AD7BC445BCDFDF2E1C4 /* DownloadSpeedMeterTests.swift in Sources */,
 				59A9A6B109F8C906DF06087F /* ModelCatalogTests.swift in Sources */,
 				7A1728F9E6F89BA0549FAB93 /* ModelInstallationTests.swift in Sources */,
+				C86AA77F6187B37D1C05C2BB /* PlaybackRateTests.swift in Sources */,
 				62F3FD33DADA0A478557C864 /* RetentionPlannerTests.swift in Sources */,
 				DE021B6D3B71E4C6A19859E7 /* SayItSkillTests.swift in Sources */,
 				02436FE64F4012B38FCF9EB9 /* SpeakingPaceTests.swift in Sources */,

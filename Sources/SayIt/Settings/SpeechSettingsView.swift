@@ -67,15 +67,24 @@ struct SpeechSettingsView: View {
             }
 
             Section {
-                Picker("Playback speed", selection: $settings.playbackRate) {
-                    ForEach([0.75, 1, 1.25, 1.5, 1.75, 2], id: \.self) {
-                        Text(
-                            $0,
-                            format: .number.precision(.fractionLength(0...2))
-                        )
-                        .tag($0)
-                    }
+                Slider(
+                    value: $settings.playbackRate,
+                    in: PlaybackRate.minimum...PlaybackRate.maximum,
+                    step: PlaybackRate.step
+                ) {
+                    Text(
+                        "Playback speed · "
+                            + PlaybackRate.formatted(settings.playbackRate)
+                    )
+                } minimumValueLabel: {
+                    Text(PlaybackRate.formatted(PlaybackRate.minimum))
+                } maximumValueLabel: {
+                    Text(PlaybackRate.formatted(PlaybackRate.maximum))
                 }
+                .accessibilityLabel("Playback speed")
+                .accessibilityValue(
+                    PlaybackRate.formatted(settings.playbackRate)
+                )
                 .onChange(of: settings.playbackRate) { _, rate in
                     updatePlaybackRate(rate)
                 }

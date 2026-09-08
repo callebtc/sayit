@@ -1149,19 +1149,20 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.changePlaybackRateCommand.supportedPlaybackRates = [
-            0.75, 1, 1.25, 1.5, 1.75, 2
-        ]
+        commands.changePlaybackRateCommand.supportedPlaybackRates =
+            PlaybackRate.presets.map { NSNumber(value: $0) }
         commands.changePlaybackRateCommand.addTarget { [weak self] event in
             guard let rateEvent = event as? MPChangePlaybackRateCommandEvent,
-                  [0.75, 1, 1.25, 1.5, 1.75, 2].contains(
+                  PlaybackRate.isSupported(
                     Double(rateEvent.playbackRate)
                   ) else {
                 return .commandFailed
             }
             Task { @MainActor in
                 guard let self else { return }
-                self.rate = Double(rateEvent.playbackRate)
+                self.rate = PlaybackRate.normalized(
+                    Double(rateEvent.playbackRate)
+                )
                 self.onExternalControl?()
             }
             return .success

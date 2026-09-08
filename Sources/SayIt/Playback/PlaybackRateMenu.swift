@@ -1,37 +1,64 @@
+import SayItCore
 import SwiftUI
 
 struct PlaybackRateMenu: View {
     @Environment(AppState.self) private var state
 
-    private let playbackRates = [0.75, 1, 1.25, 1.5, 1.75, 2]
-
     var body: some View {
         Menu {
-            ForEach(playbackRates, id: \.self) { rate in
+            Button("Slower", systemImage: "minus") {
+                adjustPlaybackRate(bySteps: -1)
+            }
+            .disabled(state.playback.rate <= PlaybackRate.minimum)
+
+            Button("Faster", systemImage: "plus") {
+                adjustPlaybackRate(bySteps: 1)
+            }
+            .disabled(state.playback.rate >= PlaybackRate.maximum)
+
+            Divider()
+
+            ForEach(menuRates, id: \.self) { rate in
                 Button {
                     setPlaybackRate(rate)
                 } label: {
-                    if state.playback.rate == rate {
-                        Label(formattedRate(rate), systemImage: "checkmark")
+                    if PlaybackRate.matches(state.playback.rate, rate) {
+                        Label(
+                            PlaybackRate.formatted(rate),
+                            systemImage: "checkmark"
+                        )
                     } else {
-                        Text(formattedRate(rate))
+                        Text(PlaybackRate.formatted(rate))
                     }
                 }
             }
         } label: {
-            Text(formattedRate(state.playback.rate))
+            Text(PlaybackRate.formatted(state.playback.rate))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
         .help("Playback speed")
     }
 
+    /// Presets, plus the current rate when it was dialed in between them.
+    private var menuRates: [Double] {
+        let current = PlaybackRate.clamped(state.playback.rate)
+        guard PlaybackRate.presets.allSatisfy({
+            !PlaybackRate.matches($0, current)
+        }) else {
+            return PlaybackRate.presets
+        }
+        return (PlaybackRate.presets + [current]).sorted()
+    }
+
+    private func adjustPlaybackRate(bySteps steps: Int) {
+        setPlaybackRate(
+            PlaybackRate.adjusted(state.playback.rate, bySteps: steps)
+        )
+    }
+
     private func setPlaybackRate(_ rate: Double) {
         state.playback.rate = rate
         state.settings.playbackRate = rate
-    }
-
-    private func formattedRate(_ rate: Double) -> String {
-        "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
 }

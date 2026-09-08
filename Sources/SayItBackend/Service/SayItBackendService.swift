@@ -3097,7 +3097,7 @@ public final class SayItBackendService: SayItService {
                 message: "Choose one of the supported speaking paces."
             )
         }
-        guard (0.5...2).contains(settings.playbackRate) else {
+        guard PlaybackRate.isSupported(settings.playbackRate) else {
             throw ServiceFailure(
                 code: "settings.invalid_playback_rate",
                 message: "Playback rate must be between 0.5 and 2."
@@ -3281,7 +3281,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func validatedPlaybackRate(_ value: Double) -> Double {
-        min(max(value, 0.5), 2)
+        PlaybackRate.clamped(value)
     }
 
     private func validatedVolume(_ value: Double) -> Double {
