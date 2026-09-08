@@ -58,7 +58,23 @@
 			<string>public.text</string>
 		</dict>
 	</array>
-	<key>SayItUpdateAPIURL</key>
-	<string>$(SAYIT_UPDATE_API_URL)</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>$(SAYIT_UPDATE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>aYJwSZLrVeSxVjJ71m9qondDl/zSMxFlWD8FIgtWrBE=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

@@ -94,7 +94,8 @@ signing to work around the failure.
 ## Prepare a version
 
 Use the version explicitly requested by the user. Prefer tags in the form
-`vMAJOR.MINOR.PATCH`; Say It's update checker removes the leading `v` or `V`.
+`vMAJOR.MINOR.PATCH`; Sparkle uses the monotonically increasing build number
+for update ordering.
 
 1. Update `MARKETING_VERSION` in `project.yml`.
 2. Increment `CURRENT_PROJECT_VERSION`; it must be a positive, monotonically
@@ -184,16 +185,18 @@ release_version=1.2.3
 release_tag="v$release_version"
 release_commit=$(git rev-parse HEAD)
 release_dmg="Build/SayIt-$release_version.dmg"
-release_upload_dir=$(mktemp -d "${TMPDIR:-/tmp}/sayit-release-upload.XXXXXX")
+release_upload_dir="Build/Update-$release_version"
 release_upload_dmg="$release_upload_dir/SayIt.dmg"
+release_appcast="$release_upload_dir/appcast.xml"
 ```
 
-Recheck the artifact checksum and repository state. Copy the approved artifact
-to the stable public asset name and verify that the copy is byte-identical:
+Recheck the artifact checksum and repository state. The release script prepares
+the signed appcast and stable public asset name after stapling. Verify that the
+prepared DMG is byte-identical and the feed exists:
 
 ```sh
-cp "$release_dmg" "$release_upload_dmg"
 cmp "$release_dmg" "$release_upload_dmg"
+test -f "$release_appcast"
 ```
 
 Then create a draft release against the exact reviewed commit. The stable asset
@@ -203,6 +206,7 @@ local production artifact remains versioned:
 ```sh
 gh release create "$release_tag" \
   "$release_upload_dmg#Say It $release_version for macOS" \
+  "$release_appcast#Signed software update feed" \
   --target "$release_commit" \
   --draft \
   --title "Say It $release_version" \
@@ -228,12 +232,13 @@ Confirm that:
 - the tag is the requested version;
 - the target is the reviewed release commit;
 - the release is still a draft;
-- exactly one intended DMG asset named `SayIt.dmg` is attached; and
+- exactly the intended `SayIt.dmg` and `appcast.xml` assets are attached; and
 - no local path or private identifier appears in the title, notes, or label.
 
 For higher assurance, download the draft asset to an explicit temporary
 directory and compare its SHA-256 with the local approved artifact. Remove only
-that validated temporary directory and `release_upload_dir` afterward.
+that validated temporary download directory afterward. Keep the prepared release
+assets until publication has been verified.
 
 ## Publish the GitHub release
 
@@ -250,9 +255,13 @@ gh release view "$release_tag" \
   --json tagName,isDraft,isPrerelease,assets,publishedAt,url
 ```
 
-The app's update checker reads the latest GitHub Release tag and links users to
-the release page. A published release with the DMG asset therefore provides the
-download without embedding account or signing credentials in the app.
+Sparkle reads the latest release's signed `appcast.xml` asset. The feed must
+reference the tag-specific `SayIt.dmg` URL, never a mutable latest-DMG URL.
+Publish both assets together. The release script verifies their signatures and
+requires the public key derived from ignored `.env` to match the public key
+embedded in the app. Use `Scripts/sparkle-tool.py` for signing; it passes the
+private seed over stdin, never through Keychain, arguments, logs, or Git.
+See `docs/updates.md` for key configuration, migration, and update smoke tests.
 
 ## Report the outcome
 

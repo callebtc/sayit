@@ -30,6 +30,12 @@ final class HTTPServerSupervisor {
         activePort = nil
     }
 
+    func stopAndWait() async {
+        let task = serverTask
+        stop()
+        await task?.value
+    }
+
     private func synchronize(_ configuration: HTTPServiceConfiguration) {
         guard configuration.isEnabled else {
             serverTask?.cancel()

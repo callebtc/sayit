@@ -23,7 +23,6 @@ final class AppSettings {
         static let retentionPeriod = "retentionPeriod"
         static let historyQuota = "historyQuota"
         static let checkForUpdates = "checkForUpdates"
-        static let lastUpdateCheck = "lastUpdateCheck"
         static let selectedSettingsPane = "selectedSettingsPane"
         static let shortcutKeyCode = "shortcutKeyCode"
         static let shortcutModifiers = "shortcutModifiers"
@@ -146,9 +145,6 @@ final class AppSettings {
     }
     var checkForUpdates: Bool {
         didSet { defaults.set(checkForUpdates, forKey: Key.checkForUpdates) }
-    }
-    var lastUpdateCheck: Date? {
-        didSet { defaults.set(lastUpdateCheck, forKey: Key.lastUpdateCheck) }
     }
     var selectedSettingsPane: SettingsPane {
         didSet {
@@ -318,7 +314,6 @@ final class AppSettings {
         checkForUpdates = defaults.object(forKey: Key.checkForUpdates) == nil
             ? true
             : defaults.bool(forKey: Key.checkForUpdates)
-        lastUpdateCheck = defaults.object(forKey: Key.lastUpdateCheck) as? Date
         selectedSettingsPane = SettingsPane(
             rawValue: defaults.string(forKey: Key.selectedSettingsPane) ?? ""
         ) ?? .general

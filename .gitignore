@@ -21,7 +21,7 @@ xcuserdata/
 *.pkg
 *.zip
 
-# Local configuration and signing material
+# Local configuration and signing material (including the Sparkle private seed)
 .env
 .env.*
 !.env.example

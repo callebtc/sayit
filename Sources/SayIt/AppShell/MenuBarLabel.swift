@@ -28,8 +28,15 @@ struct MenuBarLabel: View {
                         .accessibilityHidden(true)
                 }
             }
+            .overlay(alignment: .bottomLeading) {
+                if state.updates.hasUpdate {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 9))
+                        .accessibilityHidden(true)
+                }
+            }
             .accessibilityLabel("Say It")
-            .accessibilityValue(state.statusText)
+            .accessibilityValue(state.updates.hasUpdate ? "Update available. \(state.statusText)" : state.statusText)
             .background {
                 AppWindowCoordinator()
             }

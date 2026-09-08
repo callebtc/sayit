@@ -148,3 +148,10 @@ Tests run with `swift test --disable-sandbox`.
 
 Say It is available under the [MIT License](LICENSE). Models are distributed
 under their own licenses; review the model card before downloading or using one.
+
+### Software updates
+
+Say It checks daily and offers **Update Now** or **Later**. Update Now downloads,
+installs, and restarts Say It and its helpers. Later postpones reminders for
+24 hours; automatic checks can be disabled in Settings. See
+[software update and release details](docs/updates.md).

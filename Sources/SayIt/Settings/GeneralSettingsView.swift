@@ -75,6 +75,9 @@ struct GeneralSettingsView: View {
                     "Check for updates daily",
                     isOn: $settings.checkForUpdates
                 )
+                .onChange(of: settings.checkForUpdates) { _, enabled in
+                    state.updates.setAutomaticChecks(enabled)
+                }
             }
 
             Section {

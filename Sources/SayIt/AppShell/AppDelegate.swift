@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { _ in
             Task { @MainActor in
+                AppState.shared.updates.userDidInteract()
                 guard AppState.shared.selectionService
                     .accessibilityIsTrusted != nil else {
                     return
@@ -80,6 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(
         _ sender: NSApplication
     ) -> NSApplication.TerminateReply {
+        guard !AppState.shared.isPreparingUpdate || AppState.shared.isPreparedForUpdate else {
+            return .terminateCancel
+        }
         Task {
             await AppState.shared.terminateBackgroundServiceForQuit()
             NSApp.reply(toApplicationShouldTerminate: true)

@@ -27,32 +27,30 @@ struct AboutSettingsView: View {
                 Section("Updates") {
                     LabeledContent("Status") {
                         HStack(spacing: DesignTokens.compactSpacing) {
-                            if state.isCheckingForUpdates {
+                            if state.updates.phase == .checking {
                                 ProgressView()
                                     .controlSize(.small)
                                     .accessibilityLabel(
                                         "Checking for updates"
                                     )
                             }
-                            Text(state.updateStatus)
+                            Text(state.updates.status)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    if let updateURL = state.availableUpdateURL {
-                        Link(
-                            "Open Release on GitHub…",
-                            destination: updateURL
-                        )
-                    } else {
-                        Button(
-                            "Check for Updates…",
-                            action: state.checkForUpdates
-                        )
-                        .disabled(state.isCheckingForUpdates)
+                    Button(state.updates.hasUpdate ? "Update Now…" : "Check for Updates…") {
+                        if state.updates.hasUpdate {
+                            state.updates.updateNow()
+                        } else {
+                            state.checkForUpdates()
+                        }
                     }
+                    .disabled(state.updates.phase == .unavailable)
+
                 }
 
                 Section {
+                    Link("Sparkle", destination: URL(string: "https://sparkle-project.org")!)
                     Link(
                         "MLX Audio Swift",
                         destination: URL(
@@ -69,7 +67,7 @@ struct AboutSettingsView: View {
                     Text("Acknowledgements")
                 } footer: {
                     Text(
-                        "Text and generated audio stay local. Network access is used only for model downloads and update checks. Say It and MLX Audio Swift are distributed under the MIT License."
+                        "Text and generated audio stay local. Network access is used only for model downloads and software updates. Say It and MLX Audio Swift are distributed under the MIT License."
                     )
                 }
             }

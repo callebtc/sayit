@@ -15,6 +15,7 @@ final class SelectionServiceController {
 
     private(set) var accessibilityIsTrusted: Bool?
     private(set) var isWorking = false
+    var isPreparingUpdate = false
     private(set) var errorMessage: String?
 
     func refreshAuthorization() async {
@@ -87,6 +88,24 @@ final class SelectionServiceController {
         }
     }
 
+    var wasRunning: Bool { hasPreparedHelper }
+
+    func restoreAfterUpdate() async {
+        guard UserDefaults.standard.bool(forKey: "restoreSelectionAfterUpdate") else { return }
+        do {
+            try await verifyXPCConnection()
+            UserDefaults.standard.removeObject(forKey: "restoreSelectionAfterUpdate")
+        } catch {
+            errorMessage = "The selected-text helper could not restart. Try reading selected text again."
+        }
+    }
+
+    func terminateForUpdate(deadline: Date) async throws {
+        await client.invalidate()
+        try await SelectionServiceLauncher.terminateForUpdate(deadline: deadline)
+        hasPreparedHelper = false
+    }
+
     func terminateForQuit() async {
         await client.invalidate()
         try? SelectionServiceLauncher.unregister()
@@ -115,6 +134,7 @@ final class SelectionServiceController {
     }
 
     private func ensureRunning() async throws {
+        guard !isPreparingUpdate else { throw CancellationError() }
         let shouldRestartExistingJob = !hasPreparedHelper
         do {
             try await SelectionServiceLauncher.ensureRunning(
