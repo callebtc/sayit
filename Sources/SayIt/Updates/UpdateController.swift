@@ -275,7 +275,7 @@ extension UpdateController: SPUUserDriver {
         case Int(SUError.installationCanceledError.rawValue), Int(SUError.authenticationFailure.rawValue):
             status = "Installation was canceled or couldn’t be authorized. Check for updates when you’re ready to try again."
         default:
-            status = "The update couldn’t be completed. Check your connection and try again. If this keeps happening, quit and reopen Say It."
+            status = "Update failed. Try again."
         }
         self.acknowledgement = acknowledgement
         showWindow()
