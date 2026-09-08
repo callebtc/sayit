@@ -21,15 +21,20 @@ struct VolumeControlView: View {
                     value: Self.symbol(for: state.playback.volume)
                 )
 
+            Text("Playback volume")
+                .frame(width: 104, alignment: .leading)
+
             Slider(value: sliderPosition, in: 0...1) {
                 Text("Playback volume")
             }
+            .labelsHidden()
 
             Text(formattedVolume)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .monospacedDigit()
                 .frame(width: 42, alignment: .trailing)
         }
+        .font(.body)
+        .foregroundStyle(.primary)
         .contentShape(.rect)
         .onExitCommand {
             isActive = false

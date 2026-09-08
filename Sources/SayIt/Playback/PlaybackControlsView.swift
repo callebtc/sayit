@@ -1,8 +1,10 @@
+import SayItCore
 import SwiftUI
 
 struct PlaybackControlsView: View {
     @Environment(AppState.self) private var state
     @State private var volumeControlActive = false
+    @State private var speedControlActive = false
 
     var body: some View {
         ZStack {
@@ -57,7 +59,29 @@ struct PlaybackControlsView: View {
                         }
                     }
 
-                    PlaybackRateMenu()
+                    Button {
+                        speedControlActive = true
+                    } label: {
+                        Label(
+                            PlaybackRate.formatted(state.playback.rate),
+                            systemImage: "timer"
+                        )
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 6)
+                        .frame(height: 28)
+                        .background(.primary.opacity(0.07), in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .fixedSize()
+                    .accessibilityLabel("Playback speed")
+                    .accessibilityValue(PlaybackRate.formatted(state.playback.rate))
+                    .help("Playback speed")
+                    .onHover { hovering in
+                        if hovering {
+                            speedControlActive = true
+                        }
+                    }
 
                     Spacer()
 
@@ -82,20 +106,29 @@ struct PlaybackControlsView: View {
                     .buttonStyle(CircularIconButtonStyle())
                 }
             }
-            .opacity(volumeControlActive ? 0 : 1)
-            .allowsHitTesting(!volumeControlActive)
+            .opacity(volumeControlActive || speedControlActive ? 0 : 1)
+            .allowsHitTesting(!volumeControlActive && !speedControlActive)
+            .accessibilityHidden(volumeControlActive || speedControlActive)
 
             VolumeControlView(isActive: $volumeControlActive)
                 .opacity(volumeControlActive ? 1 : 0)
                 .allowsHitTesting(volumeControlActive)
+                .accessibilityHidden(!volumeControlActive)
+
+            PlaybackRateControlView(isActive: $speedControlActive)
+                .opacity(speedControlActive ? 1 : 0)
+                .allowsHitTesting(speedControlActive)
+                .accessibilityHidden(!speedControlActive)
         }
         .onHover { hovering in
             if !hovering {
                 volumeControlActive = false
+                speedControlActive = false
             }
         }
         .animation(DesignTokens.springAnimation, value: state.clipboardHasNewText)
         .animation(DesignTokens.springAnimation, value: volumeControlActive)
+        .animation(DesignTokens.springAnimation, value: speedControlActive)
         .disabled(!state.isServiceOnline)
         .accessibilityHint(
             state.isServiceOnline
