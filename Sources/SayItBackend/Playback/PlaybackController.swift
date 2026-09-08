@@ -3,6 +3,7 @@
 import Foundation
 @preconcurrency import MediaPlayer
 import Observation
+import PlaybackDSP
 import SayItCore
 import SayItProtocol
 
@@ -10,7 +11,7 @@ import SayItProtocol
 @Observable
 final class PlaybackController: BackendPlaybackControlling {
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
-    static let highQualityTimePitchOverlap: Float = 32
+    static let timeStretchEngineName = TimeStretchStream.engineName
     static let schedulingHorizon: TimeInterval = 12
     static let schedulingChunkDuration: TimeInterval = 2
     static let fileReadFrameCount = 65_536
@@ -23,7 +24,11 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
-    private let timePitch = AVAudioUnitTimePitch()
+    private var timeStretch: TimeStretchStream?
+    private var processingIsComplete = false
+    private var pendingSourceFrames: Int64 = 0
+    private var scheduledOutputFrames: Int64 = 0
+    private var renderRate: Double = 1
     private let timeline = TimelineDriver()
     private var audioConfigurationTask: Task<Void, Never>?
     private var audioConfigurationRecoveryTask: Task<Void, Never>?
@@ -97,7 +102,19 @@ final class PlaybackController: BackendPlaybackControlling {
     }
     var rate: Double = 1 {
         didSet {
-            timePitch.rate = Float(rate)
+            guard rate != oldValue else { return }
+            let wasPlaying = state == .playing
+            let anchor = currentPlaybackTime()
+            do {
+                if hasStoredAudio {
+                    try rescheduleAudio(from: anchor)
+                    elapsed = anchor
+                    lastStablePlaybackTime = anchor
+                    if wasPlaying { try startPlayback() }
+                }
+            } catch {
+                reportFailure(error, shouldResume: wasPlaying)
+            }
             scheduleCompletionWatchdog()
             updateNowPlaying()
         }
@@ -126,10 +143,6 @@ final class PlaybackController: BackendPlaybackControlling {
 
     init() {
         engine.attach(player)
-        engine.attach(timePitch)
-        timePitch.rate = Float(rate)
-        timePitch.pitch = 0
-        timePitch.overlap = Self.highQualityTimePitchOverlap
         configureRemoteCommands()
         monitorAudioConfiguration()
     }
@@ -345,6 +358,12 @@ final class PlaybackController: BackendPlaybackControlling {
     func finishBuffering() {
         synthesisIsComplete = true
         estimatedDuration = generatedDuration
+        do {
+            try scheduleAvailableAudio()
+        } catch {
+            reportFailure(error)
+            return
+        }
         if state == .buffering {
             play()
         } else {
@@ -492,16 +511,7 @@ final class PlaybackController: BackendPlaybackControlling {
         engine.stop()
         player.stop()
         engine.disconnectNodeOutput(player)
-        engine.disconnectNodeOutput(timePitch)
-        engine.connect(player, to: timePitch, format: format)
-        engine.connect(
-            timePitch,
-            to: engine.mainMixerNode,
-            format: format
-        )
-        timePitch.rate = Float(rate)
-        timePitch.pitch = 0
-        timePitch.overlap = Self.highQualityTimePitchOverlap
+        engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.prepare()
         configuredSampleRate = format.sampleRate
         try ensureEngineRunning()
@@ -601,6 +611,7 @@ final class PlaybackController: BackendPlaybackControlling {
     ) {
         let generation = scheduleGeneration
         scheduledBufferCount += 1
+        scheduledOutputFrames += Int64(buffer.frameLength)
         player.scheduleBuffer(
             buffer,
             completionCallbackType: .dataPlayedBack
@@ -636,6 +647,11 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask = nil
         scheduleGeneration &+= 1
         scheduledBufferCount = 0
+        scheduledOutputFrames = 0
+        pendingSourceFrames = 0
+        timeStretch = nil
+        processingIsComplete = false
+        renderRate = rate
         if var frameScheduler {
             frameScheduler.reset(startingAt: frameScheduler.nextFrame)
             self.frameScheduler = frameScheduler
@@ -658,38 +674,54 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func scheduleAvailableAudio() throws {
-        guard let pcmStore, var frameScheduler else { return }
-        while let range = frameScheduler.nextRange(
-            availableFrameCount: pcmStore.frameCount
-        ) {
-            var samples = try pcmStore.readFrames(
+        guard let pcmStore, var frameScheduler, !processingIsComplete else { return }
+        if timeStretch == nil {
+            renderRate = rate
+            timeStretch = try TimeStretchStream(sampleRate: sampleRate, rate: renderRate)
+        }
+        guard let timeStretch else { return }
+        while let range = frameScheduler.nextRange(availableFrameCount: pcmStore.frameCount) {
+            let samples = try pcmStore.readFrames(
                 startingAt: range.lowerBound,
                 count: Int(range.count)
             )
             guard samples.count == range.count else {
                 throw CocoaError(.fileReadCorruptFile)
             }
-            if shouldFadeInNextScheduledBuffer {
-                samples = PCMTransitionRamp.fadeInHead(
-                    samples,
-                    frameCount: transitionFrameCount
-                )
-                shouldFadeInNextScheduledBuffer = false
-            }
-            let buffer = try makeBuffer(
-                samples: samples,
-                sampleRate: sampleRate
-            )
-            if configuredSampleRate == nil {
-                try prepareAudioGraph(for: buffer.format)
-            } else {
-                try ensureEngineRunning()
-            }
-            try validatePlayerFormat(for: buffer)
-            schedule(buffer, sourceFrameCount: Int64(range.count))
+            let output = try timeStretch.process(samples)
+            pendingSourceFrames += Int64(range.count)
             frameScheduler.didSchedule(range)
+            try scheduleProcessedAudio(output)
+        }
+        if synthesisIsComplete, frameScheduler.nextFrame == pcmStore.frameCount {
+            let tail = try timeStretch.process([], final: true)
+            try scheduleProcessedAudio(tail)
+            // A unity-rate stream has no delayed output to attach this accounting to.
+            if pendingSourceFrames > 0 {
+                frameScheduler.didComplete(frameCount: pendingSourceFrames)
+                pendingSourceFrames = 0
+            }
+            processingIsComplete = true
         }
         self.frameScheduler = frameScheduler
+    }
+
+    private func scheduleProcessedAudio(_ output: [Float]) throws {
+        guard !output.isEmpty else { return }
+        var samples = output
+        if shouldFadeInNextScheduledBuffer {
+            samples = PCMTransitionRamp.fadeInHead(samples, frameCount: transitionFrameCount)
+            shouldFadeInNextScheduledBuffer = false
+        }
+        let buffer = try makeBuffer(samples: samples, sampleRate: sampleRate)
+        if configuredSampleRate == nil {
+            try prepareAudioGraph(for: buffer.format)
+        } else {
+            try ensureEngineRunning()
+        }
+        try validatePlayerFormat(for: buffer)
+        schedule(buffer, sourceFrameCount: pendingSourceFrames)
+        pendingSourceFrames = 0
     }
 
     private func currentPlaybackTime() -> TimeInterval {
@@ -701,7 +733,8 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         return min(
             scheduleOffset
-                + Double(playerTime.sampleTime) / playerTime.sampleRate,
+                + Double(min(playerTime.sampleTime, scheduledOutputFrames))
+                    / playerTime.sampleRate * renderRate,
             generatedDuration
         )
     }
@@ -722,7 +755,7 @@ final class PlaybackController: BackendPlaybackControlling {
               scheduledBufferCount == 0 else {
             return
         }
-        if synthesisIsComplete {
+        if synthesisIsComplete, processingIsComplete {
             completePlayback()
         } else if state == .playing {
             enterBufferingState()
@@ -789,10 +822,14 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func enterBufferingState() {
-        elapsed = generatedDuration
+        // Restart from the audible source position, including the processor's
+        // held-back lookahead, when progressive synthesis catches up.
+        elapsed = currentPlaybackTime()
         lastStablePlaybackTime = elapsed
         invalidateScheduledAudio()
-        scheduleOffset = elapsed
+        let frame = Int64((elapsed * sampleRate).rounded(.down))
+        frameScheduler?.reset(startingAt: frame)
+        scheduleOffset = Double(frame) / sampleRate
         state = .buffering
         updateNowPlaying()
     }
