@@ -297,7 +297,9 @@ final class AppSettings {
             rawValue: defaults.double(forKey: Key.speakingPace)
         ) ?? .natural
         let storedRate = defaults.double(forKey: Key.playbackRate)
-        playbackRate = storedRate == 0 ? 1 : storedRate
+        playbackRate = storedRate == 0
+            ? PlaybackRate.normal
+            : PlaybackRate.clamped(storedRate)
         volume = defaults.object(forKey: Key.volume) == nil
             ? 1
             : defaults.double(forKey: Key.volume)
