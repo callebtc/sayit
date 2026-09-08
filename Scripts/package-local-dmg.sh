@@ -84,11 +84,10 @@ hdiutil attach \
     "$read_write_dmg" >/dev/null
 mounted=YES
 
-osascript "$project_root/Scripts/style-dmg.applescript" "$mountpoint"
+"$project_root/Scripts/dmg-layout.sh" write "$mountpoint"
 sync
 
-# Writable APFS images may pick up host filesystem metadata while Finder saves
-# the window layout. Keep only the intentional installer contents.
+# Keep only the intentional installer contents, including the saved layout.
 case "$mountpoint" in
     "$staging"/mount) ;;
     *)
@@ -126,5 +125,12 @@ if [ -n "$dmg_sign_identity" ]; then
 fi
 
 hdiutil verify "$dmg_path"
+
+# Conversion must preserve the saved layout in the artifact we distribute.
+hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" "$dmg_path" >/dev/null
+mounted=YES
+"$project_root/Scripts/dmg-layout.sh" validate "$mountpoint"
+hdiutil detach "$mountpoint" >/dev/null
+mounted=NO
 
 echo "$dmg_path"

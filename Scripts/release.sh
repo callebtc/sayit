@@ -285,6 +285,7 @@ mounted_app="$mountpoint/Say It.app"
     || fail "the Applications symlink has an unexpected target."
 [ -f "$mountpoint/.background/dmg-background.png" ] \
     || fail "the DMG background image is missing."
+"$project_root/Scripts/dmg-layout.sh" validate "$mountpoint"
 
 top_level_count=$(
     find "$mountpoint" -mindepth 1 -maxdepth 1 \

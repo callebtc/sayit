@@ -1,7 +1,8 @@
 ---
 name: sayit-release
 description: Prepare, build, sign, notarize, validate, tag, and publish versioned macOS DMG releases for the Say It project. Use this skill whenever the user mentions a Say It release, version bump, production DMG, Developer ID signing, Apple notarization or stapling, a GitHub Release/tag/asset, or asks whether a build is ready to distribute—even if they request only one stage. Enforce privacy-safe, explicit-upload boundaries and use the repository release scripts plus gh.
-compatibility: Requires macOS, Xcode, XcodeGen, notarytool, codesign, hdiutil, Git, and GitHub CLI. Expects Scripts/release.sh and project.yml in the repository.
+metadata:
+  compatibility: Requires macOS, Xcode, XcodeGen, notarytool, codesign, hdiutil, Git, and GitHub CLI. Expects Scripts/release.sh and project.yml in the repository.
 ---
 
 # Say It Release
@@ -85,6 +86,10 @@ Check that the machine-local setup exists without exposing its values:
 test -f .env.release
 ```
 
+Prepare the pinned packaging-only Python tools with
+`./Scripts/setup-dmg-tools.sh` when `Build/DMGTools` is missing. The tools stay
+in ignored `Build/`; they are not bundled with the app.
+
 The local setup is reusable on the configured Mac. A new Mac needs its own
 Developer ID identity/private key, provisioning profiles, ignored
 `.env.release`, and `notarytool` Keychain profile. If an identity, profile, or
@@ -159,6 +164,31 @@ Keep the log under ignored `Build/`, inspect it for private paths before quoting
 it, and report only redacted issue summaries.
 
 ## Inspect the final artifact locally
+
+### Verify the installer layout, not just its assets
+
+Version 0.1.7 included the background PNG and Applications symlink but omitted
+`.DS_Store`. The old Finder automation returned success without persisting the
+layout. A background file alone does **not** prove that Finder displays it.
+
+Packaging now uses `Scripts/dmg-layout.sh write MOUNT` to save the layout
+directly. Never restore a Finder delay or `sync` as the only persistence check.
+Run `Scripts/dmg-layout.sh validate MOUNT` on the read-only mounted **final
+compressed DMG**, and again on a downloaded release asset when verifying the
+published installer. The validator must pass before upload: it checks the
+background bytes, picture alias, icon view, window bounds, icon positions,
+Applications link, and absence of private/temporary paths in `.DS_Store`.
+Do not skip a failed check or publish a DMG that merely contains the image.
+
+When changing the packaging layout, also inspect it in Finder if UI access is
+available. If it is unavailable, report that limitation and distinguish saved
+metadata validation from visual confirmation; never claim a screenshot or
+visual inspection occurred. A defect in an already-published DMG requires a
+new version/build and notarization, not silently replacing signed assets.
+
+Run the layout regression checks against a mounted test artifact after changes:
+`Build/DMGTools/bin/python3 Scripts/test-dmg-layout.py MOUNT`. These exercise
+missing layout, broken image references, wrong icon positions, and path leaks.
 
 The production artifact is:
 
