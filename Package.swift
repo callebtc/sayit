@@ -22,6 +22,7 @@ let package = Package(
         .executable(name: "SayIt", targets: ["SayIt"])
     ],
     dependencies: [
+        .package(path: "Packages/PlaybackDSP"),
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6"),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
@@ -71,6 +72,7 @@ let package = Package(
         .target(
             name: "SayItBackend",
             dependencies: [
+                .product(name: "PlaybackDSP", package: "PlaybackDSP"),
                 "SayItCore",
                 "SayItProtocol",
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),

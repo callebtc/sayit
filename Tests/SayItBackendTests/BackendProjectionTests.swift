@@ -97,6 +97,6 @@ struct BackendProjectionTests {
         #expect(PlaybackController.preferredStartBufferDuration(for: 0.5) == 1.2)
         #expect(PlaybackController.preferredStartBufferDuration(for: 1) == 1.2)
         #expect(PlaybackController.preferredStartBufferDuration(for: 2) == 2.4)
-        #expect(PlaybackController.highQualityTimePitchOverlap == 32)
+        #expect(PlaybackController.timeStretchEngineName == "Sonic")
     }
 }
