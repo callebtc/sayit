@@ -28,6 +28,11 @@ def write_layout(root):
         }
         store["."]["icvp"] = {
             "viewOptionsVersion": 1, "backgroundType": 2,
+            # Finder requires color components even for a picture background;
+            # omitting them makes it ignore the entire icon-view settings blob.
+            "backgroundColorRed": 1.0,
+            "backgroundColorGreen": 1.0,
+            "backgroundColorBlue": 1.0,
             "backgroundImageAlias": alias.to_bytes(),
             "gridOffsetX": 0.0, "gridOffsetY": 0.0, "gridSpacing": 100.0,
             "arrangeBy": "none", "showIconPreview": True,
@@ -67,6 +72,9 @@ def validate_layout(root):
             require(window[key] is False, "Installer window chrome is incorrect")
         icons = store["."]["icvp"]
         require(icons["backgroundType"] == 2, "Picture background is not selected")
+        require(all(icons.get(key) == 1.0 for key in (
+            "backgroundColorRed", "backgroundColorGreen", "backgroundColorBlue")),
+            "Background color components are missing or incorrect")
         require(icons["iconSize"] == 128 and icons["textSize"] == 14,
                 "Installer icon or label size is incorrect")
         require(icons["arrangeBy"] == "none", "Automatic icon arrangement is enabled")

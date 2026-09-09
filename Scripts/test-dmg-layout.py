@@ -48,6 +48,19 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Picture background"):
             layout.validate_layout(self.root)
 
+    def test_missing_background_color_component(self):
+        for key in ("backgroundColorRed", "backgroundColorGreen", "backgroundColorBlue"):
+            with self.subTest(key=key):
+                with DSStore.open(str(self.root / ".DS_Store"), "r+") as store:
+                    icons = store["."]["icvp"]
+                    original = icons.pop(key)
+                    store["."]["icvp"] = icons
+                with self.assertRaisesRegex(ValueError, "Background color components"):
+                    layout.validate_layout(self.root)
+                with DSStore.open(str(self.root / ".DS_Store"), "r+") as store:
+                    icons[key] = original
+                    store["."]["icvp"] = icons
+
     def test_incorrect_background_alias(self):
         with DSStore.open(str(self.root / ".DS_Store"), "r+") as store:
             icons = store["."]["icvp"]

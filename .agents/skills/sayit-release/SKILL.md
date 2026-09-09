@@ -1,310 +1,92 @@
 ---
 name: sayit-release
-description: Prepare, build, sign, notarize, validate, tag, and publish versioned macOS DMG releases for the Say It project. Use this skill whenever the user mentions a Say It release, version bump, production DMG, Developer ID signing, Apple notarization or stapling, a GitHub Release/tag/asset, or asks whether a build is ready to distribute—even if they request only one stage. Enforce privacy-safe, explicit-upload boundaries and use the repository release scripts plus gh.
+description: Build, sign, validate, notarize, and publish Say It macOS DMG releases using the repository release script. Use for Say It version bumps, release builds, installer packaging, notarization, and GitHub release assets.
 metadata:
-  compatibility: Requires macOS, Xcode, XcodeGen, notarytool, codesign, hdiutil, Git, and GitHub CLI. Expects Scripts/release.sh and project.yml in the repository.
+  compatibility: Requires the Say It repository, macOS, Xcode, XcodeGen, Developer ID signing, hdiutil, and gh.
 ---
 
 # Say It Release
 
-Create repeatable macOS releases without exposing signing material, account
-details, or local-machine information. Treat preparation, Apple notarization,
-GitHub draft upload, and public publication as separate authorization stages.
+Use `Scripts/release.sh` as the single entrypoint. Once the release source is
+prepared, one command builds, tests, signs, packages, validates, notarizes,
+staples, and generates the signed update feed. **No visual review or Finder
+interaction is required.** Honor any checkpoint the user explicitly requests.
 
-## Start by determining the authorized stage
+## Prepare the release source
 
-Map the user's request to one or more stages:
+- Read `AGENTS.md`; inspect the source diff, current versions, and latest tag.
+  Use `gh` to check main and the latest release when asked for the latest features.
+- Use the requested version, or the next patch version if none is specified.
+  Update `MARKETING_VERSION` and increment `CURRENT_PROJECT_VERSION` in
+  `project.yml` above the released build. Regenerate with
+  `xcodegen generate --spec project.yml --project .` and check the diff.
+- Resolve unrelated changes without discarding or silently including them.
+  Commit the prepared source when authorized; the full release command requires
+  a clean worktree. The local prepare-only mode allows the task's uncommitted
+  version bump and fixes.
+- Keep `.env.release` and signing material ignored. Never print configuration,
+  private keys, or Keychain identities. Keep logs/artifacts under `Build/`; keep
+  machine/user information out of Git history and GitHub. Preserve Git identity.
 
-1. **Inspect** — report readiness without changing files or contacting external
-   services.
-2. **Prepare** — update the version/build number, regenerate the Xcode project,
-   test, and commit locally when requested. Do not upload.
-3. **Notarize** — build the final DMG and upload it to Apple's notarization
-   service. This requires explicit Apple-upload approval in the current request.
-4. **Draft on GitHub** — create the tag/release draft and upload the approved
-   DMG. This requires explicit GitHub-upload approval in the current request.
-5. **Publish on GitHub** — make the verified draft public. Require explicit
-   publication approval after the draft has been inspected.
+## Run one command
 
-A request to build a DMG does not authorize notarization. A request to notarize
-does not authorize GitHub upload. A request to prepare a GitHub release does not
-authorize making a draft public unless the user clearly asks to publish it.
-
-## Protect private information
-
-- Read the repository's `AGENTS.md` instructions before doing release work.
-- Never read, print, summarize, copy, commit, or upload a `.p8`, `.p12`, private
-  key, password, Keychain secret, or provisioning-profile payload.
-- Never print `.env.release`. Check only that it exists and is ignored.
-- Do not place certificate fingerprints, API key IDs, issuer IDs, Apple Account
-  identifiers, email addresses, usernames, device names, local absolute paths,
-  or GitHub account identifiers in commits, tags, release notes, or assets.
-- Do not enumerate every Keychain identity in user-visible output. Let the
-  release script perform its filtered identity check.
-- Before any Git or GitHub action, scan staged content, the commit message,
-  release title, and release notes for local paths and personally identifying
-  information.
-- Confirm `.env.release`, `*.p8`, `*.p12`, `*.key`, `*.cer`,
-  `*.provisionprofile`, and generated release artifacts are ignored.
-- Use `gh` for GitHub releases. Never use raw GitHub HTTP requests when `gh`
-  supports the operation.
-- Preserve the configured Git author and committer. Never override either
-  identity.
-
-Public product data such as the product name, semantic version, public bundle
-identifiers already stored in tracked project files, and the public organization
-name present in a Developer ID signature may be reported when necessary. Do not
-add unrelated signing metadata merely because it is technically public.
-
-## Inspect the repository safely
-
-Run read-only checks first:
+When authorized to build and notarize:
 
 ```sh
-git status --short
-git diff --check
-git tag --list --sort=-version:refname
-rg -n 'MARKETING_VERSION|CURRENT_PROJECT_VERSION' project.yml
-test -x Scripts/release.sh
-test -x Scripts/build-app.sh
-test -x Scripts/package-local-dmg.sh
-test -x Scripts/smoke-test-selection-xpc.sh
-test -x Scripts/validate-selection-bundle.sh
-sh -n Scripts/release.sh Scripts/build-app.sh Scripts/package-local-dmg.sh \
-  Scripts/smoke-test-selection-xpc.sh Scripts/validate-selection-bundle.sh
-git check-ignore -q .env.release
+SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh VERSION
 ```
 
-Do not continue to a production release from a dirty worktree. Existing changes
-may belong to the user or another task; do not stash, discard, reset, or commit
-them without authorization. Report the blocker and let the user finish or
-approve those changes.
+Replace `VERSION` with the prepared version. Signing and notarization settings
+come from the existing ignored `.env.release`. The script uses
+`Scripts/prepare-release-dmg.sh` for the shared build/test/package/audit pipeline;
+do not copy or reconstruct these steps in temporary version-specific scripts.
+Tests include the package suite with its MLX Metal library, DSP and muted playback
+integration tests, and the selected-text XPC smoke test. The final compressed
+DMG is audited before Apple submission and again after stapling. Failures stop
+the pipeline. Do not bypass tests or disable secure timestamps.
 
-Check that the machine-local setup exists without exposing its values:
+For an explicitly local-only task:
 
 ```sh
-test -f .env.release
+./Scripts/release.sh --prepare VERSION
 ```
 
-Prepare the pinned packaging-only Python tools with
-`./Scripts/setup-dmg-tools.sh` when `Build/DMGTools` is missing. The tools stay
-in ignored `Build/`; they are not bundled with the app.
-
-The local setup is reusable on the configured Mac. A new Mac needs its own
-Developer ID identity/private key, provisioning profiles, ignored
-`.env.release`, and `notarytool` Keychain profile. If an identity, profile, or
-API key is expired, revoked, or unavailable, stop and rotate it; never weaken
-signing to work around the failure.
-
-## Prepare a version
-
-Use the version explicitly requested by the user. Prefer tags in the form
-`vMAJOR.MINOR.PATCH`; Sparkle uses the monotonically increasing build number
-for update ordering.
-
-1. Update `MARKETING_VERSION` in `project.yml`.
-2. Increment `CURRENT_PROJECT_VERSION`; it must be a positive, monotonically
-   increasing integer.
-3. Regenerate the tracked Xcode project:
-
-   ```sh
-   xcodegen generate --spec project.yml --project .
-   ```
-
-4. Review only the intended version/generated-project diff.
-5. Run `git diff --check`.
-6. Commit the release state locally only when authorized, using a generic
-   message such as `Prepare 1.2.3 release`.
-7. Confirm the worktree is clean and the release commit is the exact commit
-   intended for the tag.
-
-Do not tag yet. First create and inspect the notarized artifact so a failed
-Apple submission cannot leave behind a misleading release tag.
-
-## Build and notarize the production DMG
-
-Run this stage only after explicit permission to upload to Apple:
+This produces the same signed, validated DMG without uploading. To check an
+existing DMG without changing it, use `./Scripts/release.sh --audit VERSION`.
+To later notarize an already prepared artifact without rebuilding it:
 
 ```sh
-release_version=1.2.3
 SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES \
-  ./Scripts/release.sh "$release_version"
+  ./Scripts/release.sh --notarize-existing VERSION RECORDED_SHA256
 ```
 
-Never set `SAYIT_ALLOW_DIRTY_WORKTREE=YES` or `SAYIT_SKIP_TESTS=YES` for a
-production release.
+The script preserves existing DMGs, update assets, and submission records rather
+than silently overwriting them. Inspect a previous attempt before retrying. If
+Say It is running, arrange to quit it without interrupting active playback when
+the build or XPC smoke test requires it.
 
-The repository script is responsible for:
+## Keep DMG generation deterministic
 
-- running the Swift test suite;
-- regenerating and building the Release app;
-- exercising the production selected-text helper over XPC without prompting
-  for Accessibility access;
-- rejecting a sandbox or missing embedded Info.plist that would prevent the
-  selected-text helper from registering on a clean Mac;
-- applying Developer ID signatures and secure timestamps;
-- verifying hardened runtime for the app and bundled helpers;
-- creating and signing `Build/SayIt-VERSION.dmg`;
-- submitting the DMG to Apple and waiting for `Accepted`;
-- stapling and validating the ticket;
-- running Gatekeeper, code-signature, disk-image, and mounted-content checks;
-- checking the mounted app for local user paths; and
-- printing the final SHA-256 checksum and notarization submission ID.
+`Scripts/package-local-dmg.sh` writes the layout directly using `dmg-layout.sh`,
+then compresses, signs, and validates the read-only artifact. The preparation
+helper also runs the layout regression suite. Do not replace this with Finder
+automation, screenshots, sleeps, or manual icon positioning.
 
-Stop if any check fails. Do not tag or upload a failed or partially processed
-artifact. If notarization fails, retrieve the log only when useful:
+The picture background requires `icvp.backgroundType=2` **and all three
+`backgroundColorRed/Green/Blue` fields set to 1.0**. Without the color fields,
+Finder ignored both the picture and icon sizes. Preserve the fix and regression
+coverage in `Scripts/dmg-layout.py` and `Scripts/test-dmg-layout.py`. Checks also
+cover the background bytes and alias, window bounds, icon positions, Applications
+link, and absence of private/temporary paths. These automated checks are the
+release requirement; do not stop for visual approval.
 
-```sh
-xcrun notarytool log SUBMISSION_ID \
-  --keychain-profile PROFILE_NAME \
-  Build/notarization-log.json
-```
+## Deliver or publish
 
-Keep the log under ignored `Build/`, inspect it for private paths before quoting
-it, and report only redacted issue summaries.
-
-## Inspect the final artifact locally
-
-### Verify the installer layout, not just its assets
-
-Version 0.1.7 included the background PNG and Applications symlink but omitted
-`.DS_Store`. The old Finder automation returned success without persisting the
-layout. A background file alone does **not** prove that Finder displays it.
-
-Packaging now uses `Scripts/dmg-layout.sh write MOUNT` to save the layout
-directly. Never restore a Finder delay or `sync` as the only persistence check.
-Run `Scripts/dmg-layout.sh validate MOUNT` on the read-only mounted **final
-compressed DMG**, and again on a downloaded release asset when verifying the
-published installer. The validator must pass before upload: it checks the
-background bytes, picture alias, icon view, window bounds, icon positions,
-Applications link, and absence of private/temporary paths in `.DS_Store`.
-Do not skip a failed check or publish a DMG that merely contains the image.
-
-When changing the packaging layout, also inspect it in Finder if UI access is
-available. If it is unavailable, report that limitation and distinguish saved
-metadata validation from visual confirmation; never claim a screenshot or
-visual inspection occurred. A defect in an already-published DMG requires a
-new version/build and notarization, not silently replacing signed assets.
-
-Run the layout regression checks against a mounted test artifact after changes:
-`Build/DMGTools/bin/python3 Scripts/test-dmg-layout.py MOUNT`. These exercise
-missing layout, broken image references, wrong icon positions, and path leaks.
-
-The production artifact is:
-
-```text
-Build/SayIt-VERSION.dmg
-```
-
-Do not substitute a file whose name contains `-local` or `-signed-local`.
-
-The release script already performs mechanical validation. Before GitHub
-upload, also let the user inspect the DMG and, when practical, test installation
-and launch on a compatible clean user account or another Mac. Record the
-SHA-256 checksum shown by the script. Do not modify, repackage, or re-sign the
-DMG after notarization; rebuild and notarize again if its contents change.
-
-## Create a GitHub draft and upload the DMG
-
-Run only after explicit GitHub-upload permission and after confirming that the
-tested release commit is available on the remote repository. Use variables so
-commands remain version-independent:
-
-```sh
-release_version=1.2.3
-release_tag="v$release_version"
-release_commit=$(git rev-parse HEAD)
-release_dmg="Build/SayIt-$release_version.dmg"
-release_upload_dir="Build/Update-$release_version"
-release_upload_dmg="$release_upload_dir/SayIt.dmg"
-release_appcast="$release_upload_dir/appcast.xml"
-```
-
-Recheck the artifact checksum and repository state. The release script prepares
-the signed appcast and stable public asset name after stapling. Verify that the
-prepared DMG is byte-identical and the feed exists:
-
-```sh
-cmp "$release_dmg" "$release_upload_dmg"
-test -f "$release_appcast"
-```
-
-Then create a draft release against the exact reviewed commit. The stable asset
-name keeps `/releases/latest/download/SayIt.dmg` valid across releases while the
-local production artifact remains versioned:
-
-```sh
-gh release create "$release_tag" \
-  "$release_upload_dmg#Say It $release_version for macOS" \
-  "$release_appcast#Signed software update feed" \
-  --target "$release_commit" \
-  --draft \
-  --title "Say It $release_version" \
-  --generate-notes
-```
-
-`gh release create` creates the tag when it does not exist and uploads the DMG
-as a release asset. A draft is intentionally not public.
-
-If the tag or release already exists, inspect it with `gh release view` and
-stop. Never overwrite, delete, retarget, or replace an existing release asset
-without explicit approval.
-
-Verify the draft metadata:
-
-```sh
-gh release view "$release_tag" \
-  --json tagName,targetCommitish,isDraft,isPrerelease,assets,url
-```
-
-Confirm that:
-
-- the tag is the requested version;
-- the target is the reviewed release commit;
-- the release is still a draft;
-- exactly the intended `SayIt.dmg` and `appcast.xml` assets are attached; and
-- no local path or private identifier appears in the title, notes, or label.
-
-For higher assurance, download the draft asset to an explicit temporary
-directory and compare its SHA-256 with the local approved artifact. Remove only
-that validated temporary download directory afterward. Keep the prepared release
-assets until publication has been verified.
-
-## Publish the GitHub release
-
-Require explicit approval to make the inspected draft public:
-
-```sh
-gh release edit "$release_tag" --draft=false --latest
-```
-
-Verify the result:
-
-```sh
-gh release view "$release_tag" \
-  --json tagName,isDraft,isPrerelease,assets,publishedAt,url
-```
-
-Sparkle reads the latest release's signed `appcast.xml` asset. The feed must
-reference the tag-specific `SayIt.dmg` URL, never a mutable latest-DMG URL.
-Publish both assets together. The release script verifies their signatures and
-requires the public key derived from ignored `.env` to match the public key
-embedded in the app. Use `Scripts/sparkle-tool.py` for signing; it passes the
-private seed over stdin, never through Keychain, arguments, logs, or Git.
-See `docs/updates.md` for key configuration, migration, and update smoke tests.
-
-## Report the outcome
-
-State only the stages actually completed. Include:
-
-- version and build number;
-- local artifact path, when one was created;
-- SHA-256 checksum;
-- whether Apple notarization was accepted and stapled;
-- whether GitHub state is absent, draft, or public;
-- GitHub release URL only after it exists; and
-- any remaining compatibility caveats.
-
-Explicitly say when no Apple or GitHub upload occurred. Never claim a release is
-ready merely because compilation succeeded; the production DMG must complete
-the release script and local inspection first.
+Report version/build, the versioned DMG, checksum, test status, and actual
+notarization status. Full release output includes `Build/Update-VERSION/SayIt.dmg`
+and signed `appcast.xml`. Keep pre-notarization and post-stapling hashes distinct.
+Write a release description highlighting the biggest changes since the previous
+release and publish both update assets together. GitHub upload/publication is
+separate; follow [distribution.md](references/distribution.md)
+when authorized. Do not claim an upload occurred merely because a script exists
+or its workflow tests passed.

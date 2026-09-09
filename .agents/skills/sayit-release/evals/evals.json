@@ -3,26 +3,28 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Prepare Say It version 0.2.0 and tell me what remains, but do not upload anything to Apple or GitHub.",
-      "expected_output": "The agent inspects the worktree, updates the marketing/build versions only if safe, regenerates the Xcode project, validates locally, and explicitly stops before Apple or GitHub uploads.",
+      "prompt": "Prepare Say It version 0.2.0 with the latest features. Build the signed DMG locally; do not upload anything.",
+      "expected_output": "The agent prepares the source and runs Scripts/release.sh --prepare 0.2.0. It reports automated validation and the checksum without requiring Finder review or uploading.",
       "files": [],
       "expectations": [
-        "Does not run notarization with SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES.",
-        "Does not create a GitHub tag, release, or asset.",
-        "Refuses to release from a dirty worktree rather than discarding unrelated changes.",
-        "Avoids printing .env.release or signing credential values."
+        "Uses Scripts/release.sh --prepare with the requested version.",
+        "Allows authorized preparation changes to remain uncommitted and preserves unrelated changes.",
+        "Uses the shared production preparation and layout validation scripts.",
+        "Does not require a screenshot, Finder interaction, or visual approval.",
+        "Does not submit to Apple or create GitHub state, and does not print signing configuration."
       ]
     },
     {
       "id": 2,
-      "prompt": "The 0.3.0 release commit is clean and approved. Build and notarize the production DMG, then stop so I can inspect it before anything goes to GitHub.",
-      "expected_output": "The agent runs the guarded release script with explicit Apple-upload authorization, reports the notarized artifact and checksum, and performs no GitHub operation.",
+      "prompt": "I approved the installer appearance and its recorded checksum. Notarize this exact Say It 0.3.0 DMG now, then stop before GitHub.",
+      "expected_output": "The agent checks the recorded checksum, submits the existing DMG without rebuilding or re-signing it, requires Apple acceptance, staples and validates it, records the post-stapling checksum, and stops before GitHub.",
       "files": [],
       "expectations": [
-        "Uses Scripts/release.sh with the requested version.",
-        "Authorizes only the Apple notarization upload.",
-        "Reports Apple acceptance, stapling, and the production DMG checksum only after verification succeeds.",
-        "Does not invoke gh or create GitHub state."
+        "Uses Scripts/release.sh --notarize-existing with the version and recorded checksum; does not rebuild or re-sign the app or DMG.",
+        "Submits the existing checksum-verified DMG to Apple only under the explicit authorization.",
+        "Requires Accepted status before stapling and verifies Gatekeeper, signatures, and disk-image integrity.",
+        "Distinguishes the pre-submission checksum from the post-stapling checksum.",
+        "Does not create GitHub state."
       ]
     },
     {
@@ -32,7 +34,7 @@
       "files": [],
       "expectations": [
         "Uses gh rather than raw GitHub HTTP calls.",
-        "Targets the exact reviewed commit and attaches Build/SayIt-0.4.0.dmg.",
+        "Targets the exact reviewed remote commit and attaches the byte-identical stable SayIt.dmg asset plus the signed appcast.xml from Build/Update-0.4.0.",
         "Keeps the release in draft state.",
         "Does not publish without a separate explicit instruction."
       ]
@@ -47,6 +49,31 @@
         "Does not include fingerprints, key IDs, issuer IDs, emails, usernames, device names, or local paths in GitHub content.",
         "Scans proposed GitHub content for private information before upload.",
         "Preserves the configured Git author and committer identity."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "The DMG has its background PNG and Applications link, and the old layout validator passes, but Finder shows a plain white background and tiny icons. Fix the packaging and prepare a replacement candidate; do not notarize.",
+      "expected_output": "The agent restores the required icvp color fields, uses the packaging scripts to generate the DMG, and verifies the compressed artifact and regression tests without requiring manual review.",
+      "files": [],
+      "expectations": [
+        "Checks backgroundColorRed, backgroundColorGreen, and backgroundColorBlue are present as 1.0 even when backgroundType is 2.",
+        "Does not replace deterministic layout writing with Finder automation, sleeps, or sync alone.",
+        "Validates the final compressed artifact using the layout validator and regression suite; visual approval is not a release requirement.",
+        "Does not submit the replacement candidate to Apple."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The next version and build number are committed and the source is clean. Build and notarize the release using our standard process; stop before GitHub.",
+      "expected_output": "The agent runs the single authorized release command, waits for completion, and reports the notarized DMG and signed update assets without stopping for visual review.",
+      "files": [],
+      "expectations": [
+        "Uses SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh VERSION.",
+        "Does not reconstruct the build, packaging, signing, or notarization commands in a temporary script.",
+        "Does not request a Finder review or visual approval checkpoint.",
+        "Reports Apple acceptance and stapling only after the script verifies them.",
+        "Does not upload to GitHub."
       ]
     }
   ]

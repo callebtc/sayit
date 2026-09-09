@@ -1,349 +1,106 @@
 #!/bin/sh
+# One release entrypoint; all build and DMG checks live in the preparation helper.
 set -eu
-
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-build_root="$project_root/Build"
-derived_data="$build_root/DerivedData-Release"
-app_root="$derived_data/Build/Products/Release/SayIt.app"
-module_cache="$build_root/ModuleCache"
-swiftpm_cache="$build_root/SwiftPMCache"
-local_config="$project_root/.env.release"
-expected_team_id="${SAYIT_EXPECTED_TEAM_ID:-D7AHD3GLH6}"
-allow_notarization_upload="${SAYIT_ALLOW_NOTARIZATION_UPLOAD:-NO}"
-allow_dirty_worktree="${SAYIT_ALLOW_DIRTY_WORKTREE:-NO}"
-skip_tests="${SAYIT_SKIP_TESTS:-NO}"
-
+cd "$project_root"
+allow_upload=${SAYIT_ALLOW_NOTARIZATION_UPLOAD:-NO}
+mode=release
 usage() {
-    cat <<'EOF'
-Usage: SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh VERSION
+    cat <<'USAGE'
+Usage:
+  SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh VERSION
+  ./Scripts/release.sh --prepare VERSION
+  ./Scripts/release.sh --audit VERSION
+  SAYIT_ALLOW_NOTARIZATION_UPLOAD=YES ./Scripts/release.sh --notarize-existing VERSION SHA256
 
-Builds, signs, notarizes, staples, mounts, and audits a release DMG. This
-uploads only to Apple's notarization service; it never publishes to GitHub.
-
-One-time configuration may be stored in .env.release:
-  SAYIT_SIGN_IDENTITY='Developer ID Application identity or SHA-1 fingerprint'
-  SAYIT_NOTARY_PROFILE='notarytool Keychain profile name'
-  SAYIT_UPDATE_FEED_URL='GitHub latest-release appcast asset URL'
-  SAYIT_UPDATE_KEY_FILE='.env containing the private Sparkle signing seed'
-  SAYIT_SPARKLE_TOOLS_DIR='Directory containing Sparkle release tools'
-EOF
+Default: build, test, sign, package, audit, notarize, staple, and prepare updates.
+--prepare stops after generating and validating the signed DMG; no upload.
+--audit checks an existing DMG without modifying it.
+--notarize-existing resumes from an exact checksum without rebuilding.
+No visual review is required. GitHub publication is separate.
+USAGE
 }
-
-fail() {
-    echo "Release failed: $*" >&2
-    exit 1
-}
-
-verify_timestamped_code() {
-    code_path=$1
-    code_label=$2
-
-    [ -e "$code_path" ] || fail "$code_label is missing."
-    codesign --verify --strict --verbose=2 "$code_path"
-
-    code_signature=$(
-        codesign --display --verbose=4 "$code_path" 2>&1
-    )
-    printf '%s\n' "$code_signature" \
-        | grep -F "TeamIdentifier=$expected_team_id" >/dev/null \
-        || fail "$code_label is not signed by the expected team."
-    printf '%s\n' "$code_signature" | grep -F "Timestamp=" >/dev/null \
-        || fail "$code_label is missing a secure signing timestamp."
-}
-
-verify_release_code() {
-    verify_timestamped_code "$1" "$2"
-    printf '%s\n' "$code_signature" | grep -F "flags=0x10000(runtime)" >/dev/null \
-        || fail "$code_label does not have hardened runtime enabled."
-}
-
-case "$allow_dirty_worktree" in
-    YES|NO) ;;
-    *) fail "SAYIT_ALLOW_DIRTY_WORKTREE must be YES or NO." ;;
+fail() { echo "Release failed: $*" >&2; exit 1; }
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    --prepare) mode=prepare; shift ;;
+    --audit) mode=audit; shift ;;
+    --notarize-existing) mode=existing; shift ;;
 esac
-
-case "$skip_tests" in
-    YES|NO) ;;
-    *) fail "SAYIT_SKIP_TESTS must be YES or NO." ;;
-esac
-
-if [ "$#" -ne 1 ]; then
-    usage >&2
-    exit 2
-fi
-
-expected_version=$1
-case "$expected_version" in
-    ''|*[!0-9A-Za-z.+-]*|.*|*..*)
-        fail "VERSION must be a filename-safe release version."
-        ;;
-esac
-
-if [ -f "$local_config" ]; then
-    # This file is gitignored. Keep notarization credentials in Keychain;
-    # only non-secret identity/profile names belong here.
-    set -a
-    # shellcheck disable=SC1090
-    . "$local_config"
-    set +a
-fi
-
-: "${SAYIT_SIGN_IDENTITY:?Set SAYIT_SIGN_IDENTITY in .env.release or the environment.}"
-: "${SAYIT_NOTARY_PROFILE:?Set SAYIT_NOTARY_PROFILE in .env.release or the environment.}"
-SAYIT_UPDATE_FEED_URL=${SAYIT_UPDATE_FEED_URL:-https://github.com/callebtc/sayit/releases/latest/download/appcast.xml}
-
-if [ "$allow_notarization_upload" != "YES" ]; then
-    echo "Apple notarization upload was not explicitly approved." >&2
-    exit 2
-fi
-
-for command_name in codesign git hdiutil pgrep security shasum swift xcodegen xcrun; do
-    command -v "$command_name" >/dev/null 2>&1 \
-        || fail "required command is unavailable: $command_name"
-done
-
-if [ "$allow_dirty_worktree" != "YES" ] \
-    && [ -n "$(git -C "$project_root" status --porcelain --untracked-files=all)" ]; then
-    fail "the Git worktree is not clean. Commit the release state first."
-fi
-
-security find-identity -v -p codesigning \
-    | grep -F "$SAYIT_SIGN_IDENTITY" >/dev/null \
-    || fail "the configured Developer ID Application identity is unavailable."
-
-echo "Checking the notarization Keychain profile…"
-xcrun notarytool history \
-    --keychain-profile "$SAYIT_NOTARY_PROFILE" \
-    --output-format json >/dev/null
-
-echo "Building the signed release app…"
-SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
-SAYIT_DERIVED_DATA_PATH="$derived_data" \
-SAYIT_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
-SAYIT_UPDATE_FEED_URL="$SAYIT_UPDATE_FEED_URL" \
-    "$project_root/Scripts/build-app.sh"
-
-if [ "$skip_tests" = "NO" ]; then
-    echo "Running tests…"
-    mkdir -p "$module_cache" "$swiftpm_cache"
-
-    app_metallib="$app_root/Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
-    [ -f "$app_metallib" ] \
-        || fail "the signed app is missing the MLX Metal library required by tests."
-    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-    CLANG_MODULE_CACHE_PATH="$module_cache" \
-    SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
-    XDG_CACHE_HOME="$swiftpm_cache" \
-        xcrun swift build --build-tests
-    swiftpm_bin_path=$(xcrun swift build --show-bin-path)
-    test_executable="$swiftpm_bin_path/SayItPackageTests.xctest/Contents/MacOS/SayItPackageTests"
-    [ -x "$test_executable" ] \
-        || fail "the SwiftPM test executable is missing."
-    test_metallib="$(dirname "$test_executable")/mlx.metallib"
-    cp "$app_metallib" "$test_metallib"
-
-    if ! DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-        CLANG_MODULE_CACHE_PATH="$module_cache" \
-        SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
-        XDG_CACHE_HOME="$swiftpm_cache" \
-            xcrun swift test --disable-sandbox --skip-build; then
-        rm -f "$test_metallib"
-        fail "the Swift test suite failed."
-    fi
-    rm -f "$test_metallib"
+if [ "$mode" = existing ]; then
+    [ "$#" -eq 2 ] || { usage >&2; exit 2; }
+    expected_checksum=$2
+    printf '%s\n' "$expected_checksum" | grep -E '^[0-9a-f]{64}$' >/dev/null \
+        || fail 'SHA256 must be a lowercase 64-character digest.'
 else
-    echo "Skipping tests because SAYIT_SKIP_TESTS=YES."
+    [ "$#" -eq 1 ] || { usage >&2; exit 2; }
 fi
-
-echo "Testing the selected-text helper XPC connection…"
-SAYIT_APP_PATH="$app_root" \
-    "$project_root/Scripts/smoke-test-selection-xpc.sh"
-
-version=$(
-    /usr/libexec/PlistBuddy \
-        -c "Print :CFBundleShortVersionString" \
-        "$app_root/Contents/Info.plist"
-)
-build_number=$(
-    /usr/libexec/PlistBuddy \
-        -c "Print :CFBundleVersion" \
-        "$app_root/Contents/Info.plist"
-)
-
-[ "$version" = "$expected_version" ] \
-    || fail "built version $version does not match requested version $expected_version."
-
-case "$build_number" in
-    ''|*[!0-9]*) fail "CFBundleVersion must be a positive integer." ;;
-    0) fail "CFBundleVersion must be greater than zero." ;;
+version=$1
+printf '%s\n' "$version" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' >/dev/null \
+    || fail 'VERSION must be MAJOR.MINOR.PATCH.'
+case "$mode" in
+    prepare) exec "$project_root/Scripts/prepare-release-dmg.sh" "$version" ;;
+    audit) exec "$project_root/Scripts/prepare-release-dmg.sh" --audit "$version" ;;
 esac
-
+[ "$allow_upload" = YES ] || fail 'Apple notarization upload was not authorized. Use --prepare for a local DMG.'
+build_root="$project_root/Build"
 dmg_path="$build_root/SayIt-$version.dmg"
-[ ! -e "$build_root/Update-$version" ] \
-    || fail "the prepared update directory already exists; inspect it before retrying."
-update_key_file=${SAYIT_UPDATE_KEY_FILE:-$project_root/.env}
-embedded_update_key=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$app_root/Contents/Info.plist")
-file_update_key=$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-    xcrun swift "$project_root/Scripts/update-key.swift" public "$update_key_file")
-[ "$embedded_update_key" = "$file_update_key" ] \
-    || fail "the update signing key does not match the app."
-
-
-release_temp=$(mktemp -d "${TMPDIR:-/tmp}/sayit-release.XXXXXX")
-mountpoint="$release_temp/mount"
-notary_result="$release_temp/notary-result.json"
-mounted=NO
-
-cleanup() {
-    if [ "$mounted" = "YES" ]; then
-        hdiutil detach "$mountpoint" >/dev/null 2>&1 || true
-    fi
-    rm -rf "$release_temp"
-}
-trap cleanup EXIT
-
-echo "Packaging and signing the DMG…"
-SAYIT_APP_PATH="$app_root" \
-SAYIT_DISABLE_SECURE_TIMESTAMP=NO \
-SAYIT_DMG_SIGN_IDENTITY="$SAYIT_SIGN_IDENTITY" \
-SAYIT_LOCAL_DMG_PATH="$dmg_path" \
-    "$project_root/Scripts/package-local-dmg.sh"
-
-codesign --verify --deep --strict --verbose=2 "$app_root"
-verify_release_code "$app_root" "the app"
-verify_release_code \
-    "$app_root/Contents/Library/LaunchServices/SayItAgent.app" \
-    "the background service"
-verify_release_code \
-    "$app_root/Contents/Helpers/SayItCLI.app" \
-    "the CLI"
-verify_release_code \
-    "$app_root/Contents/Helpers/SayItSelectionAgent" \
-    "the selection helper"
-"$project_root/Scripts/validate-selection-bundle.sh" "$app_root"
-"$project_root/Scripts/validate-package-linkage.sh" "$app_root"
-"$project_root/Scripts/validate-updater.sh" "$app_root" "$expected_team_id"
-
-find "$app_root" -type f -name '*.dylib' -print \
-    | while IFS= read -r dylib_path; do
-        verify_timestamped_code "$dylib_path" "an embedded dynamic library"
-    done
-
-dmg_signature=$(
-    codesign --display --verbose=4 "$dmg_path" 2>&1
-)
-printf '%s\n' "$dmg_signature" | grep -F "TeamIdentifier=$expected_team_id" >/dev/null \
-    || fail "the DMG is not signed by the expected team."
-printf '%s\n' "$dmg_signature" | grep -F "Timestamp=" >/dev/null \
-    || fail "the DMG is missing a secure signing timestamp."
-
-echo "Submitting the DMG to Apple for notarization…"
-if ! xcrun notarytool submit \
-        "$dmg_path" \
-        --keychain-profile "$SAYIT_NOTARY_PROFILE" \
-        --wait \
-        --output-format json >"$notary_result"; then
-    if [ -s "$notary_result" ]; then
-        failed_notary_id=$(
-            /usr/bin/plutil -extract id raw -o - "$notary_result" \
-                2>/dev/null \
-                || printf 'unknown'
-        )
-        fail "Apple notarization failed (submission $failed_notary_id)."
-    fi
-    fail "Apple notarization failed before returning a submission ID."
+app_root="$build_root/DerivedData-Release/Build/Products/Release/SayIt.app"
+update_output="$build_root/Update-$version"
+notary_result="$build_root/notarization-$version.json"
+[ ! -e "$update_output" ] || fail 'Update assets already exist; inspect them before retrying.'
+[ ! -e "$notary_result" ] || fail 'A submission record already exists; inspect its status before retrying.'
+if [ "$mode" = release ]; then
+    [ -z "$(git status --porcelain --untracked-files=all)" ] \
+        || fail 'Commit the prepared release source before running the full release.'
+    [ ! -e "$dmg_path" ] || fail 'DMG already exists. Use --notarize-existing with its recorded checksum to resume.'
+else
+    [ -f "$dmg_path" ] || fail 'The requested DMG does not exist.'
+    actual_checksum=$(shasum -a 256 "$dmg_path" | awk '{print $1}')
+    [ "$actual_checksum" = "$expected_checksum" ] || fail 'The DMG checksum differs from the expected artifact.'
 fi
 
-notary_status=$(
-    /usr/bin/plutil -extract status raw -o - "$notary_result"
-)
-notary_id=$(
-    /usr/bin/plutil -extract id raw -o - "$notary_result"
-)
-[ "$notary_status" = "Accepted" ] \
-    || fail "Apple notarization status was $notary_status (submission $notary_id)."
+test -f .env.release && git check-ignore -q .env.release \
+    || fail 'An ignored .env.release is required.'
+set -a
+. ./.env.release
+set +a
+: "${SAYIT_NOTARY_PROFILE:?Configure SAYIT_NOTARY_PROFILE in .env.release.}"
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
-echo "Stapling and validating Apple's notarization ticket…"
+echo 'Checking notarization credentials…'
+xcrun notarytool history --keychain-profile "$SAYIT_NOTARY_PROFILE" --output-format json >/dev/null
+if [ "$mode" = release ]; then
+    "$project_root/Scripts/prepare-release-dmg.sh" "$version"
+    [ -z "$(git status --porcelain --untracked-files=all)" ] \
+        || fail 'Source changed during preparation; inspect it before submission.'
+else
+    "$project_root/Scripts/prepare-release-dmg.sh" --audit "$version"
+fi
+checksum=$(shasum -a 256 "$dmg_path" | awk '{print $1}')
+if [ "$mode" = existing ]; then
+    [ "$checksum" = "$expected_checksum" ] || fail 'The DMG changed during validation.'
+fi
+printf '%s  %s\n' "$checksum" "SayIt-$version.dmg" > "$build_root/release-$version-pre-notarization.sha256"
+
+echo 'Submitting the validated DMG to Apple…'
+if ! xcrun notarytool submit "$dmg_path" \
+    --keychain-profile "$SAYIT_NOTARY_PROFILE" --wait --output-format json > "$notary_result"; then
+    fail 'Notarization submission failed. Inspect the saved result before retrying.'
+fi
+notary_status=$(/usr/bin/plutil -extract status raw -o - "$notary_result")
+notary_id=$(/usr/bin/plutil -extract id raw -o - "$notary_result")
+[ "$notary_status" = Accepted ] || fail "Apple notarization status was $notary_status (submission $notary_id)."
+
 xcrun stapler staple "$dmg_path"
 xcrun stapler validate "$dmg_path"
-codesign --verify --verbose=2 "$dmg_path"
-spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg_path"
-
-echo "Mounting and auditing the final DMG…"
-mkdir "$mountpoint"
-hdiutil attach \
-    -readonly \
-    -nobrowse \
-    -mountpoint "$mountpoint" \
-    "$dmg_path" >/dev/null
-mounted=YES
-
-mounted_app="$mountpoint/Say It.app"
-[ -d "$mounted_app" ] || fail "Say It.app is missing from the DMG."
-[ -L "$mountpoint/Applications" ] || fail "the Applications symlink is missing."
-[ "$(readlink "$mountpoint/Applications")" = "/Applications" ] \
-    || fail "the Applications symlink has an unexpected target."
-[ -f "$mountpoint/.background/dmg-background.png" ] \
-    || fail "the DMG background image is missing."
-"$project_root/Scripts/dmg-layout.sh" validate "$mountpoint"
-
-top_level_count=$(
-    find "$mountpoint" -mindepth 1 -maxdepth 1 \
-        ! -name '.DS_Store' \
-        ! -name '.background' \
-        | wc -l \
-        | tr -d ' '
-)
-[ "$top_level_count" = "2" ] \
-    || fail "the DMG contains unexpected top-level items."
-
-codesign --verify --deep --strict --verbose=2 "$mounted_app"
-verify_release_code "$mounted_app" "the mounted app"
-verify_release_code \
-    "$mounted_app/Contents/Library/LaunchServices/SayItAgent.app" \
-    "the mounted background service"
-verify_release_code \
-    "$mounted_app/Contents/Helpers/SayItCLI.app" \
-    "the mounted CLI"
-verify_release_code \
-    "$mounted_app/Contents/Helpers/SayItSelectionAgent" \
-    "the mounted selection helper"
-"$project_root/Scripts/validate-selection-bundle.sh" "$mounted_app"
-"$project_root/Scripts/validate-package-linkage.sh" "$mounted_app"
-"$project_root/Scripts/validate-updater.sh" "$mounted_app" "$expected_team_id"
-
-find "$mounted_app" -type f -name '*.dylib' -print \
-    | while IFS= read -r dylib_path; do
-        verify_timestamped_code "$dylib_path" \
-            "a mounted embedded dynamic library"
-    done
-
-# Check regular files only so the /Applications symlink is never traversed.
-if find "$mounted_app" -type f -exec grep -a -E -l \
-    '/Users/|file:///Users/|/home/|file:///home/' {} + \
-    | grep -q .; then
-    fail "the mounted app contains a local user path."
-fi
-
-hdiutil detach "$mountpoint" >/dev/null
-mounted=NO
-hdiutil verify "$dmg_path"
-
-update_output="$build_root/Update-$version"
+codesign --verify --strict "$dmg_path"
+spctl --assess --type open --context context:primary-signature "$dmg_path"
+"$project_root/Scripts/prepare-release-dmg.sh" --audit "$version"
 "$project_root/Scripts/prepare-update-feed.sh" "$dmg_path" "$app_root" "$update_output"
-
-checksum=$(
-    shasum -a 256 "$dmg_path" | awk '{print $1}'
-)
-
-cat <<EOF
-
-Release artifact ready:
-  Version: $version ($build_number)
-  DMG: $dmg_path
-  Update assets: $update_output/SayIt.dmg and $update_output/appcast.xml
-  SHA-256: $checksum
-  Notarization submission: $notary_id
-
-No GitHub upload was performed.
-EOF
+checksum=$(shasum -a 256 "$dmg_path" | awk '{print $1}')
+printf '%s  %s\n' "$checksum" "SayIt-$version.dmg" > "$build_root/release-$version-notarized.sha256"
+printf '\nRelease ready: Say It %s\nDMG: %s\nSHA-256: %s\nNotarization: %s\n' \
+    "$version" "$dmg_path" "$checksum" "$notary_id"
+echo "Update assets: $update_output/SayIt.dmg and appcast.xml"
+echo 'No GitHub upload was performed.'
