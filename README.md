@@ -63,6 +63,18 @@ Say It requires macOS 15 or later on an Apple silicon Mac.
 Both shortcuts can be changed in Settings. Say It queries the current selection
 or reads clipboard text only when you explicitly invoke the matching action.
 
+### Open the app window
+
+Open Say It from Spotlight, Finder, or the Dock to show its main window. The
+sidebar provides access to General, Voices, Models, Speech, and the other
+settings. Reopening the app brings back the same window and selected section.
+Closing the window keeps Say It running so its reading shortcuts remain
+available. Use **Say It → Quit** to stop the app.
+
+The menu-bar **Settings…** button and **Command–comma** open the same window.
+Local builds are named **Say It Local** and keep their settings and model
+library separate from the official app.
+
 ### Terminal
 
 The app includes a `sayit` CLI for speech, playback, models, voices, and
@@ -139,6 +151,11 @@ used for the app. The build does not select a certificate from your keychain
 automatically.
 
 Tests run with `swift test --disable-sandbox`.
+
+Run the launch, reopen, and onboarding UI tests with `./Scripts/test-windows.sh`.
+This builds and signs a local app and test runner; it requires a macOS desktop
+session with Xcode UI testing available. To run one test, pass an Xcode filter,
+for example `-only-testing:SayItUITests/SayItUITests/testLaunchOpensMainWindow`.
 
 ## More screenshots
 

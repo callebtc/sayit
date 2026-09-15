@@ -4,7 +4,7 @@ import SwiftUI
 struct ServiceRepairView: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.standardSpacing) {
@@ -96,7 +96,8 @@ struct ServiceRepairView: View {
         dismiss()
         Task {
             try? await Task.sleep(for: .milliseconds(150))
-            openSettings()
+            WindowActivator.prepareForWindowPresentation()
+            openWindow(id: AppWindowID.main)
             NSApp.activate()
         }
     }
