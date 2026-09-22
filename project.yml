@@ -526,6 +526,17 @@ targets:
         TEST_TARGET_NAME: SayIt
 
 schemes:
+  SayItWindowTests:
+    build:
+      targets:
+        SayIt: all
+        SayItUITests: [test]
+    test:
+      config: Release
+      debugEnabled: false
+      targets:
+        - SayItUITests
+
   SayItModelCatalogTests:
     build:
       targets:
