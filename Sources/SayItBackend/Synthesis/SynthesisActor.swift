@@ -11,6 +11,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let minimumListItemPause: TimeInterval = 0.25
     // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
     // Short inputs let each request reach EOS instead of truncating mid-block.
     static let orpheusChunker = TextChunker(
@@ -44,6 +45,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     ) {
         self.modelURLProvider = modelURLProvider
         self.chunker = chunker
+    }
+
+    /// Insert silence at list boundaries even when paragraph pauses are disabled.
+    static func pauseFrameCount(
+        sampleRate: Double,
+        paragraphPause: Double,
+        startsListItem: Bool
+    ) -> Int {
+        let minimumPause = startsListItem ? minimumListItemPause : 0
+        return Int(sampleRate * max(paragraphPause, minimumPause))
     }
 
     func synthesize(
@@ -363,10 +374,14 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceText = anchorText
         }
 
+        let listItemStartOffsets = Set(
+            request.cleanedText.listItemStartOffsets ?? []
+        )
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
+            listItemStartOffsets: listItemStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
         var conditioner = try PCMStreamConditioner(
@@ -427,7 +442,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     let pauseFrameCount = chunk.startsParagraph
                         && generatedSamples > 0
                         && chunkSamples == 0
-                        ? Int(Double(loadedModel.sampleRate) * paragraphPause)
+                        ? Self.pauseFrameCount(
+                            sampleRate: Double(loadedModel.sampleRate),
+                            paragraphPause: paragraphPause,
+                            startsListItem: listItemStartOffsets.contains(
+                                chunk.sourceRange.lowerBound
+                            )
+                        )
                         : 0
                     let speechStartFrames = conditioner.speechStartFrameOffset(
                         logicalChunkIndex: completedChunkCount,
