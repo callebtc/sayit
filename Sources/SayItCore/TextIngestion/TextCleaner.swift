@@ -35,7 +35,9 @@ public actor TextCleaner: TextIngesting {
             ),
             requiresLongTextConfirmation: parsed.text.count
                 > Self.confirmationThreshold,
-            listItemStartOffsets: parsed.listItemStartOffsets.isEmpty ? nil : parsed.listItemStartOffsets
+            listItemStartOffsets: parsed.listItemStartOffsets.isEmpty
+                ? nil
+                : parsed.listItemStartOffsets
         )
     }
 

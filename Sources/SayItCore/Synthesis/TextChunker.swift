@@ -20,8 +20,10 @@ public struct TextChunker: Sendable {
         listItemStartOffsets: Set<Int> = []
     ) -> [SpeechChunk] {
         chunks(
-            for: text, separatesParagraphs: separatesParagraphs,
-            listItemStartOffsets: listItemStartOffsets, checkingCancellation: {}
+            for: text,
+            separatesParagraphs: separatesParagraphs,
+            listItemStartOffsets: listItemStartOffsets,
+            checkingCancellation: {}
         )
     }
 
@@ -48,8 +50,12 @@ public struct TextChunker: Sendable {
 
         for paragraph in try paragraphs(in: text, checkingCancellation: checkingCancellation) {
             try checkingCancellation()
-            let isListItem = listItemStartOffsets.contains(paragraph.sourceOffset)
-            if isListItem { flush() }
+            let isListItem = listItemStartOffsets.contains(
+                paragraph.sourceOffset
+            )
+            if isListItem {
+                flush()
+            }
             let sentences = sentences(
                 in: text,
                 within: paragraph.range,

@@ -7,7 +7,9 @@ public struct CleanedText: Codable, Equatable, Sendable {
     public let detectedLanguage: String?
     public let cleanupSummary: CleanupSummary
     public let requiresLongTextConfirmation: Bool
-    /// Character offsets of list items after cleanup. Optional for older stored records.
+
+    /// Character offsets of list items after cleanup.
+    /// Optional so older stored records remain decodable.
     public let listItemStartOffsets: [Int]?
 
     public init(

@@ -5,36 +5,52 @@ import Testing
 
 @Suite("PCM stream conditioning")
 struct PCMStreamConditionerTests {
-    @Test("Unpunctuated list items receive a quarter second of actual silence", arguments: [0.0, 0.18, 0.5])
+    @Test(
+        "Unpunctuated list items receive a quarter second of actual silence",
+        arguments: [0.0, 0.18, 0.5]
+    )
     func listItemSilence(paragraphPause: Double) async throws {
-        let cleaned = try await TextCleaner().ingest(.init(source: .selection, plainText: "- Milk\n- Bread"))
+        let cleaned = try await TextCleaner().ingest(
+            .init(source: .selection, plainText: "- Milk\n- Bread")
+        )
         let listOffsets = Set(cleaned.listItemStartOffsets ?? [])
-        let chunks = TextChunker().chunks(for: cleaned.text, listItemStartOffsets: listOffsets)
+        let chunks = TextChunker().chunks(
+            for: cleaned.text,
+            listItemStartOffsets: listOffsets
+        )
         #expect(chunks.map(\.text) == ["Milk", "Bread"])
         var conditioner = try PCMStreamConditioner(sampleRate: 1_000)
         var output: [Float] = []
         for (index, chunk) in chunks.enumerated() {
             let frames = index == 0 ? 0 : SynthesisActor.pauseFrameCount(
-                sampleRate: 1_000, paragraphPause: paragraphPause,
+                sampleRate: 1_000,
+                paragraphPause: paragraphPause,
                 startsListItem: listOffsets.contains(chunk.sourceRange.lowerBound)
             )
             output += try conditioner.append(
-                [Float](repeating: 0.5, count: 100), logicalChunkIndex: index,
-                startsParagraph: chunk.startsParagraph, paragraphPauseFrameCount: frames
+                [Float](repeating: 0.5, count: 100),
+                logicalChunkIndex: index,
+                startsParagraph: chunk.startsParagraph,
+                paragraphPauseFrameCount: frames
             )
             // Another streaming packet from the same item must not repeat the pause.
             output += try conditioner.append(
-                [Float](repeating: 0.5, count: 100), logicalChunkIndex: index,
-                startsParagraph: chunk.startsParagraph, paragraphPauseFrameCount: frames
+                [Float](repeating: 0.5, count: 100),
+                logicalChunkIndex: index,
+                startsParagraph: chunk.startsParagraph,
+                paragraphPauseFrameCount: frames
             )
         }
         output += conditioner.finish()
         let expectedFrames = Int(max(paragraphPause, 0.25) * 1_000)
         #expect(output.count == 400 + expectedFrames)
         #expect(output[200..<(200 + expectedFrames)].allSatisfy { $0 == 0 })
-        #expect(SynthesisActor.pauseFrameCount(
-            sampleRate: 1_000, paragraphPause: paragraphPause, startsListItem: false
-        ) == Int(paragraphPause * 1_000))
+        let paragraphFrames = SynthesisActor.pauseFrameCount(
+            sampleRate: 1_000,
+            paragraphPause: paragraphPause,
+            startsListItem: false
+        )
+        #expect(paragraphFrames == Int(paragraphPause * 1_000))
     }
 
     @Test("Speech timestamps account for the outgoing tail and paragraph silence once")

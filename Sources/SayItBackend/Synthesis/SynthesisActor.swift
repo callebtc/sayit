@@ -11,6 +11,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let minimumListItemPause: TimeInterval = 0.25
     // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
     // Short inputs let each request reach EOS instead of truncating mid-block.
     static let orpheusChunker = TextChunker(
@@ -28,13 +29,6 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private let modelURLProvider: ModelURLProvider
     private var chunker: TextChunker
     private var chunkDelay: Double = 0
-    /// List boundaries always receive real silence, even with paragraph pauses disabled.
-    static func pauseFrameCount(
-        sampleRate: Double, paragraphPause: Double, startsListItem: Bool
-    ) -> Int {
-        Int(sampleRate * max(paragraphPause, startsListItem ? 0.25 : 0))
-    }
-
     private var paragraphPause: Double = 0.18
     private var idleUnloadDelay: Double = 600
     private var loadedModel: SpeechGenerationModel?
@@ -51,6 +45,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     ) {
         self.modelURLProvider = modelURLProvider
         self.chunker = chunker
+    }
+
+    /// Insert silence at list boundaries even when paragraph pauses are disabled.
+    static func pauseFrameCount(
+        sampleRate: Double,
+        paragraphPause: Double,
+        startsListItem: Bool
+    ) -> Int {
+        let minimumPause = startsListItem ? minimumListItemPause : 0
+        return Int(sampleRate * max(paragraphPause, minimumPause))
     }
 
     func synthesize(
@@ -370,7 +374,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceText = anchorText
         }
 
-        let listItemStartOffsets = Set(request.cleanedText.listItemStartOffsets ?? [])
+        let listItemStartOffsets = Set(
+            request.cleanedText.listItemStartOffsets ?? []
+        )
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
@@ -439,7 +445,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         ? Self.pauseFrameCount(
                             sampleRate: Double(loadedModel.sampleRate),
                             paragraphPause: paragraphPause,
-                            startsListItem: listItemStartOffsets.contains(chunk.sourceRange.lowerBound)
+                            startsListItem: listItemStartOffsets.contains(
+                                chunk.sourceRange.lowerBound
+                            )
                         )
                         : 0
                     let speechStartFrames = conditioner.speechStartFrameOffset(

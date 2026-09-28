@@ -53,14 +53,18 @@ struct TextParser: Sendable {
         // A block inside an HTML list item can put whitespace after its marker.
         // Move the marker next to its content before computing character offsets.
         let marked = replacingMatches(
-            in: parsed.text, pattern: listMarker + #"\s+"#, with: listMarker
+            in: parsed.text,
+            pattern: listMarker + #"\s+"#,
+            with: listMarker
         )
         let normalized = normalize(marked)
         var text = ""
         var listItemStartOffsets: [Int] = []
         let pieces = normalized.components(separatedBy: listMarker)
         for (index, piece) in pieces.enumerated() {
-            if index > 0 { listItemStartOffsets.append(text.count) }
+            if index > 0 {
+                listItemStartOffsets.append(text.count)
+            }
             text += piece
         }
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -68,8 +72,11 @@ struct TextParser: Sendable {
             text: text,
             sourceFormat: parsed.sourceFormat,
             removedCodeBlocks: parsed.removedCodeBlocks,
-            normalizedWhitespace: text != parsed.text.replacing(listMarker, with: ""),
-            listItemStartOffsets: Array(Set(listItemStartOffsets.filter { $0 < text.count })).sorted()
+            normalizedWhitespace: text
+                != parsed.text.replacing(listMarker, with: ""),
+            listItemStartOffsets: Array(
+                Set(listItemStartOffsets.filter { $0 < text.count })
+            ).sorted()
         )
     }
 
@@ -446,7 +453,9 @@ struct TextParser: Sendable {
             // Neural voices can pronounce the arrow as an unrelated sound.
             // Expand this transition explicitly, including text/emoji presentation.
             value = replacingMatches(
-                in: value, pattern: "→[\u{FE0E}\u{FE0F}]?", with: " to "
+                in: value,
+                pattern: "→[\u{FE0E}\u{FE0F}]?",
+                with: " to "
             )
         } else {
             value = canonical
