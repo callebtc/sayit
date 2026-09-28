@@ -34,7 +34,8 @@ public actor TextCleaner: TextIngesting {
                 normalizedWhitespace: parsed.normalizedWhitespace
             ),
             requiresLongTextConfirmation: parsed.text.count
-                > Self.confirmationThreshold
+                > Self.confirmationThreshold,
+            listItemStartOffsets: parsed.listItemStartOffsets.isEmpty ? nil : parsed.listItemStartOffsets
         )
     }
 

@@ -28,6 +28,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private let modelURLProvider: ModelURLProvider
     private var chunker: TextChunker
     private var chunkDelay: Double = 0
+    /// List boundaries always receive real silence, even with paragraph pauses disabled.
+    static func pauseFrameCount(
+        sampleRate: Double, paragraphPause: Double, startsListItem: Bool
+    ) -> Int {
+        Int(sampleRate * max(paragraphPause, startsListItem ? 0.25 : 0))
+    }
+
     private var paragraphPause: Double = 0.18
     private var idleUnloadDelay: Double = 600
     private var loadedModel: SpeechGenerationModel?
@@ -363,10 +370,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceText = anchorText
         }
 
+        let listItemStartOffsets = Set(request.cleanedText.listItemStartOffsets ?? [])
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
+            listItemStartOffsets: listItemStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
         var conditioner = try PCMStreamConditioner(
@@ -427,7 +436,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     let pauseFrameCount = chunk.startsParagraph
                         && generatedSamples > 0
                         && chunkSamples == 0
-                        ? Int(Double(loadedModel.sampleRate) * paragraphPause)
+                        ? Self.pauseFrameCount(
+                            sampleRate: Double(loadedModel.sampleRate),
+                            paragraphPause: paragraphPause,
+                            startsListItem: listItemStartOffsets.contains(chunk.sourceRange.lowerBound)
+                        )
                         : 0
                     let speechStartFrames = conditioner.speechStartFrameOffset(
                         logicalChunkIndex: completedChunkCount,
