@@ -6,6 +6,25 @@ import Testing
 
 @Suite("Backend persistence", .serialized)
 struct BackendPersistenceTests {
+    @Test("Selection identity is optional in older pending job records")
+    func selectionIdentityCompatibility() throws {
+        let original = PendingSpeechJob(
+            submission: SpeechSubmission(text: "Text", source: .selection),
+            cleanedText: nil,
+            selectionIdentity: "Text"
+        )
+        let data = try JSONEncoder().encode(original)
+        #expect(try JSONDecoder().decode(PendingSpeechJob.self, from: data).selectionIdentity == "Text")
+        var legacy = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        legacy.removeValue(forKey: "selectionIdentity")
+        let decoded = try JSONDecoder().decode(
+            PendingSpeechJob.self,
+            from: JSONSerialization.data(withJSONObject: legacy)
+        )
+        #expect(decoded.selectionIdentity == nil)
+        #expect(decoded.submission.text == "Text")
+    }
+
     @Test("Settings use defaults for missing and corrupt files")
     @MainActor
     func settingsDefaultsAndCorruptionRecovery() throws {

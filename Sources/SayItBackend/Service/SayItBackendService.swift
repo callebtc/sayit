@@ -10,6 +10,11 @@ public final class SayItBackendService: SayItService {
     private let modelManager: ModelManager
     private let synthesizer: any BackendSpeechSynthesizing
     private let textCleaner = TextCleaner()
+    private let selectionIdentityCleaner = TextCleaner(options: .init(
+        stripMarkdown: false,
+        stripCodeBlocks: false,
+        stripSpecialCharacters: false
+    ))
     private let playback: any BackendPlaybackControlling
     private let history: HistoryStore
     private let audioArchive: AudioArchive
@@ -42,6 +47,7 @@ public final class SayItBackendService: SayItService {
     private var pendingJobs: [UUID: PendingSpeechJob] = [:]
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
+    private var playbackIsPaused = false
     private var activeRequest: SpeechRequest?
     private var playbackCompletionJobID: UUID?
     private var playbackCompletionContinuation: CheckedContinuation<
@@ -439,6 +445,10 @@ public final class SayItBackendService: SayItService {
             )
         case .submit(let submission):
             return .job(try await submit(submission))
+        case .selectionShortcut(let submission, let expectedJobID, let expectedText):
+            return try await handleSelectionShortcut(
+                submission, expectedJobID: expectedJobID, expectedText: expectedText
+            )
         case .jobs:
             return .jobs(jobOrder.compactMap { jobsByID[$0] })
         case .confirmJob(let id):
@@ -448,14 +458,10 @@ public final class SayItBackendService: SayItService {
             await cancelJob(id)
             return .accepted
         case .play:
-            playback.play()
-            updateActiveJobState(.playing)
-            revision &+= 1
+            resumePlayback()
             return .accepted
         case .pause:
-            playback.pause()
-            updateActiveJobState(.paused)
-            revision &+= 1
+            pausePlayback()
             return .accepted
         case .clear:
             await cancelActiveJob()
@@ -1462,7 +1468,96 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private func submit(_ submission: SpeechSubmission) async throws -> SpeechJob {
+    private static func selectionIdentity(_ text: String) -> String {
+        text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    private func selectionIdentity(
+        for submission: SpeechSubmission
+    ) async throws -> String {
+        if submission.inputFormat == .plainText || submission.inputFormat == .markdown {
+            return Self.selectionIdentity(submission.text)
+        }
+        let cleaned = try await selectionIdentityCleaner.ingest(payload(for: submission))
+        return Self.selectionIdentity(cleaned.text)
+    }
+
+    private func handleSelectionShortcut(
+        _ submission: SpeechSubmission?,
+        expectedJobID: UUID?,
+        expectedText: String
+    ) async throws -> ServiceResponse {
+        let selectedText: String
+        if let submission {
+            selectedText = try await selectionIdentity(for: submission)
+        } else {
+            selectedText = ""
+        }
+        // Representation extraction can suspend; validate the capture context after it.
+        guard activeJobID == expectedJobID,
+              activeJobID != nil || playback.spokenText == expectedText else {
+            return .accepted
+        }
+        let pending = activeJobID.flatMap { pendingJobs[$0] }
+        let currentText = pending?.selectionIdentity
+            ?? pending?.cleanedText?.text
+            ?? pending?.submission.text
+            ?? playback.spokenText
+        let hasPlayback = activeJobID != nil
+            || [.preparing, .buffering, .playing, .paused].contains(playback.state)
+        if hasPlayback,
+           selectedText.isEmpty || selectedText == Self.selectionIdentity(currentText) {
+            if playbackIsPaused || playback.state == .paused {
+                resumePlayback()
+            } else {
+                pausePlayback()
+            }
+            return .accepted
+        }
+        guard let submission, !selectedText.isEmpty else {
+            throw ServiceFailure(
+                code: "selection.no_selection",
+                message: "No readable text is selected in the frontmost app."
+            )
+        }
+        // This command is a selection action, never an enqueue operation.
+        return .job(try await submit(
+            submission, interruptCurrent: true, selectionIdentity: selectedText
+        ))
+    }
+
+    private func pausePlayback() {
+        guard activeJobID != nil
+            || [.preparing, .buffering, .playing, .paused].contains(playback.state) else {
+            return
+        }
+        playbackIsPaused = true
+        playback.pause()
+        updateActiveJobState(.paused)
+        statusText = "Paused"
+        revision &+= 1
+    }
+
+    private func resumePlayback() {
+        playbackIsPaused = false
+        if let id = activeJobID, pendingJobs[id]?.cleanedText == nil {
+            updateJob(id, state: .parsing, progress: 0.02)
+            statusText = "Cleaning text"
+            revision &+= 1
+            return
+        }
+        playback.play()
+        let state: SpeechJobState = playback.state == .playing ? .playing : .buffering
+        updateActiveJobState(state)
+        statusText = playback.state == .playing ? "Playing" : "Preparing speech"
+        revision &+= 1
+    }
+
+    private func submit(
+        _ submission: SpeechSubmission,
+        interruptCurrent: Bool = false,
+        selectionIdentity: String? = nil
+    ) async throws -> SpeechJob {
         guard !modelSwitchIsPending else {
             throw ServiceFailure(
                 code: "model.switch_in_progress",
@@ -1490,7 +1585,9 @@ public final class SayItBackendService: SayItService {
             )
         }
 
-        switch submission.queuePolicy {
+        let queuePolicy: QueuePolicy = interruptCurrent
+            ? .interruptCurrent : submission.queuePolicy
+        switch queuePolicy {
         case .enqueue:
             break
         case .interruptCurrent:
@@ -1506,9 +1603,13 @@ public final class SayItBackendService: SayItService {
         jobOrder.insert(job.id, at: 0)
         pendingJobs[job.id] = PendingSpeechJob(
             submission: submission,
-            cleanedText: nil
+            cleanedText: nil,
+            selectionIdentity: selectionIdentity ?? (
+                [.plainText, .markdown].contains(submission.inputFormat)
+                    ? Self.selectionIdentity(submission.text) : nil
+            )
         )
-        if submission.queuePolicy == .interruptCurrent {
+        if queuePolicy == .interruptCurrent {
             queuedJobIDs.insert(job.id, at: 0)
         } else {
             queuedJobIDs.append(job.id)
@@ -1529,6 +1630,7 @@ public final class SayItBackendService: SayItService {
         }
         queuedJobIDs.removeFirst()
         activeJobID = id
+        playbackIsPaused = false
         persistJobJournal()
         jobTask = Task { [weak self] in
             await self?.processJob(id)
@@ -1575,6 +1677,7 @@ public final class SayItBackendService: SayItService {
             persistJobJournal()
             if cleaned.requiresLongTextConfirmation,
                !pending.submission.permitsLongText {
+                playbackIsPaused = false
                 updateJob(id, state: .awaitingConfirmation, progress: 0.05)
                 activeJobID = nil
                 jobTask = nil
@@ -1787,6 +1890,7 @@ public final class SayItBackendService: SayItService {
                 / request.speakingPace.rawValue,
             modelID: request.model.id.rawValue
         )
+        if playbackIsPaused { playback.pause() }
         playback.setSpokenText(cleaned.text)
         spokenTextCharacterCount = cleaned.characterCount
         lastRecordedTextEnd = 0
@@ -1831,6 +1935,7 @@ public final class SayItBackendService: SayItService {
         _ event: SynthesisEvent,
         request: SpeechRequest
     ) async throws {
+        guard activeJobID == request.id else { throw CancellationError() }
         switch event {
         case .loadingModel:
             statusText = "Loading \(request.model.displayName)"
@@ -1847,8 +1952,9 @@ public final class SayItBackendService: SayItService {
             let revisionBeforeAudio = revision
             flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
+            if playbackIsPaused { playback.pause() }
             spokenAudioCursor = playback.generatedDuration
-            if playback.shouldStartWhenBuffered {
+            if !playbackIsPaused, playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
                 updateJob(request.id, state: .playing, progress: playbackProgress)
@@ -1862,7 +1968,7 @@ public final class SayItBackendService: SayItService {
         case .metrics(let metrics):
             finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
             playback.observeSynthesisMetrics(metrics)
-            if playback.shouldStartWhenBuffered {
+            if !playbackIsPaused, playback.shouldStartWhenBuffered {
                 playback.play()
                 statusText = "Playing"
                 updateJob(
@@ -1890,7 +1996,7 @@ public final class SayItBackendService: SayItService {
             if request.source != .preview {
                 try await archiveCompletedRequest(request)
             }
-            activeRequest = nil
+            if activeJobID == request.id { activeRequest = nil }
         case .cancelled:
             throw CancellationError()
         }
@@ -1947,6 +2053,7 @@ public final class SayItBackendService: SayItService {
         startNext: Bool = true,
         forModelSwitch: Bool = false
     ) async {
+        playbackIsPaused = false
         guard let id = activeJobID else {
             if forModelSwitch {
                 await playback.stopForModelSwitch()
@@ -2020,6 +2127,7 @@ public final class SayItBackendService: SayItService {
         resumePlaybackCompletion(for: id, with: playback.state)
         stopSynthesisWatchdog(for: id)
         activeJobID = nil
+        playbackIsPaused = false
         activeRequest = nil
         jobTask = nil
         statusText = errorMessage == nil ? "Ready to speak" : "Needs attention"
@@ -2050,6 +2158,8 @@ public final class SayItBackendService: SayItService {
         progress: Double
     ) {
         guard var job = jobsByID[id], !job.state.isTerminal else { return }
+        let state = playbackIsPaused && activeJobID == id && !state.isTerminal
+            ? SpeechJobState.paused : state
         let previousState = job.state
         let boundedProgress = min(max(progress, 0), 1)
         guard state != previousState || boundedProgress != job.progress else {
@@ -2176,10 +2286,15 @@ public final class SayItBackendService: SayItService {
     private func playbackStateDidChange(_ state: PlaybackState) {
         switch state {
         case .playing:
+            playbackIsPaused = false
             updateActiveJobState(.playing)
         case .paused:
+            playbackIsPaused = true
             updateActiveJobState(.paused)
         case .buffering:
+            // A paused controller enters buffering when playback is resumed,
+            // including through the system media controls.
+            playbackIsPaused = false
             updateActiveJobState(.buffering)
         default:
             break
@@ -2325,7 +2440,7 @@ public final class SayItBackendService: SayItService {
         return ServiceSnapshot(
             serviceVersion: serviceVersion,
             revision: revision,
-            statusText: statusText,
+            statusText: playbackIsPaused ? "Paused" : statusText,
             lastError: errorMessage,
             httpServiceError: httpServiceError,
             activeJob: activeJob,
@@ -2339,7 +2454,8 @@ public final class SayItBackendService: SayItService {
             },
             queueBlock: queueBlockSnapshot,
             playback: PlaybackSnapshot(
-                state: playback.state.rawValue,
+                state: playbackIsPaused
+                    ? PlaybackState.paused.rawValue : playback.state.rawValue,
                 elapsed: playback.elapsed,
                 generatedDuration: playback.generatedDuration,
                 estimatedDuration: playback.estimatedDuration,

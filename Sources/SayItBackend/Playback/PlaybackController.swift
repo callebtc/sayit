@@ -219,6 +219,13 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func play() {
         cancelAudioConfigurationRecovery()
+        if state == .paused, !synthesisIsComplete {
+            state = .buffering
+            guard shouldStartWhenBuffered else {
+                updateNowPlaying()
+                return
+            }
+        }
         do {
             try startPlayback()
         } catch {
@@ -227,7 +234,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func pause() {
-        guard state == .playing else { return }
+        guard [.preparing, .buffering, .playing].contains(state) else { return }
         elapsed = AudioRouteRecoveryPolicy.stableAnchor(
             lastRendered: lastStablePlaybackTime,
             fallback: currentPlaybackTime(),

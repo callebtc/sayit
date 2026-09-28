@@ -1,8 +1,42 @@
+import Foundation
+import SayItCore
 import Testing
 @testable import SayItBackend
 
 @Suite("Playback controller calculations")
 struct PlaybackControllerBoundaryTests {
+    @Test("Pausing preparation holds arriving audio and completion until resumed")
+    @MainActor
+    func pausesBeforeFirstAudio() throws {
+        let playback = PlaybackController()
+        let id = UUID()
+        playback.prepare(requestID: id, title: "Test", estimatedDuration: 10, modelID: nil)
+        playback.pause()
+        #expect(playback.state == .paused)
+        try playback.enqueue(AudioChunk(
+            requestID: id, index: 0,
+            samples: [Float](repeating: 0.1, count: 2_400),
+            sampleRate: 24_000, startsParagraph: true
+        ))
+        #expect(playback.state == .paused)
+        #expect(!playback.shouldStartWhenBuffered)
+        playback.finishBuffering()
+        #expect(playback.state == .paused)
+        playback.stop()
+    }
+
+    @Test("Resuming before audio exists rearms automatic buffered playback")
+    @MainActor
+    func resumesBeforeFirstAudio() {
+        let playback = PlaybackController()
+        playback.prepare(requestID: UUID(), title: "Test", estimatedDuration: 10, modelID: nil)
+        playback.pause()
+        playback.play()
+        #expect(playback.state == .buffering)
+        #expect(!playback.shouldStartWhenBuffered)
+        playback.stop()
+    }
+
     @Test("Playback buffer duration grows only above normal speed")
     @MainActor
     func preferredBufferDuration() {

@@ -46,7 +46,7 @@ struct GeneralSettingsView: View {
                 Text("Shortcuts")
             } footer: {
                 Text(
-                    "The selection shortcut reads the frontmost app only when pressed and requires Accessibility access. Clipboard and Services remain available without it."
+                    "Select text to start reading. Press again with the same text or no selection to pause or resume, or select different text to start a new reading. Selection access requires Accessibility permission. Clipboard and Services remain available without it."
                 )
             }
 

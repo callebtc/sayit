@@ -5,4 +5,5 @@ import SayItProtocol
 struct PendingSpeechJob: Codable, Sendable {
     let submission: SpeechSubmission
     var cleanedText: CleanedText?
+    var selectionIdentity: String? = nil
 }

@@ -167,6 +167,7 @@
 		51C0584024264406E5670233 /* MenuBarRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8077FB8567737F537A02DE3B /* MenuBarRootView.swift */; };
 		51D7D34EF229D7089C4DFFC2 /* QueueBlockSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275052E6202240464C9009E3 /* QueueBlockSnapshot.swift */; };
 		5284097D44147769C8F5DE13 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = D32C1E8AC5B0B86155A50698 /* MLXAudioCore */; };
+		52B3AF316DE16EAE6C4CDD82 /* SelectionShortcutQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B53D196D90801DFCECC05D /* SelectionShortcutQueue.swift */; };
 		53280083429EC40EB5447394 /* SettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0F462BFFCCB9F7F8B10A64 /* SettingsPane.swift */; };
 		5335E77D09F3E4133ACBB024 /* HuggingFaceLFSInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAAB79ECE86C6928C43363F /* HuggingFaceLFSInfo.swift */; };
 		538BED38870710899B0EAD49 /* ModelManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FD50F093D897C5794716C1 /* ModelManaging.swift */; };
@@ -1127,6 +1128,7 @@
 		B505BBBD717AD2DD95A53A71 /* ServiceFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFailure.swift; sourceTree = "<group>"; };
 		B57904CB7418B385CE9136D3 /* SpeechJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechJob.swift; sourceTree = "<group>"; };
 		B59C1431DC3F3B4E084DCB7C /* SecondsRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondsRequest.swift; sourceTree = "<group>"; };
+		B5B53D196D90801DFCECC05D /* SelectionShortcutQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionShortcutQueue.swift; sourceTree = "<group>"; };
 		B5C50EA50CB078D9A6FF8212 /* UpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateView.swift; sourceTree = "<group>"; };
 		B5C75D0EF7E30D82DA8EFBE0 /* SpeechLyricsTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLyricsTimeline.swift; sourceTree = "<group>"; };
 		B6CD19FD7EF8F989B4581F14 /* SpeechReaderDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechReaderDocument.swift; sourceTree = "<group>"; };
@@ -2244,6 +2246,7 @@
 				3083E18F1B28B31D261C1F00 /* SelectionServiceController.swift */,
 				A022F5B29532790F5FB8FEA7 /* SelectionServiceError.swift */,
 				065828CA46C96608B4144F7B /* SelectionServiceLauncher.swift */,
+				B5B53D196D90801DFCECC05D /* SelectionShortcutQueue.swift */,
 				DE475C05CB98A5B79F93A9F1 /* SelectionXPCSmokeTest.swift */,
 			);
 			path = Selection;
@@ -3255,6 +3258,7 @@
 				F7EDAE89400223BABD57B7F9 /* SelectionServiceController.swift in Sources */,
 				927010F10DB914F87831DC7F /* SelectionServiceError.swift in Sources */,
 				37A9955C3EA97FCB6171DDE0 /* SelectionServiceLauncher.swift in Sources */,
+				52B3AF316DE16EAE6C4CDD82 /* SelectionShortcutQueue.swift in Sources */,
 				CB9E8FF2D1596FA2BF963494 /* SelectionXPCSmokeTest.swift in Sources */,
 				65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */,
 				E900FFE2EA7D7743A097327C /* ServiceProvider.swift in Sources */,
