@@ -443,6 +443,11 @@ struct TextParser: Sendable {
                 .replacing("\u{2060}", with: "")
                 .replacing("\u{FEFF}", with: "")
                 .replacing("\u{FFFC}", with: " ")
+            // Neural voices can pronounce the arrow as an unrelated sound.
+            // Expand this transition explicitly, including text/emoji presentation.
+            value = replacingMatches(
+                in: value, pattern: "→[\u{FE0E}\u{FE0F}]?", with: " to "
+            )
         } else {
             value = canonical
         }

@@ -44,7 +44,8 @@ struct TextCleanupRegressionTests {
         let ending = "It’s MIT-licensed, with no subscription or cloud inference charges. Models download once, then synthesis works offline."
         let input = ([heading] + items.map { "- " + $0 } + [ending]).joined(separator: "\n")
         let result = try await TextCleaner().ingest(.init(source: .selection, plainText: input))
-        #expect(result.text == ([heading] + items + [ending]).joined(separator: "\n"))
+        let spokenItems = ["Selected text to speech through a configurable global shortcut."] + items.dropFirst()
+        #expect(result.text == ([heading] + spokenItems + [ending]).joined(separator: "\n"))
     }
 
     @Test("Bullet cleanup preserves numbers, inline punctuation, and literal code")
@@ -133,6 +134,51 @@ struct TextCleanupRegressionTests {
         let decoded = try JSONDecoder().decode(CleanedText.self, from: JSONSerialization.data(withJSONObject: legacy))
         #expect(decoded.text == result.text)
         #expect(decoded.listItemStartOffsets == nil)
+    }
+
+    @Test("Right arrows become spoken transitions", arguments: [
+        ("Selected text → speech through a configurable global shortcut.",
+         "Selected text to speech through a configurable global shortcut."),
+        ("Text→speech", "Text to speech"),
+        ("Settings → Voices → Preview", "Settings to Voices to Preview"),
+        ("Text →\u{FE0F} speech", "Text to speech"),
+        ("Text →\u{FE0E} speech", "Text to speech"),
+        ("x → y; x - y; -42; +3", "x to y; x - y; -42; +3")
+    ])
+    func speaksRightArrows(example: (String, String)) async throws {
+        let result = try await TextCleaner().ingest(.init(source: .selection, plainText: example.0))
+        #expect(result.text == example.1)
+    }
+
+    @Test("Right-arrow replacement respects cleanup opt-outs", arguments: [
+        TextCleaningOptions(stripSpecialCharacters: false), TextCleaningOptions(isEnabled: false)
+    ])
+    func preservesArrowOptOut(options: TextCleaningOptions) async throws {
+        let input = "Selected text → speech"
+        let result = try await TextCleaner(options: options).ingest(.init(source: .selection, plainText: input))
+        #expect(result.text == input)
+    }
+
+    @Test("Arrow replacement preserves list pause offsets for Markdown and HTML", arguments: [true, false])
+    func arrowListOffsets(html: Bool) async throws {
+        let payload = html
+            ? TextSourcePayload(source: .clipboard, html: Data("<ul><li>Text &#8594; speech</li><li>Next item</li></ul>".utf8))
+            : TextSourcePayload(source: .selection, plainText: "- Text → speech\n- Next item")
+        let result = try await TextCleaner().ingest(payload)
+        #expect(result.text == "Text to speech\nNext item")
+        #expect(result.listItemStartOffsets == [0, 15])
+        let chunks = TextChunker().chunks(
+            for: result.text, listItemStartOffsets: Set(result.listItemStartOffsets ?? [])
+        )
+        #expect(chunks.map(\.text) == ["Text to speech", "Next item"])
+    }
+
+    @Test("Arrow replacement is independent of whitespace and Markdown cleanup")
+    func arrowCleanupOptions() async throws {
+        let result = try await TextCleaner(options: .init(stripMarkdown: false, normalizeWhitespace: false)).ingest(
+            .init(source: .selection, plainText: "Text→speech\nNext   line")
+        )
+        #expect(result.text == "Text to speech\nNext   line")
     }
 
     @Test("Standalone inline Markdown is recognized", arguments: [
