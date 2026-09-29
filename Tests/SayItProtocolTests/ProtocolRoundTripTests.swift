@@ -3,6 +3,26 @@ import SayItProtocol
 import Testing
 
 struct ProtocolRoundTripTests {
+    @Test("Selection shortcut context and optional text survive wire encoding", arguments: [true, false])
+    func selectionShortcutRoundTrip(hasSelection: Bool) throws {
+        let id = UUID()
+        let submission = hasSelection
+            ? SpeechSubmission(text: "Selected text", source: .selection) : nil
+        let original = ServiceCommand.selectionShortcut(
+            submission, expectedJobID: id, expectedText: "Current text"
+        )
+        let decoded = try SayItWireCodec.decode(
+            ServiceCommand.self, from: SayItWireCodec.encode(original)
+        )
+        guard case .selectionShortcut(let value, let expectedID, let text) = decoded else {
+            Issue.record("Expected selection shortcut command")
+            return
+        }
+        #expect(value?.text == submission?.text)
+        #expect(expectedID == id)
+        #expect(text == "Current text")
+    }
+
     @Test("Timing suffix metadata and optional audio ends survive wire encoding")
     func playbackTimingRoundTrip() throws {
         let chunk = PlaybackTextChunk(textStart: 100, textEnd: 200, audioStart: 12, audioEnd: 23)

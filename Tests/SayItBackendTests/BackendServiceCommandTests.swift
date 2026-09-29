@@ -8,6 +8,289 @@ import Testing
 @Suite("Backend service commands", .serialized)
 @MainActor
 struct BackendServiceCommandTests {
+    @Test("Selection shortcut starts, pauses and resumes without submitting duplicates")
+    func selectionShortcutLifecycle() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let empty = try failure(await selectionShortcut(nil, service: fixture.service))
+        #expect(empty.code == "selection.no_selection")
+        let job = try submittedJob(
+            await selectionShortcut("First block.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: job.id, service: fixture.service)
+        fixture.playback.seek(to: 0.25)
+        #expect(isAccepted(
+            await selectionShortcut("  First\n block.  ", service: fixture.service)
+        ))
+        let paused = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(paused.activeJob?.state == .paused)
+        #expect(paused.playback.state == "paused")
+        #expect(isAccepted(
+            await selectionShortcut(nil, service: fixture.service)
+        ))
+        #expect(fixture.playback.elapsed == 0.25)
+        #expect(fixture.playback.state == .playing)
+        #expect(isAccepted(
+            await selectionShortcut(nil, service: fixture.service)
+        ))
+        #expect(fixture.playback.state == .paused)
+        #expect(isAccepted(
+            await selectionShortcut("First block.", service: fixture.service)
+        ))
+        #expect(fixture.playback.state == .playing)
+        #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test(
+        "Rich selections compare by their text rather than their formatting",
+        arguments: [InputFormat.html, .richText]
+    )
+    func selectionShortcutRichRepresentations(format: InputFormat) async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let representation = format == .html
+            ? Data("<p><strong>Formatted</strong> text.</p>".utf8)
+            : Data(#"{\rtf1\ansi Formatted text.}"#.utf8)
+        let initial = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        let command = ServiceCommand.selectionShortcut(
+            SpeechSubmission(
+                text: "",
+                inputFormat: format,
+                representationData: representation,
+                source: .selection,
+                permitsLongText: true
+            ),
+            expectedJobID: initial.activeJob?.id,
+            expectedText: initial.playback.spokenText
+        )
+        let first = try submittedJob(
+            await fixture.service.handle(.init(command: command))
+        )
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+        #expect(isAccepted(
+            await selectionShortcut("Formatted text.", service: fixture.service)
+        ))
+        #expect(fixture.playback.state == .paused)
+        #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test(
+        "Changed selections interrupt playing or paused speech and preserve queued jobs",
+        arguments: [false, true]
+    )
+    func selectionShortcutReplaces(paused: Bool) async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let first = try submittedJob(
+            await selectionShortcut("Original text.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+        if paused {
+            _ = await selectionShortcut(nil, service: fixture.service)
+        }
+        let queuedSubmission = SpeechSubmission(
+            text: "Queued text.", source: .commandLine
+        )
+        let queued = try submittedJob(
+            await fixture.service.handle(.init(command: .submit(queuedSubmission)))
+        )
+        let replacement = try submittedJob(
+            await selectionShortcut("original text!", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: replacement.id, service: fixture.service)
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(current.activeJob?.id == replacement.id)
+        #expect(current.queuedJobs.map(\.id) == [queued.id])
+        let jobs = try jobList(await fixture.service.handle(.init(command: .jobs)))
+        #expect(jobs.first { $0.id == first.id }?.state == .canceled)
+        _ = await fixture.service.handle(.init(command: .cancelJob(queued.id)))
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("A selection captured for a replaced job cannot control its replacement")
+    func staleSelectionCapture() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let first = try submittedJob(
+            await selectionShortcut("First.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+        let replacement = try submittedJob(
+            await selectionShortcut("Second.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: replacement.id, service: fixture.service)
+        let stale = await fixture.service.handle(.init(command: .selectionShortcut(
+            SpeechSubmission(text: "Third.", source: .selection),
+            expectedJobID: first.id, expectedText: "First."
+        )))
+        #expect(isAccepted(stale))
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(current.activeJob?.id == replacement.id)
+        #expect(current.playback.state == "playing")
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Pause intent survives loading, arriving audio, and synthesis completion")
+    func selectionShortcutPausesPendingAudio() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisStartGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let job = try submittedJob(
+            await selectionShortcut("Pending speech.", service: fixture.service)
+        )
+        try await waitForJobState(.preparing, id: job.id, service: fixture.service)
+        _ = await selectionShortcut(nil, service: fixture.service)
+        #expect(fixture.playback.state == .paused)
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration > 0
+                && $0.activeJob?.state == .paused
+                && fixture.playback.finishBufferingCount == 1
+        }
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(current.playback.state == "paused")
+        #expect(current.statusText == "Paused")
+        #expect(fixture.playback.playCount == 0)
+        _ = await selectionShortcut(nil, service: fixture.service)
+        #expect(fixture.playback.state == .playing)
+        #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Buffering remains paused across later chunks and resumes the existing request")
+    func selectionShortcutDuringBuffering() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let text = String(repeating: "A sentence to split into chunks. ", count: 180)
+        let job = try submittedJob(
+            await selectionShortcut(text, service: fixture.service)
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == job.id && $0.playback.generatedDuration == 1
+        }
+        _ = await selectionShortcut(text, service: fixture.service)
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration == 2
+        }
+        #expect(fixture.playback.state == .paused)
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) { _ in
+            fixture.playback.finishBufferingCount == 1
+        }
+        #expect(fixture.playback.state == .paused)
+        _ = await selectionShortcut(nil, service: fixture.service)
+        #expect(fixture.playback.state == .playing)
+        #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Replacing buffered speech ignores late chunks from the canceled stream")
+    func selectionShortcutIgnoresCanceledAudio() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let text = String(repeating: "Old speech with multiple chunks. ", count: 180)
+        let first = try submittedJob(
+            await selectionShortcut(text, service: fixture.service)
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == first.id && $0.playback.generatedDuration == 1
+        }
+        let second = try submittedJob(
+            await selectionShortcut("Replacement.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: second.id, service: fixture.service)
+        await gate.releaseNext()
+        await gate.releaseNext()
+        try await gate.waitForStreamCompletion()
+        #expect(fixture.playback.spokenText == "Replacement.")
+        #expect(fixture.playback.generatedDuration == 1)
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("A failed reading can be retried with the same selection")
+    func selectionShortcutAfterFailure() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let first = try submittedJob(
+            await selectionShortcut("Retry me.", service: fixture.service)
+        )
+        try await waitForJobState(.failed, id: first.id, service: fixture.service)
+        let empty = try failure(
+            await selectionShortcut(nil, service: fixture.service)
+        )
+        #expect(empty.code == "selection.no_selection")
+        let retry = try submittedJob(
+            await selectionShortcut("Retry me.", service: fixture.service)
+        )
+        #expect(retry.id != first.id)
+        try await waitForJobState(.failed, id: retry.id, service: fixture.service)
+    }
+
+    @Test("Finished selections start again and long selections still require confirmation")
+    func selectionShortcutTerminalAndConfirmation() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let first = try submittedJob(
+            await selectionShortcut("Read again.", service: fixture.service)
+        )
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+        fixture.playback.finishForTesting()
+        try await waitForJobState(.completed, id: first.id, service: fixture.service)
+        let second = try submittedJob(
+            await selectionShortcut("Read again.", service: fixture.service)
+        )
+        #expect(second.id != first.id)
+        try await waitForJobState(.playing, id: second.id, service: fixture.service)
+        let long = try submittedJob(await selectionShortcut(
+            String(repeating: "Long text. ", count: 5_000),
+            permitsLongText: false, service: fixture.service
+        ))
+        try await waitForJobState(.awaitingConfirmation, id: long.id, service: fixture.service)
+        _ = await fixture.service.handle(.init(command: .cancelJob(long.id)))
+    }
+
     @Test("Replaying history restores saved audio boundaries and supports legacy recordings")
     func historyRestoresTiming() async throws {
         for includesTiming in [false, true] {
@@ -2396,6 +2679,7 @@ private final class ServiceFixture {
         seedPlaybackTiming: Bool = false,
         synthesizesAudio: Bool = false,
         synthesisEventGate: BackendSynthesisEventGate? = nil,
+        synthesisStartGate: BackendSynthesisEventGate? = nil,
         downloadCatalog: ModelCatalog? = nil,
         downloadSession: URLSession? = nil,
         dependencyPreparationGate: DependencyPreparationGate? = nil,
@@ -2422,6 +2706,7 @@ private final class ServiceFixture {
         synthesizer = DeterministicSynthesizer(
             synthesizesAudio: synthesizesAudio,
             eventGate: synthesisEventGate,
+            startGate: synthesisStartGate,
             dependencyPreparationGate: dependencyPreparationGate
         )
         let modelManager: ModelManager?
@@ -2629,7 +2914,20 @@ private actor BackendEventSleepGate {
 
 private actor BackendSynthesisEventGate {
     private var permits = 0
+    private var streamCompleted = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func markStreamCompleted() {
+        streamCompleted = true
+    }
+
+    func waitForStreamCompletion() async throws {
+        for _ in 0..<400 {
+            if streamCompleted { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw TestResponseError.timedOut
+    }
 
     func wait() async {
         if permits > 0 {
@@ -2658,15 +2956,18 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
     private let eventGate: BackendSynthesisEventGate?
+    private let startGate: BackendSynthesisEventGate?
     private let dependencyPreparationGate: DependencyPreparationGate?
 
     init(
         synthesizesAudio: Bool = false,
         eventGate: BackendSynthesisEventGate? = nil,
+        startGate: BackendSynthesisEventGate? = nil,
         dependencyPreparationGate: DependencyPreparationGate? = nil
     ) {
         self.synthesizesAudio = synthesizesAudio
         self.eventGate = eventGate
+        self.startGate = startGate
         self.dependencyPreparationGate = dependencyPreparationGate
     }
 
@@ -2676,6 +2977,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         requestedModelIDs.append(request.model.id.rawValue)
         requestedLanguages.append(request.language)
         requestedVoiceDescriptions.append(request.voiceDescription)
+        if let startGate { await startGate.wait() }
         guard synthesizesAudio else {
             return AsyncThrowingStream { continuation in
                 continuation.yield(.loadingModel(request.model.id))
@@ -2714,6 +3016,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                     await eventGate.wait()
                     continuation.yield(.completed)
                     continuation.finish()
+                    await eventGate.markStreamCompleted()
                 }
             }
         }
@@ -2801,6 +3104,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var playCount = 0
     private(set) var pauseCount = 0
     private(set) var stopCount = 0
+    private(set) var finishBufferingCount = 0
     private(set) var playedFileTitle: String?
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
@@ -2831,7 +3135,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
             throw enqueueError
         }
         generatedDuration += chunk.duration
-        state = .buffering
+        if state != .paused { state = .buffering }
     }
 
     func setSpokenText(_ text: String) {
@@ -2880,7 +3184,8 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func finishBuffering() {
-        state = .playing
+        finishBufferingCount += 1
+        if state != .paused { state = .playing }
     }
 
     func finishForTesting() {
@@ -3202,4 +3507,21 @@ private func downloadSHA256(_ data: Data) -> String {
 private enum TestResponseError: Error {
     case unexpected
     case timedOut
+}
+
+@MainActor
+private func selectionShortcut(
+    _ text: String?,
+    permitsLongText: Bool = true,
+    service: SayItBackendService
+) async -> ServiceResponse {
+    let response = await service.handle(.init(command: .snapshot))
+    guard case .snapshot(let current) = response else { return response }
+    return await service.handle(.init(command: .selectionShortcut(
+        text.map {
+            SpeechSubmission(text: $0, source: .selection, permitsLongText: permitsLongText)
+        },
+        expectedJobID: current.activeJob?.id,
+        expectedText: current.playback.spokenText
+    )))
 }

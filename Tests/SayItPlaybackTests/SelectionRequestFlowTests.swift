@@ -6,6 +6,61 @@ import Testing
 @Suite("Selected-text permission recovery")
 @MainActor
 struct SelectionRequestFlowTests {
+    @Test("Only a genuine missing selection becomes a shortcut toggle")
+    func shortcutSelectionFailures() async throws {
+        let empty = try await SelectionRequestFlow.performShortcut {
+            throw SelectionServiceError.noSelection
+        }
+        #expect(empty == nil)
+        let errors: [SelectionServiceError] = [
+            .accessibilityRequired,
+            .helperUnavailable,
+            .frontmostApplicationUnavailable,
+            .selectionTooLong(maximumCharacters: 10)
+        ]
+        for error in errors {
+            await #expect(throws: SelectionServiceError.self) {
+                try await SelectionRequestFlow.performShortcut { throw error }
+            }
+        }
+    }
+
+    @Test("Rapid shortcut presses wait for the previous acknowledgement")
+    func serializesShortcutActions() async {
+        let queue = SelectionShortcutQueue()
+        var events: [Int] = []
+        var release: CheckedContinuation<Void, Never>?
+        queue.enqueue {
+            events.append(1)
+            await withCheckedContinuation { release = $0 }
+            events.append(2)
+        }
+        queue.enqueue { events.append(3) }
+        queue.enqueue { events.append(4) }
+        while release == nil { await Task.yield() }
+        #expect(events == [1])
+        release?.resume()
+        await queue.task?.value
+        #expect(events == [1, 2, 3, 4])
+    }
+
+    @Test("Canceling selection work discards queued presses")
+    func cancelsQueuedActions() async {
+        let queue = SelectionShortcutQueue()
+        var events: [Int] = []
+        var release: CheckedContinuation<Void, Never>?
+        queue.enqueue {
+            events.append(1)
+            await withCheckedContinuation { release = $0 }
+        }
+        queue.enqueue { events.append(2) }
+        while release == nil { await Task.yield() }
+        queue.cancel()
+        release?.resume()
+        await queue.task?.value
+        #expect(events == [1])
+    }
+
     @Test("Granting Accessibility resumes the original selection request")
     func resumesAfterAuthorization() async throws {
         var events: [String] = []

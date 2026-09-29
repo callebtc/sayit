@@ -3,6 +3,16 @@ import SayItProtocol
 
 @MainActor
 enum SelectionRequestFlow {
+    static func performShortcut(
+        readSelection: () async throws -> TextSourcePayload
+    ) async throws -> TextSourcePayload? {
+        do {
+            return try await readSelection()
+        } catch SelectionServiceError.noSelection {
+            return nil
+        }
+    }
+
     static func perform(
         readSelection: () async throws -> TextSourcePayload,
         requestAuthorization: () async throws -> Bool,

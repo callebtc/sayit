@@ -5,6 +5,11 @@ public enum ServiceCommand: Codable, Sendable {
     case events(after: UInt64)
     case waitForEvents(after: UInt64, playbackInterval: TimeInterval)
     case submit(SpeechSubmission)
+    case selectionShortcut(
+        SpeechSubmission?,
+        expectedJobID: UUID?,
+        expectedText: String
+    )
     case jobs
     case confirmJob(UUID)
     case cancelJob(UUID)

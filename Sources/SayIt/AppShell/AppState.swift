@@ -35,7 +35,7 @@ final class AppState {
     private var serviceRepairTask: Task<Void, Never>?
     private var automaticServiceRecovery = AutomaticServiceRecovery()
     private var isTerminating = false
-    private var selectionRequestTask: Task<Void, Never>?
+    private let selectionShortcutQueue = SelectionShortcutQueue()
     @ObservationIgnored
     private var menuActivityTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
@@ -79,6 +79,10 @@ final class AppState {
 
     var isPlaybackSurfacePresented: Bool {
         isMenuPresented || isAppWindowPresented
+    }
+
+    private var selectionRequestTask: Task<Void, Never>? {
+        selectionShortcutQueue.task
     }
 
     private init() {
@@ -156,29 +160,43 @@ final class AppState {
 
     func speakSelectedText() {
         guard !isPreparingUpdate else { return }
-        guard selectionRequestTask == nil else { return }
         let targetApplication = NSWorkspace.shared.frontmostApplication
-        clearPresentedError()
-
-        selectionRequestTask = Task { [weak self] in
-            guard let self else { return }
-            defer { selectionRequestTask = nil }
+        selectionShortcutQueue.enqueue { [weak self] in
+            guard let self, !Task.isCancelled else { return }
+            clearPresentedError()
             do {
-                let payload = try await SelectionRequestFlow.perform(
-                    readSelection: {
-                        try await self.selectionService.selectedPayload()
-                    },
-                    requestAuthorization: {
-                        try await self.selectionService
-                            .requestAuthorizationAndWait()
-                    },
-                    resumeTargetApplication: {
-                        try await self.restoreSelectionTarget(
-                            targetApplication
-                        )
-                    }
-                )
-                receive(payload)
+                if !isServiceOnline {
+                    await startup()
+                }
+                let response = try await send(.snapshot)
+                try requireSuccess(response)
+                guard case .snapshot(let snapshot) = response else { return }
+                // A queued press must not capture a different application's text.
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier
+                    == targetApplication?.processIdentifier else {
+                    throw SelectionServiceError.frontmostApplicationUnavailable
+                }
+                let payload = try await SelectionRequestFlow.performShortcut {
+                    try await SelectionRequestFlow.perform(
+                        readSelection: {
+                            try await self.selectionService.selectedPayload()
+                        },
+                        requestAuthorization: {
+                            try await self.selectionService
+                                .requestAuthorizationAndWait()
+                        },
+                        resumeTargetApplication: {
+                            try await self.restoreSelectionTarget(targetApplication)
+                        }
+                    )
+                }
+                try Task.checkCancellation()
+                let result = try await send(.selectionShortcut(
+                    payload.map { submission(for: $0) },
+                    expectedJobID: snapshot.activeJob?.id,
+                    expectedText: snapshot.playback.spokenText
+                ))
+                try requireSuccess(result)
             } catch is CancellationError {
                 return
             } catch {
@@ -305,6 +323,10 @@ final class AppState {
 
     func receive(_ payload: TextSourcePayload) {
         guard !isPreparingUpdate else { return }
+        submit(submission(for: payload))
+    }
+
+    private func submission(for payload: TextSourcePayload) -> SpeechSubmission {
         let submission: SpeechSubmission
         if let html = payload.html {
             submission = makeSubmission(
@@ -327,7 +349,7 @@ final class AppState {
                 source: payload.source
             )
         }
-        submit(submission)
+        return submission
     }
 
     func confirmLongText() {
@@ -1007,9 +1029,8 @@ final class AppState {
         await client.invalidate()
         await pollingTask?.value
         pollingTask = nil
-        selectionRequestTask?.cancel()
+        selectionShortcutQueue.cancel()
         await selectionRequestTask?.value
-        selectionRequestTask = nil
         await selectionService.terminateForQuit()
         await backgroundService.terminateForQuit()
     }
@@ -1062,7 +1083,7 @@ final class AppState {
         modelSelectionTask?.cancel()
         modelInstallRequestTask?.cancel()
         serviceRepairTask?.cancel()
-        selectionRequestTask?.cancel()
+        selectionShortcutQueue.cancel()
         await client.invalidate()
         // Capture tasks before clearing their slots; cancellation-aware XPC calls
         // are invalidated above so they cannot reconnect during preparation.
@@ -1076,7 +1097,6 @@ final class AppState {
         modelSelectionTask = nil
         modelInstallRequestTask = nil
         serviceRepairTask = nil
-        selectionRequestTask = nil
         try await selectionService.terminateForUpdate(deadline: deadline)
         try await backgroundService.terminateForUpdate(deadline: deadline)
         isPreparedForUpdate = true

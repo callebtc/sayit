@@ -9,7 +9,7 @@ struct AnywhereOnboardingView: View {
         OnboardingPage(
             symbol: "cursorarrow.click.2",
             title: "Use Say It anywhere",
-            subtitle: "Select text and use its shortcut, read the clipboard, or choose Services → Say It."
+            subtitle: "Select text and use its shortcut. Press again to pause or resume; select different text to start a new reading. Clipboard and Services → Say It are also available."
         ) {
             VStack(spacing: DesignTokens.standardSpacing) {
                 VStack(alignment: .leading, spacing: 10) {
