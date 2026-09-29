@@ -12,8 +12,13 @@ struct SelectionRequestFlowTests {
             throw SelectionServiceError.noSelection
         }
         #expect(empty == nil)
-        for error in [SelectionServiceError.accessibilityRequired, .helperUnavailable,
-                      .frontmostApplicationUnavailable, .selectionTooLong(maximumCharacters: 10)] {
+        let errors: [SelectionServiceError] = [
+            .accessibilityRequired,
+            .helperUnavailable,
+            .frontmostApplicationUnavailable,
+            .selectionTooLong(maximumCharacters: 10)
+        ]
+        for error in errors {
             await #expect(throws: SelectionServiceError.self) {
                 try await SelectionRequestFlow.performShortcut { throw error }
             }

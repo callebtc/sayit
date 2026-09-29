@@ -14,8 +14,11 @@ struct BackendPersistenceTests {
             selectionIdentity: "Text"
         )
         let data = try JSONEncoder().encode(original)
-        #expect(try JSONDecoder().decode(PendingSpeechJob.self, from: data).selectionIdentity == "Text")
-        var legacy = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let restored = try JSONDecoder().decode(PendingSpeechJob.self, from: data)
+        #expect(restored.selectionIdentity == "Text")
+        var legacy = try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
         legacy.removeValue(forKey: "selectionIdentity")
         let decoded = try JSONDecoder().decode(
             PendingSpeechJob.self,

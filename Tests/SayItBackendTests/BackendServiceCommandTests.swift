@@ -16,25 +16,40 @@ struct BackendServiceCommandTests {
         await fixture.service.start()
         let empty = try failure(await selectionShortcut(nil, service: fixture.service))
         #expect(empty.code == "selection.no_selection")
-        let job = try submittedJob(await selectionShortcut("First block.", service: fixture.service))
+        let job = try submittedJob(
+            await selectionShortcut("First block.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: job.id, service: fixture.service)
         fixture.playback.seek(to: 0.25)
-        #expect(isAccepted(await selectionShortcut("  First\n block.  ", service: fixture.service)))
-        let paused = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(isAccepted(
+            await selectionShortcut("  First\n block.  ", service: fixture.service)
+        ))
+        let paused = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
         #expect(paused.activeJob?.state == .paused)
         #expect(paused.playback.state == "paused")
-        #expect(isAccepted(await selectionShortcut(nil, service: fixture.service)))
+        #expect(isAccepted(
+            await selectionShortcut(nil, service: fixture.service)
+        ))
         #expect(fixture.playback.elapsed == 0.25)
         #expect(fixture.playback.state == .playing)
-        #expect(isAccepted(await selectionShortcut(nil, service: fixture.service)))
+        #expect(isAccepted(
+            await selectionShortcut(nil, service: fixture.service)
+        ))
         #expect(fixture.playback.state == .paused)
-        #expect(isAccepted(await selectionShortcut("First block.", service: fixture.service)))
+        #expect(isAccepted(
+            await selectionShortcut("First block.", service: fixture.service)
+        ))
         #expect(fixture.playback.state == .playing)
         #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
-    @Test("Rich selections compare by their text rather than their formatting", arguments: [InputFormat.html, .richText])
+    @Test(
+        "Rich selections compare by their text rather than their formatting",
+        arguments: [InputFormat.html, .richText]
+    )
     func selectionShortcutRichRepresentations(format: InputFormat) async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
         defer { fixture.remove() }
@@ -43,36 +58,61 @@ struct BackendServiceCommandTests {
         let representation = format == .html
             ? Data("<p><strong>Formatted</strong> text.</p>".utf8)
             : Data(#"{\rtf1\ansi Formatted text.}"#.utf8)
-        let initial = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
-        let first = try submittedJob(await fixture.service.handle(.init(command: .selectionShortcut(
+        let initial = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        let command = ServiceCommand.selectionShortcut(
             SpeechSubmission(
-                text: "", inputFormat: format, representationData: representation,
-                source: .selection, permitsLongText: true
+                text: "",
+                inputFormat: format,
+                representationData: representation,
+                source: .selection,
+                permitsLongText: true
             ),
-            expectedJobID: initial.activeJob?.id, expectedText: initial.playback.spokenText
-        ))))
+            expectedJobID: initial.activeJob?.id,
+            expectedText: initial.playback.spokenText
+        )
+        let first = try submittedJob(
+            await fixture.service.handle(.init(command: command))
+        )
         try await waitForJobState(.playing, id: first.id, service: fixture.service)
-        #expect(isAccepted(await selectionShortcut("Formatted text.", service: fixture.service)))
+        #expect(isAccepted(
+            await selectionShortcut("Formatted text.", service: fixture.service)
+        ))
         #expect(fixture.playback.state == .paused)
         #expect(await fixture.synthesizer.requestedModelIDs.count == 1)
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
-    @Test("Changed selections interrupt playing or paused speech and preserve queued jobs", arguments: [false, true])
+    @Test(
+        "Changed selections interrupt playing or paused speech and preserve queued jobs",
+        arguments: [false, true]
+    )
     func selectionShortcutReplaces(paused: Bool) async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        let first = try submittedJob(await selectionShortcut("Original text.", service: fixture.service))
+        let first = try submittedJob(
+            await selectionShortcut("Original text.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: first.id, service: fixture.service)
-        if paused { _ = await selectionShortcut(nil, service: fixture.service) }
-        let queued = try submittedJob(await fixture.service.handle(.init(command: .submit(
-            SpeechSubmission(text: "Queued text.", source: .commandLine)
-        ))))
-        let replacement = try submittedJob(await selectionShortcut("original text!", service: fixture.service))
+        if paused {
+            _ = await selectionShortcut(nil, service: fixture.service)
+        }
+        let queuedSubmission = SpeechSubmission(
+            text: "Queued text.", source: .commandLine
+        )
+        let queued = try submittedJob(
+            await fixture.service.handle(.init(command: .submit(queuedSubmission)))
+        )
+        let replacement = try submittedJob(
+            await selectionShortcut("original text!", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: replacement.id, service: fixture.service)
-        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
         #expect(current.activeJob?.id == replacement.id)
         #expect(current.queuedJobs.map(\.id) == [queued.id])
         let jobs = try jobList(await fixture.service.handle(.init(command: .jobs)))
@@ -87,16 +127,22 @@ struct BackendServiceCommandTests {
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        let first = try submittedJob(await selectionShortcut("First.", service: fixture.service))
+        let first = try submittedJob(
+            await selectionShortcut("First.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: first.id, service: fixture.service)
-        let replacement = try submittedJob(await selectionShortcut("Second.", service: fixture.service))
+        let replacement = try submittedJob(
+            await selectionShortcut("Second.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: replacement.id, service: fixture.service)
         let stale = await fixture.service.handle(.init(command: .selectionShortcut(
             SpeechSubmission(text: "Third.", source: .selection),
             expectedJobID: first.id, expectedText: "First."
         )))
         #expect(isAccepted(stale))
-        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
         #expect(current.activeJob?.id == replacement.id)
         #expect(current.playback.state == "playing")
         _ = await fixture.service.handle(.init(command: .clear))
@@ -105,21 +151,28 @@ struct BackendServiceCommandTests {
     @Test("Pause intent survives loading, arriving audio, and synthesis completion")
     func selectionShortcutPausesPendingAudio() async throws {
         let gate = BackendSynthesisEventGate()
-        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisStartGate: gate)
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisStartGate: gate
+        )
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        let job = try submittedJob(await selectionShortcut("Pending speech.", service: fixture.service))
+        let job = try submittedJob(
+            await selectionShortcut("Pending speech.", service: fixture.service)
+        )
         try await waitForJobState(.preparing, id: job.id, service: fixture.service)
         _ = await selectionShortcut(nil, service: fixture.service)
         #expect(fixture.playback.state == .paused)
         await gate.releaseNext()
         _ = try await waitForServiceSnapshot(fixture.service) {
-            $0.playback.generatedDuration > 0 && $0.activeJob?.state == .paused
+            $0.playback.generatedDuration > 0
+                && $0.activeJob?.state == .paused
+                && fixture.playback.finishBufferingCount == 1
         }
-        // Drain the completion event as well as the first audio event.
-        for _ in 0..<20 { await Task.yield() }
-        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        let current = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
         #expect(current.playback.state == "paused")
         #expect(current.statusText == "Paused")
         #expect(fixture.playback.playCount == 0)
@@ -132,12 +185,17 @@ struct BackendServiceCommandTests {
     @Test("Buffering remains paused across later chunks and resumes the existing request")
     func selectionShortcutDuringBuffering() async throws {
         let gate = BackendSynthesisEventGate()
-        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
         let text = String(repeating: "A sentence to split into chunks. ", count: 180)
-        let job = try submittedJob(await selectionShortcut(text, service: fixture.service))
+        let job = try submittedJob(
+            await selectionShortcut(text, service: fixture.service)
+        )
         _ = try await waitForServiceSnapshot(fixture.service) {
             $0.activeJob?.id == job.id && $0.playback.generatedDuration == 1
         }
@@ -148,7 +206,9 @@ struct BackendServiceCommandTests {
         }
         #expect(fixture.playback.state == .paused)
         await gate.releaseNext()
-        for _ in 0..<20 { await Task.yield() }
+        _ = try await waitForServiceSnapshot(fixture.service) { _ in
+            fixture.playback.finishBufferingCount == 1
+        }
         #expect(fixture.playback.state == .paused)
         _ = await selectionShortcut(nil, service: fixture.service)
         #expect(fixture.playback.state == .playing)
@@ -159,20 +219,27 @@ struct BackendServiceCommandTests {
     @Test("Replacing buffered speech ignores late chunks from the canceled stream")
     func selectionShortcutIgnoresCanceledAudio() async throws {
         let gate = BackendSynthesisEventGate()
-        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
         let text = String(repeating: "Old speech with multiple chunks. ", count: 180)
-        let first = try submittedJob(await selectionShortcut(text, service: fixture.service))
+        let first = try submittedJob(
+            await selectionShortcut(text, service: fixture.service)
+        )
         _ = try await waitForServiceSnapshot(fixture.service) {
             $0.activeJob?.id == first.id && $0.playback.generatedDuration == 1
         }
-        let second = try submittedJob(await selectionShortcut("Replacement.", service: fixture.service))
+        let second = try submittedJob(
+            await selectionShortcut("Replacement.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: second.id, service: fixture.service)
         await gate.releaseNext()
         await gate.releaseNext()
-        for _ in 0..<20 { await Task.yield() }
+        try await gate.waitForStreamCompletion()
         #expect(fixture.playback.spokenText == "Replacement.")
         #expect(fixture.playback.generatedDuration == 1)
         _ = await fixture.service.handle(.init(command: .clear))
@@ -184,11 +251,17 @@ struct BackendServiceCommandTests {
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        let first = try submittedJob(await selectionShortcut("Retry me.", service: fixture.service))
+        let first = try submittedJob(
+            await selectionShortcut("Retry me.", service: fixture.service)
+        )
         try await waitForJobState(.failed, id: first.id, service: fixture.service)
-        #expect(try failure(await selectionShortcut(nil, service: fixture.service)).code
-            == "selection.no_selection")
-        let retry = try submittedJob(await selectionShortcut("Retry me.", service: fixture.service))
+        let empty = try failure(
+            await selectionShortcut(nil, service: fixture.service)
+        )
+        #expect(empty.code == "selection.no_selection")
+        let retry = try submittedJob(
+            await selectionShortcut("Retry me.", service: fixture.service)
+        )
         #expect(retry.id != first.id)
         try await waitForJobState(.failed, id: retry.id, service: fixture.service)
     }
@@ -199,11 +272,15 @@ struct BackendServiceCommandTests {
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        let first = try submittedJob(await selectionShortcut("Read again.", service: fixture.service))
+        let first = try submittedJob(
+            await selectionShortcut("Read again.", service: fixture.service)
+        )
         try await waitForJobState(.playing, id: first.id, service: fixture.service)
         fixture.playback.finishForTesting()
         try await waitForJobState(.completed, id: first.id, service: fixture.service)
-        let second = try submittedJob(await selectionShortcut("Read again.", service: fixture.service))
+        let second = try submittedJob(
+            await selectionShortcut("Read again.", service: fixture.service)
+        )
         #expect(second.id != first.id)
         try await waitForJobState(.playing, id: second.id, service: fixture.service)
         let long = try submittedJob(await selectionShortcut(
@@ -2837,7 +2914,20 @@ private actor BackendEventSleepGate {
 
 private actor BackendSynthesisEventGate {
     private var permits = 0
+    private var streamCompleted = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func markStreamCompleted() {
+        streamCompleted = true
+    }
+
+    func waitForStreamCompletion() async throws {
+        for _ in 0..<400 {
+            if streamCompleted { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw TestResponseError.timedOut
+    }
 
     func wait() async {
         if permits > 0 {
@@ -2926,6 +3016,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                     await eventGate.wait()
                     continuation.yield(.completed)
                     continuation.finish()
+                    await eventGate.markStreamCompleted()
                 }
             }
         }
@@ -3013,6 +3104,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var playCount = 0
     private(set) var pauseCount = 0
     private(set) var stopCount = 0
+    private(set) var finishBufferingCount = 0
     private(set) var playedFileTitle: String?
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
@@ -3092,6 +3184,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func finishBuffering() {
+        finishBufferingCount += 1
         if state != .paused { state = .playing }
     }
 

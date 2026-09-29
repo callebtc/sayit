@@ -36,9 +36,6 @@ final class AppState {
     private var automaticServiceRecovery = AutomaticServiceRecovery()
     private var isTerminating = false
     private let selectionShortcutQueue = SelectionShortcutQueue()
-    private var selectionRequestTask: Task<Void, Never>? {
-        selectionShortcutQueue.task
-    }
     @ObservationIgnored
     private var menuActivityTask: Task<Void, Never>?
     private var lastModelsRevision: UInt64?
@@ -82,6 +79,10 @@ final class AppState {
 
     var isPlaybackSurfacePresented: Bool {
         isMenuPresented || isAppWindowPresented
+    }
+
+    private var selectionRequestTask: Task<Void, Never>? {
+        selectionShortcutQueue.task
     }
 
     private init() {
@@ -164,7 +165,9 @@ final class AppState {
             guard let self, !Task.isCancelled else { return }
             clearPresentedError()
             do {
-                if !isServiceOnline { await startup() }
+                if !isServiceOnline {
+                    await startup()
+                }
                 let response = try await send(.snapshot)
                 try requireSuccess(response)
                 guard case .snapshot(let snapshot) = response else { return }

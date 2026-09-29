@@ -10,11 +10,13 @@ public final class SayItBackendService: SayItService {
     private let modelManager: ModelManager
     private let synthesizer: any BackendSpeechSynthesizing
     private let textCleaner = TextCleaner()
-    private let selectionIdentityCleaner = TextCleaner(options: .init(
-        stripMarkdown: false,
-        stripCodeBlocks: false,
-        stripSpecialCharacters: false
-    ))
+    private let selectionIdentityCleaner = TextCleaner(
+        options: .init(
+            stripMarkdown: false,
+            stripCodeBlocks: false,
+            stripSpecialCharacters: false
+        )
+    )
     private let playback: any BackendPlaybackControlling
     private let history: HistoryStore
     private let audioArchive: AudioArchive
@@ -447,7 +449,9 @@ public final class SayItBackendService: SayItService {
             return .job(try await submit(submission))
         case .selectionShortcut(let submission, let expectedJobID, let expectedText):
             return try await handleSelectionShortcut(
-                submission, expectedJobID: expectedJobID, expectedText: expectedText
+                submission,
+                expectedJobID: expectedJobID,
+                expectedText: expectedText
             )
         case .jobs:
             return .jobs(jobOrder.compactMap { jobsByID[$0] })
@@ -1478,7 +1482,9 @@ public final class SayItBackendService: SayItService {
         if submission.inputFormat == .plainText || submission.inputFormat == .markdown {
             return Self.selectionIdentity(submission.text)
         }
-        let cleaned = try await selectionIdentityCleaner.ingest(payload(for: submission))
+        let cleaned = try await selectionIdentityCleaner.ingest(
+            payload(for: submission)
+        )
         return Self.selectionIdentity(cleaned.text)
     }
 
@@ -1522,7 +1528,9 @@ public final class SayItBackendService: SayItService {
         }
         // This command is a selection action, never an enqueue operation.
         return .job(try await submit(
-            submission, interruptCurrent: true, selectionIdentity: selectedText
+            submission,
+            interruptCurrent: true,
+            selectionIdentity: selectedText
         ))
     }
 
@@ -1890,7 +1898,9 @@ public final class SayItBackendService: SayItService {
                 / request.speakingPace.rawValue,
             modelID: request.model.id.rawValue
         )
-        if playbackIsPaused { playback.pause() }
+        if playbackIsPaused {
+            playback.pause()
+        }
         playback.setSpokenText(cleaned.text)
         spokenTextCharacterCount = cleaned.characterCount
         lastRecordedTextEnd = 0
@@ -1952,7 +1962,9 @@ public final class SayItBackendService: SayItService {
             let revisionBeforeAudio = revision
             flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
-            if playbackIsPaused { playback.pause() }
+            if playbackIsPaused {
+                playback.pause()
+            }
             spokenAudioCursor = playback.generatedDuration
             if !playbackIsPaused, playback.shouldStartWhenBuffered {
                 playback.play()
@@ -1996,7 +2008,9 @@ public final class SayItBackendService: SayItService {
             if request.source != .preview {
                 try await archiveCompletedRequest(request)
             }
-            if activeJobID == request.id { activeRequest = nil }
+            if activeJobID == request.id {
+                activeRequest = nil
+            }
         case .cancelled:
             throw CancellationError()
         }
