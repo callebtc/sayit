@@ -292,6 +292,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSUIElement: true
+        NSAudioCaptureUsageDescription: Say It lowers music and other apps while it speaks.
         NSMicrophoneUsageDescription: Say It uses the microphone only when you choose to record a local voice reference.
         SUFeedURL: "$(SAYIT_UPDATE_FEED_URL)"
         SUPublicEDKey: aYJwSZLrVeSxVjJ71m9qondDl/zSMxFlWD8FIgtWrBE=

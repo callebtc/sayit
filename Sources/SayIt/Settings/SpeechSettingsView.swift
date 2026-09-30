@@ -106,10 +106,45 @@ struct SpeechSettingsView: View {
                 )
             }
 
+            Section {
+                Toggle(
+                    "Lower other audio while speaking",
+                    isOn: $settings.lowerOtherAudio
+                )
+
+                Slider(
+                    value: $settings.otherAudioLevel,
+                    in: 0...0.5,
+                    step: 0.05
+                ) {
+                    Text("Other audio level · " + otherAudioLevelLabel)
+                } minimumValueLabel: {
+                    Text("Muted")
+                } maximumValueLabel: {
+                    Text("50%")
+                }
+                .accessibilityLabel("Other audio level")
+                .accessibilityValue(otherAudioLevelLabel)
+                .disabled(!settings.lowerOtherAudio)
+            } header: {
+                Text("Other audio")
+            } footer: {
+                Text(
+                    "Music and other apps get quieter while Say It speaks. "
+                        + "macOS asks for System Audio Recording permission "
+                        + "the first time; without it, other audio is left "
+                        + "unchanged."
+                )
+            }
+
             Section("Voice preview") {
                 SpeechPreviewView()
             }
         }
+    }
+
+    private var otherAudioLevelLabel: String {
+        settings.otherAudioLevel.formatted(.percent.precision(.fractionLength(0)))
     }
 
     private var selectableInstalledModels: [ModelDescriptor] {
