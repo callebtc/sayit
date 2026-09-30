@@ -11,6 +11,7 @@ public final class SayItBackendService: SayItService {
     private let synthesizer: any BackendSpeechSynthesizing
     private let textCleaner = TextCleaner()
     private let playback: any BackendPlaybackControlling
+    private let otherAudioDucker: OtherAudioDucker
     private let history: HistoryStore
     private let audioArchive: AudioArchive
     private let voiceAudioArchive: AudioArchive
@@ -135,11 +136,13 @@ public final class SayItBackendService: SayItService {
         catalogOverride: ModelCatalog? = nil,
         modelManagerOverride: ModelManager? = nil,
         eventSleep: ServiceEventHub.Sleep? = nil,
-        synthesisStallTimeout: Duration = .seconds(300)
+        synthesisStallTimeout: Duration = .seconds(300),
+        otherAudioDucker: OtherAudioDucker = OtherAudioDucker()
     ) throws {
         self.directories = directories
         self.serviceVersion = serviceVersion
         self.playback = playback
+        self.otherAudioDucker = otherAudioDucker
         self.synthesisStallTimeout = synthesisStallTimeout
         if let eventSleep {
             eventHub = ServiceEventHub(sleep: eventSleep)
@@ -217,6 +220,9 @@ public final class SayItBackendService: SayItService {
         }
         playback.onStateChange = { [weak self] state in
             self?.playbackStateDidChange(state)
+        }
+        otherAudioDucker.onFailure = { [weak self] error in
+            self?.recordDuckingFailure(error)
         }
     }
 
@@ -2174,6 +2180,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func playbackStateDidChange(_ state: PlaybackState) {
+        otherAudioDucker.playbackStateDidChange(state)
         switch state {
         case .playing:
             updateActiveJobState(.playing)
@@ -3199,6 +3206,8 @@ public final class SayItBackendService: SayItService {
         playback.backwardSkipInterval = settings.rewindInterval
         playback.forwardSkipInterval = settings.forwardInterval
         playback.showTitleInNowPlaying = settings.showNowPlayingTitles
+        otherAudioDucker.level = settings.otherAudioLevel
+        otherAudioDucker.isEnabled = settings.lowerOtherAudio
     }
 
     private var httpServiceConfiguration: HTTPServiceConfiguration {
@@ -3244,6 +3253,26 @@ public final class SayItBackendService: SayItService {
             historyRevision &+= 1
         } catch {
             logger.error("History retention failed")
+        }
+    }
+
+    /// Lowering other audio is best effort, so failures only reach diagnostics.
+    private func recordDuckingFailure(_ error: any Error) {
+        let coreAudioStatus: OSStatus? = if case .coreAudio(_, let status) =
+            error as? DuckingError { status } else { nil }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.diagnostics.record(
+                DiagnosticEvent(
+                    severity: .warning,
+                    category: .playback,
+                    code: "playback.lower_other_audio_failed",
+                    errorDomain: coreAudioStatus == nil ? nil : "CoreAudio",
+                    errorCode: coreAudioStatus.map(Int.init)
+                )
+            )
+            self.diagnosticsRevision &+= 1
+            self.revision &+= 1
         }
     }
 

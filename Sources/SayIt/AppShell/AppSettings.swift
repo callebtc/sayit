@@ -20,6 +20,8 @@ final class AppSettings {
         static let rewindInterval = "rewindInterval"
         static let forwardInterval = "forwardInterval"
         static let showNowPlayingTitles = "showNowPlayingTitles"
+        static let lowerOtherAudio = "lowerOtherAudio"
+        static let otherAudioLevel = "otherAudioLevel"
         static let retentionPeriod = "retentionPeriod"
         static let historyQuota = "historyQuota"
         static let checkForUpdates = "checkForUpdates"
@@ -128,6 +130,18 @@ final class AppSettings {
     var showNowPlayingTitles: Bool {
         didSet {
             defaults.set(showNowPlayingTitles, forKey: Key.showNowPlayingTitles)
+            notifyBackendChange()
+        }
+    }
+    var lowerOtherAudio: Bool {
+        didSet {
+            defaults.set(lowerOtherAudio, forKey: Key.lowerOtherAudio)
+            notifyBackendChange()
+        }
+    }
+    var otherAudioLevel: Double {
+        didSet {
+            defaults.set(otherAudioLevel, forKey: Key.otherAudioLevel)
             notifyBackendChange()
         }
     }
@@ -308,6 +322,10 @@ final class AppSettings {
         let storedForward = defaults.double(forKey: Key.forwardInterval)
         forwardInterval = storedForward == 0 ? 30 : storedForward
         showNowPlayingTitles = defaults.bool(forKey: Key.showNowPlayingTitles)
+        lowerOtherAudio = defaults.bool(forKey: Key.lowerOtherAudio)
+        otherAudioLevel = defaults.object(forKey: Key.otherAudioLevel) == nil
+            ? 0.2
+            : defaults.double(forKey: Key.otherAudioLevel)
         retentionPeriod = RetentionPeriod(
             rawValue: defaults.string(forKey: Key.retentionPeriod) ?? ""
         ) ?? .thirtyDays
@@ -410,6 +428,8 @@ final class AppSettings {
             rewindInterval: rewindInterval,
             forwardInterval: forwardInterval,
             showNowPlayingTitles: showNowPlayingTitles,
+            lowerOtherAudio: lowerOtherAudio,
+            otherAudioLevel: otherAudioLevel,
             retentionPeriod: retentionPeriod.rawValue,
             historyQuotaBytes: historyQuotaBytes,
             httpEnabled: httpEnabled,
@@ -442,6 +462,8 @@ final class AppSettings {
         rewindInterval = snapshot.rewindInterval
         forwardInterval = snapshot.forwardInterval
         showNowPlayingTitles = snapshot.showNowPlayingTitles
+        lowerOtherAudio = snapshot.lowerOtherAudio
+        otherAudioLevel = snapshot.otherAudioLevel
         retentionPeriod = RetentionPeriod(
             rawValue: snapshot.retentionPeriod
         ) ?? .thirtyDays
