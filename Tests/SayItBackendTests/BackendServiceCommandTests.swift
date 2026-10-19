@@ -2479,6 +2479,19 @@ private final class ServiceFixture {
         try JSONEncoder.sayIt.encode(installation).write(
             to: directory.appending(path: "installation.json")
         )
+        // Preset voices resolve only when their files are installed; sparse
+        // placeholders with the catalog byte counts stand in for them.
+        for file in model.files where file.path.hasPrefix("voices/") {
+            let url = directory.appending(path: file.path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: url)
+            defer { try? handle.close() }
+            try handle.truncate(atOffset: UInt64(file.byteCount))
+        }
     }
 
     func seedRecording(id: UUID, duration: Double) async throws {
