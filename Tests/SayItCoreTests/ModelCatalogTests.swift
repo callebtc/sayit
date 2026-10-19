@@ -16,6 +16,46 @@ struct ModelCatalogTests {
         })
     }
 
+    @Test("Clone duration limits are ordered and processable")
+    func cloneDurationLimits() throws {
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let requirements = catalog.models.compactMap { model in
+            model.capabilities.voiceCloneRequirements.map { (model, $0) }
+        }
+
+        #expect(!requirements.isEmpty)
+        for (model, limits) in requirements {
+            #expect(limits.minimumDuration > 0, "\(model.id)")
+            #expect(
+                limits.minimumDuration <= limits.recommendedMinimumDuration,
+                "\(model.id)"
+            )
+            #expect(
+                limits.recommendedMinimumDuration
+                    <= limits.recommendedMaximumDuration,
+                "\(model.id)"
+            )
+            #expect(
+                limits.recommendedMaximumDuration <= limits.maximumDuration,
+                "\(model.id)"
+            )
+            // VoiceRecordingProcessor rejects longer maximums.
+            #expect(limits.maximumDuration <= 60, "\(model.id)")
+        }
+
+        for id in ["qwen3-06b-base-8bit", "qwen3-17b-customvoice-8bit"] {
+            let qwen = try #require(
+                catalog.models.first { $0.id.rawValue == id }?
+                    .capabilities.voiceCloneRequirements
+            )
+            #expect(qwen.minimumDuration == 3)
+            #expect(qwen.recommendedMinimumDuration == 10)
+            #expect(qwen.recommendedMaximumDuration == 20)
+            #expect(qwen.maximumDuration == 30)
+            #expect(qwen.transcriptRequired)
+        }
+    }
+
     @Test("Hands-on recommendations lead the ranked catalog")
     func recommendedModelsAndRanking() throws {
         let models = try ModelCatalogLoader().bundledCatalog().models
