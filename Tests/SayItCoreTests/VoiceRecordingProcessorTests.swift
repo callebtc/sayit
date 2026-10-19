@@ -74,6 +74,51 @@ struct VoiceRecordingProcessorTests {
         }
     }
 
+    @Test("Long references are accepted up to a 30-second limit")
+    func longReferenceLimit() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SayItRecordingTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        let accepted = root.appending(path: "accepted.wav")
+        let rejected = root.appending(path: "rejected.wav")
+        try writeFixture(
+            to: accepted,
+            sampleRate: 24_000,
+            signalDuration: 29,
+            amplitude: 0.2,
+            channelCount: 1
+        )
+        try writeFixture(
+            to: rejected,
+            sampleRate: 24_000,
+            signalDuration: 32,
+            amplitude: 0.2,
+            channelCount: 1
+        )
+
+        let analysis = try VoiceRecordingProcessor().process(
+            source: accepted,
+            destination: root.appending(path: "reference.wav"),
+            targetSampleRate: 24_000,
+            minimumDuration: 3,
+            maximumDuration: 30
+        )
+        #expect((28.5...30).contains(analysis.duration))
+        #expect(throws: VoiceRecordingError.tooLong(maximum: 30)) {
+            _ = try VoiceRecordingProcessor().process(
+                source: rejected,
+                destination: root.appending(path: "rejected-reference.wav"),
+                targetSampleRate: 24_000,
+                minimumDuration: 3,
+                maximumDuration: 30
+            )
+        }
+    }
+
     @Test("Bluetooth microphone audio is accepted and normalized")
     func bluetoothMicrophoneAudio() throws {
         let root = FileManager.default.temporaryDirectory

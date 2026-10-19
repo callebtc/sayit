@@ -210,7 +210,8 @@ struct InstalledModelSmokeTests {
                     + "duration=\(audioDuration) peak=\(peak) rms=\(rms) "
                     + "elapsed=\(seconds) firstAudio=\(firstAudioSeconds ?? -1) "
                     + "audioEvents=\(audioEventCount) "
-                    + "rtf=\(audioDuration > 0 ? seconds / audioDuration : -1)"
+                    + "rtf=\(audioDuration > 0 ? seconds / audioDuration : -1) "
+                    + "peakFootprintBytes=\(peakPhysicalFootprint() ?? 0)"
             )
 
             #expect(samples.count > 1_000, "No audio for voice \(voiceName)")
@@ -255,6 +256,21 @@ struct InstalledModelSmokeTests {
             }
         }
         await synthesizer.unloadModel()
+    }
+
+    /// Process-lifetime peak footprint, which includes Metal allocations on
+    /// Apple silicon, so audits can compare model and reference memory cost.
+    private func peakPhysicalFootprint() -> Int64? {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
+        )
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? info.ledger_phys_footprint_peak : nil
     }
 
     private func auditValue(
