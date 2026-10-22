@@ -50,7 +50,44 @@ final class VoiceProfileStore {
                 message: "The saved voice reference is missing."
             )
         }
+        if record.origin == .importedFile {
+            try PhononVoiceFile.validate(Data(contentsOf: url, options: .mappedIfSafe))
+        }
         return url
+    }
+
+    func importPhononVoice(
+        data: Data, modelID: String, name: String
+    ) throws -> VoiceProfileSnapshot {
+        guard isSafeModelID(modelID) else {
+            throw ServiceFailure(code: "voice.invalid_profile", message: "The voice model is invalid.")
+        }
+        try PhononVoiceFile.validate(data)
+        let name = try validated(name: name, modelID: modelID, excluding: nil)
+        let id = UUID()
+        let directory = profileDirectory(modelID: modelID, id: id)
+        guard isContained(directory, by: directories.voiceProfiles) else {
+            throw ServiceFailure(code: "voice.invalid_profile", message: "The voice location is invalid.")
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            try data.write(to: directory.appending(path: "voice.safetensors"), options: .atomic)
+            let now = Date.now
+            let record = VoiceProfileRecord(
+                schemaVersion: 1, id: id, modelID: modelID,
+                displayName: name, origin: .importedFile, language: "en",
+                transcript: nil, duration: 0, referenceFilename: "voice.safetensors",
+                createdAt: now, updatedAt: now,
+                sortOrder: nextSortOrder(modelID: modelID),
+                tuning: VoiceTuning(), generationSeed: nil
+            )
+            try write(record, to: directory)
+            recordsByID[id] = record
+            return record.snapshot
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
     }
 
     func draftURL(
@@ -320,7 +357,7 @@ final class VoiceProfileStore {
         do {
             try FileManager.default.copyItem(
                 at: sourceDirectory.appending(path: source.referenceFilename),
-                to: directory.appending(path: "reference.wav")
+                to: directory.appending(path: source.referenceFilename)
             )
             let now = Date.now
             let nextOrder = (recordsByID.values.filter {
@@ -335,7 +372,7 @@ final class VoiceProfileStore {
                 language: source.language,
                 transcript: source.transcript,
                 duration: source.duration,
-                referenceFilename: "reference.wav",
+                referenceFilename: source.referenceFilename,
                 createdAt: now,
                 updatedAt: now,
                 sortOrder: nextOrder,
@@ -435,10 +472,7 @@ final class VoiceProfileStore {
             }
             for directory in profileDirectories {
                 let metadata = directory.appending(path: "profile.json")
-                let reference = directory.appending(path: "reference.wav")
                 guard isContained(metadata, by: directories.voiceProfiles),
-                      isContained(reference, by: directory),
-                      manager.fileExists(atPath: reference.path),
                       let data = try? Data(contentsOf: metadata),
                       let record = try? JSONDecoder.sayIt.decode(
                           VoiceProfileRecord.self,
@@ -449,6 +483,9 @@ final class VoiceProfileStore {
                       directory.lastPathComponent == record.id.uuidString else {
                     continue
                 }
+                let reference = directory.appending(path: record.referenceFilename)
+                guard isContained(reference, by: directory),
+                      manager.fileExists(atPath: reference.path) else { continue }
                 recordsByID[record.id] = record
             }
         }
@@ -486,8 +523,9 @@ final class VoiceProfileStore {
             && record.displayName == trimmedName
             && (1...50).contains(trimmedName.count)
             && record.duration.isFinite
-            && record.duration > 0
-            && record.referenceFilename == "reference.wav"
+            && (record.origin == .importedFile
+                ? record.duration == 0 && record.referenceFilename == "voice.safetensors"
+                : record.duration > 0 && record.referenceFilename == "reference.wav")
             && record.tuning.parameters.values.allSatisfy(\.isFinite)
     }
 

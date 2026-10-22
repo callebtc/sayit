@@ -92,7 +92,59 @@ struct ModelManagerTests {
     func compatibleUpstreamArchitectureAliases() {
         #expect(SupportedModelTypes.areCompatible("orpheus", "llama"))
         #expect(SupportedModelTypes.areCompatible("moss_tts", "moss_tts_delay"))
+        #expect(SupportedModelTypes.areCompatible("phonon", "gradium_phonon_tts"))
+        #expect(SupportedModelTypes.loaderType(for: "gradium_phonon_tts") == "phonon")
+        #expect(SupportedModelTypes.loaderType(for: "qwen3_tts") == "qwen3_tts")
+        #expect(!SupportedModelTypes.areCompatible("phonon", "pocket_tts"))
         #expect(!SupportedModelTypes.areCompatible("orpheus", "qwen3"))
+    }
+
+    @Test("Phonon installs its declared architecture and verifies the root preset")
+    func installsPhononSnapshot() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItPhononTests")
+        defer { fixture.remove() }
+        let config = Data(#"{"model_type":"gradium_phonon_tts"}"#.utf8)
+        let weights = Data([1, 2, 3])
+        let voice = Data([4, 5, 6])
+        let contents = [
+            ("config.json", config),
+            ("model.safetensors", weights),
+            ("default-voice.safetensors", voice)
+        ]
+        let model = makeModel(
+            id: "phonon-test",
+            revision: "revision",
+            modelType: "phonon",
+            files: contents.map { path, data in
+                ModelFileDescriptor(
+                    path: path, byteCount: Int64(data.count), sha256: sha256(data)
+                )
+            },
+            voices: ["default"]
+        )
+        let manager = ModelManager(
+            catalog: makeCatalog(models: [model]),
+            directories: fixture.directories,
+            activeModelID: ModelID("other")
+        )
+        let staging = fixture.directories.downloads.appending(
+            path: "phonon-test-revision.partial"
+        )
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        for (path, data) in contents {
+            try data.write(to: staging.appending(path: path))
+        }
+        try Data([9, 9, 9]).write(to: staging.appending(path: "default-voice.safetensors"))
+        await #expect(throws: ModelManagerError.self) {
+            try await manager.install(model.id)
+        }
+        #expect(await manager.installedURL(for: model.id) == nil)
+        try voice.write(to: staging.appending(path: "default-voice.safetensors"))
+        try await manager.install(model.id)
+        #expect(await manager.availableVoices(for: model.id) == ["default"])
+        let installed = try #require(await manager.installedURL(for: model.id))
+        try Data([9]).write(to: installed.appending(path: "default-voice.safetensors"))
+        #expect(await manager.availableVoices(for: model.id) == [])
     }
 
     @Test("A complete staged snapshot installs, reports progress, and removes")
@@ -594,7 +646,7 @@ private func makeModel(
         quantization: "none",
         languages: ["en"],
         voices: voices,
-        defaultVoice: "test-voice",
+        defaultVoice: voices.first,
         defaultLanguage: "en",
         capabilities: ModelCapabilities(
             presetVoices: true,

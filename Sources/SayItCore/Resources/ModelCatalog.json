@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-05",
+  "generatedAt": "2026-10-22",
   "dependencies": [
     {
       "id": "kitten-tts-g2p",
@@ -1182,6 +1182,486 @@
       },
       "testedMLXAudioVersion": "bf14ae0",
       "testedDate": "2026-09-05"
+    },
+    {
+      "id": "phonon-31m-en",
+      "displayName": "Phonon 31M English",
+      "family": "Phonon",
+      "repository": "gradium/phonon-31m-en",
+      "revision": "541f5752bc3c79583068bb205bfda5eb39aaa08a",
+      "modelType": "phonon",
+      "parameterCount": "31M",
+      "quantization": "BF16 / FP32",
+      "languages": [
+        "en"
+      ],
+      "voices": [
+        "default",
+        "Zoey",
+        "Juniper",
+        "Everly",
+        "Harper",
+        "Hadley",
+        "Delia",
+        "Easton",
+        "Micah",
+        "Trevor",
+        "Russell",
+        "Preston",
+        "Miles",
+        "Maeve",
+        "Freya",
+        "Pippa",
+        "Elodie-Rose",
+        "Imogen",
+        "Lottie",
+        "Alfie",
+        "Hugh",
+        "Edwin",
+        "Spencer",
+        "Toby",
+        "Teddy",
+        "Bryony",
+        "Captain Silas Blackwater",
+        "Morwenna of the Deep",
+        "Old Mortlake",
+        "Azgorath",
+        "Fennick the Young Elf",
+        "The Thing Under the Stairs",
+        "Vyrmathrax the Ancient",
+        "Grub the Ogre",
+        "Master Aldric",
+        "The Snow Queen",
+        "Sir Bramwell",
+        "Fairy Godmother"
+      ],
+      "defaultVoice": "default",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false
+      },
+      "playbackMode": "progressive",
+      "files": [
+        {
+          "path": "config.json",
+          "byteCount": 4634,
+          "sha256": "b5d0f88353638370d94035b7d73d7d6577c0554d78f8d7ecfd40490aae39ae85"
+        },
+        {
+          "path": "model.safetensors",
+          "byteCount": 102823920,
+          "sha256": "8a04cf833cfe69b67c2ec968b2d31244655b9accc84ade9c0ebcc176f2074607"
+        },
+        {
+          "path": "tokenizer.json",
+          "byteCount": 277967,
+          "sha256": "691a00068fa7b989f2f3e5ae5daa2d1a5bb319f2d5360deafcfb19a8bb6e7936"
+        },
+        {
+          "path": "tokenizer.model",
+          "byteCount": 65045,
+          "sha256": "82e4572006d64d483317074c22c368e87779640b6f3a9dcd07b7caae32b030ce"
+        },
+        {
+          "path": "default-voice.safetensors",
+          "byteCount": 256136,
+          "sha256": "f739e8c4c76ee7f92e7c94a82002748c8cd22e99582ac49f7b9b94cd63786e18"
+        },
+        {
+          "path": "voices/Zoey.safetensors",
+          "byteCount": 256136,
+          "sha256": "97c7f8c253413574406ab80dd23f49c3ebb2517163b00a9bf86b9c4cf43e7e23",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/NbpkqMVS3CJeq2j8.safetensors"
+          }
+        },
+        {
+          "path": "voices/Juniper.safetensors",
+          "byteCount": 256136,
+          "sha256": "444378eb06b7c492b86e8fc7d13e4db1a3c0cf3e68891a960bf6f0a41a13ef35",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/NIWIOv5vTi5eRMj8.safetensors"
+          }
+        },
+        {
+          "path": "voices/Everly.safetensors",
+          "byteCount": 256136,
+          "sha256": "958ea94da14f46dd48c7f64adac11ed2ad2aa45f7ccd165dfebab5272664402e",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/vjFyp2BcCyTlUmYb.safetensors"
+          }
+        },
+        {
+          "path": "voices/Harper.safetensors",
+          "byteCount": 256136,
+          "sha256": "6b3da6e2d796a20c51af892c482bd6509fb88267a221aff83c870843dee2a123",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/4SZHfMpw-p46Ywgs.safetensors"
+          }
+        },
+        {
+          "path": "voices/Hadley.safetensors",
+          "byteCount": 256136,
+          "sha256": "a879938aa9a2df0a8220bdadef88137929f71e887bd91e7db205bd5fa11661d2",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/bXwrkHhURL1VFJdG.safetensors"
+          }
+        },
+        {
+          "path": "voices/Delia.safetensors",
+          "byteCount": 256136,
+          "sha256": "a0c3dcb91b2247eca56536be9ae8e8becc1c807b1136c5fe101552d6a155b24a",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/nGzMHMPAWGaJFHOo.safetensors"
+          }
+        },
+        {
+          "path": "voices/Easton.safetensors",
+          "byteCount": 256136,
+          "sha256": "45c582673cb20edb04ddcca2b5a8865ddfb0a82599efadb269021e87d20fbdd4",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/LMDIYE0Oa377Qh6Z.safetensors"
+          }
+        },
+        {
+          "path": "voices/Micah.safetensors",
+          "byteCount": 256136,
+          "sha256": "0de1098d1051686a138d068e83ff09deb5053328bc74ec9541a1fdb90bfc24da",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/40QrMVgAxFiUnP9f.safetensors"
+          }
+        },
+        {
+          "path": "voices/Trevor.safetensors",
+          "byteCount": 256136,
+          "sha256": "dc1341c8937af5534e6bbcc5c0fc5e7c10312229b59061228074f93683fe2261",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/0zLApsZfVLLNaEGl.safetensors"
+          }
+        },
+        {
+          "path": "voices/Russell.safetensors",
+          "byteCount": 256136,
+          "sha256": "beae9e4030efce0a935fcb0f807dc0784d598bcaa87ad4aacb047436b1eaa411",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/_6Aslh2DxfmnRLmP.safetensors"
+          }
+        },
+        {
+          "path": "voices/Preston.safetensors",
+          "byteCount": 256136,
+          "sha256": "6e04b84d3ae8751b22bca0a4f63936f9cb648f4f2182b2d0788071ea1c0b68a1",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/qIxlZ7Ei8KvWlyQH.safetensors"
+          }
+        },
+        {
+          "path": "voices/Miles.safetensors",
+          "byteCount": 256136,
+          "sha256": "eab20e4f159b48cfbc01b1885804e24f681f80e7a64f909182763a4e3361bee8",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/d9XCyhjo4JhkHF1d.safetensors"
+          }
+        },
+        {
+          "path": "voices/Maeve.safetensors",
+          "byteCount": 256136,
+          "sha256": "56494ee67d533ad227ff0dfd0b1c13ff5aa91f1ad6e596e66c2986ba3005e844",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/6PWnV0Nq4wu7RVBT.safetensors"
+          }
+        },
+        {
+          "path": "voices/Freya.safetensors",
+          "byteCount": 256136,
+          "sha256": "eb3cd47418349e618408c16bea7153988b3ad04b41a6033039dd474a9a4dcd23",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/GgfEkEJtxZR7gnpy.safetensors"
+          }
+        },
+        {
+          "path": "voices/Pippa.safetensors",
+          "byteCount": 256136,
+          "sha256": "d41a8f01d6e33450f1ce062d332914da10beee99e585dab531750706f187c48a",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/uem82D50GRv2Dwma.safetensors"
+          }
+        },
+        {
+          "path": "voices/Elodie-Rose.safetensors",
+          "byteCount": 256136,
+          "sha256": "21eade9d83b2e66b9364e1b6cd999a3a6704c000a71f27f34e05ace5cdfd58bb",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/y9bQqIDnyxwqK01t.safetensors"
+          }
+        },
+        {
+          "path": "voices/Imogen.safetensors",
+          "byteCount": 256136,
+          "sha256": "1980ab3c35fa98a25b5f3b5e643fd852e14ca8a12a4a26b06aaf1abf2a8c68b1",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/gDT1nz7Ie36ZhL-C.safetensors"
+          }
+        },
+        {
+          "path": "voices/Lottie.safetensors",
+          "byteCount": 256136,
+          "sha256": "a906ebf17e43fded12b3d6bd077abb2df33bc86eff51c1beeb82e5d416527db3",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/m9MxpY6IUGXtWp76.safetensors"
+          }
+        },
+        {
+          "path": "voices/Alfie.safetensors",
+          "byteCount": 256136,
+          "sha256": "4de75497fff3030168e8aa6dca23ffeb332b1bc8c25d0bf3507ceadac953ae9c",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/X6NceqF285Gr04gb.safetensors"
+          }
+        },
+        {
+          "path": "voices/Hugh.safetensors",
+          "byteCount": 256136,
+          "sha256": "3169d74b47a54d1eb15e4c243f56393abe9fe90c7e1c308ecf96ee67618b152a",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/YyKcxPG7iIgS3jsK.safetensors"
+          }
+        },
+        {
+          "path": "voices/Edwin.safetensors",
+          "byteCount": 256136,
+          "sha256": "ff1d0735b8b45710462b1d1f846da040f970c6eb62c7c2f36dbfb8e5bde74f1e",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/zUCxzrOrugTSis03.safetensors"
+          }
+        },
+        {
+          "path": "voices/Spencer.safetensors",
+          "byteCount": 256136,
+          "sha256": "cc9ac1107b0ffce282374a19beb7bfa95847724e6b7afbac991b4ae4277d5e6d",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/JOW0vchyswkQUMDS.safetensors"
+          }
+        },
+        {
+          "path": "voices/Toby.safetensors",
+          "byteCount": 256136,
+          "sha256": "09ab315c7f4b72b4d71e66cb756184cedfb1f14d222d096e115bf95bfe7b29dc",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/dME3IWyZBvmh1n1q.safetensors"
+          }
+        },
+        {
+          "path": "voices/Teddy.safetensors",
+          "byteCount": 256136,
+          "sha256": "baea0ea9506f3237a5ebfc61afb7c72dbd189c5603b199ef42fbb00dbda379e0",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/Zn7g6NxLqXlJb7Qi.safetensors"
+          }
+        },
+        {
+          "path": "voices/Bryony.safetensors",
+          "byteCount": 256136,
+          "sha256": "bcc207a73b7885e45b49ab633d3377a10158292e3a7cef9cd6764ad107f1cb9b",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/gfP44RlHwr2kEwk7.safetensors"
+          }
+        },
+        {
+          "path": "voices/Captain Silas Blackwater.safetensors",
+          "byteCount": 256136,
+          "sha256": "a09f615b0084980ebc4076d71550bf73ccd8d4df076bbbee4a9beb523a1379d9",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/xPDpsV3F592srkjA.safetensors"
+          }
+        },
+        {
+          "path": "voices/Morwenna of the Deep.safetensors",
+          "byteCount": 256136,
+          "sha256": "2ff2db91e70648623df8d42c0dcd7c336b2f14cb4362d602a20f292a4d862154",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/nOykTmcH9ydsGGIc.safetensors"
+          }
+        },
+        {
+          "path": "voices/Old Mortlake.safetensors",
+          "byteCount": 256136,
+          "sha256": "d3f9429205e5906dcd3c78edaf7c9d5148c7e389e34c82c86f72f154adb5d923",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/lX3LavMNdlIbgEHH.safetensors"
+          }
+        },
+        {
+          "path": "voices/Azgorath.safetensors",
+          "byteCount": 256136,
+          "sha256": "83900e020c14946426614c6553c5a138ba6277e1aaa69832223bd0f0f8b73893",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/dGyGDKo2osj7h3s7.safetensors"
+          }
+        },
+        {
+          "path": "voices/Fennick the Young Elf.safetensors",
+          "byteCount": 256136,
+          "sha256": "a05944e4c69d61d10d66f689175ba0b081930df2d77b22f04d00ac40d3d69ecb",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/cXoIXJ2llS8S0WOW.safetensors"
+          }
+        },
+        {
+          "path": "voices/The Thing Under the Stairs.safetensors",
+          "byteCount": 256136,
+          "sha256": "bfa37bac98aefbb9de80f792c47d01a0f9e3b94e73776169040c249c8b722759",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/GXaSqMEmOg12OIYb.safetensors"
+          }
+        },
+        {
+          "path": "voices/Vyrmathrax the Ancient.safetensors",
+          "byteCount": 256136,
+          "sha256": "63ab4b15427844a804480a1603774262e8903dee33cb279e2749860dbfaedd10",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/xO8xQo3BrB8FuI6J.safetensors"
+          }
+        },
+        {
+          "path": "voices/Grub the Ogre.safetensors",
+          "byteCount": 256136,
+          "sha256": "b30fa847686ec1eb6be8c5bea4b6a5c5076ea66c3ff053cf98210a155d8aad1e",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/cYtsRSxV5q9IMehn.safetensors"
+          }
+        },
+        {
+          "path": "voices/Master Aldric.safetensors",
+          "byteCount": 256136,
+          "sha256": "a83430cc022b85c83753f859f9e44f406651646dab994fced8ef7a9a88005971",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/gSgG5Tor0GPEnqzC.safetensors"
+          }
+        },
+        {
+          "path": "voices/The Snow Queen.safetensors",
+          "byteCount": 256136,
+          "sha256": "bc8a8fcb95bb4f32d2d4376aa69d81b186b3ba2f8e9b6cb6a403b2b194590e85",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/NIWoEurJHMJjyUTe.safetensors"
+          }
+        },
+        {
+          "path": "voices/Sir Bramwell.safetensors",
+          "byteCount": 256136,
+          "sha256": "b3cea6789aeb58822af16ba08c4e5105d7febb840dcb67b47f426c19d1a8f209",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/y2eiKxtQo2B67deU.safetensors"
+          }
+        },
+        {
+          "path": "voices/Fairy Godmother.safetensors",
+          "byteCount": 256136,
+          "sha256": "f390c09f5e279c0f2171995a534b92f5ca5c83443906879da68fc27445f89d89",
+          "source": {
+            "repository": "gradium/phonon-voices",
+            "revision": "0ee17205f254b5abc43b266c8a0f215565c352f7",
+            "path": "voices/QXNr0SvkukLB4wPq.safetensors"
+          }
+        }
+      ],
+      "estimatedDiskBytes": 112904734,
+      "estimatedPeakMemoryBytes": 1000000000,
+      "hardwareTier": "base",
+      "license": {
+        "identifier": "Apache-2.0",
+        "url": "https://huggingface.co/gradium/phonon-31m-en",
+        "commercialUseAllowed": true,
+        "requiresAcceptance": false
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 18,
+        "size": "small",
+        "speed": "medium-fast",
+        "note": "Experimental English speech with 37 preset voices and imported Phonon voice files. Runs locally and streams audio as it is generated."
+      },
+      "testedMLXAudioVersion": "624fd54",
+      "testedDate": "2026-10-22"
     }
   ]
 }

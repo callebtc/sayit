@@ -6,6 +6,37 @@ import Testing
 
 @Suite("Voice profile storage")
 struct VoiceProfileStoreTests {
+    @Test("Imported Phonon voices persist, duplicate, rename, and delete independently")
+    @MainActor
+    func importedVoicePersistence() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let store = VoiceProfileStore(directories: directories)
+        let data = try PhononVoiceFixture.data()
+        let voice = try store.importPhononVoice(data: data, modelID: "phonon-31m-en", name: "Custom Voice")
+        #expect(voice.origin == .importedFile)
+        let reloaded = VoiceProfileStore(directories: directories)
+        let record = try #require(reloaded.record(id: voice.id))
+        #expect(try Data(contentsOf: reloaded.referenceURL(for: record)) == data)
+        #expect(record.referenceFilename == "voice.safetensors")
+        #expect(record.transcript == nil)
+        let copy = try reloaded.duplicate(id: voice.id, name: "Voice Copy", tuning: voice.tuning)
+        let copyRecord = try #require(reloaded.record(id: copy.id))
+        #expect(try Data(contentsOf: reloaded.referenceURL(for: copyRecord)) == data)
+        _ = try reloaded.rename(id: copy.id, name: "Renamed Voice")
+        try reloaded.delete(id: voice.id)
+        let remaining = VoiceProfileStore(directories: directories)
+        #expect(remaining.snapshots.map(\.displayName) == ["Renamed Voice"])
+        #expect(try Data(contentsOf: remaining.referenceURL(for: copyRecord)) == data)
+        #expect(throws: ServiceFailure.self) {
+            try remaining.importPhononVoice(data: Data([1, 2]), modelID: "phonon-31m-en", name: "Invalid")
+        }
+        #expect(throws: ServiceFailure.self) {
+            try remaining.importPhononVoice(data: data, modelID: "phonon-31m-en", name: "Renamed Voice")
+        }
+        #expect(remaining.snapshots.count == 1)
+    }
     @Test("Profiles persist atomically and corrupt siblings are isolated")
     @MainActor
     func profilePersistenceAndIsolation() throws {

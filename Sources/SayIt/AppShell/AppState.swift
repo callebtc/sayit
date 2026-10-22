@@ -628,6 +628,21 @@ final class AppState {
         perform(.selectVoice(profile.id))
     }
 
+    func importPhononVoice(modelID: String, name: String, data: Data) async -> Bool {
+        clearPresentedError()
+        do {
+            let response = try await send(
+                .importPhononVoice(modelID: modelID, name: name, data: data)
+            )
+            try requireSuccess(response)
+            await refreshVoices()
+            return true
+        } catch {
+            presentError(error.localizedDescription)
+            return false
+        }
+    }
+
     func renameVoice(_ profile: VoiceProfileSnapshot, name: String) {
         perform(.renameVoice(profile.id, name: name))
     }

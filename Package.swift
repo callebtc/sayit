@@ -26,7 +26,7 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6"),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
-            revision: "bf14ae0c26e4e85553dd989571cae29d70fa6735"
+            revision: "624fd5410b2fc8ea06f955500c9ac078e405261f"
         ),
         .package(
             url: "https://github.com/apple/swift-openapi-generator",
