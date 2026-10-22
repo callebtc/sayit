@@ -9,21 +9,22 @@ struct ModelCatalogTests {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
         #expect(catalog.models.count == 24)
-        #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
+        #expect(catalog.models.first?.id == ModelID("phonon-31m-en"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
             ["0.1.3", "bf14ae0", "624fd54"].contains($0.testedMLXAudioVersion)
         })
     }
 
-    @Test("Phonon English is experimental with a verified offline preset")
+    @Test("Phonon English is recommended with verified offline presets")
     func phononEnglishCapabilities() throws {
         let model = try #require(
             ModelCatalogLoader().bundledCatalog().models.first {
                 $0.id == ModelID("phonon-31m-en")
             }
         )
-        #expect(model.stability == .experimental)
+        #expect(model.stability == .recommended)
+        #expect(model.experience?.recommendationRank == 1)
         #expect(model.isSelectable)
         #expect(model.modelType == "phonon")
         #expect(model.languages == ["en"])
@@ -67,6 +68,7 @@ struct ModelCatalogTests {
             }
 
         #expect(recommended.map(\.id.rawValue) == [
+            "phonon-31m-en",
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
             "qwen3-17b-customvoice-8bit",
@@ -78,7 +80,8 @@ struct ModelCatalogTests {
                 model.experience.map { ($0.recommendationRank, model.id) }
             }
             .sorted { $0.0 < $1.0 }
-        #expect(ranked.prefix(4).map { $0.1.rawValue } == [
+        #expect(ranked.prefix(5).map { $0.1.rawValue } == [
+            "phonon-31m-en",
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
             "qwen3-17b-customvoice-8bit",
@@ -122,7 +125,9 @@ struct ModelCatalogTests {
     @Test("Hardware warning uses the seventy-percent boundary")
     func hardwareWarning() throws {
         let model = try #require(
-            ModelCatalogLoader().bundledCatalog().models.first
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("kokoro-bf16")
+            }
         )
         let advisor = HardwareAdvisor()
 

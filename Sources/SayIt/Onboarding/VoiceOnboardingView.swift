@@ -52,7 +52,16 @@ struct VoiceOnboardingView: View {
     }
 
     private var recommendedModel: ModelDescriptor? {
-        state.models.first { $0.stability == .recommended }
+        Self.recommendedModel(in: state.models)
+    }
+
+    static func recommendedModel(in models: [ModelDescriptor]) -> ModelDescriptor? {
+        models
+            .filter { $0.stability == .recommended && $0.isSelectable }
+            .min {
+                ($0.experience?.recommendationRank ?? .max)
+                    < ($1.experience?.recommendationRank ?? .max)
+            }
     }
 
     private func showModelPicker() {

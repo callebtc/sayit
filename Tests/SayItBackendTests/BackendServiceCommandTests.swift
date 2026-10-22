@@ -2643,7 +2643,9 @@ private final class ServiceFixture {
     ) throws -> UUID {
         let store = try HistoryStore(directories: directories)
         let model = try #require(
-            ModelCatalogLoader().bundledCatalog().models.first
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("kokoro-bf16")
+            }
         )
         let request = SpeechRequest(
             cleanedText: CleanedText(
