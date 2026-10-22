@@ -103,15 +103,17 @@ if [ "$mode" = prepare ]; then
     mkdir -p "$CLANG_MODULE_CACHE_PATH" "$XDG_CACHE_HOME"
     app_metallib="$app_root/Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
     [ -f "$app_metallib" ] || fail 'The app Metal library is missing.'
-    xcrun swift build --build-tests
-    swiftpm_bin_path=$(xcrun swift build --show-bin-path)
+    # Keep the XCTest layout and app-supplied Metal library used by this harness.
+    # Swift 6.4 defaults to swiftbuild, which separately compiles Metal resources.
+    xcrun swift build --build-system native --build-tests
+    swiftpm_bin_path=$(xcrun swift build --build-system native --show-bin-path)
     test_executable="$swiftpm_bin_path/SayItPackageTests.xctest/Contents/MacOS/SayItPackageTests"
     [ -x "$test_executable" ] || fail 'The package test executable is missing.'
     test_metallib="$(dirname "$test_executable")/mlx.metallib"
     cp "$app_metallib" "$test_metallib"
-    xcrun swift test --disable-sandbox --skip-build
-    xcrun swift test --disable-sandbox --package-path Packages/PlaybackDSP -c release
-    SAYIT_PLAYBACK_INTEGRATION=1 xcrun swift test --disable-sandbox --skip-build --filter TimeStretchPlaybackTests
+    xcrun swift test --build-system native --disable-sandbox --skip-build
+    xcrun swift test --build-system native --disable-sandbox --package-path Packages/PlaybackDSP -c release
+    SAYIT_PLAYBACK_INTEGRATION=1 xcrun swift test --build-system native --disable-sandbox --skip-build --filter TimeStretchPlaybackTests
     rm -f "$test_metallib"
     test_metallib=
     SAYIT_APP_PATH="$app_root" ./Scripts/smoke-test-selection-xpc.sh
