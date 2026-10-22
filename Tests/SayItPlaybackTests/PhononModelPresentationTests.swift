@@ -25,12 +25,28 @@ struct PhononModelPresentationTests {
     func supportedVoiceControls() throws {
         let descriptor = try phononModel().serviceSnapshot.descriptor
         #expect(descriptor.isSelectable)
-        #expect(descriptor.stability == .experimental)
+        #expect(descriptor.stability == .recommended)
         #expect(descriptor.supportsPhononVoiceImport)
         #expect(!descriptor.capabilities.voiceCloning)
         #expect(descriptor.capabilities.voiceCloneRequirements == nil)
         #expect(!descriptor.capabilities.voiceDescription)
         #expect(!descriptor.capabilities.supportsVoiceDiscovery)
+    }
+
+    @Test("Onboarding recommends Phonon first regardless of catalog order")
+    @MainActor
+    func onboardingRecommendation() throws {
+        let models = try ModelCatalogLoader().bundledCatalog().models
+        #expect(
+            VoiceOnboardingView.recommendedModel(in: Array(models.reversed()))?.id
+                == ModelID("phonon-31m-en")
+        )
+        #expect(VoiceOnboardingView.recommendedModel(in: []) == nil)
+        #expect(
+            VoiceOnboardingView.recommendedModel(
+                in: models.filter { $0.stability == .experimental }
+            ) == nil
+        )
     }
 
     private func phononModel() throws -> ModelDescriptor {
