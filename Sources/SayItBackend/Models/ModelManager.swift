@@ -192,7 +192,11 @@ actor ModelManager: ModelManaging {
         for voice: String,
         in model: ModelDescriptor
     ) -> ModelFileDescriptor? {
-        model.files.first { $0.path == "voices/\(voice).safetensors" }
+        if SupportedModelTypes.areCompatible(model.modelType, "phonon"),
+           voice == "default" {
+            return model.files.first { $0.path == "default-voice.safetensors" }
+        }
+        return model.files.first { $0.path == "voices/\(voice).safetensors" }
     }
 
     private func missingVoiceFiles(
@@ -253,9 +257,9 @@ actor ModelManager: ModelManaging {
                 let response = try await downloadFile(
                     for: model.id,
                     from: downloadURL(
-                        repository: model.repository,
-                        revision: model.revision,
-                        path: file.path
+                        repository: file.source?.repository ?? model.repository,
+                        revision: file.source?.revision ?? model.revision,
+                        path: file.source?.path ?? file.path
                     ),
                     to: downloaded,
                     resumeDataURL: staged.appendingPathExtension("resume"),
@@ -447,9 +451,9 @@ actor ModelManager: ModelManaging {
                     withIntermediateDirectories: true
                 )
                 let remoteURL = try downloadURL(
-                    repository: model.repository,
-                    revision: model.revision,
-                    path: file.path
+                    repository: file.source?.repository ?? model.repository,
+                    revision: file.source?.revision ?? model.revision,
+                    path: file.source?.path ?? file.path
                 )
                 let resumeURL = destination.appendingPathExtension("resume")
                 let downloadedFile = destination.appendingPathExtension(

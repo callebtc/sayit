@@ -22,6 +22,7 @@ public enum ServiceCommand: Codable, Sendable {
     case cancelModelInstall
     case removeModel(String)
     case voices(modelID: String?)
+    case importPhononVoice(modelID: String, name: String, data: Data)
     case startVoiceDiscovery(VoiceDiscoveryRequest)
     case startVoiceClone(VoiceCloneRequest)
     case cancelVoiceStudio

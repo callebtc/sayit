@@ -15,7 +15,7 @@ packages:
     exactVersion: 2.9.6
   MLXAudio:
     url: https://github.com/Blaizzy/mlx-audio-swift.git
-    revision: bf14ae0c26e4e85553dd989571cae29d70fa6735
+    revision: 624fd5410b2fc8ea06f955500c9ac078e405261f
   Hummingbird:
     url: https://github.com/hummingbird-project/hummingbird.git
     exactVersion: 2.22.0

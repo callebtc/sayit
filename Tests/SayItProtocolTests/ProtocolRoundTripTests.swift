@@ -3,6 +3,20 @@ import SayItProtocol
 import Testing
 
 struct ProtocolRoundTripTests {
+    @Test("Phonon voice imports survive wire encoding")
+    func phononVoiceImportRoundTrip() throws {
+        let data = Data([1, 2, 3])
+        let original = ServiceCommand.importPhononVoice(modelID: "phonon-31m-en", name: "Custom", data: data)
+        let decoded = try SayItWireCodec.decode(ServiceCommand.self, from: SayItWireCodec.encode(original))
+        guard case .importPhononVoice(let model, let name, let bytes) = decoded else {
+            Issue.record("Expected a Phonon voice import")
+            return
+        }
+        #expect(model == "phonon-31m-en")
+        #expect(name == "Custom")
+        #expect(bytes == data)
+    }
+
     @Test("Timing suffix metadata and optional audio ends survive wire encoding")
     func playbackTimingRoundTrip() throws {
         let chunk = PlaybackTextChunk(textStart: 100, textEnd: 200, audioStart: 12, audioEnd: 23)
@@ -75,7 +89,7 @@ struct ProtocolRoundTripTests {
             from: SayItWireCodec.encode(request)
         )
         #expect(decodedRequest == request)
-        #expect(SayItProtocolVersion.current == 8)
+        #expect(SayItProtocolVersion.current == 9)
     }
 
     @Test

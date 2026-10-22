@@ -70,11 +70,14 @@ actor CommunityModelResolver {
             "echo_tts", "echo", "indextts", "index_tts", "moss_tts_nano"
         ].contains(rawType)
         let voiceDesign = ["irodori_tts", "irodori", "omnivoice"].contains(rawType)
-        let progressive = [
+        let isPhonon = SupportedModelTypes.areCompatible(rawType, "phonon")
+        let progressive = isPhonon || [
             "kokoro", "kokoro_tts", "kitten_tts", "kitten", "pocket_tts"
         ].contains(rawType)
         let defaultVoice: String? = if ["kokoro", "kokoro_tts"].contains(rawType) {
             "af_heart"
+        } else if isPhonon {
+            "default"
         } else {
             nil
         }
@@ -96,7 +99,7 @@ actor CommunityModelResolver {
             family: "Community model",
             repository: normalizedRepository,
             revision: metadata.sha,
-            modelType: rawType,
+            modelType: SupportedModelTypes.loaderType(for: rawType),
             parameterCount: "Unknown",
             quantization: "Repository",
             languages: [],
@@ -109,7 +112,7 @@ actor CommunityModelResolver {
                 voiceCloning: referenceOnly,
                 streaming: progressive,
                 longForm: true,
-                languageSelection: true,
+                languageSelection: !isPhonon,
                 requiresReferenceAudio: referenceOnly
             ),
             playbackMode: progressive ? .progressive : .buffered,
@@ -188,12 +191,17 @@ actor CommunityModelResolver {
             "echo_tts", "echo", "indextts", "index_tts", "moss_tts_nano"
         ].contains(rawType)
         let voiceDesign = ["irodori_tts", "irodori", "omnivoice"].contains(rawType)
-        let progressive = [
+        let isPhonon = SupportedModelTypes.areCompatible(rawType, "phonon")
+        let progressive = isPhonon || [
             "kokoro", "kokoro_tts", "kitten_tts", "kitten", "pocket_tts"
         ].contains(rawType)
-        let defaultVoice = ["kokoro", "kokoro_tts"].contains(rawType)
-            ? "af_heart"
-            : nil
+        let defaultVoice: String? = if ["kokoro", "kokoro_tts"].contains(rawType) {
+            "af_heart"
+        } else if isPhonon {
+            "default"
+        } else {
+            nil
+        }
 
         return ModelDescriptor(
             id: ModelID("community-local-\(revision.prefix(12))"),
@@ -201,7 +209,7 @@ actor CommunityModelResolver {
             family: "Imported model",
             repository: "local-import",
             revision: revision,
-            modelType: rawType,
+            modelType: SupportedModelTypes.loaderType(for: rawType),
             parameterCount: "Unknown",
             quantization: "Local",
             languages: [],
@@ -214,7 +222,7 @@ actor CommunityModelResolver {
                 voiceCloning: referenceOnly,
                 streaming: progressive,
                 longForm: true,
-                languageSelection: true,
+                languageSelection: !isPhonon,
                 requiresReferenceAudio: referenceOnly
             ),
             playbackMode: progressive ? .progressive : .buffered,

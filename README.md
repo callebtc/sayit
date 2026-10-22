@@ -30,6 +30,13 @@ stay on your Mac.
   [Chatterbox](https://huggingface.co/mlx-community/Chatterbox-TTS-fp16), and
   [OmniVoice](https://huggingface.co/mlx-community/OmniVoice). Compatible
   community models can be added by Hugging Face repository ID.
+  [Phonon 31M English](https://huggingface.co/gradium/phonon-31m-en) is available
+  under Experimental models, with 37 English preset voices, a default voice,
+  and offline streaming playback. Import custom Phonon `.safetensors` voice
+  files in Settings → Voices; Say It keeps a local copy. Cloning and voice design
+  for Phonon happen in Gradium Studio before export. New model downloads include
+  all presets. Existing installations can get the voice pack with **Update Voices**
+  in Settings → Models or Settings → Voices, without downloading the model again.
 - **Create voices.** Models expose the features they support, from built-in
   voices and voice descriptions to random voice discovery and voice cloning.
 - **Efficient model loading.** Only one model is kept in memory, and it is

@@ -8,12 +8,52 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 23)
+        #expect(catalog.models.count == 24)
         #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
-            ["0.1.3", "bf14ae0"].contains($0.testedMLXAudioVersion)
+            ["0.1.3", "bf14ae0", "624fd54"].contains($0.testedMLXAudioVersion)
         })
+    }
+
+    @Test("Phonon English is experimental with a verified offline preset")
+    func phononEnglishCapabilities() throws {
+        let model = try #require(
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("phonon-31m-en")
+            }
+        )
+        #expect(model.stability == .experimental)
+        #expect(model.isSelectable)
+        #expect(model.modelType == "phonon")
+        #expect(model.languages == ["en"])
+        #expect(model.defaultLanguage == "en")
+        #expect(model.voices.count == 38)
+        #expect(Set(model.voices).count == 38)
+        #expect(model.voices.contains("Zoey"))
+        #expect(model.voices.contains("Freya"))
+        #expect(model.voices.contains("Captain Silas Blackwater"))
+        #expect(model.supportsPhononVoiceImport)
+        #expect(model.defaultVoice == "default")
+        #expect(model.capabilities.presetVoices)
+        #expect(model.capabilities.streaming)
+        #expect(model.playbackMode == .progressive)
+        #expect(!model.capabilities.voiceCloning)
+        #expect(!model.capabilities.voiceDescription)
+        #expect(!model.capabilities.languageSelection)
+        #expect(!model.supportsNativeSpeakingPace)
+        #expect(model.license.commercialUseAllowed)
+        #expect(!model.license.requiresAcceptance)
+        #expect(model.downloadByteCount == 112_904_734)
+        let voices = model.files.filter { $0.path.hasPrefix("voices/") }
+        #expect(voices.count == 37)
+        #expect(voices.allSatisfy {
+            $0.source?.repository == "gradium/phonon-voices"
+                && $0.source?.revision == "0ee17205f254b5abc43b266c8a0f215565c352f7"
+        })
+        #expect(model.files.allSatisfy { $0.sha256?.count == 64 })
+        #expect(model.files.contains { $0.path == "default-voice.safetensors" })
+        #expect(!model.files.contains { $0.path.hasSuffix(".gguf") })
     }
 
     @Test("Hands-on recommendations lead the ranked catalog")

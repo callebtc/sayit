@@ -507,6 +507,18 @@ public final class SayItBackendService: SayItService {
                 modelID == nil || $0.modelID == modelID
             }
             return .voices(voices)
+        case .importPhononVoice(let modelID, let name, let data):
+            guard let model = models.first(where: { $0.id.rawValue == modelID }),
+                  SupportedModelTypes.areCompatible(model.modelType, "phonon") else {
+                throw ServiceFailure(
+                    code: "voice.import_unsupported",
+                    message: "Voice-file import is available for Phonon models."
+                )
+            }
+            _ = try voiceProfiles.importPhononVoice(data: data, modelID: modelID, name: name)
+            voicesRevision &+= 1
+            revision &+= 1
+            return .accepted
         case .startVoiceDiscovery(let request):
             return .voiceStudio(try startVoiceDiscovery(request))
         case .startVoiceClone(let request):
@@ -1298,10 +1310,9 @@ public final class SayItBackendService: SayItService {
                 parameters: validated.parameters
             ),
             seed: UInt64.random(in: UInt64.min...UInt64.max),
-            reference: VoiceReference(
-                audioURL: referenceURL,
-                transcript: record.transcript
-            )
+            reference: record.origin == .importedFile
+                ? VoiceReference(phononEmbeddingURL: referenceURL)
+                : VoiceReference(audioURL: referenceURL, transcript: record.transcript)
         )
         let temporary = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -1674,10 +1685,9 @@ public final class SayItBackendService: SayItService {
             return ResolvedVoice(
                 preset: nil,
                 mode: .savedProfile,
-                reference: VoiceReference(
-                    audioURL: referenceURL,
-                    transcript: record.transcript
-                ),
+                reference: record.origin == .importedFile
+                    ? VoiceReference(phononEmbeddingURL: referenceURL)
+                    : VoiceReference(audioURL: referenceURL, transcript: record.transcript),
                 profileID: record.id,
                 profileName: record.displayName,
                 tuning: VoiceSynthesisTuning(

@@ -48,32 +48,23 @@ struct VoiceProfileRow: View {
                     .contentShape(.rect)
                     .accessibilityLabel("Voice name")
             } else {
-                rowContent
-                    .contentShape(.rect)
-                    .onDrag(makeDragItem) {
-                        Color.clear.frame(width: 1, height: 1)
-                    }
-                    .onTapGesture {
-                        guard canUse else { return }
-                        onSelect()
-                    }
-                    .onHover { hovering in
-                        guard canUse else { return }
-                        if hovering {
-                            NSCursor.pointingHand.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Use voice \(profile.displayName)")
-                    .accessibilityHint(
-                        canUse
-                            ? "Selects this voice for speech"
-                            : isSelected
-                                ? "This voice is selected"
-                                : "Reinstall the model to use this voice"
-                    )
+                Button(action: selectVoice) {
+                    rowContent.contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isModelInstalled)
+                .onDrag(makeDragItem) {
+                    Color.clear.frame(width: 1, height: 1)
+                }
+                .accessibilityLabel("Use voice \(profile.displayName)")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityHint(
+                    canUse
+                        ? "Selects this voice for speech"
+                        : isSelected
+                            ? "This voice is selected"
+                            : "Reinstall the model to use this voice"
+                )
             }
 
             Menu("Voice actions", systemImage: "ellipsis") {
@@ -83,11 +74,13 @@ struct VoiceProfileRow: View {
                     action: onTest
                 )
                 .disabled(!isModelInstalled)
-                Button(
-                    "Customize…",
-                    systemImage: "slider.horizontal.3",
-                    action: onCustomize
-                )
+                if profile.origin != .importedFile {
+                    Button(
+                        "Customize…",
+                        systemImage: "slider.horizontal.3",
+                        action: onCustomize
+                    )
+                }
                 Button("Rename", action: beginRename)
                 Button(
                     "Delete",
@@ -111,7 +104,9 @@ struct VoiceProfileRow: View {
             Button("Delete Voice", role: .destructive, action: onDelete)
         } message: {
             Text(
-                "The reference recording will be removed. Existing history audio stays available."
+                profile.origin == .importedFile
+                    ? "The imported voice file will be removed. Existing history audio stays available."
+                    : "The reference recording will be removed. Existing history audio stays available."
             )
         }
     }
@@ -152,9 +147,7 @@ struct VoiceProfileRow: View {
                         }
                 }
                 SayItBadge(
-                    title: profile.origin == .generated
-                        ? "Discovered"
-                        : "Cloned",
+                    title: originTitle,
                     tint: profile.origin == .generated
                         ? .accentColor
                         : .indigo
@@ -167,6 +160,19 @@ struct VoiceProfileRow: View {
 
     private var canUse: Bool {
         isModelInstalled && !isSelected && !isRenaming
+    }
+
+    private var originTitle: String {
+        switch profile.origin {
+        case .generated: "Discovered"
+        case .recordedClone: "Cloned"
+        case .importedFile: "Imported"
+        }
+    }
+
+    private func selectVoice() {
+        guard canUse else { return }
+        onSelect()
     }
 
     private func beginRename() {

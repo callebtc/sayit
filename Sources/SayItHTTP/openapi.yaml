@@ -528,7 +528,7 @@ components:
           maxLength: 50
         origin:
           type: string
-          enum: [generated, recordedClone]
+          enum: [generated, recordedClone, importedFile]
         language:
           type: [string, "null"]
         duration:

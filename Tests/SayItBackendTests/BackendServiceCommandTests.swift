@@ -8,6 +8,84 @@ import Testing
 @Suite("Backend service commands", .serialized)
 @MainActor
 struct BackendServiceCommandTests {
+    @Test("Phonon voice imports validate, persist, and route embeddings for previews")
+    func phononVoiceImportLifecycle() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "phonon-31m-en")
+        await fixture.service.start()
+        let data = try PhononVoiceFixture.data()
+        let unsupported = await fixture.service.handle(.init(command:
+            .importPhononVoice(modelID: fixture.seedModelID, name: "Wrong model", data: data)
+        ))
+        #expect(try failure(unsupported).code == "voice.import_unsupported")
+        let invalid = await fixture.service.handle(.init(command:
+            .importPhononVoice(modelID: "phonon-31m-en", name: "Invalid", data: Data([1]))
+        ))
+        #expect(try failure(invalid).code == "voice.invalid_file")
+        #expect(isAccepted(await fixture.service.handle(.init(command:
+            .importPhononVoice(modelID: "phonon-31m-en", name: "Imported Voice", data: data)
+        ))))
+        let saved = try voices(await fixture.service.handle(.init(command: .voices(modelID: "phonon-31m-en"))))
+        let profile = try #require(saved.first)
+        #expect(saved.count == 1)
+        #expect(profile.origin == .importedFile)
+        #expect(isAccepted(await fixture.service.handle(.init(command: .selectVoice(profile.id)))))
+        let preview = try exportedFile(await fixture.service.handle(.init(command:
+            .previewVoiceProfile(profile.id, tuning: profile.tuning, text: "A custom voice preview.")
+        )))
+        #expect(!preview.data.isEmpty)
+        #expect(await fixture.synthesizer.referenceKinds.last == .phononEmbedding)
+        #expect(VoiceProfileStore(directories: fixture.directories).snapshots.map(\.id) == [profile.id])
+        #expect(isAccepted(await fixture.service.handle(.init(command: .deleteVoice(profile.id)))))
+        #expect(try voices(await fixture.service.handle(.init(command: .voices(modelID: "phonon-31m-en")))).isEmpty)
+    }
+
+    @Test("A separately distributed preset downloads from its pinned source")
+    func pinnedVoiceSourceDownload() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let config = Data(#"{"model_type":"gradium_phonon_tts"}"#.utf8)
+        let weights = Data([1, 2, 3])
+        let base = downloadTestModel(config: config, weights: weights)
+        let model = ModelDescriptor(
+            id: base.id, displayName: base.displayName, family: "Phonon",
+            repository: base.repository, revision: base.revision, modelType: "phonon",
+            parameterCount: "31M", quantization: base.quantization, languages: ["en"],
+            voices: ["Zoey"], defaultVoice: "Zoey", defaultLanguage: "en",
+            capabilities: base.capabilities, playbackMode: .progressive,
+            files: base.files + [ModelFileDescriptor(
+                path: "voices/Zoey.safetensors", byteCount: 3,
+                sha256: SHA256.hash(data: weights).map { String(format: "%02x", $0) }.joined(),
+                source: ModelFileSource(repository: "voices/catalog", revision: String(repeating: "a", count: 40), path: "voices/opaque.safetensors")
+            )],
+            estimatedDiskBytes: base.estimatedDiskBytes + 3,
+            estimatedPeakMemoryBytes: 1, hardwareTier: .base, license: base.license,
+            stability: .experimental, testedMLXAudioVersion: "test", testedDate: "test"
+        )
+        let staging = directories.downloads.appending(path: "\(model.id.rawValue)-\(model.revision).partial")
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        try config.write(to: staging.appending(path: "config.json"))
+        try weights.write(to: staging.appending(path: "model.safetensors"))
+        let expected = "https://huggingface.co/voices/catalog/resolve/\(String(repeating: "a", count: 40))/voices/opaque.safetensors"
+        RestartableDownloadURLProtocol.setHandler { request in
+            guard let url = request.url else { return nil }
+            let matches = url.absoluteString == expected
+            return (HTTPURLResponse(url: url, statusCode: matches ? 200 : 404, httpVersion: nil, headerFields: nil)!, matches ? weights : Data())
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RestartableDownloadURLProtocol.self]
+        let manager = ModelManager(
+            catalog: ModelCatalog(schemaVersion: 1, generatedAt: "test", models: [model]),
+            directories: directories, activeModelID: ModelID("other"), session: URLSession(configuration: configuration)
+        )
+        try await manager.install(model.id)
+        #expect(await manager.availableVoices(for: model.id) == ["Zoey"])
+        let installed = try #require(await manager.installedURL(for: model.id))
+        #expect(try Data(contentsOf: installed.appending(path: "voices/Zoey.safetensors")) == weights)
+    }
+
     @Test("Replaying history restores saved audio boundaries and supports legacy recordings")
     func historyRestoresTiming() async throws {
         for includesTiming in [false, true] {
@@ -2467,6 +2545,20 @@ private final class ServiceFixture {
             at: directory,
             withIntermediateDirectories: true
         )
+        // Request routing uses a mock synthesizer, but installed preset
+        // availability still requires files with the catalog's expected sizes.
+        for file in model.files where file.path.hasPrefix("voices/")
+            || file.path == "default-voice.safetensors" {
+            let url = directory.appending(path: file.path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data().write(to: url)
+            let handle = try FileHandle(forWritingTo: url)
+            try handle.truncate(atOffset: UInt64(file.byteCount))
+            try handle.close()
+        }
         let installation = ModelInstallation(
             modelID: model.id,
             revision: model.revision,
@@ -2655,6 +2747,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedLanguages: [String?] = []
     private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
+    private(set) var referenceKinds: [VoiceReferenceKind] = []
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
     private let eventGate: BackendSynthesisEventGate?
@@ -2768,6 +2861,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         reference: VoiceReference?
     ) async throws -> GeneratedVoiceSample {
         referenceTranscripts.append(reference?.transcript)
+        if let reference { referenceKinds.append(reference.kind) }
         return GeneratedVoiceSample(
             samples: (0..<2_400).map { frame in
                 Float(
