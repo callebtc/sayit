@@ -6,7 +6,7 @@ import SwiftUI
 struct MenuFooterView: View {
     @Environment(AppState.self) private var state
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openSettings) private var showSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(spacing: DesignTokens.compactSpacing) {
@@ -119,7 +119,7 @@ struct MenuFooterView: View {
         Task {
             try? await Task.sleep(for: .milliseconds(150))
             WindowActivator.prepareForWindowPresentation()
-            showSettings()
+            openWindow(id: AppWindowID.main)
             NSApp.activate(ignoringOtherApps: true)
         }
     }

@@ -4,9 +4,29 @@ import SwiftUI
 @MainActor
 struct SayItApplication: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var state = AppState.shared
 
     var body: some Scene {
+        Window("Say It", id: AppWindowID.main) {
+            SettingsRootView()
+                .tabViewStyle(.sidebarAdaptable)
+                .environment(state)
+                .frame(minWidth: 860, minHeight: 560)
+        }
+        .defaultSize(width: 960, height: 640)
+        .defaultLaunchBehavior(.presented)
+        .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    WindowActivator.prepareForWindowPresentation()
+                    openWindow(id: AppWindowID.main)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+
         MenuBarExtra {
             MenuBarRootView()
                 .environment(state)
@@ -15,13 +35,6 @@ struct SayItApplication: App {
                 .environment(state)
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsRootView()
-                .environment(state)
-                .frame(minWidth: 720, minHeight: 500)
-        }
-        .defaultSize(width: 760, height: 560)
 
         Window("History", id: AppWindowID.history) {
             HistoryView()
