@@ -8,12 +8,14 @@ struct TextParser: Sendable {
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int,
-        normalizedWhitespace: Bool
+        normalizedWhitespace: Bool,
+        listItemStartOffsets: [Int]
     ) {
         guard options.isEnabled else {
             return try rawPassthrough(payload)
         }
 
+        let listMarker = "SAYITLIST" + UUID().uuidString
         let parsed: (text: String, sourceFormat: String, removedCodeBlocks: Int)
 
         let plainText = payload.plainText.flatMap { text in
@@ -29,10 +31,10 @@ struct TextParser: Sendable {
         if let plainText,
            (payload.html == nil
                || (options.stripHTML && !plainTextMirrorsHTML)) {
-            parsed = cleanPlainText(plainText)
+            parsed = cleanPlainText(plainText, listMarker: listMarker)
         } else if let html = payload.html {
             if options.stripHTML {
-                let cleaned = try cleanHTML(html)
+                let cleaned = try cleanHTML(html, listMarker: listMarker)
                 parsed = (cleaned.text, "HTML", cleaned.removedCodeBlocks)
             } else if let raw = decodeHTMLSource(html) {
                 let cleaned = removeHTMLCodeBlocks(from: raw)
@@ -43,17 +45,38 @@ struct TextParser: Sendable {
         } else if let richText = payload.richText {
             parsed = (try cleanRichText(richText), "Rich text", 0)
         } else if let plainText {
-            parsed = cleanPlainText(plainText)
+            parsed = cleanPlainText(plainText, listMarker: listMarker)
         } else {
             throw TextIngestionError.noReadableText
         }
 
-        let normalized = normalize(parsed.text)
+        // A block inside an HTML list item can put whitespace after its marker.
+        // Move the marker next to its content before computing character offsets.
+        let marked = replacingMatches(
+            in: parsed.text,
+            pattern: listMarker + #"\s+"#,
+            with: listMarker
+        )
+        let normalized = normalize(marked)
+        var text = ""
+        var listItemStartOffsets: [Int] = []
+        let pieces = normalized.components(separatedBy: listMarker)
+        for (index, piece) in pieces.enumerated() {
+            if index > 0 {
+                listItemStartOffsets.append(text.count)
+            }
+            text += piece
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return (
-            text: normalized,
+            text: text,
             sourceFormat: parsed.sourceFormat,
             removedCodeBlocks: parsed.removedCodeBlocks,
-            normalizedWhitespace: normalized != parsed.text
+            normalizedWhitespace: text
+                != parsed.text.replacing(listMarker, with: ""),
+            listItemStartOffsets: Array(
+                Set(listItemStartOffsets.filter { $0 < text.count })
+            ).sorted()
         )
     }
 
@@ -61,22 +84,24 @@ struct TextParser: Sendable {
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int,
-        normalizedWhitespace: Bool
+        normalizedWhitespace: Bool,
+        listItemStartOffsets: [Int]
     ) {
         if let plainText = payload.plainText {
             return (
                 sanitize(plainText),
                 "Plain text",
                 0,
-                false
+                false,
+                []
             )
         }
         if let html = payload.html,
            let raw = decodeHTMLSource(html) {
-            return (sanitize(raw), "HTML", 0, false)
+            return (sanitize(raw), "HTML", 0, false, [])
         }
         if let richText = payload.richText {
-            return (sanitize(try cleanRichText(richText)), "Rich text", 0, false)
+            return (sanitize(try cleanRichText(richText)), "Rich text", 0, false, [])
         }
         throw TextIngestionError.noReadableText
     }
@@ -88,7 +113,7 @@ struct TextParser: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func cleanPlainText(_ input: String) -> (
+    private func cleanPlainText(_ input: String, listMarker: String) -> (
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int
@@ -104,7 +129,7 @@ struct TextParser: Sendable {
         if !hasFences, options.stripHTML,
            looksLikeHTML(detectionInput),
            let data = detectionInput.data(using: .utf8),
-           let html = try? cleanHTML(data) {
+           let html = try? cleanHTML(data, listMarker: listMarker) {
             return (html.text, "HTML", html.removedCodeBlocks)
         }
 
@@ -116,7 +141,7 @@ struct TextParser: Sendable {
         if hasFences || looksLikeMarkdown(detectionInput) {
             if options.stripMarkdown {
                 let stripped = stripMarkdownBlocks(from: detectionInput)
-                let parsed = parseMarkdown(stripped.text)
+                let parsed = parseMarkdown(stripped.text, listMarker: listMarker)
                 return (parsed, "Markdown", stripped.removedCodeBlocks)
             }
             if options.stripCodeBlocks {
@@ -128,7 +153,7 @@ struct TextParser: Sendable {
         return (input, "Plain text", 0)
     }
 
-    private func parseMarkdown(_ input: String) -> String {
+    private func parseMarkdown(_ input: String, listMarker: String) -> String {
         var fence: String?
         return input.components(separatedBy: "\n").map { line in
             if let open = fence {
@@ -140,11 +165,11 @@ struct TextParser: Sendable {
                 fence = open
                 return line
             }
-            return cleanMarkdownLine(line)
+            return cleanMarkdownLine(line, listMarker: listMarker)
         }.joined(separator: "\n")
     }
 
-    private func cleanMarkdownLine(_ line: String) -> String {
+    private func cleanMarkdownLine(_ line: String, listMarker: String) -> String {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return "" }
         if trimmed.range(
@@ -156,11 +181,18 @@ struct TextParser: Sendable {
         var working = trimmed
         var prefix = ""
         if let bullet = working.range(
-            of: #"^([-*+•]|\d+[.)])\s+"#,
+            of: #"^[-*+•][\p{Zs}\t]+"#,
             options: .regularExpression
         ) {
-            prefix = String(working[bullet])
+            // Keep the list boundary as metadata, never as a spoken symbol.
+            prefix = listMarker
             working.removeSubrange(bullet)
+        } else if let number = working.range(
+            of: #"^\d+[.)][\p{Zs}\t]+"#,
+            options: .regularExpression
+        ) {
+            prefix = listMarker + String(working[number])
+            working.removeSubrange(number)
         }
         working = replacingMatches(in: working, pattern: #"^#{1,6}\s+"#, with: "")
         working = replacingMatches(in: working, pattern: #"^>\s?"#, with: "")
@@ -215,6 +247,7 @@ struct TextParser: Sendable {
     // The importer is injectable so boundary preservation is tested on failure too.
     func cleanHTML(
         _ data: Data,
+        listMarker: String = "",
         using importer: (Data) throws -> String = TextParser.readHTML
     ) throws -> (text: String, removedCodeBlocks: Int) {
         guard var source = decodeHTMLSource(data) else {
@@ -238,7 +271,12 @@ struct TextParser: Sendable {
         )
         source = replacingMatches(
             in: source,
-            pattern: #"(?i)<(li|tr)\b[^>]*>"#,
+            pattern: #"(?i)<li\b[^>]*>"#,
+            with: boundary + listMarker
+        )
+        source = replacingMatches(
+            in: source,
+            pattern: #"(?i)<tr\b[^>]*>"#,
             with: ""
         )
         source = replacingMatches(
@@ -412,6 +450,13 @@ struct TextParser: Sendable {
                 .replacing("\u{2060}", with: "")
                 .replacing("\u{FEFF}", with: "")
                 .replacing("\u{FFFC}", with: " ")
+            // Neural voices can pronounce the arrow as an unrelated sound.
+            // Expand this transition explicitly, including text/emoji presentation.
+            value = replacingMatches(
+                in: value,
+                pattern: "→[\u{FE0E}\u{FE0F}]?",
+                with: " to "
+            )
         } else {
             value = canonical
         }
@@ -445,7 +490,7 @@ struct TextParser: Sendable {
 
     private func looksLikeMarkdown(_ text: String) -> Bool {
         text.range(
-            of: #"(?m)^(#{1,6}\s|[-*+]\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|\*[^*\n]+\*|(?<!\w)_{1,2}[^_\n]+_{1,2}(?!\w)|~~[^~\n]+~~|`[^`\n]+`"#,
+            of: #"(?m)^([ \t]*(?:[-*+•]|\d+[.)])[\p{Zs}\t]+|#{1,6}\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|\*[^*\n]+\*|(?<!\w)_{1,2}[^_\n]+_{1,2}(?!\w)|~~[^~\n]+~~|`[^`\n]+`"#,
             options: .regularExpression
         ) != nil
     }
