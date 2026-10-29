@@ -258,6 +258,8 @@ struct ProtocolRoundTripTests {
         )
 
         #expect(settings.voiceSelections["kokoro-bf16"] == .preset("af_sky"))
+        #expect(!settings.lowerOtherAudio)
+        #expect(settings.otherAudioLevel == 0.2)
     }
 
     @Test
