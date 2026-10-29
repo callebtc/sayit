@@ -16,6 +16,11 @@ packages:
   MLXAudio:
     url: https://github.com/Blaizzy/mlx-audio-swift.git
     revision: 624fd5410b2fc8ea06f955500c9ac078e405261f
+  # MLX core 0.32.2 regresses Metal token-generation throughput by ~50%.
+  # Pin the last mlx-swift commit before that core update until fixed upstream.
+  MLXSwift:
+    url: https://github.com/ml-explore/mlx-swift.git
+    revision: ac4ae9a39af573d4135109d1640817147c79a5e7
   Hummingbird:
     url: https://github.com/hummingbird-project/hummingbird.git
     exactVersion: 2.22.0
@@ -111,6 +116,8 @@ targets:
         product: PlaybackDSP
       - target: SayItCore
       - target: SayItProtocol
+      - package: MLXSwift
+        product: MLX
       - package: MLXAudio
         product: MLXAudioCore
       - package: MLXAudio

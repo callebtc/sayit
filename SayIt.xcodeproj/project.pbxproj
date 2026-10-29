@@ -32,6 +32,7 @@
 		09E94756EA98F9506DD13C52 /* DiagnosticCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A092AE8477F880752CF985 /* DiagnosticCategory.swift */; };
 		0A00DCDC6CC2981A2DF8C523 /* ModelID.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB04A144E7B0EC58078BD43A /* ModelID.swift */; };
 		0A2D669D9D8BCA189C6ECF28 /* SayItHTTPServer+VoiceRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E46C278E2A69A51F79DE353 /* SayItHTTPServer+VoiceRoutes.swift */; };
+		0A6CFEC41D707770299C2D4E /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */; };
 		0AA91D2459428B799CF9F727 /* SelectionRequestFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FAD8898C143F6D470DFFE7 /* SelectionRequestFlow.swift */; };
 		0ABBF6D2B19B6666B372E308 /* VoiceReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC20994C0FBDFBF9945C121 /* VoiceReference.swift */; };
 		0B5B5BCD24A338EB27529A01 /* SayItHTTPServer+HistoryRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */; };
@@ -103,7 +104,7 @@
 		2F13AD95B66B59D9BEFAB69D /* VoiceProfileRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48CC76FCF104B6EA0CCFFC3 /* VoiceProfileRecord.swift */; };
 		2F98443BCC6A9CE666AFF7D2 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		30F806119784A3EA06D08732 /* APITokenCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AADDFBAF6765A7A9E46F6F /* APITokenCreation.swift */; };
-		31CB6C9597C1FD2312EB3DE6 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */; };
+		31CB6C9597C1FD2312EB3DE6 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
 		32FC4CC7ADAA06A627E07AD0 /* HTTPEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FEAC3BEEF3A43EBD6DCF107 /* HTTPEventStreamTests.swift */; };
 		35C22B80D3F495E9B15559DB /* PhononVoiceImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C022565E5F0A887C7D6A12 /* PhononVoiceImportSheet.swift */; };
 		35C5858DED5258F9813091A5 /* SynthesisError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */; };
@@ -129,7 +130,7 @@
 		3E69D945BB53BFBF82FCAA9D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E68391B4A83D06AD4C1FFAA0 /* OnboardingView.swift */; };
 		3F22D38886E6E44E0156F0F7 /* VoiceDiscoveryRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82AD71761AE179BEA6A20967 /* VoiceDiscoveryRequest.swift */; };
 		40F3797F2C6B54BD494E8C74 /* APITokenDigestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8697FFA4EB481A4A7FB1A3A /* APITokenDigestTests.swift */; };
-		419CB00AB6F80C7F4A3F46BC /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
+		419CB00AB6F80C7F4A3F46BC /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = CAFF8992F9C4085232A242D2 /* MLX */; };
 		41DE1A049C2D3BFE630D7177 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = 12D3C7903194A06085F4C99C /* Atomics */; };
 		4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C074F8772DC89E43CE2A267 /* DesignTokens.swift */; };
 		435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13CEBAFD3BF5D864C5BD06D /* SayItApplication.swift */; };
@@ -1303,8 +1304,9 @@
 				690DD7FC6DABD5D8A65B7A48 /* PlaybackDSP in Frameworks */,
 				0922BE8F5F7353F975466383 /* SayItCore.framework in Frameworks */,
 				89AD3D4D8907B9BD8BC76B7F /* SayItProtocol.framework in Frameworks */,
-				419CB00AB6F80C7F4A3F46BC /* MLXAudioCore in Frameworks */,
-				31CB6C9597C1FD2312EB3DE6 /* MLXAudioTTS in Frameworks */,
+				419CB00AB6F80C7F4A3F46BC /* MLX in Frameworks */,
+				31CB6C9597C1FD2312EB3DE6 /* MLXAudioCore in Frameworks */,
+				0A6CFEC41D707770299C2D4E /* MLXAudioTTS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2393,6 +2395,7 @@
 			name = SayItBackend;
 			packageProductDependencies = (
 				7D5589CFD718091E8391DB68 /* PlaybackDSP */,
+				CAFF8992F9C4085232A242D2 /* MLX */,
 				71DDF93755CA3F43B4C3D31B /* MLXAudioCore */,
 				A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */,
 			);
@@ -2766,6 +2769,7 @@
 				0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
 				DE2AC70706798290F46011A7 /* XCRemoteSwiftPackageReference "hummingbird" */,
 				EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
+				308EBC299675A1638735F4AB /* XCRemoteSwiftPackageReference "mlx-swift" */,
 				69B2450C9F3F9BA22499C57E /* XCRemoteSwiftPackageReference "Sparkle" */,
 				8C57CA57D58F0367C9CA83E8 /* XCRemoteSwiftPackageReference "swift-atomics" */,
 				C93AA06F3A6E248872ED93BC /* XCRemoteSwiftPackageReference "swift-collections" */,
@@ -4560,6 +4564,14 @@
 				minimumVersion = 2.83.0;
 			};
 		};
+		308EBC299675A1638735F4AB /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift.git";
+			requirement = {
+				kind = revision;
+				revision = ac4ae9a39af573d4135109d1640817147c79a5e7;
+			};
+		};
 		69B2450C9F3F9BA22499C57E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -4679,6 +4691,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 69B2450C9F3F9BA22499C57E /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		CAFF8992F9C4085232A242D2 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 308EBC299675A1638735F4AB /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
 		};
 		D32C1E8AC5B0B86155A50698 /* MLXAudioCore */ = {
 			isa = XCSwiftPackageProductDependency;

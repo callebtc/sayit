@@ -28,6 +28,12 @@ let package = Package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
             revision: "624fd5410b2fc8ea06f955500c9ac078e405261f"
         ),
+        // MLX core 0.32.2 regresses Metal token-generation throughput by ~50%.
+        // Pin the last mlx-swift commit before that core update until fixed upstream.
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift.git",
+            revision: "ac4ae9a39af573d4135109d1640817147c79a5e7"
+        ),
         .package(
             url: "https://github.com/apple/swift-openapi-generator",
             exact: "1.11.1"
@@ -75,6 +81,7 @@ let package = Package(
                 .product(name: "PlaybackDSP", package: "PlaybackDSP"),
                 "SayItCore",
                 "SayItProtocol",
+                .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift")
             ],
