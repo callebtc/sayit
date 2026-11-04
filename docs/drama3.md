@@ -6,7 +6,7 @@ is copied into Say It, and inference needs no Python runtime or companion server
 
 ## Model
 
-Select **Fish Audio Drama 3 Q4 (Standard)** in Settings → Models. It uses
+Select **Fish Audio Drama 3 Q4** in Settings → Models. It uses
 `mlx-community/fish-audio-drama-3-4bit` at revision
 `2b0c8028998533972e77359cce56b8bf1c5d6d4a`, with 4-bit experts and 8-bit dense
 projections. Download size is approximately 23.8 GB; 48 GB or more of unified

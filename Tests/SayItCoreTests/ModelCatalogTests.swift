@@ -61,6 +61,7 @@ struct ModelCatalogTests {
     func drama3Variants() throws {
         let models = try ModelCatalogLoader().bundledCatalog().models
         let standard = try #require(models.first { $0.id.rawValue == "fish-drama3-standard-q4" })
+        #expect(standard.displayName == "Fish Audio Drama 3 Q4")
         #expect(standard.modelType == "fish_drama3")
         #expect(standard.isSelectable && standard.capabilities.streaming)
         #expect(standard.playbackMode == .adaptive)

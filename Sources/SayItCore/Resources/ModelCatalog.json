@@ -1665,7 +1665,7 @@
     },
     {
       "id": "fish-drama3-standard-q4",
-      "displayName": "Fish Audio Drama 3 Q4 (Standard)",
+      "displayName": "Fish Audio Drama 3 Q4",
       "family": "Fish Audio",
       "repository": "mlx-community/fish-audio-drama-3-4bit",
       "revision": "2b0c8028998533972e77359cce56b8bf1c5d6d4a",
