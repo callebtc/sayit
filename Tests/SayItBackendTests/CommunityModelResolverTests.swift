@@ -5,6 +5,39 @@ import Testing
 
 @Suite("Community model resolution", .serialized)
 struct CommunityModelResolverTests {
+    @Test("Drama 3 accepts converted weights and rejects the original checkpoint")
+    func resolvesDrama3Conversion() async throws {
+        for converted in [false, true] {
+            let session = makeStubSession { request in
+                if request.url?.path.hasPrefix("/api/models/") == true {
+                    return try response(request: request, json: [
+                        "sha": String(repeating: "a", count: 40),
+                        "siblings": [["rfilename": "codec.safetensors", "size": 100]],
+                        "cardData": [:]
+                    ])
+                }
+                var config: [String: Any] = ["model_type": "fish_drama3"]
+                if converted { config["quantization"] = ["bits": 4] }
+                return try response(request: request, json: config)
+            }
+            let resolver = CommunityModelResolver(session: session)
+            if converted {
+                let model = try await resolver.resolve(repository: "owner/model", revision: nil, token: nil)
+                #expect(model.isSelectable)
+                #expect(model.capabilities.voiceCloning)
+                #expect(model.capabilities.streaming)
+                #expect(model.capabilities.voiceCloneRequirements?.transcriptRequired == true)
+                #expect(!model.capabilities.languageSelection)
+                #expect(model.playbackMode == .adaptive)
+            } else {
+                await #expect(throws: ModelManagerError.self) {
+                    try await resolver.resolve(repository: "owner/model", revision: nil, token: nil)
+                }
+            }
+        }
+        #expect(!SupportedModelTypes.areCompatible("fish_drama3", "fish_qwen3_omni"))
+    }
+
     @Test("Official Phonon metadata selects the loader alias and default preset")
     func resolvesRemotePhononModel() async throws {
         let session = makeStubSession { request in
@@ -236,7 +269,8 @@ struct CommunityModelResolverTests {
             ("kokoro_tts", PlaybackMode.progressive, "af_heart"),
             ("gradium_phonon_tts", PlaybackMode.progressive, "default"),
             ("omnivoice", PlaybackMode.buffered, nil),
-            ("index_tts", PlaybackMode.buffered, nil)
+            ("index_tts", PlaybackMode.buffered, nil),
+            ("fish_drama3", PlaybackMode.adaptive, nil)
         ] {
             let fixture = try TemporaryBackendFixture(
                 prefix: "SayItLocalModelTests"
@@ -250,12 +284,17 @@ struct CommunityModelResolverTests {
                 at: source.appending(path: "nested"),
                 withIntermediateDirectories: true
             )
-            try JSONSerialization.data(
-                withJSONObject: ["model_type": type]
-            ).write(to: source.appending(path: "config.json"))
+            var config: [String: Any] = ["model_type": type]
+            if type == "fish_drama3" { config["quantization"] = ["bits": 4] }
+            try JSONSerialization.data(withJSONObject: config)
+                .write(to: source.appending(path: "config.json"))
             try Data(repeating: 7, count: 128).write(
                 to: source.appending(path: "nested/model.safetensors")
             )
+            if type == "fish_drama3" {
+                try Data(repeating: 7, count: 128)
+                    .write(to: source.appending(path: "codec.safetensors"))
+            }
 
             let model = try await CommunityModelResolver().resolveLocal(
                 directory: source
@@ -264,6 +303,7 @@ struct CommunityModelResolverTests {
             #expect(model.repository == "local-import")
             #expect(model.modelType == SupportedModelTypes.loaderType(for: type))
             #expect(model.playbackMode == expectedMode)
+            #expect(model.capabilities.streaming == ["kokoro_tts", "gradium_phonon_tts", "fish_drama3"].contains(type))
             #expect(model.defaultVoice == expectedVoice)
             #expect(model.estimatedDiskBytes >= 128)
             #expect(model.id.rawValue.hasPrefix("community-local-"))

@@ -43,6 +43,14 @@ public final class SayItBackendService: SayItService {
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
     private var activeRequest: SpeechRequest?
+    private struct RequestTiming {
+        let modelID: ModelID
+        let started: ContinuousClock.Instant
+        var firstAudio: ContinuousClock.Instant?
+        var hasPlayed = false
+        var previousState: PlaybackState = .idle
+    }
+    private var requestTiming: RequestTiming?
     private var playbackCompletionJobID: UUID?
     private var playbackCompletionContinuation: CheckedContinuation<
         PlaybackState,
@@ -183,9 +191,11 @@ public final class SayItBackendService: SayItService {
         if let synthesizer {
             resolvedSynthesizer = synthesizer
         } else {
-            resolvedSynthesizer = SynthesisActor { id in
-                await manager.installedURL(for: id)
-            }
+            resolvedSynthesizer = SynthesisActor(
+                modelURLProvider: { id in
+                    await manager.installedURL(for: id)
+                }
+            )
         }
         self.synthesizer = resolvedSynthesizer
         audioArchive = AudioArchive(directory: directories.historyAudio)
@@ -1785,6 +1795,8 @@ public final class SayItBackendService: SayItService {
             historyRevision &+= 1
         }
 
+        requestTiming = RequestTiming(modelID: request.model.id, started: .now)
+        defer { requestTiming = nil }
         playback.rate = validatedPlaybackRate(
             submission.playbackRate ?? settings.playbackRate
         )
@@ -1853,13 +1865,26 @@ public final class SayItBackendService: SayItService {
             updateJob(request.id, state: .synthesizing, progress: 0.12)
         case .chunkStarted(_, let chunk):
             registerSpokenChunk(chunk)
+        case .timing(let timing):
+            await diagnostics.record(DiagnosticEvent(
+                severity: .info, category: .synthesis,
+                code: "synthesis.timing.\(timing.phase.rawValue)",
+                modelID: request.model.id,
+                durationMilliseconds: Int(timing.duration * 1_000)
+            ))
+            diagnosticsRevision &+= 1
         case .audio(let chunk):
+            if requestTiming?.firstAudio == nil {
+                requestTiming?.firstAudio = .now
+            }
             let revisionBeforeAudio = revision
             flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
             spokenAudioCursor = playback.generatedDuration
             if playback.shouldStartWhenBuffered {
                 playback.play()
+            }
+            if playback.state == .playing {
                 statusText = "Playing"
                 updateJob(request.id, state: .playing, progress: playbackProgress)
             } else {
@@ -1868,6 +1893,13 @@ public final class SayItBackendService: SayItService {
             }
             if revision == revisionBeforeAudio {
                 revision &+= 1
+            }
+        case .progress(let progress):
+            playback.observeSynthesisProgress(progress)
+            if playback.shouldStartWhenBuffered {
+                playback.play()
+                statusText = "Playing"
+                updateJob(request.id, state: .playing, progress: playbackProgress)
             }
         case .metrics(let metrics):
             finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
@@ -2184,6 +2216,43 @@ public final class SayItBackendService: SayItService {
     }
 
     private func playbackStateDidChange(_ state: PlaybackState) {
+        if var timing = requestTiming {
+            var events: [DiagnosticEvent] = []
+            func milliseconds(since start: ContinuousClock.Instant) -> Int {
+                let duration = start.duration(to: .now)
+                return Int(Double(duration.components.seconds) * 1_000
+                    + Double(duration.components.attoseconds) / 1e15)
+            }
+            if state == .playing, !timing.hasPlayed {
+                timing.hasPlayed = true
+                events.append(DiagnosticEvent(
+                    severity: .info, category: .playback,
+                    code: "playback.timing.first_start", modelID: timing.modelID,
+                    durationMilliseconds: milliseconds(since: timing.started),
+                    numericValue: max(playback.generatedDuration - playback.elapsed, 0)
+                ))
+                if let firstAudio = timing.firstAudio {
+                    events.append(DiagnosticEvent(
+                        severity: .info, category: .playback,
+                        code: "playback.timing.buffer_wait", modelID: timing.modelID,
+                        durationMilliseconds: milliseconds(since: firstAudio)
+                    ))
+                }
+            } else if state == .buffering, timing.previousState == .playing {
+                events.append(DiagnosticEvent(
+                    severity: .info, category: .playback,
+                    code: "playback.rebuffered", modelID: timing.modelID
+                ))
+            }
+            timing.previousState = state
+            requestTiming = timing
+            if !events.isEmpty {
+                Task { [events] in
+                    for event in events { await diagnostics.record(event) }
+                    diagnosticsRevision &+= 1
+                }
+            }
+        }
         switch state {
         case .playing:
             updateActiveJobState(.playing)

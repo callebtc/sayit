@@ -63,6 +63,12 @@ actor CommunityModelResolver {
             throw ModelManagerError.modelUnavailable
         }
 
+        if rawType == "fish_drama3",
+           config["quantization"] == nil
+            || !metadata.siblings.contains(where: { $0.rfilename == "codec.safetensors" }) {
+            throw ModelManagerError.modelUnavailable
+        }
+
         let diskBytes = metadata.siblings.reduce(Int64(0)) {
             $0 + ($1.lfs?.size ?? $1.size ?? 0)
         }
@@ -109,13 +115,20 @@ actor CommunityModelResolver {
             capabilities: ModelCapabilities(
                 presetVoices: defaultVoice != nil,
                 voiceDescription: voiceDesign,
-                voiceCloning: referenceOnly,
-                streaming: progressive,
+                voiceCloning: referenceOnly || rawType == "fish_drama3",
+                streaming: progressive || rawType == "fish_drama3",
                 longForm: true,
-                languageSelection: !isPhonon,
-                requiresReferenceAudio: referenceOnly
+                languageSelection: !isPhonon && rawType != "fish_drama3",
+                requiresReferenceAudio: referenceOnly,
+                voiceDiscovery: rawType == "fish_drama3" ? true : nil,
+                randomVoiceSampling: rawType == "fish_drama3" ? true : nil,
+                voiceCloneRequirements: rawType == "fish_drama3" ? .init(
+                    minimumDuration: 3, recommendedMinimumDuration: 5,
+                    recommendedMaximumDuration: 15, maximumDuration: 30,
+                    transcriptRequired: true
+                ) : nil
             ),
-            playbackMode: progressive ? .progressive : .buffered,
+            playbackMode: rawType == "fish_drama3" ? .adaptive : progressive ? .progressive : .buffered,
             files: [],
             estimatedDiskBytes: max(diskBytes, 1),
             estimatedPeakMemoryBytes: max(diskBytes * 2, 1_000_000_000),
@@ -127,7 +140,8 @@ actor CommunityModelResolver {
                 requiresAcceptance: true
             ),
             stability: referenceOnly ? .unavailable : .experimental,
-            testedMLXAudioVersion: "0.1.3",
+            testedMLXAudioVersion: rawType == "fish_drama3"
+                ? "624fd54 + DramaTTS 3.2.1" : "0.1.3",
             testedDate: "Community model — not tested"
         )
     }
@@ -144,6 +158,12 @@ actor CommunityModelResolver {
                 ?? config["model_version"] as? String
         )?.lowercased(),
         SupportedModelTypes.all.contains(rawType) else {
+            throw ModelManagerError.modelUnavailable
+        }
+
+        if rawType == "fish_drama3",
+           config["quantization"] == nil
+            || !FileManager.default.fileExists(atPath: directory.appending(path: "codec.safetensors").path) {
             throw ModelManagerError.modelUnavailable
         }
 
@@ -219,13 +239,20 @@ actor CommunityModelResolver {
             capabilities: ModelCapabilities(
                 presetVoices: defaultVoice != nil,
                 voiceDescription: voiceDesign,
-                voiceCloning: referenceOnly,
-                streaming: progressive,
+                voiceCloning: referenceOnly || rawType == "fish_drama3",
+                streaming: progressive || rawType == "fish_drama3",
                 longForm: true,
-                languageSelection: !isPhonon,
-                requiresReferenceAudio: referenceOnly
+                languageSelection: !isPhonon && rawType != "fish_drama3",
+                requiresReferenceAudio: referenceOnly,
+                voiceDiscovery: rawType == "fish_drama3" ? true : nil,
+                randomVoiceSampling: rawType == "fish_drama3" ? true : nil,
+                voiceCloneRequirements: rawType == "fish_drama3" ? .init(
+                    minimumDuration: 3, recommendedMinimumDuration: 5,
+                    recommendedMaximumDuration: 15, maximumDuration: 30,
+                    transcriptRequired: true
+                ) : nil
             ),
-            playbackMode: progressive ? .progressive : .buffered,
+            playbackMode: rawType == "fish_drama3" ? .adaptive : progressive ? .progressive : .buffered,
             files: [],
             estimatedDiskBytes: max(diskBytes, 1),
             estimatedPeakMemoryBytes: max(diskBytes * 2, 1_000_000_000),
@@ -237,7 +264,8 @@ actor CommunityModelResolver {
                 requiresAcceptance: true
             ),
             stability: referenceOnly ? .unavailable : .experimental,
-            testedMLXAudioVersion: "0.1.3",
+            testedMLXAudioVersion: rawType == "fish_drama3"
+                ? "624fd54 + DramaTTS 3.2.1" : "0.1.3",
             testedDate: "Local model — not tested"
         )
     }

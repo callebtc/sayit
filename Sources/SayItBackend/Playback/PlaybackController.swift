@@ -84,9 +84,15 @@ final class PlaybackController: BackendPlaybackControlling {
     var preferredStartBufferDuration: TimeInterval {
         bufferPolicy.preferredSourceLead
     }
+    private var synthesisProgress: SynthesisProgress?
+    private var completedSynthesisChunkIndex = -1
     var shouldStartWhenBuffered: Bool {
         guard state == .preparing || state == .buffering else {
             return false
+        }
+        if let synthesisProgress,
+           bufferPolicy.shouldStartStreaming(synthesisProgress, bufferedDuration: bufferedDuration) {
+            return true
         }
         return bufferPolicy.shouldStart(
             synthesisIsComplete: synthesisIsComplete,
@@ -154,6 +160,8 @@ final class PlaybackController: BackendPlaybackControlling {
         modelID: String?
     ) {
         stop()
+        synthesisProgress = nil
+        completedSynthesisChunkIndex = -1
         self.requestID = requestID
         currentTitle = title
         currentModelID = modelID
@@ -182,6 +190,7 @@ final class PlaybackController: BackendPlaybackControlling {
             throw PlaybackError.emptyAudio
         }
         try pcmStore.append(chunk.samples)
+        synthesisProgress = nil
         generatedDuration = Double(pcmStore.frameCount) / sampleRate
         appendAmplitudeSamples(chunk.samples)
         try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
@@ -209,7 +218,16 @@ final class PlaybackController: BackendPlaybackControlling {
         playbackMode = mode
     }
 
+    func observeSynthesisProgress(_ progress: SynthesisProgress) {
+        guard requestID != nil, progress.chunkIndex == completedSynthesisChunkIndex + 1,
+              progress.generationDuration >= (synthesisProgress?.generationDuration ?? 0),
+              progress.generatedAudioDuration >= (synthesisProgress?.generatedAudioDuration ?? 0) else { return }
+        synthesisProgress = progress
+    }
+
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
+        synthesisProgress = nil
+        completedSynthesisChunkIndex = metrics.chunkIndex
         guard let currentModelID else { return }
         var estimator = performanceByModelID[currentModelID]
             ?? SynthesisPerformanceEstimator()

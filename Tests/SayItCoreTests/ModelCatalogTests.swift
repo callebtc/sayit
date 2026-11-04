@@ -8,11 +8,11 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 24)
+        #expect(catalog.models.count == 25)
         #expect(catalog.models.first?.id == ModelID("phonon-31m-en"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
-            ["0.1.3", "bf14ae0", "624fd54"].contains($0.testedMLXAudioVersion)
+            ["0.1.3", "bf14ae0", "624fd54", "624fd54 + DramaTTS 3.2.1"].contains($0.testedMLXAudioVersion)
         })
     }
 
@@ -55,6 +55,19 @@ struct ModelCatalogTests {
         #expect(model.files.allSatisfy { $0.sha256?.count == 64 })
         #expect(model.files.contains { $0.path == "default-voice.safetensors" })
         #expect(!model.files.contains { $0.path.hasSuffix(".gguf") })
+    }
+
+    @Test("Standard Drama uses the pinned upstream checkpoint")
+    func drama3Variants() throws {
+        let models = try ModelCatalogLoader().bundledCatalog().models
+        let standard = try #require(models.first { $0.id.rawValue == "fish-drama3-standard-q4" })
+        #expect(standard.modelType == "fish_drama3")
+        #expect(standard.isSelectable && standard.capabilities.streaming)
+        #expect(standard.playbackMode == .adaptive)
+        #expect(standard.repository == "mlx-community/fish-audio-drama-3-4bit")
+        #expect(standard.license.requiresAcceptance)
+        #expect(models.filter { $0.modelType == "fish_drama3" }.count == 1)
+        #expect(standard.license.url.absoluteString.contains(standard.repository))
     }
 
     @Test("Hands-on recommendations lead the ranked catalog")
