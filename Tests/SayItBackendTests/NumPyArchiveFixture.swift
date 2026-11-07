@@ -1,0 +1,41 @@
+import Foundation
+
+/// Archives written by NumPy 2.5 `savez` and `savez_compressed`.
+enum NumPyArchiveFixture {
+    /// `__tree__` (JSON), int8 `lq` [2, 3], and float16 `h` [0.5, -2].
+    static var archive: Data {
+        Data(base64Encoded: archiveBase64)!
+    }
+
+    /// A deflate-compressed archive, which NumPy writes with `savez_compressed`.
+    static var compressed: Data {
+        Data(base64Encoded: compressedBase64)!
+    }
+
+    private static let archiveBase64 = [
+        "UEsDBC0AAAAAAAAAIQCK8s/J//////////8MABQAX190cmVlX18ubnB5AQAQADABAAAAAAAAMAEA",
+        "AAAAAACTTlVNUFkBAHYAeydkZXNjcic6ICc8VTQ0JywgJ2ZvcnRyYW5fb3JkZXInOiBGYWxzZSwg",
+        "J3NoYXBlJzogKCksIH0gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+        "ICAgICAgICAgICAgICAgICAgCnsAAAAiAAAAbAAAAGEAAAB5AAAAZQAAAHIAAABzAAAAIgAAADoA",
+        "AAAgAAAAWwAAAHsAAAAiAAAAcQAAACIAAAA6AAAAIAAAAHsAAAAiAAAAQAAAACIAAAA6AAAAIAAA",
+        "ACIAAABsAAAAcQAAACIAAAB9AAAAfQAAAF0AAAAsAAAAIAAAACIAAABjAAAAbwAAAHUAAABuAAAA",
+        "dAAAACIAAAA6AAAAIAAAADcAAAB9AAAAUEsDBC0AAAAAAAAAIQAkT+PG//////////8GABQAbHEu",
+        "bnB5AQAQAIYAAAAAAAAAhgAAAAAAAACTTlVNUFkBAHYAeydkZXNjcic6ICd8aTEnLCAnZm9ydHJh",
+        "bl9vcmRlcic6IEZhbHNlLCAnc2hhcGUnOiAoMiwgMyksIH0gICAgICAgICAgICAgICAgICAgICAg",
+        "ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCgH+A/wF+lBLAwQtAAAAAAAAACEA",
+        "Ab0PCP//////////BQAUAGgubnB5AQAQAIQAAAAAAAAAhAAAAAAAAACTTlVNUFkBAHYAeydkZXNj",
+        "cic6ICc8ZjInLCAnZm9ydHJhbl9vcmRlcic6IEZhbHNlLCAnc2hhcGUnOiAoMiwpLCB9ICAgICAg",
+        "ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCgA4",
+        "AMBQSwECLQMtAAAAAAAAACEAivLPyTABAAAwAQAADAAAAAAAAAAAAAAAgAEAAAAAX190cmVlX18u",
+        "bnB5UEsBAi0DLQAAAAAAAAAhACRP48aGAAAAhgAAAAYAAAAAAAAAAAAAAIABbgEAAGxxLm5weVBL",
+        "AQItAy0AAAAAAAAAIQABvQ8IhAAAAIQAAAAFAAAAAAAAAAAAAACAASwCAABoLm5weVBLBQYAAAAA",
+        "AwADAKEAAADnAgAAAAA="
+    ].joined()
+
+    private static let compressedBase64 = [
+        "UEsDBC0AAAAIAAAAIQCMY8gy//////////8FABQAYS5ucHkBABAAkAAAAAAAAABHAAAAAAAAAJvs",
+        "F+obEMnIUMZQrZ6SWpxcpG6loG6TZqKuo6Cell9UUpSYF59flJIKEndLzClOBYoXZyQWpAL5GiY6",
+        "mjoKtQoUAC4GNAAAUEsBAi0DLQAAAAgAAAAhAIxjyDJHAAAAkAAAAAUAAAAAAAAAAAAAAIABAAAA",
+        "AGEubnB5UEsFBgAAAAABAAEAMwAAAH4AAAAAAA=="
+    ].joined()
+}

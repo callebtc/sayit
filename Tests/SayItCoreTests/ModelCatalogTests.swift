@@ -8,7 +8,7 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 25)
+        #expect(catalog.models.count == 26)
         #expect(catalog.models.first?.id == ModelID("phonon-31m-en"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
@@ -69,6 +69,32 @@ struct ModelCatalogTests {
         #expect(standard.license.requiresAcceptance)
         #expect(models.filter { $0.modelType == "fish_drama3" }.count == 1)
         #expect(standard.license.url.absoluteString.contains(standard.repository))
+    }
+
+    @Test("Underdog Woof is experimental, pinned, and credited")
+    func underdogWoofEntry() throws {
+        let model = try #require(
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("underdog-woof")
+            }
+        )
+        #expect(model.stability == .experimental)
+        #expect(model.isSelectable)
+        #expect(model.modelType == "underdog_woof")
+        #expect(model.languages == ["en"])
+        #expect(model.voices == ["Juno", "Mira"])
+        #expect(model.defaultVoice == "Juno")
+        #expect(model.playbackMode == .progressive)
+        #expect(model.capabilities.presetVoices)
+        #expect(!model.capabilities.voiceCloning)
+        #expect(!model.capabilities.voiceDescription)
+        #expect(!model.license.commercialUseAllowed)
+        #expect(model.license.requiresAcceptance)
+        #expect(model.license.url.absoluteString.contains(model.revision))
+        #expect(model.experience?.note?.contains("Voice by Underdog Woof") == true)
+        #expect(model.files.map(\.path) == ["woof_int8.npz", "LICENSE", "NOTICE"])
+        #expect(model.files.allSatisfy { $0.sha256?.count == 64 })
+        #expect(model.downloadByteCount == model.estimatedDiskBytes)
     }
 
     @Test("Hands-on recommendations lead the ranked catalog")

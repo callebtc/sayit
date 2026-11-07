@@ -391,7 +391,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             request.cleanedText.listItemStartOffsets ?? []
         )
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
-        var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
+        let usesSentenceChunks = request.model.modelType.lowercased() == "underdog_woof"
+        var chunks = try (usesShortChunks
+            ? Self.orpheusChunker
+            : usesSentenceChunks ? WoofModel.sentenceChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
             listItemStartOffsets: listItemStartOffsets,
@@ -541,10 +544,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         )
                     try checkOperation(operationID)
                     try emit(samples)
-                } else if loadedModel is KokoroModel {
-                    // Kokoro emits a whole text chunk. Materialize it in the
-                    // generating task; the upstream stream proxy can evaluate
-                    // its lazy graph on a thread without its internal GPU streams.
+                } else if loadedModel is KokoroModel || loadedModel is WoofModel {
+                    // Kokoro and Woof emit a whole text chunk. Materialize it in
+                    // the generating task; the upstream stream proxy can evaluate
+                    // its lazy graph on a thread without its internal GPU streams,
+                    // and its producer can outlive a cancelled operation.
                     let samples = try await SerializedSpeechModel(loadedModel)
                         .generateSamples(
                             text: chunk.text,
@@ -733,6 +737,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     modelURL,
                     repo: model.repository
                 )
+            case "underdog_woof":
+                candidate = try WoofModel(directory: modelURL)
             default:
                 candidate = try await TTS.loadModel(
                     modelRepo: modelURL.path,

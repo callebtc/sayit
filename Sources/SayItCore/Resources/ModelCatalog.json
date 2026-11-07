@@ -1798,6 +1798,70 @@
         "speed": "medium-slow",
         "note": "Native upstream Swift streaming with the standard Drama 3 checkpoint. Suggested unified memory: 48 GB or more."
       }
+    },
+    {
+      "id": "underdog-woof",
+      "displayName": "Underdog Woof",
+      "family": "Underdog Woof",
+      "repository": "ConwayResearch/Underdog-Woof",
+      "revision": "be702960539777fc3f698e54335276a8391b00f9",
+      "modelType": "underdog_woof",
+      "parameterCount": "38M",
+      "quantization": "INT8",
+      "languages": [
+        "en"
+      ],
+      "voices": [
+        "Juno",
+        "Mira"
+      ],
+      "defaultVoice": "Juno",
+      "defaultLanguage": "en",
+      "capabilities": {
+        "presetVoices": true,
+        "voiceDescription": false,
+        "voiceCloning": false,
+        "streaming": true,
+        "longForm": true,
+        "languageSelection": false,
+        "requiresReferenceAudio": false
+      },
+      "playbackMode": "progressive",
+      "files": [
+        {
+          "path": "woof_int8.npz",
+          "byteCount": 40595426,
+          "sha256": "d895fbbe84b8f4f461e3e94ab48b1164353b1988ce8d365f5aa8263d0de1203e"
+        },
+        {
+          "path": "LICENSE",
+          "byteCount": 7612,
+          "sha256": "784c4a353d15f370ff387f74bde64f50a2041df9c6f2338c3d8a2f781b944de5"
+        },
+        {
+          "path": "NOTICE",
+          "byteCount": 919,
+          "sha256": "0849de251c109869d24f8a0b520260afa10594334ae3d0c06b75e68be1e2c623"
+        }
+      ],
+      "estimatedDiskBytes": 40603957,
+      "estimatedPeakMemoryBytes": 1000000000,
+      "hardwareTier": "base",
+      "license": {
+        "identifier": "Underdog Non-Commercial 1.0",
+        "url": "https://huggingface.co/ConwayResearch/Underdog-Woof/blob/be702960539777fc3f698e54335276a8391b00f9/LICENSE",
+        "commercialUseAllowed": false,
+        "requiresAcceptance": true
+      },
+      "stability": "experimental",
+      "experience": {
+        "recommendationRank": 20,
+        "size": "small",
+        "speed": "fast",
+        "note": "Voice by Underdog Woof (underdog.ai). Experimental English speech with two preset voices, Juno and Mira. Non-commercial use only."
+      },
+      "testedMLXAudioVersion": "624fd54",
+      "testedDate": "2026-11-07"
     }
   ]
 }

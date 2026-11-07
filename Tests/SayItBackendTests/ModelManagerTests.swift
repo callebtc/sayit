@@ -97,6 +97,8 @@ struct ModelManagerTests {
         #expect(SupportedModelTypes.loaderType(for: "qwen3_tts") == "qwen3_tts")
         #expect(!SupportedModelTypes.areCompatible("phonon", "pocket_tts"))
         #expect(!SupportedModelTypes.areCompatible("orpheus", "qwen3"))
+        #expect(SupportedModelTypes.areCompatible("underdog_woof", "underdog_woof"))
+        #expect(!SupportedModelTypes.areCompatible("underdog_woof", "phonon"))
     }
 
     @Test("Phonon installs its declared architecture and verifies the root preset")
@@ -145,6 +147,58 @@ struct ModelManagerTests {
         let installed = try #require(await manager.installedURL(for: model.id))
         try Data([9]).write(to: installed.appending(path: "default-voice.safetensors"))
         #expect(await manager.availableVoices(for: model.id) == [])
+    }
+
+    @Test("Underdog Woof installs NumPy weights without an MLX config")
+    func installsWoofSnapshot() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItWoofTests")
+        defer { fixture.remove() }
+        let contents = [
+            (WoofModel.weightsFileName, Data([1, 2, 3])),
+            ("LICENSE", Data("license".utf8))
+        ]
+        func model(_ id: String, files: [(String, Data)]) -> ModelDescriptor {
+            makeModel(
+                id: id,
+                modelType: "underdog_woof",
+                files: files.map { path, data in
+                    ModelFileDescriptor(
+                        path: path, byteCount: Int64(data.count), sha256: sha256(data)
+                    )
+                },
+                voices: ["Juno", "Mira"]
+            )
+        }
+        let complete = model("woof-test", files: contents)
+        let withoutWeights = model("woof-license-only", files: [contents[1]])
+        let manager = ModelManager(
+            catalog: makeCatalog(models: [complete, withoutWeights]),
+            directories: fixture.directories,
+            activeModelID: ModelID("other")
+        )
+        for model in [complete, withoutWeights] {
+            let staging = fixture.directories.downloads.appending(
+                path: "\(model.id.rawValue)-revision.partial"
+            )
+            try FileManager.default.createDirectory(
+                at: staging, withIntermediateDirectories: true
+            )
+            for file in model.files {
+                try contents.first { $0.0 == file.path }?.1
+                    .write(to: staging.appending(path: file.path))
+            }
+        }
+
+        await #expect(throws: ModelManagerError.self) {
+            try await manager.install(withoutWeights.id)
+        }
+        #expect(await manager.installedURL(for: withoutWeights.id) == nil)
+        try await manager.install(complete.id)
+        let installed = try #require(await manager.installedURL(for: complete.id))
+        #expect(FileManager.default.fileExists(
+            atPath: installed.appending(path: WoofModel.weightsFileName).path
+        ))
+        #expect(await manager.availableVoices(for: complete.id) == ["Juno", "Mira"])
     }
 
     @Test("A complete staged snapshot installs, reports progress, and removes")
