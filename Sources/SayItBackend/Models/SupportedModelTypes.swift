@@ -11,6 +11,7 @@ enum SupportedModelTypes {
         ["qwen3_tts"],
         ["qwen3", "qwen"],
         ["fish_speech", "fish_qwen3_omni"],
+        ["fish_drama3"],
         [
             "llama_tts", "llama3_tts", "llama3", "llama", "orpheus",
             "orpheus_tts"

@@ -1224,6 +1224,34 @@ struct BackendServiceCommandTests {
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
+    @Test("Synthesis phase and first playback timings are recorded once per request")
+    func requestTimings() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        for run in 1...2 {
+            _ = try submittedJob(await fixture.service.handle(.init(command: .submit(
+                SpeechSubmission(text: "Private timing test sentence.", source: .preview,
+                    modelID: fixture.seedModelID, permitsLongText: true)
+            ))))
+            var recorded: [DiagnosticSnapshot] = []
+            for _ in 0..<300 {
+                recorded = try diagnosticList(await fixture.service.handle(.init(command: .diagnostics)))
+                if recorded.filter({ $0.code == "playback.timing.buffer_wait" }).count == run { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let starts = recorded.filter { $0.code == "playback.timing.first_start" }
+            #expect(starts.count == run)
+            #expect(starts.allSatisfy { ($0.durationMilliseconds ?? -1) >= 0 && $0.numericValue != nil })
+            #expect(recorded.filter { $0.code == "synthesis.timing.model_load" }.count == run)
+            #expect(recorded.filter { $0.code == "synthesis.timing.model_load" }
+                .allSatisfy { $0.durationMilliseconds == 125 })
+            #expect(!recorded.contains { $0.code.contains("Private timing") })
+            _ = await fixture.service.handle(.init(command: .clear))
+        }
+    }
+
     @Test("Repeated buffering audio publishes changed playback content")
     func repeatedBufferingAudioPublishesContent() async throws {
         let eventGate = BackendSynthesisEventGate()
@@ -2813,6 +2841,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
             }
         }
         return AsyncThrowingStream { continuation in
+            continuation.yield(.timing(SynthesisTiming(phase: .modelLoad, duration: 0.125)))
             continuation.yield(.modelLoaded(request.model.id))
             for (index, chunk) in chunks.enumerated() {
                 continuation.yield(

@@ -1,8 +1,34 @@
+import Foundation
 import Testing
+import SayItCore
+import SayItProtocol
 @testable import SayItBackend
 
 @Suite("Playback controller calculations")
 struct PlaybackControllerBoundaryTests {
+    @Test("Streaming startup uses delivered audio and resets across requests")
+    @MainActor
+    func streamingProgressLifecycle() throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        let requestID = UUID()
+        playback.setPlaybackMode(.adaptive)
+        playback.prepare(requestID: requestID, title: "Stream", estimatedDuration: 100, modelID: "stream-test")
+        try playback.enqueue(AudioChunk(requestID: requestID, index: 0,
+            samples: Array(repeating: 0, count: 32_000), sampleRate: 8000, startsParagraph: false))
+        #expect(!playback.shouldStartWhenBuffered)
+        let progress = SynthesisProgress(chunkIndex: 0, generatedAudioDuration: 4,
+            generationDuration: 1.6, recentRealTimeFactor: 0.4, deliveredAudioPieces: 6,
+            maximumDeliveryGap: 0.6)
+        playback.observeSynthesisProgress(progress)
+        #expect(playback.shouldStartWhenBuffered)
+        playback.stop()
+        playback.observeSynthesisProgress(progress)
+        #expect(!playback.shouldStartWhenBuffered)
+        playback.prepare(requestID: UUID(), title: "Next", estimatedDuration: 100, modelID: "stream-test")
+        #expect(!playback.shouldStartWhenBuffered)
+    }
+
     @Test("Playback buffer duration grows only above normal speed")
     @MainActor
     func preferredBufferDuration() {

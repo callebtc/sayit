@@ -33,6 +33,7 @@ protocol BackendPlaybackControlling: PlaybackControlling {
     func appendSpokenChunk(_ chunk: PlaybackTextChunk)
     func setPlaybackMode(_ mode: PlaybackMode)
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics)
+    func observeSynthesisProgress(_ progress: SynthesisProgress)
     func stopSmoothly() async
     func stopForModelSwitch() async
     func finishBuffering()
@@ -47,6 +48,10 @@ extension BackendPlaybackControlling {
 
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
         _ = metrics
+    }
+
+    func observeSynthesisProgress(_ progress: SynthesisProgress) {
+        _ = progress
     }
 
     func stopSmoothly() async {

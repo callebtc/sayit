@@ -1,5 +1,6 @@
 import Foundation
 import SayItCore
+import SayItProtocol
 import Testing
 @testable import SayItBackend
 
@@ -268,6 +269,7 @@ struct InstalledModelSmokeTests {
     }
 
     @Test("Configured model generates finite, audible samples")
+    @MainActor
     func configuredModelGeneratesAudio() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let modelID = auditValue("SAYIT_MODEL_AUDIT_ID", in: environment),
@@ -294,9 +296,11 @@ struct InstalledModelSmokeTests {
         let modelURL = modelsRootURL
             .appending(path: model.id.rawValue, directoryHint: .isDirectory)
             .appending(path: model.revision, directoryHint: .isDirectory)
-        let synthesizer = SynthesisActor { requestedID in
-            requestedID == model.id ? modelURL : nil
-        }
+        let synthesizer = SynthesisActor(
+            modelURLProvider: { requestedID in
+                requestedID == model.id ? modelURL : nil
+            }
+        )
         let voiceReference = auditValue(
             "SAYIT_MODEL_AUDIT_REFERENCE",
             in: environment
@@ -361,6 +365,28 @@ struct InstalledModelSmokeTests {
             )
 
             let startedAt = ContinuousClock.now
+            let playback = environment["SAYIT_MODEL_AUDIT_PLAYBACK"] == "1" ? PlaybackController() : nil
+            var firstPlaybackSeconds: Double?
+            var rebufferCount = 0
+            var previousState = PlaybackState.idle
+            func elapsedSeconds() -> Double {
+                let elapsed = startedAt.duration(to: .now)
+                return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+            }
+            playback?.onStateChange = { state in
+                if state == .playing, firstPlaybackSeconds == nil { firstPlaybackSeconds = elapsedSeconds() }
+                if state == .buffering, previousState == .playing { rebufferCount += 1 }
+                previousState = state
+            }
+            playback?.volume = 0
+            if let rate = auditValue("SAYIT_MODEL_AUDIT_PLAYBACK_RATE", in: environment).flatMap(Double.init) {
+                playback?.rate = rate
+            }
+            playback?.setPlaybackMode(model.playbackMode)
+            playback?.prepare(requestID: request.id, title: "Timing audit",
+                estimatedDuration: Double(request.cleanedText.text.count) / 14, modelID: model.id.rawValue)
+            playback?.setSpokenText(request.cleanedText.text)
+            defer { playback?.stop() }
             let stream = await synthesizer.synthesize(request)
             var samples: [Float] = []
             var firstAudioSeconds: Double?
@@ -372,6 +398,9 @@ struct InstalledModelSmokeTests {
                 switch event {
                 case .chunkStarted(_, let chunk):
                     synthesizedChunks.append(chunk)
+                    playback?.appendSpokenChunk(PlaybackTextChunk(
+                        textStart: chunk.sourceRange.lowerBound, textEnd: chunk.sourceRange.upperBound,
+                        audioStart: playback?.generatedDuration ?? 0))
                 case .audio(let chunk):
                     if firstAudioSeconds == nil {
                         let elapsed = startedAt.duration(to: .now)
@@ -381,8 +410,26 @@ struct InstalledModelSmokeTests {
                     audioEventCount += 1
                     samples.append(contentsOf: chunk.samples)
                     sampleRate = chunk.sampleRate
+                    try playback?.enqueue(chunk)
+                    if playback?.shouldStartWhenBuffered == true { playback?.play() }
+                case .progress(let progress):
+                    playback?.observeSynthesisProgress(progress)
+                    if playback?.shouldStartWhenBuffered == true { playback?.play() }
                 case .metrics(let metrics):
                     chunkDurations.append(metrics.audioDuration)
+                    if let playback, let chunk = playback.spokenChunks.last {
+                        playback.appendSpokenChunk(PlaybackTextChunk(textStart: chunk.textStart,
+                            textEnd: chunk.textEnd, audioStart: chunk.audioStart,
+                            audioEnd: playback.generatedDuration + metrics.trailingAudioDuration))
+                        playback.observeSynthesisMetrics(metrics)
+                        if playback.shouldStartWhenBuffered { playback.play() }
+                    }
+                    print("MODEL_AUDIT_CHUNK index=\(metrics.chunkIndex) generation=\(metrics.generationDuration) audio=\(metrics.audioDuration) rtf=\(metrics.realTimeFactor)")
+                case .timing(let timing):
+                    #expect(timing.duration.isFinite && timing.duration >= 0)
+                    print("MODEL_AUDIT_TIMING phase=\(timing.phase.rawValue) seconds=\(timing.duration)")
+                case .completed:
+                    playback?.finishBuffering()
                 default:
                     break
                 }
@@ -391,6 +438,17 @@ struct InstalledModelSmokeTests {
             let elapsed = startedAt.duration(to: .now)
             let seconds = Double(elapsed.components.seconds)
                 + Double(elapsed.components.attoseconds) / 1e18
+            if let playback {
+                let deadline = ContinuousClock.now.advanced(by: .seconds(playback.generatedDuration + 10))
+                while playback.state == .playing || playback.state == .buffering {
+                    if ContinuousClock.now >= deadline { break }
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+                #expect(playback.state == .finished)
+                #expect(rebufferCount == 0, "Adaptive playback ran out of audio")
+                #expect(firstPlaybackSeconds != nil)
+                print("MODEL_AUDIT_PLAYBACK firstStart=\(firstPlaybackSeconds ?? -1) synthesisComplete=\(seconds) rebuffers=\(rebufferCount)")
+            }
             let finiteSamples = samples.filter(\.isFinite)
             let peak = finiteSamples.map { abs($0) }.max() ?? 0
             let rms = finiteSamples.isEmpty

@@ -23,6 +23,18 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Packages/PlaybackDSP"),
+        .package(
+            url: "https://github.com/huggingface/swift-transformers.git",
+            exact: "1.3.3"
+        ),
+        .package(
+            url: "https://github.com/arraypress/swift-tts.git",
+            exact: "3.2.1"
+        ),
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift-lm.git",
+            revision: "ee673d6a71d76e67b532dc7eaf91d92edc3bb8bb"
+        ),
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6"),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
@@ -79,9 +91,13 @@ let package = Package(
             name: "SayItBackend",
             dependencies: [
                 .product(name: "PlaybackDSP", package: "PlaybackDSP"),
+                .product(name: "DramaTTS", package: "swift-tts"),
+                .product(name: "SpeechSynthesizer", package: "swift-tts"),
                 "SayItCore",
                 "SayItProtocol",
                 .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "Transformers", package: "swift-transformers"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift")
             ],

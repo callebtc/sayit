@@ -32,7 +32,7 @@
 		09E94756EA98F9506DD13C52 /* DiagnosticCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A092AE8477F880752CF985 /* DiagnosticCategory.swift */; };
 		0A00DCDC6CC2981A2DF8C523 /* ModelID.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB04A144E7B0EC58078BD43A /* ModelID.swift */; };
 		0A2D669D9D8BCA189C6ECF28 /* SayItHTTPServer+VoiceRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E46C278E2A69A51F79DE353 /* SayItHTTPServer+VoiceRoutes.swift */; };
-		0A6CFEC41D707770299C2D4E /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */; };
+		0A6CFEC41D707770299C2D4E /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 01F1859E486870DC0E3F43CB /* Transformers */; };
 		0AA91D2459428B799CF9F727 /* SelectionRequestFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FAD8898C143F6D470DFFE7 /* SelectionRequestFlow.swift */; };
 		0ABBF6D2B19B6666B372E308 /* VoiceReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC20994C0FBDFBF9945C121 /* VoiceReference.swift */; };
 		0B5B5BCD24A338EB27529A01 /* SayItHTTPServer+HistoryRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAEC9FF2C8C1913A888EA2F /* SayItHTTPServer+HistoryRoutes.swift */; };
@@ -55,12 +55,15 @@
 		1222CE5AD3F752C87A20D209 /* VoiceFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 815F4468AEC35FC11968AE16 /* VoiceFingerprint.swift */; };
 		1277983D5FFBC76A6CD5274E /* ModelFileDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D4CBC539AFA34387DA49C6 /* ModelFileDescriptor.swift */; };
 		12C62944CEE15619FB0B74DC /* UpdateOffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DD06F06BB2F0F12013A199 /* UpdateOffer.swift */; };
+		13A19D39D7E41300E27F7690 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */; };
 		1487C2E135090B89B5290D1F /* JSONEncoder+SayIt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8C5D4E319B7ED9AA559B65 /* JSONEncoder+SayIt.swift */; };
 		1499573C719AFE565957C8DE /* AnywhereOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9139DB6590D67057C09ABBF /* AnywhereOnboardingView.swift */; };
 		14C2C345DED4A876DEB5AABB /* APITokenRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C260D3D114063A57EE6106 /* APITokenRecord.swift */; };
 		15BC1D2ACF0F95AC493733D5 /* ModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69AC3686B8CAE0506DD0984 /* ModelManagerTests.swift */; };
+		1647C5A55E0071042AE89CB8 /* DramaTTSLinkage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E416D902D489C8D120D00761 /* DramaTTSLinkage.framework */; };
 		168A63FEEDC7C157E117CB1C /* ServiceEventHubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24BB3FA53E080276A116642 /* ServiceEventHubTests.swift */; };
 		16A5F34E0F821CFCC1C608D0 /* APITokenMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEF4E9A880944ACA9E6A4AA /* APITokenMetadata.swift */; };
+		18A992FB1A913FF259BFCC06 /* Linkage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 006FD5F1A043A37EF2989024 /* Linkage.swift */; };
 		19488C0CF76ABE8972AE4980 /* QueuePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E857E910DF547DDF281E5A /* QueuePolicy.swift */; };
 		19B6090764A4FAC7C2557148 /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 4D514FBB81728B5F7E53FCCE /* openapi.yaml */; };
 		1AB6750260BF70B395B0F9E5 /* HistorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDA6836016ADDCDC5ACF3AF /* HistorySettingsView.swift */; };
@@ -104,7 +107,7 @@
 		2F13AD95B66B59D9BEFAB69D /* VoiceProfileRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48CC76FCF104B6EA0CCFFC3 /* VoiceProfileRecord.swift */; };
 		2F98443BCC6A9CE666AFF7D2 /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		30F806119784A3EA06D08732 /* APITokenCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AADDFBAF6765A7A9E46F6F /* APITokenCreation.swift */; };
-		31CB6C9597C1FD2312EB3DE6 /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
+		31CB6C9597C1FD2312EB3DE6 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = E179132734C462632FAEE244 /* MLXNN */; };
 		32FC4CC7ADAA06A627E07AD0 /* HTTPEventStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FEAC3BEEF3A43EBD6DCF107 /* HTTPEventStreamTests.swift */; };
 		35C22B80D3F495E9B15559DB /* PhononVoiceImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C022565E5F0A887C7D6A12 /* PhononVoiceImportSheet.swift */; };
 		35C5858DED5258F9813091A5 /* SynthesisError.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */; };
@@ -135,6 +138,7 @@
 		4251B261B2659D5CB44E474C /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C074F8772DC89E43CE2A267 /* DesignTokens.swift */; };
 		435E896B82A959E7FDFB0403 /* SayItApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13CEBAFD3BF5D864C5BD06D /* SayItApplication.swift */; };
 		457DDAEE9ECE2D7E62DD35D7 /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		4581863BEFB457A209F9D54A /* DramaLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEFF27897B469CFCC79D7DB6 /* DramaLibraryTests.swift */; };
 		45E5E96E262A16E29BC0B1C3 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D05793EC7DD8A6AD63C5EB8 /* AppDelegate.swift */; };
 		466EF460CC2E6FADDF770B9E /* IdempotencyEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068C859B80F661F56E0DDCA6 /* IdempotencyEntry.swift */; };
 		46AA742DBE34EAA5E41B2A71 /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -187,6 +191,7 @@
 		57F882F8230C74C9C260774F /* UpdateOffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DD06F06BB2F0F12013A199 /* UpdateOffer.swift */; };
 		58F83E662C322E4BC40E6F4B /* MenuBarLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC9632EA8823DD86F4CA8B4 /* MenuBarLabel.swift */; };
 		59A9A6B109F8C906DF06087F /* ModelCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */; };
+		59E60BE2337AAC7BE1F4D5E2 /* SpeechSynthesizer in Frameworks */ = {isa = PBXBuildFile; productRef = F45A7417F7C6986DC7FAA79C /* SpeechSynthesizer */; };
 		5A2DF64A186464BD8109F198 /* VoiceRibbonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */; };
 		5A820100F57FE500E4159648 /* PCMStoreSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6221BD9BAE2E457693E6687A /* PCMStoreSnapshot.swift */; };
 		5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */; };
@@ -444,6 +449,7 @@
 		DC09BC8CD78C2EA737B30CB4 /* LongTextConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DCDEEA486A4B8840D1463C5 /* LongTextConfirmationView.swift */; };
 		DC3537F1F093936D660CC7DB /* RateLimitWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01D5840F137CD49046F6AD9C /* RateLimitWindow.swift */; };
 		DD9403AC760E9C7AC4F7B641 /* VoiceSynthesisMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 305232C320E9BF2C82FCF35C /* VoiceSynthesisMode.swift */; };
+		DD991807F8FDB76C60A91E10 /* Drama3Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C0229430B164D8FBA5DD59 /* Drama3Error.swift */; };
 		DDE91548092439266D6EDF7D /* ModelArchiveImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33C679C3BD54B83C5BCE6E2E /* ModelArchiveImporter.swift */; };
 		DE021B6D3B71E4C6A19859E7 /* SayItSkillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82F6D19637D2F9DF3BEDD30F /* SayItSkillTests.swift */; };
 		DE86C07FEA6CF2BA7095A872 /* ModelArchiveImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07CB98D7E8BB1E9C661C03A /* ModelArchiveImporterTests.swift */; };
@@ -451,14 +457,17 @@
 		DF76E0B4B9EA8B82E6C4D86B /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DFB7C6CFF86DE53C733F2CDE /* SayItServiceIdentifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237C50A94D70BEA1B215CA30 /* SayItServiceIdentifiers.swift */; };
 		DFDD41547768B5F7D0E85012 /* UpdateNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E6757C20FB3DB2ACD89E76 /* UpdateNotification.swift */; };
+		E04C71B6F97BC1EF540A4A46 /* DramaLibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EDA5F9F1746A54AFE89FD61 /* DramaLibraryModel.swift */; };
 		E0D9FF0CFEFFF92FA76A2283 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D14E180FC88D852A4F45409 /* PlaybackController.swift */; };
 		E1E9D02A137084C5FFE4EFC3 /* SayItProtocol.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; };
 		E246A995B180E51036FFD2C7 /* ModelsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB628EB0BC6022040D88381 /* ModelsSettingsView.swift */; };
 		E25ABD1126F9F37FC5EFBE47 /* VoiceDraftCandidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E94484176E80E02C334F8 /* VoiceDraftCandidate.swift */; };
+		E25E17FAB078CCBB6D140279 /* ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = C289277F8850FA76D5D3AA2D /* ThirdPartyNotices.txt */; };
 		E2AC6C65451CA83997616295 /* ServiceRepairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3FF8D568898C9A58A33EB6 /* ServiceRepairView.swift */; };
 		E2EC3F4FDF5F57D59B375F62 /* HealthResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA8150FAAAA5955808EBE01 /* HealthResponse.swift */; };
 		E335892358D6C6B2C47FFAEE /* SynthesisEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56CCEF096A897C16E532418 /* SynthesisEvent.swift */; };
 		E58FD5D5C18D857F9C7893F2 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 6DEF26A91625D0058B8D2295 /* Localizable.xcstrings */; };
+		E6203D3AC79F75838EE2DB2B /* DramaTTS in Frameworks */ = {isa = PBXBuildFile; productRef = FF1D4E2CFEDE3D0904CCE517 /* DramaTTS */; };
 		E70CB86990DB91139F05A377 /* SupportedModelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7300175D3859BFBAAE93CFD /* SupportedModelTypes.swift */; };
 		E75CC5A07A4902647096AC6B /* SayItXPCClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431BE087EDC0779B11802FCC /* SayItXPCClient.swift */; };
 		E7773CBAD241FE2DF197C8E8 /* PlaybackState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BFC5B0C7315AC02FFB29E20 /* PlaybackState.swift */; };
@@ -478,6 +487,7 @@
 		EECE7B3F7BACB09CA84DA1D6 /* HistorySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE5F16E197CCDD51CC8BEC73 /* HistorySnapshot.swift */; };
 		EFB987AC996D3190C88081AF /* ModelRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0550FD90B6416B868A98A89 /* ModelRowView.swift */; };
 		F1117CAFD7B8384CBDD42C9E /* TextIngestionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714FE91E9E9B6DD5FD7EEA80 /* TextIngestionError.swift */; };
+		F1683376CB7D3E51AF32427A /* MLXAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 71DDF93755CA3F43B4C3D31B /* MLXAudioCore */; };
 		F1C9759FFD7F42B474603F0F /* HistoryItemSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90333F6EA2A7FFDB276CCF77 /* HistoryItemSnapshot.swift */; };
 		F23CE722598CD3E8CD87A3BF /* BackendPrimitiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BFBF98DB02E32E3E824EF6 /* BackendPrimitiveTests.swift */; };
 		F37DE5C0F712CCB35E6CDC9D /* SpeechReaderLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1ED9A5191200B4C3B2F306A /* SpeechReaderLayout.swift */; };
@@ -724,6 +734,13 @@
 			remoteGlobalIDString = 805D294C1B998FB17D83063C;
 			remoteInfo = SayItHTTP;
 		};
+		DF2F3751E00F33C510345842 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8AF9EEE72B3A2CD1CEF5909E;
+			remoteInfo = DramaTTSLinkage;
+		};
 		E2DEA465019FBA8B61D67DD3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7BB6086046F49669100D0BE4 /* Project object */;
@@ -845,6 +862,7 @@
 
 /* Begin PBXFileReference section */
 		00445B56A690FA19B85A8F34 /* SayItXPC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SayItXPC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		006FD5F1A043A37EF2989024 /* Linkage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Linkage.swift; sourceTree = "<group>"; };
 		01D5840F137CD49046F6AD9C /* RateLimitWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateLimitWindow.swift; sourceTree = "<group>"; };
 		029B4E9368A75CA1F818245E /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSectionView.swift; sourceTree = "<group>"; };
@@ -883,6 +901,7 @@
 		1C19862FF50A31ADB162AF44 /* BackendProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProjectionTests.swift; sourceTree = "<group>"; };
 		1C35797452379AD419E11196 /* PlaybackTextChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTextChunk.swift; sourceTree = "<group>"; };
 		1E705EEFA323ECDF9CB0C03E /* APITokenDigest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenDigest.swift; sourceTree = "<group>"; };
+		1EDA5F9F1746A54AFE89FD61 /* DramaLibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaLibraryModel.swift; sourceTree = "<group>"; };
 		1F0F462BFFCCB9F7F8B10A64 /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
 		1F6D46E06272DBBA7E296DBA /* VoiceCandidateCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCandidateCard.swift; sourceTree = "<group>"; };
 		20DCE962475D7651F58F5FD8 /* ModelCatalogBundleToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogBundleToken.swift; sourceTree = "<group>"; };
@@ -991,6 +1010,7 @@
 		5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReferenceFormat.swift; sourceTree = "<group>"; };
 		5842EBC765548471AD55DED2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		5893C6A2226C5DB7DD366D9A /* VoiceProfileSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfileSnapshot.swift; sourceTree = "<group>"; };
+		59C0229430B164D8FBA5DD59 /* Drama3Error.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Drama3Error.swift; sourceTree = "<group>"; };
 		5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateRequest.swift; sourceTree = "<group>"; };
 		5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+PlaybackRoutes.swift"; sourceTree = "<group>"; };
 		5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+SettingsRoutes.swift"; sourceTree = "<group>"; };
@@ -1154,12 +1174,14 @@
 		BB95F4768AD968BE1C4CBCD1 /* SayItStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItStyles.swift; sourceTree = "<group>"; };
 		BD2C197A18B385CC45949276 /* DiagnosticEvent+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DiagnosticEvent+Snapshot.swift"; sourceTree = "<group>"; };
 		BE4174D1D4EB7E48D19724DA /* SelectionCaptureFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionCaptureFlow.swift; sourceTree = "<group>"; };
+		BEFF27897B469CFCC79D7DB6 /* DramaLibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaLibraryTests.swift; sourceTree = "<group>"; };
 		BF40F57ED0F12633FF9C0DB4 /* PlaybackRateControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateControlView.swift; sourceTree = "<group>"; };
 		BFAB456E7038F355490CF803 /* OnboardingModelDownloadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelDownloadView.swift; sourceTree = "<group>"; };
 		C159E47E305909312F3675A5 /* ResumeCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumeCommand.swift; sourceTree = "<group>"; };
 		C18D316474D0C21D880BE963 /* VoiceCloneWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneWizard.swift; sourceTree = "<group>"; };
 		C1F03C694936914BB34739D7 /* DiagnosticExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticExport.swift; sourceTree = "<group>"; };
 		C24BB3FA53E080276A116642 /* ServiceEventHubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceEventHubTests.swift; sourceTree = "<group>"; };
+		C289277F8850FA76D5D3AA2D /* ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = ThirdPartyNotices.txt; sourceTree = "<group>"; };
 		C48D19F3EA41DDA50FB5AEFF /* APITokenRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenRow.swift; sourceTree = "<group>"; };
 		C509233A0D24A11DE540B5D0 /* SynthesisPerformanceEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisPerformanceEstimator.swift; sourceTree = "<group>"; };
 		C5CCCB7A23542E9559F8DB1C /* ResolvedVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolvedVoice.swift; sourceTree = "<group>"; };
@@ -1231,6 +1253,7 @@
 		E34A1926523800EBB0B6959D /* PlaybackControllerBoundaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControllerBoundaryTests.swift; sourceTree = "<group>"; };
 		E35626CDDF11816B4A32DE6A /* BackendServiceCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendServiceCommandTests.swift; sourceTree = "<group>"; };
 		E4131E2F67BB0F4B12F4E8AA /* VoiceRecordingProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingProcessorTests.swift; sourceTree = "<group>"; };
+		E416D902D489C8D120D00761 /* DramaTTSLinkage.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DramaTTSLinkage.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E4A114503EEA29B96D47D643 /* InterruptMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterruptMonitor.swift; sourceTree = "<group>"; };
 		E56CCEF096A897C16E532418 /* SynthesisEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthesisEvent.swift; sourceTree = "<group>"; };
 		E5F48BE0144116BFEF453925 /* TextCleaningOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleaningOptions.swift; sourceTree = "<group>"; };
@@ -1301,12 +1324,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1647C5A55E0071042AE89CB8 /* DramaTTSLinkage.framework in Frameworks */,
 				690DD7FC6DABD5D8A65B7A48 /* PlaybackDSP in Frameworks */,
 				0922BE8F5F7353F975466383 /* SayItCore.framework in Frameworks */,
 				89AD3D4D8907B9BD8BC76B7F /* SayItProtocol.framework in Frameworks */,
 				419CB00AB6F80C7F4A3F46BC /* MLX in Frameworks */,
-				31CB6C9597C1FD2312EB3DE6 /* MLXAudioCore in Frameworks */,
-				0A6CFEC41D707770299C2D4E /* MLXAudioTTS in Frameworks */,
+				31CB6C9597C1FD2312EB3DE6 /* MLXNN in Frameworks */,
+				0A6CFEC41D707770299C2D4E /* Transformers in Frameworks */,
+				F1683376CB7D3E51AF32427A /* MLXAudioCore in Frameworks */,
+				13A19D39D7E41300E27F7690 /* MLXAudioTTS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1343,6 +1369,15 @@
 			files = (
 				89D4D1F9824FDC6B29ECA9AA /* SayItBackend.framework in Frameworks */,
 				E1E9D02A137084C5FFE4EFC3 /* SayItProtocol.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9C994175D4040E35206E499A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E6203D3AC79F75838EE2DB2B /* DramaTTS in Frameworks */,
+				59E60BE2337AAC7BE1F4D5E2 /* SpeechSynthesizer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1437,6 +1472,7 @@
 				82A711EE958FDE745E330925 /* Assets.xcassets */,
 				6DEF26A91625D0058B8D2295 /* Localizable.xcstrings */,
 				9E366DE86214B3DDB3FE45A2 /* PrivacyInfo.xcprivacy */,
+				C289277F8850FA76D5D3AA2D /* ThirdPartyNotices.txt */,
 			);
 			name = Resources;
 			path = Sources/SayIt/Resources;
@@ -1588,6 +1624,15 @@
 			path = Tests/SayItHTTPTests;
 			sourceTree = "<group>";
 		};
+		26384F9921CB4C169E9680F6 /* DramaTTSLinkage */ = {
+			isa = PBXGroup;
+			children = (
+				006FD5F1A043A37EF2989024 /* Linkage.swift */,
+			);
+			name = DramaTTSLinkage;
+			path = Sources/DramaTTSLinkage;
+			sourceTree = "<group>";
+		};
 		2ABD171B39B2D37263C1D61D /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
@@ -1630,6 +1675,8 @@
 			isa = PBXGroup;
 			children = (
 				DA3519C44D00FEEA77E4A7E1 /* BackendSpeechSynthesizing.swift */,
+				59C0229430B164D8FBA5DD59 /* Drama3Error.swift */,
+				1EDA5F9F1746A54AFE89FD61 /* DramaLibraryModel.swift */,
 				8C462F1A523FD96FFB614980 /* KittenVoiceArchiveConverter.swift */,
 				0C900418213D0916ED7E5673 /* SynthesisActor.swift */,
 				FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */,
@@ -1963,6 +2010,7 @@
 		87E25D5B80E0D6D94DD25735 = {
 			isa = PBXGroup;
 			children = (
+				26384F9921CB4C169E9680F6 /* DramaTTSLinkage */,
 				D5368688F97DCA95208246D6 /* Fixtures */,
 				E6A9ADAA62A15BD6C74D2CEF /* Packages */,
 				04D76396770A2F14616CD133 /* Resources */,
@@ -2034,6 +2082,7 @@
 		932443B985F40D816A0FD3B7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				E416D902D489C8D120D00761 /* DramaTTSLinkage.framework */,
 				A89BAB57F71A7F5E2FBB982E /* SayIt.app */,
 				A8C3FAB8E768F21BF7E8DFA3 /* SayItAgent.app */,
 				7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */,
@@ -2285,6 +2334,7 @@
 				E35626CDDF11816B4A32DE6A /* BackendServiceCommandTests.swift */,
 				9921FBAE1C609BFD9AB4942F /* BackendSettingsStoreTests.swift */,
 				214BC446DB61B3C9A7569932 /* CommunityModelResolverTests.swift */,
+				BEFF27897B469CFCC79D7DB6 /* DramaLibraryTests.swift */,
 				0B1F7F464B9E202A91B06177 /* HistoryStoreTests.swift */,
 				AEF71953E379EAB20DD769AF /* InstalledModelSmokeTests.swift */,
 				85B3DB81C1C87B0895285F71 /* KittenVoiceArchiveConverterTests.swift */,
@@ -2389,6 +2439,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				938A6FDB4F011F58BB95850D /* PBXTargetDependency */,
 				938F35BFBDE32E2E4487DD2F /* PBXTargetDependency */,
 				C3BD4103B564840FECB08D15 /* PBXTargetDependency */,
 			);
@@ -2396,6 +2447,8 @@
 			packageProductDependencies = (
 				7D5589CFD718091E8391DB68 /* PlaybackDSP */,
 				CAFF8992F9C4085232A242D2 /* MLX */,
+				E179132734C462632FAEE244 /* MLXNN */,
+				01F1859E486870DC0E3F43CB /* Transformers */,
 				71DDF93755CA3F43B4C3D31B /* MLXAudioCore */,
 				A3CB740DA97596EA73A0ED80 /* MLXAudioTTS */,
 			);
@@ -2551,6 +2604,27 @@
 			);
 			productName = SayItHTTP;
 			productReference = 7E0D0C006406346A39E5C37E /* SayItHTTP.framework */;
+			productType = "com.apple.product-type.framework.static";
+		};
+		8AF9EEE72B3A2CD1CEF5909E /* DramaTTSLinkage */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A968954CA37B8A9DA44845DD /* Build configuration list for PBXNativeTarget "DramaTTSLinkage" */;
+			buildPhases = (
+				4DDAAE783158EC08EEF7D59E /* Sources */,
+				9C994175D4040E35206E499A /* Frameworks */,
+				AAFC86E63666AAA9A85D951B /* Use Shared Tokenizers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DramaTTSLinkage;
+			packageProductDependencies = (
+				FF1D4E2CFEDE3D0904CCE517 /* DramaTTS */,
+				F45A7417F7C6986DC7FAA79C /* SpeechSynthesizer */,
+			);
+			productName = DramaTTSLinkage;
+			productReference = E416D902D489C8D120D00761 /* DramaTTSLinkage.framework */;
 			productType = "com.apple.product-type.framework.static";
 		};
 		8F86AD8C9F6B4A4C4524329A /* SayIt */ = {
@@ -2730,6 +2804,10 @@
 						DevelopmentTeam = D7AHD3GLH6;
 						ProvisioningStyle = Automatic;
 					};
+					8AF9EEE72B3A2CD1CEF5909E = {
+						DevelopmentTeam = D7AHD3GLH6;
+						ProvisioningStyle = Automatic;
+					};
 					8F86AD8C9F6B4A4C4524329A = {
 						DevelopmentTeam = D7AHD3GLH6;
 						ProvisioningStyle = Manual;
@@ -2767,13 +2845,16 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				EFCFEE5C98DB5177DC86654D /* XCRemoteSwiftPackageReference "swift-tts" */,
 				DE2AC70706798290F46011A7 /* XCRemoteSwiftPackageReference "hummingbird" */,
 				EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */,
 				308EBC299675A1638735F4AB /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				7015020F95BF033C7F4BB4CC /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				69B2450C9F3F9BA22499C57E /* XCRemoteSwiftPackageReference "Sparkle" */,
 				8C57CA57D58F0367C9CA83E8 /* XCRemoteSwiftPackageReference "swift-atomics" */,
 				C93AA06F3A6E248872ED93BC /* XCRemoteSwiftPackageReference "swift-collections" */,
 				2E71412ABA0D3631AC8F7E2B /* XCRemoteSwiftPackageReference "swift-nio" */,
+				4C92387AC82437DA43399FCC /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				8FA3A87EEEF8E0DC0F7CA93B /* XCRemoteSwiftPackageReference "Yams" */,
 				84D82FD5D4C643C189B34542 /* XCLocalSwiftPackageReference "Packages/PlaybackDSP" */,
 			);
@@ -2782,6 +2863,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				8AF9EEE72B3A2CD1CEF5909E /* DramaTTSLinkage */,
 				8F86AD8C9F6B4A4C4524329A /* SayIt */,
 				06B8B306387E5860F2C96821 /* SayItAgent */,
 				08A937CF27D492EAD096D59D /* SayItBackend */,
@@ -2827,6 +2909,7 @@
 				55D0FFA88ED2C508F686997A /* Assets.xcassets in Resources */,
 				E58FD5D5C18D857F9C7893F2 /* Localizable.xcstrings in Resources */,
 				2CC74AF3F076F05AB170E86F /* PrivacyInfo.xcprivacy in Resources */,
+				E25E17FAB078CCBB6D140279 /* ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2868,6 +2951,25 @@
 			shellPath = /bin/sh;
 			shellScript = "set -euo pipefail\nservice_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices\"\nagent_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents\"\ncli_dir=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\ntimestamp_option=\nif [[ \"${SAYIT_DISABLE_SECURE_TIMESTAMP:-NO}\" == \"YES\" ]]; then\n  timestamp_option=--timestamp=none\nfi\nmkdir -p \"${service_dir}\" \"${agent_dir}\" \"${cli_dir}\"\nrm -f \\\n  \"${service_dir}/SayItAgent\" \\\n  \"${service_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/SayItSelectionAgent\" \\\n  \"${cli_dir}/sayit\" \\\n  \"${agent_dir}/com.sayit.mac.agent.plist\" \\\n  \"${agent_dir}/com.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection.plist\" \\\n  \"${agent_dir}/sh.sayit.mac.selection-helper.plist\"\nrm -rf \\\n  \"${service_dir}/SayItAgent.app\" \\\n  \"${cli_dir}/SayItCLI.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItAgent.app\" \"${service_dir}/SayItAgent.app\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItSelectionAgent\" \"${cli_dir}/SayItSelectionAgent\"\nif [[ -n \"${SAYIT_SELECTION_SIGN_IDENTITY:-}\" ]]; then\n  /usr/bin/codesign \\\n    --force \\\n    --sign \"${SAYIT_SELECTION_SIGN_IDENTITY}\" \\\n    ${timestamp_option} \\\n    --options runtime \\\n    --identifier \"${SAYIT_SELECTION_BUNDLE_IDENTIFIER}\" \\\n    \"${cli_dir}/SayItSelectionAgent\"\nfi\nditto \"${BUILT_PRODUCTS_DIR}/mlx-swift_Cmlx.bundle\" \"${service_dir}/mlx-swift_Cmlx.bundle\"\nditto \"${BUILT_PRODUCTS_DIR}/SayItCLI.app\" \"${cli_dir}/SayItCLI.app\"\nln -s \"SayItCLI.app/Contents/MacOS/sayit\" \"${cli_dir}/sayit\"\nditto \"${SRCROOT}/Config/sh.sayit.mac.agent.plist\" \"${agent_dir}/sh.sayit.mac.agent.plist\"\n\n# Compiled Swift module metadata is only needed by developers linking\n# against a framework. Removing it from the distributed app also\n# prevents local source and package-cache paths from leaking.\napp_dir=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\nfind \"${app_dir}\" \\\n  -type d \\\n  -name '*.swiftmodule' \\\n  -prune \\\n  -exec rm -rf {} +\n\n# Embedded code is signed before this post-build phase. If this is a\n# certificate-signed build, restore those nested signatures after\n# removing their development metadata; Xcode signs the outer app last.\nif [[ \"${CODE_SIGNING_ALLOWED:-NO}\" == \"YES\" \\\n    && -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]]; then\n  \"${SRCROOT}/Scripts/sign-embedded-code.sh\" \\\n    \"${app_dir}\" \"${EXPANDED_CODE_SIGN_IDENTITY}\"\nfi\n";
 		};
+		AAFC86E63666AAA9A85D951B /* Use Shared Tokenizers */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Use Shared Tokenizers";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\"${SRCROOT}/Scripts/prepare-static-drama-linkage.sh\" \\\n  \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}\"\n";
+		};
 		E710F3A6446C1616EB39499E /* Use Shared NIOCore Framework */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -2905,6 +3007,8 @@
 				862EDDD16F402EC12212F7BE /* BackendSpeechSynthesizing.swift in Sources */,
 				9A468EF5A94031E08CFEE119 /* CommunityModelResolver.swift in Sources */,
 				945A39481BECA04AEDA50C1F /* DiagnosticEvent+Snapshot.swift in Sources */,
+				DD991807F8FDB76C60A91E10 /* Drama3Error.swift in Sources */,
+				E04C71B6F97BC1EF540A4A46 /* DramaLibraryModel.swift in Sources */,
 				ADB314E2EFB15D2EA9A64854 /* HTTPServiceConfiguration.swift in Sources */,
 				0933C3DB1F15CB642A263B79 /* HistoryItemSnapshot+ServiceSnapshot.swift in Sources */,
 				F1C9759FFD7F42B474603F0F /* HistoryItemSnapshot.swift in Sources */,
@@ -2994,6 +3098,14 @@
 				25D11135F95A13A7365EB6C8 /* UpdatePreferencesTests.swift in Sources */,
 				CFE3669C879FA90FA322CE4A /* UpdateTaskBarrier.swift in Sources */,
 				FC286E934E6653C2E5F2D19F /* UpdateView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4DDAAE783158EC08EEF7D59E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				18A992FB1A913FF259BFCC06 /* Linkage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3354,6 +3466,7 @@
 				22DC722BCC81C0369F7F13CE /* BackendServiceCommandTests.swift in Sources */,
 				DA190540830AC28ABFB83F57 /* BackendSettingsStoreTests.swift in Sources */,
 				0EDC044954B21072C027314C /* CommunityModelResolverTests.swift in Sources */,
+				4581863BEFB457A209F9D54A /* DramaLibraryTests.swift in Sources */,
 				85B64EACE8D0A7F7159E7498 /* HistoryStoreTests.swift in Sources */,
 				3E237ACA743FA08AF15B1D3C /* InstalledModelSmokeTests.swift in Sources */,
 				06745E5FEE4D167ECA5C9000 /* KittenVoiceArchiveConverterTests.swift in Sources */,
@@ -3512,6 +3625,11 @@
 			isa = PBXTargetDependency;
 			target = B4824402F65B5745F1B19F74 /* SayItProtocol */;
 			targetProxy = 95F49AB20F6B33BF847F51CF /* PBXContainerItemProxy */;
+		};
+		938A6FDB4F011F58BB95850D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8AF9EEE72B3A2CD1CEF5909E /* DramaTTSLinkage */;
+			targetProxy = DF2F3751E00F33C510345842 /* PBXContainerItemProxy */;
 		};
 		938F35BFBDE32E2E4487DD2F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -3716,6 +3834,29 @@
 			};
 			name = Release;
 		};
+		2E23CF0A0C5A92D241BB84E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.drama-linkage";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
 		301248E0F0F001E101D9A6EF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -3911,6 +4052,29 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.protocol-tests";
 				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		6484289676A99D57F843E08A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "sh.sayit.mac.drama-linkage";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
@@ -4475,6 +4639,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		A968954CA37B8A9DA44845DD /* Build configuration list for PBXNativeTarget "DramaTTSLinkage" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6484289676A99D57F843E08A /* Debug */,
+				2E23CF0A0C5A92D241BB84E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		B03ABDCB12CB63CA1CBC9A91 /* Build configuration list for PBXNativeTarget "SayItBackendTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -4572,12 +4745,28 @@
 				revision = ac4ae9a39af573d4135109d1640817147c79a5e7;
 			};
 		};
+		4C92387AC82437DA43399FCC /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.3.3;
+			};
+		};
 		69B2450C9F3F9BA22499C57E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
 			requirement = {
 				kind = exactVersion;
 				version = 2.9.6;
+			};
+		};
+		7015020F95BF033C7F4BB4CC /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
+			requirement = {
+				kind = revision;
+				revision = ee673d6a71d76e67b532dc7eaf91d92edc3bb8bb;
 			};
 		};
 		8C57CA57D58F0367C9CA83E8 /* XCRemoteSwiftPackageReference "swift-atomics" */ = {
@@ -4620,9 +4809,22 @@
 				revision = 624fd5410b2fc8ea06f955500c9ac078e405261f;
 			};
 		};
+		EFCFEE5C98DB5177DC86654D /* XCRemoteSwiftPackageReference "swift-tts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/arraypress/swift-tts.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.2.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		01F1859E486870DC0E3F43CB /* Transformers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C92387AC82437DA43399FCC /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Transformers;
+		};
 		0E358E4263F4B393DA65F90A /* OrderedCollections */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C93AA06F3A6E248872ED93BC /* XCRemoteSwiftPackageReference "swift-collections" */;
@@ -4702,10 +4904,25 @@
 			package = EDE9B52C93821E68A0BAF348 /* XCRemoteSwiftPackageReference "mlx-audio-swift" */;
 			productName = MLXAudioCore;
 		};
+		E179132734C462632FAEE244 /* MLXNN */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 308EBC299675A1638735F4AB /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLXNN;
+		};
 		E452F8ABB24767BF7794A92D /* ArgumentParser */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0FB0C4A704F0962960BDE609 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
 			productName = ArgumentParser;
+		};
+		F45A7417F7C6986DC7FAA79C /* SpeechSynthesizer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFCFEE5C98DB5177DC86654D /* XCRemoteSwiftPackageReference "swift-tts" */;
+			productName = SpeechSynthesizer;
+		};
+		FF1D4E2CFEDE3D0904CCE517 /* DramaTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFCFEE5C98DB5177DC86654D /* XCRemoteSwiftPackageReference "swift-tts" */;
+			productName = DramaTTS;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

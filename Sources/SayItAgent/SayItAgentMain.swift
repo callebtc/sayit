@@ -8,6 +8,10 @@ import SayItProtocol
 struct SayItAgentMain {
     @MainActor
     static func main() async {
+        // Set before MLX's first operation; its TF32 preference is cached once.
+        // Full float32 keeps the incremental DAC waveform consistent with a
+        // whole decode on hardware supporting reduced-precision float32 GEMM.
+        setenv("MLX_ENABLE_TF32", "0", 1)
         let termination = AgentTerminationMonitor()
         do {
             let directories = try AppDirectories.shared(

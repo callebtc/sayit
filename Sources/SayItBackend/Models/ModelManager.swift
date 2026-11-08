@@ -1034,6 +1034,12 @@ actor ModelManager: ModelManaging {
               }) else {
             throw ModelManagerError.incompleteSnapshot
         }
+        if model.modelType.lowercased() == "fish_drama3" {
+            guard configJSON["quantization"] != nil,
+                  files.contains(where: { $0.path == "codec.safetensors" && $0.byteCount > 0 }) else {
+                throw ModelManagerError.incompleteSnapshot
+            }
+        }
         for file in files {
             try verify(url.appending(path: file.path), descriptor: file)
         }

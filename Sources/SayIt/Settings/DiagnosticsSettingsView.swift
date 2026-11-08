@@ -30,9 +30,16 @@ struct DiagnosticsSettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(event.category.rawValue)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if let milliseconds = event.durationMilliseconds {
+                                    Text("\(Double(milliseconds) / 1_000, format: .number.precision(.fractionLength(2))) s")
+                                        .monospacedDigit()
+                                        .accessibilityLabel("Duration: \(Double(milliseconds) / 1_000, format: .number.precision(.fractionLength(2))) seconds")
+                                }
+                                Text(event.category.rawValue)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
                         }
                         .padding(.vertical, 2)
                     }
