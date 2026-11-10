@@ -677,7 +677,22 @@ struct BackendServiceCommandTests {
         )
         #expect(fixture.playback.rate == 1.75)
 
-        for rate in [0.49, 2.01, Double.nan, Double.infinity] {
+        for rate in [2.5, 3.0] {
+            #expect(
+                isAccepted(
+                    await fixture.service.handle(
+                        .init(command: .setPlaybackRate(rate))
+                    )
+                )
+            )
+            #expect(fixture.playback.rate == rate)
+            let updated = try snapshot(
+                await fixture.service.handle(.init(command: .snapshot))
+            )
+            #expect(updated.settings.playbackRate == rate)
+        }
+
+        for rate in [0.49, 3.01, Double.nan, Double.infinity] {
             let response = await fixture.service.handle(
                 .init(command: .setPlaybackRate(rate))
             )
@@ -747,6 +762,9 @@ struct BackendServiceCommandTests {
         value.playbackRate = 0.4
         invalidCases.append((value, "settings.invalid_playback_rate"))
         value = original
+        value.playbackRate = 3.01
+        invalidCases.append((value, "settings.invalid_playback_rate"))
+        value = original
         value.volume = -0.1
         invalidCases.append((value, "settings.invalid_volume"))
         value = original
@@ -773,7 +791,7 @@ struct BackendServiceCommandTests {
         }
 
         var updated = original
-        updated.playbackRate = 1.5
+        updated.playbackRate = 3
         updated.volume = 0
         updated.rewindInterval = 7
         updated.forwardInterval = 42
@@ -792,7 +810,7 @@ struct BackendServiceCommandTests {
                 )
             )
         )
-        #expect(fixture.playback.rate == 1.5)
+        #expect(fixture.playback.rate == 3)
         #expect(fixture.playback.volume == 0)
         #expect(fixture.playback.backwardSkipInterval == 7)
         #expect(fixture.playback.forwardSkipInterval == 42)

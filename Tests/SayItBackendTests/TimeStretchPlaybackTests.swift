@@ -26,7 +26,7 @@ struct TimeStretchPlaybackTests {
         #expect(playback.failureMessage == nil)
     }
 
-    @Test("Real output graph finishes at the requested speed", arguments: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+    @Test("Real output graph finishes at the requested speed", arguments: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0])
     func duration(rate: Double) async throws {
         let playback = PlaybackController()
         defer { playback.stop() }

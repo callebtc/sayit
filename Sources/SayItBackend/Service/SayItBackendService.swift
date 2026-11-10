@@ -2492,7 +2492,7 @@ public final class SayItBackendService: SayItService {
         guard validated == rate else {
             throw ServiceFailure(
                 code: "playback.invalid_rate",
-                message: "Playback rate must be between 0.5 and 2."
+                message: "Playback rate must be between 0.5 and 3."
             )
         }
         await waitForPendingModelTransitions()
@@ -3208,7 +3208,7 @@ public final class SayItBackendService: SayItService {
         guard PlaybackRate.isSupported(settings.playbackRate) else {
             throw ServiceFailure(
                 code: "settings.invalid_playback_rate",
-                message: "Playback rate must be between 0.5 and 2."
+                message: "Playback rate must be between 0.5 and 3."
             )
         }
         guard (0...2).contains(settings.volume) else {

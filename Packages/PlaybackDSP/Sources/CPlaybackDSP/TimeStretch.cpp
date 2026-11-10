@@ -63,7 +63,7 @@ struct Stream {
 }
 extern "C" void *sayit_stretch_create(double sampleRate, double rate) {
     if (!std::isfinite(sampleRate) || sampleRate < 8000 || sampleRate > 192000
-        || !std::isfinite(rate) || rate < 0.5 || rate > 2) return nullptr;
+        || !std::isfinite(rate) || rate < 0.5 || rate > 3) return nullptr;
     try { return new Stream(sampleRate, rate); } catch (...) { return nullptr; }
 }
 extern "C" void sayit_stretch_destroy(void *handle) { delete static_cast<Stream *>(handle); }

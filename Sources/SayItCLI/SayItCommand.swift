@@ -32,7 +32,7 @@ struct SpeakCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Language identifier.")
     var language: String?
 
-    @Option(name: .long, help: "Playback rate from 0.5 to 2.")
+    @Option(name: .long, help: "Playback rate from 0.5 to 3.")
     var rate: Double?
 
     @Option(name: .long, help: "Native speaking pace.")
