@@ -880,9 +880,9 @@
         "randomVoiceSampling": true,
         "voiceCloneRequirements": {
           "minimumDuration": 3,
-          "recommendedMinimumDuration": 6,
-          "recommendedMaximumDuration": 10,
-          "maximumDuration": 15,
+          "recommendedMinimumDuration": 10,
+          "recommendedMaximumDuration": 20,
+          "maximumDuration": 30,
           "transcriptRequired": true
         }
       },
@@ -977,9 +977,9 @@
         "randomVoiceSampling": false,
         "voiceCloneRequirements": {
           "minimumDuration": 3,
-          "recommendedMinimumDuration": 6,
-          "recommendedMaximumDuration": 10,
-          "maximumDuration": 15,
+          "recommendedMinimumDuration": 10,
+          "recommendedMaximumDuration": 20,
+          "maximumDuration": 30,
           "transcriptRequired": true
         }
       },
