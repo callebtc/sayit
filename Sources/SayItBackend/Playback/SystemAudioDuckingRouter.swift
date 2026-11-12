@@ -3,8 +3,8 @@ import CoreAudio
 import Foundation
 import Synchronization
 
-/// Lowers every other app's audio by tapping it with a Core Audio process tap,
-/// muting the originals, and replaying them attenuated to the default output.
+/// Lowers other apps on the default output by tapping that device's stream,
+/// muting the originals, and replaying their native channels to the same output.
 ///
 /// Say It's own processes are excluded from the tap, so speech is untouched.
 /// The tap starts unmuted and only mutes once it delivers real samples: without
@@ -29,6 +29,8 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
     private var tapDescription: CATapDescription?
     private var signalTimer: DispatchSourceTimer?
     private var outputDeviceListener: AudioObjectPropertyListenerBlock?
+    private var outputFormatListener: AudioObjectPropertyListenerBlock?
+    private var outputDeviceID = AudioObjectID(kAudioObjectUnknown)
     var onOutputDeviceChange: (@MainActor () -> Void)?
 
     /// Starts replaying other audio at full volume; call `setGain` to duck.
@@ -59,6 +61,17 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
             )
             self.outputDeviceListener = nil
         }
+        if let outputFormatListener {
+            for var address in Self.outputFormatAddresses {
+                AudioObjectRemovePropertyListenerBlock(
+                    outputDeviceID,
+                    &address,
+                    .main,
+                    outputFormatListener
+                )
+            }
+            self.outputFormatListener = nil
+        }
         if let ioProcID {
             AudioDeviceStop(aggregateID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
@@ -76,8 +89,24 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
 
     private func start() throws {
         let excluded = try Self.sayItProcessObjects()
-        let description = CATapDescription(
-            stereoGlobalTapButExcludeProcesses: excluded
+        let outputDevice: AudioObjectID = try Self.property(
+            of: AudioObjectID(kAudioObjectSystemObject),
+            kAudioHardwarePropertyDefaultOutputDevice
+        )
+        outputDeviceID = outputDevice
+        let outputUID: CFString = try Self.property(
+            of: outputDevice,
+            kAudioDevicePropertyDeviceUID
+        )
+        let outputStreams: [AudioStreamID] = try Self.propertyArray(
+            of: outputDevice,
+            kAudioDevicePropertyStreams,
+            scope: kAudioObjectPropertyScopeOutput
+        )
+        let description = try Self.makeTapDescription(
+            excluding: excluded,
+            outputDeviceUID: outputUID as String,
+            outputStreamCount: outputStreams.count
         )
         description.uuid = UUID()
         description.name = "Say It ducking"
@@ -99,14 +128,6 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
             throw DuckingError.unsupportedFormat
         }
 
-        let outputDevice: AudioObjectID = try Self.property(
-            of: AudioObjectID(kAudioObjectSystemObject),
-            kAudioHardwarePropertyDefaultOutputDevice
-        )
-        let outputUID: CFString = try Self.property(
-            of: outputDevice,
-            kAudioDevicePropertyDeviceUID
-        )
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Say It Ducking",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
@@ -132,9 +153,24 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
             "create the ducking device"
         )
 
-        renderState.configure(
+        let inputChannels = try Self.streamChannelCounts(
+            of: aggregateID,
+            scope: kAudioObjectPropertyScopeInput
+        )
+        let outputChannels = try Self.streamChannelCounts(
+            of: aggregateID,
+            scope: kAudioObjectPropertyScopeOutput
+        )
+        let hardwareInputChannels = try Self.streamChannelCounts(
+            of: outputDevice,
+            scope: kAudioObjectPropertyScopeInput
+        )
+        try renderState.configure(
             tapChannels: Int(tapFormat.mChannelsPerFrame),
-            sampleRate: tapFormat.mSampleRate
+            sampleRate: tapFormat.mSampleRate,
+            inputChannels: inputChannels,
+            outputChannels: outputChannels,
+            hardwareInputChannels: hardwareInputChannels
         )
         try check(
             AudioDeviceCreateIOProcIDWithBlock(
@@ -150,7 +186,25 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
             "start the ducking device"
         )
         startWaitingForSignal()
-        observeOutputDevice()
+        try observeOutputDevice()
+    }
+
+    /// A device-scoped, non-mixdown tap retains the stream's channel order.
+    /// Other devices stay untouched. Multiple output streams need separate
+    /// routes; leave those devices unchanged rather than combine their audio.
+    nonisolated static func makeTapDescription(
+        excluding processes: [AudioObjectID],
+        outputDeviceUID: String,
+        outputStreamCount: Int
+    ) throws -> CATapDescription {
+        guard outputStreamCount == 1 else {
+            throw DuckingError.unsupportedFormat
+        }
+        return CATapDescription(
+            excludingProcesses: processes,
+            deviceUID: outputDeviceUID,
+            stream: 0
+        )
     }
 
     nonisolated private static var defaultOutputDeviceAddress:
@@ -162,21 +216,56 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
         )
     }
 
+    nonisolated private static var outputFormatAddresses:
+        [AudioObjectPropertyAddress] {
+        [
+            AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreamConfiguration,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            ),
+            AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreamConfiguration,
+                mScope: kAudioObjectPropertyScopeInput,
+                mElement: kAudioObjectPropertyElementMain
+            ),
+            AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyNominalSampleRate,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            ),
+        ]
+    }
+
     /// The replay is bound to the device that was current at start.
-    private func observeOutputDevice() {
+    private func observeOutputDevice() throws {
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
                 self?.onOutputDeviceChange?()
             }
         }
         var address = Self.defaultOutputDeviceAddress
-        if AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            .main,
-            listener
-        ) == noErr {
-            outputDeviceListener = listener
+        try check(
+            AudioObjectAddPropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                .main,
+                listener
+            ),
+            "observe the output device"
+        )
+        outputDeviceListener = listener
+        outputFormatListener = listener
+        for var address in Self.outputFormatAddresses {
+            try check(
+                AudioObjectAddPropertyListenerBlock(
+                    outputDeviceID,
+                    &address,
+                    .main,
+                    listener
+                ),
+                "observe the output format"
+            )
         }
     }
 
@@ -206,10 +295,16 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
     }
 
     private func muteOriginalsIfSignalArrived() {
-        guard renderState.hasReceivedSignal,
-              let tapDescription else { return }
-        signalTimer?.cancel()
-        signalTimer = nil
+        guard let tapDescription else { return }
+        if tapDescription.muteBehavior == .mutedWhenTapped {
+            // A changed or unavailable buffer layout cannot replace originals.
+            // Rebuilding stops this route and restores them before trying again.
+            if !renderState.hasReceivedSignal {
+                onOutputDeviceChange?()
+            }
+            return
+        }
+        guard renderState.hasReceivedSignal else { return }
         tapDescription.muteBehavior = .mutedWhenTapped
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioTapPropertyDescription,
@@ -230,6 +325,9 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
         // If muting fails, other apps simply stay at full volume.
         if status == noErr {
             renderState.startReplaying()
+        } else {
+            signalTimer?.cancel()
+            signalTimer = nil
         }
     }
 
@@ -286,11 +384,12 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
 
     nonisolated private static func propertyArray<Element>(
         of object: AudioObjectID,
-        _ selector: AudioObjectPropertySelector
+        _ selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal
     ) throws -> [Element] {
         var address = AudioObjectPropertyAddress(
             mSelector: selector,
-            mScope: kAudioObjectPropertyScopeGlobal,
+            mScope: scope,
             mElement: kAudioObjectPropertyElementMain
         )
         var size: UInt32 = 0
@@ -315,6 +414,45 @@ final class SystemAudioDuckingRouter: OtherAudioRouting {
             )
             initialized = Int(size) / MemoryLayout<Element>.stride
         }
+    }
+
+    nonisolated private static func streamChannelCounts(
+        of device: AudioObjectID,
+        scope: AudioObjectPropertyScope
+    ) throws -> [Int] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: scope,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        try check(
+            AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size),
+            "read the audio stream layout"
+        )
+        guard size >= MemoryLayout<UInt32>.size else {
+            throw DuckingError.unsupportedFormat
+        }
+        let storage = UnsafeMutableRawPointer.allocate(
+            byteCount: max(Int(size), MemoryLayout<AudioBufferList>.size),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { storage.deallocate() }
+        try check(
+            AudioObjectGetPropertyData(device, &address, 0, nil, &size, storage),
+            "read the audio stream layout"
+        )
+        let list = storage.assumingMemoryBound(to: AudioBufferList.self)
+        let count = Int(list.pointee.mNumberBuffers)
+        if count > 0 {
+            let requiredSize = MemoryLayout<AudioBufferList>.size
+                + (count - 1) * MemoryLayout<AudioBuffer>.stride
+            guard requiredSize <= Int(size) else {
+                throw DuckingError.unsupportedFormat
+            }
+        }
+        let buffers = UnsafeMutableAudioBufferListPointer(list)
+        return buffers.map { Int($0.mNumberChannels) }
     }
 }
 
@@ -349,12 +487,34 @@ final class DuckingRenderState: @unchecked Sendable {
     private let signalReceived = Atomic<Bool>(false)
     private let replaying = Atomic<Bool>(false)
     private var currentGain: Float = 1
-    private var tapChannels = 2
     private var sampleRate: Double = 48_000
+    private var inputChannels: [Int] = []
+    private var outputChannels: [Int] = []
+    private var tapInputRange = 0..<0
 
-    func configure(tapChannels: Int, sampleRate: Double) {
-        self.tapChannels = max(tapChannels, 1)
-        self.sampleRate = sampleRate > 0 ? sampleRate : 48_000
+    func configure(
+        tapChannels: Int,
+        sampleRate: Double,
+        inputChannels: [Int],
+        outputChannels: [Int],
+        hardwareInputChannels: [Int]
+    ) throws {
+        guard tapChannels > 0, sampleRate.isFinite, sampleRate > 0,
+              inputChannels.allSatisfy({ $0 > 0 }),
+              outputChannels.allSatisfy({ $0 > 0 }),
+              outputChannels.reduce(0, +) == tapChannels else {
+            throw DuckingError.unsupportedFormat
+        }
+        let tapStart = hardwareInputChannels.count
+        guard inputChannels.count > tapStart,
+              inputChannels.starts(with: hardwareInputChannels),
+              inputChannels[tapStart...].reduce(0, +) == tapChannels else {
+            throw DuckingError.unsupportedFormat
+        }
+        self.sampleRate = sampleRate
+        self.inputChannels = inputChannels
+        self.outputChannels = outputChannels
+        tapInputRange = tapStart..<inputChannels.count
     }
 
     var hasReceivedSignal: Bool { signalReceived.load(ordering: .acquiring) }
@@ -371,8 +531,8 @@ final class DuckingRenderState: @unchecked Sendable {
         )
     }
 
-    /// Copies the tap's channels (the trailing input buffers) to every output
-    /// channel, ramping the gain linearly toward the target.
+    /// Copies each native tap channel to the matching output channel. Hardware
+    /// inputs precede the fixed tap range and never authorize muting originals.
     func render(
         input: UnsafePointer<AudioBufferList>,
         output: UnsafeMutablePointer<AudioBufferList>
@@ -381,17 +541,23 @@ final class DuckingRenderState: @unchecked Sendable {
             UnsafeMutablePointer(mutating: input)
         )
         let outputs = UnsafeMutableAudioBufferListPointer(output)
+        let frames = outputs.first.map(Self.frameCount) ?? 0
+        guard frames > 0,
+              matchesLayout(inputs, channels: inputChannels),
+              matchesLayout(outputs, channels: outputChannels),
+              tapInputRange.allSatisfy({ Self.frameCount(inputs[$0]) == frames }),
+              outputs.allSatisfy({ Self.frameCount($0) == frames }) else {
+            signalReceived.store(false, ordering: .releasing)
+            Self.clear(outputs)
+            return
+        }
         guard replaying.load(ordering: .acquiring) else {
             // Originals are still audible: listen for signal, output silence.
             if !signalReceived.load(ordering: .relaxed),
-               Self.containsSignal(inputs) {
+               Self.containsSignal(inputs, in: tapInputRange) {
                 signalReceived.store(true, ordering: .releasing)
             }
-            for buffer in outputs {
-                if let data = buffer.mData {
-                    memset(data, 0, Int(buffer.mDataByteSize))
-                }
-            }
+            Self.clear(outputs)
             return
         }
         let target = Float(
@@ -403,15 +569,6 @@ final class DuckingRenderState: @unchecked Sendable {
         let step: Float = rampDuration > 0
             ? Float(1 / (rampDuration * sampleRate))
             : 1
-
-        // The tap's buffers follow any input streams of the output device.
-        var tapStart = inputs.count
-        var foundChannels = 0
-        while tapStart > 0, foundChannels < tapChannels {
-            tapStart -= 1
-            foundChannels += Int(inputs[tapStart].mNumberChannels)
-        }
-        let hasTap = foundChannels == tapChannels
 
         let startGain = currentGain
         var framesRendered = 0
@@ -430,14 +587,12 @@ final class DuckingRenderState: @unchecked Sendable {
                     by: step * Float(frame + 1)
                 )
                 for channel in 0..<channels {
-                    let source = hasTap
-                        ? sample(
-                            inputs,
-                            from: tapStart,
-                            channel: (outputChannel + channel) % tapChannels,
-                            frame: frame
-                        )
-                        : 0
+                    let source = sample(
+                        inputs,
+                        from: tapInputRange.lowerBound,
+                        channel: outputChannel + channel,
+                        frame: frame
+                    )
                     samples[frame * channels + channel] = source * gain
                 }
             }
@@ -474,10 +629,36 @@ final class DuckingRenderState: @unchecked Sendable {
         return 0
     }
 
-    static func containsSignal(
-        _ buffers: UnsafeMutableAudioBufferListPointer
+    private func matchesLayout(
+        _ buffers: UnsafeMutableAudioBufferListPointer,
+        channels: [Int]
     ) -> Bool {
+        buffers.count == channels.count && channels.indices.allSatisfy {
+            Int(buffers[$0].mNumberChannels) == channels[$0]
+        }
+    }
+
+    private static func clear(_ buffers: UnsafeMutableAudioBufferListPointer) {
         for buffer in buffers {
+            if let data = buffer.mData {
+                memset(data, 0, Int(buffer.mDataByteSize))
+            }
+        }
+    }
+
+    private static func frameCount(_ buffer: AudioBuffer) -> Int {
+        let frameBytes = Int(buffer.mNumberChannels) * MemoryLayout<Float>.size
+        guard frameBytes > 0, buffer.mData != nil,
+              Int(buffer.mDataByteSize) % frameBytes == 0 else { return 0 }
+        return Int(buffer.mDataByteSize) / frameBytes
+    }
+
+    private static func containsSignal(
+        _ buffers: UnsafeMutableAudioBufferListPointer,
+        in range: Range<Int>
+    ) -> Bool {
+        for index in range {
+            let buffer = buffers[index]
             guard let data = buffer.mData else { continue }
             let count = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
             let samples = data.assumingMemoryBound(to: Float.self)

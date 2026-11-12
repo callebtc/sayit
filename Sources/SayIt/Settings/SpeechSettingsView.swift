@@ -130,7 +130,8 @@ struct SpeechSettingsView: View {
                 Text("Other audio")
             } footer: {
                 Text(
-                    "Music and other apps get quieter while Say It speaks. "
+                    "Audio on your default output gets quieter "
+                        + "while Say It speaks. "
                         + "macOS asks for System Audio Recording permission "
                         + "the first time; without it, other audio is left "
                         + "unchanged."
