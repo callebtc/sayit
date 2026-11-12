@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		00B7B3A6DE0F939B18017E38 /* SelectedTextReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E040A087E3EC6D988C26DD00 /* SelectedTextReaderTests.swift */; };
+		012CFFFC80DC2D7CD4192618 /* MLXCachePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E480BD32DA093F27738855 /* MLXCachePolicyTests.swift */; };
 		0168663A8EC2A4FEDBC79848 /* ServiceEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D3BCCF0B19E3B2BE3B50D2 /* ServiceEvent.swift */; };
 		01AEDDE89CD793C1B03CF5AD /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = E452F8ABB24767BF7794A92D /* ArgumentParser */; };
 		01E5C037C6E0D63ACB175A25 /* VoiceProfileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30CAB0D4D65A6EF45D9A3A7 /* VoiceProfileRow.swift */; };
@@ -471,6 +472,7 @@
 		F1117CAFD7B8384CBDD42C9E /* TextIngestionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714FE91E9E9B6DD5FD7EEA80 /* TextIngestionError.swift */; };
 		F1C9759FFD7F42B474603F0F /* HistoryItemSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90333F6EA2A7FFDB276CCF77 /* HistoryItemSnapshot.swift */; };
 		F23CE722598CD3E8CD87A3BF /* BackendPrimitiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BFBF98DB02E32E3E824EF6 /* BackendPrimitiveTests.swift */; };
+		F3533C07DC9FF71C2FC05E10 /* MLXCachePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1B942725B7DC902DCDE1DC /* MLXCachePolicy.swift */; };
 		F37DE5C0F712CCB35E6CDC9D /* SpeechReaderLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1ED9A5191200B4C3B2F306A /* SpeechReaderLayout.swift */; };
 		F3C0BE22B46B4C9096F9D3AE /* CleanedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE5F90F8700618CBFF89611 /* CleanedText.swift */; };
 		F4DEB3192F7FFA8A44F37867 /* OnboardingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798F5FF5F67AAD0DB93DC48F /* OnboardingStep.swift */; };
@@ -871,6 +873,7 @@
 		1AAAB79ECE86C6928C43363F /* HuggingFaceLFSInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceLFSInfo.swift; sourceTree = "<group>"; };
 		1B23E1B3CFC2229DF31FDF12 /* PlaybackBufferPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackBufferPolicy.swift; sourceTree = "<group>"; };
 		1C19862FF50A31ADB162AF44 /* BackendProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendProjectionTests.swift; sourceTree = "<group>"; };
+		1C1B942725B7DC902DCDE1DC /* MLXCachePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXCachePolicy.swift; sourceTree = "<group>"; };
 		1C35797452379AD419E11196 /* PlaybackTextChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTextChunk.swift; sourceTree = "<group>"; };
 		1E705EEFA323ECDF9CB0C03E /* APITokenDigest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITokenDigest.swift; sourceTree = "<group>"; };
 		1F0F462BFFCCB9F7F8B10A64 /* SettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPane.swift; sourceTree = "<group>"; };
@@ -1118,6 +1121,7 @@
 		AF350864D071DCC0AD323701 /* VoicesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicesSettingsView.swift; sourceTree = "<group>"; };
 		AF5E19E0FDD1DD8B00C3839A /* SayItUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItUITests.swift; sourceTree = "<group>"; };
 		B118CD87A4B24F27D08007B9 /* AudioChunk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioChunk.swift; sourceTree = "<group>"; };
+		B1E480BD32DA093F27738855 /* MLXCachePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXCachePolicyTests.swift; sourceTree = "<group>"; };
 		B1ED9A5191200B4C3B2F306A /* SpeechReaderLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechReaderLayout.swift; sourceTree = "<group>"; };
 		B2C2FE18267ED3F1A992644F /* PCMStreamConditionerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMStreamConditionerTests.swift; sourceTree = "<group>"; };
 		B374AB05A892A4A82438E9DE /* ModelDownloadProgress+Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelDownloadProgress+Snapshot.swift"; sourceTree = "<group>"; };
@@ -1612,6 +1616,7 @@
 			children = (
 				DA3519C44D00FEEA77E4A7E1 /* BackendSpeechSynthesizing.swift */,
 				8C462F1A523FD96FFB614980 /* KittenVoiceArchiveConverter.swift */,
+				1C1B942725B7DC902DCDE1DC /* MLXCachePolicy.swift */,
 				0C900418213D0916ED7E5673 /* SynthesisActor.swift */,
 				FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */,
 			);
@@ -2265,6 +2270,7 @@
 				AEF71953E379EAB20DD769AF /* InstalledModelSmokeTests.swift */,
 				85B3DB81C1C87B0895285F71 /* KittenVoiceArchiveConverterTests.swift */,
 				9DE3802D1EED66EC634F96CB /* MLXAudioLocalModelBridgeTests.swift */,
+				B1E480BD32DA093F27738855 /* MLXCachePolicyTests.swift */,
 				25A4CCAF1AAB2F5114FBC8DB /* ModelFileDownloadDelegateTests.swift */,
 				F69AC3686B8CAE0506DD0984 /* ModelManagerTests.swift */,
 				EEA1C2C44F90B35FEB68010D /* PCMStoreTests.swift */,
@@ -2889,6 +2895,7 @@
 				EC9841D91F602C9A42D56702 /* KeychainTokenStore.swift in Sources */,
 				AC7A99C556D950AA7912D34D /* KittenVoiceArchiveConverter.swift in Sources */,
 				8553044424BBBA10FECF7311 /* MLXAudioLocalModelBridge.swift in Sources */,
+				F3533C07DC9FF71C2FC05E10 /* MLXCachePolicy.swift in Sources */,
 				C6CA386BB11586E35FBF163A /* ModelDescriptor+Snapshot.swift in Sources */,
 				2132BD3904587DAA3F093A71 /* ModelDownloadProgress+Snapshot.swift in Sources */,
 				CB4BCFDF950ABA3F028C97BB /* ModelFileDownloadDelegate.swift in Sources */,
@@ -3324,6 +3331,7 @@
 				3E237ACA743FA08AF15B1D3C /* InstalledModelSmokeTests.swift in Sources */,
 				06745E5FEE4D167ECA5C9000 /* KittenVoiceArchiveConverterTests.swift in Sources */,
 				BB8413E4C3E6122F71C66560 /* MLXAudioLocalModelBridgeTests.swift in Sources */,
+				012CFFFC80DC2D7CD4192618 /* MLXCachePolicyTests.swift in Sources */,
 				7CC4BC562295DF8F17167900 /* ModelFileDownloadDelegateTests.swift in Sources */,
 				15BC1D2ACF0F95AC493733D5 /* ModelManagerTests.swift in Sources */,
 				613F9D16041818D7F12332C4 /* PCMStoreTests.swift in Sources */,

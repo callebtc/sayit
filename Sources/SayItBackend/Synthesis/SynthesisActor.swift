@@ -18,6 +18,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         hardCharacterLimit: 120
     )
     private static let operationGate = SynthesisOperationGate()
+    // Read once, before any model narrows it, so other models get it back.
+    private static let defaultMLXCacheLimit = Memory.cacheLimit
 
     private struct ActiveOperation: Sendable {
         let id: UInt64
@@ -660,6 +662,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             Memory.clearCache()
             throw error
         }
+        Memory.cacheLimit = MLXCachePolicy.cacheLimit(
+            forModelType: model.modelType,
+            defaultLimit: Self.defaultMLXCacheLimit
+        )
         loadedModel = candidate
         loadedModelID = model.id
         loadedTextProcessor = textProcessor

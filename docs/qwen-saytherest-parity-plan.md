@@ -75,6 +75,76 @@ than SayTheRest's 45 s. Speaker similarity at each length still needs a
 listening evaluation. If the encoding peak can be reduced (for example by
 chunked encoding or releasing the MLX cache), 45 s could be reconsidered.
 
+#### Follow-up: where the reference memory goes (fixed with an MLX cache cap)
+
+Method: same machine and harness as above. Stage probes were added to a
+scratch copy of the pinned `mlx-audio-swift` (`bf14ae0`), not to the repo.
+Each probe logged `Memory.activeMemory`, `cacheMemory`, the per-stage
+`peakMemory` and the process footprint around the speaker encoder, the
+speech-tokenizer encode, and talker generation plus streaming decode. SayIt
+uses the streaming path, so reference codes are *not* prepended at decode
+time. That only happens on the non-streaming path.
+
+| Stage (42 s reference vs 10 s) | MLX stage peak | MLX cache left behind |
+|---|---|---|
+| Speaker encoder | 2.6 vs 2.1 GB | 0.6 vs 0.1 GB |
+| **Speech-tokenizer encode** | **4.6 vs 3.1 GB** | **4.9 vs 1.4 GB** |
+| Talker + streaming decode | 4.7 vs 4.6 GB | — |
+
+`loadReferenceAudio` and the ICL prompt are negligible: about 4 MB of samples
+and tens of MB of KV cache. The growth has two causes:
+
+1. **Encoder transient.** `Qwen3TTSSpeechTokenizerEncoder.encode` runs the
+   SEANet conv stack over the whole 24 kHz waveform in one lazy graph (64
+   channels × 1 M samples is about 0.26 GB per tensor at 42 s), so the stage
+   peak grows linearly with reference length.
+2. **Buffer cache (the bigger part).** SayIt never set `Memory.cacheLimit`, so
+   it defaulted to the device memory limit. The gigabytes of activations the
+   encoder freed stayed in MLX's reuse cache, and generation then allocated
+   on top of them.
+
+Mitigations measured (one cold run each, then repeated):
+
+| Variant | Peak footprint 10 / 27 / 42 s | First audio | RTF long |
+|---|---|---|---|
+| Baseline (no cap) | 6.4 / 8.8 / 10.7 GB | 1.1–1.3 s | 0.21–0.22 |
+| `cacheLimit = 0` | 3.5 / 3.8 / 3.9 GB | 1.4–1.6 s | 0.37–0.98 |
+| `cacheLimit = 256 MiB` | 3.6 / 3.7 / 4.1 GB | 1.3–2.7 s | 0.22–0.96 |
+| **`cacheLimit = 1 GiB`** | **4.4 / 4.5 / 4.6 GB** | **1.1–1.4 s** | **0.22–0.26** |
+| Chunked encode (2 s) + 1 GiB cap | 4.5 / — / 4.6 GB | 1.2–1.4 s | 0.21–0.24 |
+
+**Shipped:** `MLXCachePolicy` caps the MLX cache at 1 GiB whenever
+`SynthesisActor` loads a `qwen3_tts` model. Other models get the process
+default back. With the pristine pinned package, peak footprint is now
+**4.4–5.2 GB for every reference length**, including the generated-voice path
+(previously 7.9–8.5 GB). First audio (1.2–1.4 s) and RTF (0.22–0.26) are
+unchanged within run-to-run noise. Reference length no longer drives peak
+memory; talker generation (about 4.7 GB of MLX active memory) does. The cap
+applies only to Qwen because the other models' cache behavior has not been
+measured.
+
+**Chunked encoding needs an upstream change, and it matters for fidelity, not
+memory.** A prototype `streamingEncode` built from the codec's existing
+streaming parts (`SeanetEncoder.step`, the transformer KV cache,
+`ConvDownsample1d.step`, as in Mimi's `encodeStep`) holds the encode stage
+peak at 2.4 GB for any length. Once the cache is capped, though, it doesn't
+lower the process peak. It did reveal a fidelity gap. The full encode in the
+pinned MLX code attends causally over *all* encoder frames: the cache starts
+empty, so the window is never applied. But the tokenizer's encoder transformer
+is trained with `sliding_window: 250` (10 s at 25 Hz), and the PyTorch
+reference (stock HF `MimiModel` in Qwen3-TTS) applies that window even in one
+full pass. Codes match 100% within the first 10 s. After that, only 85–91% of
+codebook 0 matches the windowed encoding, and the deeper codebooks diverge
+further. So for references over 10 s, MLX conditions on codes that the
+PyTorch model would not produce. The fix belongs upstream in
+`mlx-audio-swift` (a sliding-window mask, or a streaming encode, in
+`Qwen3TTSSpeechTokenizerEncoder.encode`). Whether the gap is audible is
+untested.
+
+**Effect on the limit:** memory no longer argues against 45 s. Before raising
+the cap past 30 s, though: land the upstream sliding-window fix or confirm by
+listening that > 10 s references don't sound worse, and spot-check a 16 GB Mac.
+
 ### Phase 2: Import a reference file and edit transcripts (protocol + UI)
 
 **Import a reference**
