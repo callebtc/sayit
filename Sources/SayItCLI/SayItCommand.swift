@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import SayItCore
 import SayItProtocol
 
 struct SpeakCommand: AsyncParsableCommand {
@@ -32,11 +33,26 @@ struct SpeakCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Language identifier.")
     var language: String?
 
-    @Option(name: .long, help: "Playback rate from 0.5 to 3.")
+    @Option(
+        name: .long,
+        help: "Playback speed only (\(PlaybackRate.minimum)–\(PlaybackRate.maximum)); does not change saved audio."
+    )
     var rate: Double?
 
-    @Option(name: .long, help: "Native speaking pace.")
+    @Option(name: .long, help: "Native speaking pace on supported models; included in saved audio.")
     var pace: Double?
+
+    @Option(name: [.short, .long], help: "Save generated speech to a new .wav file.")
+    var output: String?
+
+    @Option(
+        name: .long,
+        help: "Speed multiplier baked into the WAV only (\(PlaybackRate.minimum)–\(PlaybackRate.maximum); default 1)."
+    )
+    var exportRate: Double?
+
+    @Flag(name: .long, help: "Generate without playback. Requires --output.")
+    var noPlay = false
 
     @Flag(
         exclusivity: .exclusive,
@@ -56,7 +72,25 @@ struct SpeakCommand: AsyncParsableCommand {
     )
     var allowLongText = false
 
+    mutating func validate() throws {
+        if let exportRate, !PlaybackRate.isSupported(exportRate) {
+            throw ValidationError(
+                "Choose an --export-rate from \(PlaybackRate.minimum) to \(PlaybackRate.maximum)."
+            )
+        }
+        if output == nil, exportRate != nil || noPlay {
+            throw ValidationError("--export-rate and --no-play require --output.")
+        }
+        if output != nil, detach {
+            throw ValidationError("--output cannot be combined with --detach; saving waits for generation.")
+        }
+        if let output {
+            _ = try CLIExportDestination(path: output)
+        }
+    }
+
     mutating func run() async throws {
+        let destination = try output.map { try CLIExportDestination(path: $0) }
         let input = text.isEmpty
             ? String(
                 decoding: FileHandle.standardInput.readDataToEndOfFile(),
@@ -93,6 +127,7 @@ struct SpeakCommand: AsyncParsableCommand {
                         language: language,
                         speakingPace: pace,
                         playbackRate: rate,
+                        playbackEnabled: noPlay ? false : nil,
                         queuePolicy: queuePolicy.servicePolicy,
                         permitsLongText: allowLongText
                     )
@@ -114,11 +149,37 @@ struct SpeakCommand: AsyncParsableCommand {
                 return
             }
             let interruptMonitor = InterruptMonitor()
-            try await wait(
+            let completedJob = try await wait(
                 for: job.id,
                 service: service,
                 interruptMonitor: interruptMonitor
             )
+            if let destination {
+                let response = try await service.call(
+                    .exportHistory(job.id, format: "wav", rate: exportRate ?? 1)
+                )
+                guard case .file(let file) = response else {
+                    throw ServiceFailure(
+                        code: "export.invalid_response",
+                        message: "The service did not return generated audio."
+                    )
+                }
+                if await interruptMonitor.consume() {
+                    throw CLIExitCode.canceled
+                }
+                do {
+                    try destination.write(file.data)
+                } catch {
+                    CLIOutput.status("Could not save WAV: \(error.localizedDescription)")
+                    throw CLIExitCode.outputFailed
+                }
+                if !json {
+                    CLIOutput.status("Saved \(destination.url.path)")
+                }
+            }
+            if json {
+                try CLIOutput.json(completedJob)
+            }
         } catch let code as ExitCode {
             throw code
         } catch let failure as ServiceFailure {
@@ -166,7 +227,7 @@ struct SpeakCommand: AsyncParsableCommand {
         for id: UUID,
         service: CLIService,
         interruptMonitor: InterruptMonitor
-    ) async throws {
+    ) async throws -> SpeechJob {
         var lastState: SpeechJobState?
         var lastQueueBlock: QueueBlockReason?
         while true {
@@ -206,12 +267,12 @@ struct SpeakCommand: AsyncParsableCommand {
                 )
             }
             if job.state.isTerminal {
-                if json {
+                if json, job.state != .completed {
                     try CLIOutput.json(job)
                 }
                 switch job.state {
                 case .completed:
-                    return
+                    return job
                 case .canceled:
                     throw CLIExitCode.canceled
                 case .failed:
@@ -220,7 +281,7 @@ struct SpeakCommand: AsyncParsableCommand {
                     }
                     throw CLIExitCode.synthesisFailed
                 default:
-                    return
+                    return job
                 }
             }
             try await Task.sleep(for: .milliseconds(100))

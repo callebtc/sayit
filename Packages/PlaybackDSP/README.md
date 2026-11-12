@@ -4,7 +4,8 @@ This experimental branch replaces Apple's playback time stretcher with Sonic,
 using its quality setting of 1. Playback speed supports 0.5–3× with unchanged pitch.
 At 1× the original PCM bypasses processing. A continuous processor spans scheduling
 chunks; final lookahead is drained and output is trimmed to the expected duration.
-Source audio and exports stay original.
+Source audio stays original. WAV exports default to the original speed, with
+optional pitch-preserving processing through the CLI's `--export-rate` flag.
 
 Vendored unmodified sources: waywardgeek/sonic at `b93885d`, under Apache 2.0; the
 license is beside the sources. Sonic's Float API internally uses 16-bit samples.

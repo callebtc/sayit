@@ -212,6 +212,13 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "SayItCLITests",
+            dependencies: [
+                "SayItCLI",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]
+        ),
+        .testTarget(
             name: "SayItCoreTests",
             dependencies: ["SayItCore"],
             resources: [

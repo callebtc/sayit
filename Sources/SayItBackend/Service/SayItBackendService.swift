@@ -594,8 +594,8 @@ public final class SayItBackendService: SayItService {
             return .accepted
         case .history:
             return .history(history.items.map(\.serviceSnapshot))
-        case .exportHistory(let id, let format):
-            return .file(try await exportHistory(id: id, format: format))
+        case .exportHistory(let id, let format, let rate):
+            return .file(try await exportHistory(id: id, format: format, rate: rate ?? 1))
         case .replayHistory(let id):
             try await replayHistory(id)
             return .accepted
@@ -1795,6 +1795,13 @@ public final class SayItBackendService: SayItService {
             historyRevision &+= 1
         }
 
+        armSynthesisWatchdog(for: id)
+        defer { stopSynthesisWatchdog(for: id) }
+        if submission.playbackEnabled == false {
+            try await synthesizeWithoutPlayback(request)
+            return
+        }
+
         requestTiming = RequestTiming(modelID: request.model.id, started: .now)
         defer { requestTiming = nil }
         playback.rate = validatedPlaybackRate(
@@ -1824,8 +1831,6 @@ public final class SayItBackendService: SayItService {
         statusText = "Preparing speech"
         errorMessage = nil
 
-        armSynthesisWatchdog(for: id)
-        defer { stopSynthesisWatchdog(for: id) }
         let stream = await synthesizer.synthesize(request)
         for try await event in stream {
             try Task.checkCancellation()
@@ -1847,6 +1852,54 @@ public final class SayItBackendService: SayItService {
         default:
             throw CancellationError()
         }
+    }
+
+    private func synthesizeWithoutPlayback(_ request: SpeechRequest) async throws {
+        let audio = SpeechAudioCollector(
+            requestID: request.id,
+            directory: directories.temporary
+        )
+        defer { withExtendedLifetime(audio) {} }
+        statusText = "Generating speech"
+        errorMessage = nil
+        updateJob(request.id, state: .synthesizing, progress: 0.15)
+        var completed = false
+        let stream = await synthesizer.synthesize(request)
+        for try await event in stream {
+            try Task.checkCancellation()
+            armSynthesisWatchdog(for: request.id)
+            switch event {
+            case .audio(let chunk):
+                try audio.append(chunk)
+            case .completed:
+                completed = true
+            case .cancelled:
+                throw CancellationError()
+            default:
+                break
+            }
+        }
+        stopSynthesisWatchdog(for: request.id)
+        try Task.checkCancellation()
+        guard completed else { throw SynthesisError.generatedNoAudio }
+        let source = try audio.snapshot()
+        if request.source != .preview {
+            let archive = try await audioArchive.writeM4A(source: source, requestID: request.id)
+            do {
+                try Task.checkCancellation()
+                try history.complete(
+                    id: request.id,
+                    duration: archive.duration,
+                    audioRelativePath: archive.relativePath,
+                    audioByteCount: archive.byteCount
+                )
+                historyRevision &+= 1
+            } catch {
+                await audioArchive.remove(relativePath: archive.relativePath)
+                throw error
+            }
+        }
+        finishJob(request.id, state: .completed)
     }
 
     private func handleSynthesisEvent(
@@ -3099,8 +3152,21 @@ public final class SayItBackendService: SayItService {
 
     private func exportHistory(
         id: UUID,
-        format: String
+        format: String,
+        rate: Double
     ) async throws -> ExportedFile {
+        guard PlaybackRate.isSupported(rate) else {
+            throw ServiceFailure(
+                code: "export.invalid_rate",
+                message: "Choose an export rate from \(PlaybackRate.minimum) to \(PlaybackRate.maximum)."
+            )
+        }
+        guard rate == 1 || format.lowercased() == "wav" else {
+            throw ServiceFailure(
+                code: "export.unsupported_rate_format",
+                message: "Export speed is supported for WAV files."
+            )
+        }
         guard let item = history.items.first(where: { $0.id == id }) else {
             throw ServiceFailure(
                 code: "history.not_found",
@@ -3139,7 +3205,8 @@ public final class SayItBackendService: SayItService {
             defer { try? FileManager.default.removeItem(at: destination) }
             try await audioArchive.convertToWAV(
                 source: source,
-                destination: destination
+                destination: destination,
+                rate: rate
             )
             return ExportedFile(
                 filename: "\(baseName).wav",
