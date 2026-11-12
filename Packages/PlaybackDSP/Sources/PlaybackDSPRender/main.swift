@@ -21,7 +21,7 @@ struct RenderComparison {
             throw TimeStretchStream.Failure.invalidConfiguration
         }
         print("engine,rate,input_frames,output_frames,processing_seconds")
-        for rate in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0] {
+        for rate in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0] {
             let url = destination.appendingPathComponent("speed-\(rate).wav")
             guard !FileManager.default.fileExists(atPath: url.path) else {
                 throw CocoaError(.fileWriteFileExists)

@@ -165,7 +165,7 @@ paths:
                 rate:
                   type: number
                   minimum: 0.5
-                  maximum: 2
+                  maximum: 3
       responses:
         "202":
           description: Command accepted

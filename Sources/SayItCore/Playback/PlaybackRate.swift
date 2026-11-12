@@ -4,7 +4,7 @@ import Foundation
 /// playback menu, settings, and system media controls.
 public enum PlaybackRate {
     public static let minimum = 0.5
-    public static let maximum = 2.0
+    public static let maximum = 3.0
     public static let normal = 1.0
 
     /// Smallest adjustment the interface exposes.
