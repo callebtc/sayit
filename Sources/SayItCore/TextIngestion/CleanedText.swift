@@ -8,12 +8,17 @@ public struct CleanedText: Codable, Equatable, Sendable {
     public let cleanupSummary: CleanupSummary
     public let requiresLongTextConfirmation: Bool
 
+    /// Character offsets of list items after cleanup.
+    /// Optional so older stored records remain decodable.
+    public let listItemStartOffsets: [Int]?
+
     public init(
         text: String,
         title: String,
         detectedLanguage: String?,
         cleanupSummary: CleanupSummary,
-        requiresLongTextConfirmation: Bool
+        requiresLongTextConfirmation: Bool,
+        listItemStartOffsets: [Int]? = nil
     ) {
         self.text = text
         self.title = title
@@ -21,5 +26,6 @@ public struct CleanedText: Codable, Equatable, Sendable {
         self.detectedLanguage = detectedLanguage
         self.cleanupSummary = cleanupSummary
         self.requiresLongTextConfirmation = requiresLongTextConfirmation
+        self.listItemStartOffsets = listItemStartOffsets
     }
 }

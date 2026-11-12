@@ -46,6 +46,11 @@
     --chip: rgba(10, 10, 11, 0.4);
     --focus: rgba(242, 241, 237, 0.7);
     --icon-filter: invert(0.94);
+    --tile-top: #232326;
+    --tile-bottom: #19191b;
+    --tile-hi: rgba(242, 241, 237, 0.07);
+    --menubar: rgba(242, 241, 237, 0.06);
+    --menubar-active: rgba(242, 241, 237, 0.16);
     --btn-primary-hover: #ffffff;
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -64,6 +69,11 @@
     --chip: rgba(246, 245, 241, 0.55);
     --focus: rgba(23, 23, 20, 0.55);
     --icon-filter: none;
+    --tile-top: #eceae4;
+    --tile-bottom: #e4e2db;
+    --tile-hi: rgba(255, 255, 255, 0.55);
+    --menubar: rgba(255, 255, 255, 0.5);
+    --menubar-active: rgba(23, 23, 20, 0.1);
     --btn-primary-hover: #000000;
   }
 
@@ -469,59 +479,156 @@
     color: var(--fg-muted);
   }
 
-  .shots {
+  /* Both screenshots render at one shared point scale (1124px gallery = 1:1
+     with the Mac), so their text sizes match; every length below is in cqw of
+     the gallery so the composition scales as a single unit. */
+  .gallery {
+    container-type: inline-size;
     margin-top: clamp(54px, 9vh, 92px);
-    padding-bottom: clamp(36px, 5vw, 60px);
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    gap: clamp(24px, 3vw, 44px);
-    /* one shared height so both windows match: sum of aspect ratios is 2.201 */
-    --h: min(470px, calc((min(1124px, 100vw - 56px) - 44px) / 2.201));
+    display: grid;
+    grid-template-columns: 38fr 60fr;
+    column-gap: 2cqw;
+    row-gap: 22px;
+    --tile-h: 40cqw;
+    --pt: calc(100cqw / 1124);   /* one macOS point */
   }
 
   .shot {
     margin: 0;
-    clip-path: inset(0 0 100% 0);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
     opacity: 0;
-    transition: clip-path 900ms cubic-bezier(0.77, 0, 0.175, 1), opacity 500ms ease;
+    transform: translateY(18px);
+    transition: opacity 700ms ease, transform 900ms var(--ease-out);
     transition-delay: var(--rd, 0ms);
   }
 
-  .shot.is-in { clip-path: inset(0 0 0 0); opacity: 1; }
+  .shot.is-in { opacity: 1; transform: none; }
 
-  .shot img {
+  .tile {
+    position: relative;
+    height: var(--tile-h);
+    overflow: clip;
+    border-radius: calc(22 * var(--pt));
+    background:
+      radial-gradient(120% 85% at 22% 0%, var(--tile-hi) 0%, transparent 62%),
+      linear-gradient(180deg, var(--tile-top), var(--tile-bottom));
+    box-shadow: inset 0 0 0 1px var(--line);
+    transition: background-color 300ms ease;
+  }
+
+  .tile img {
+    position: absolute;
     display: block;
-    width: auto;
-    height: var(--h);
-    transform: scale(1.05);
-    transition: transform 1200ms var(--ease-out);
-    transition-delay: var(--rd, 0ms);
+    height: auto;
+    transform: translateY(calc(26 * var(--pt)));
+    transition: transform 1300ms var(--ease-out);
+    transition-delay: calc(var(--rd, 0ms) + 120ms);
   }
 
-  .shot.is-in img { transform: scale(1); }
+  .shot.is-in .tile img { transform: none; }
 
-  /* shadows are baked into the transparent PNGs; dark mode swaps the asset */
-  .shot .img-dark { display: none; }
+  /* menu-bar strip the player hangs from */
+  .menubar {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: calc(30 * var(--pt));
+    display: flex;
+    align-items: center;
+    gap: calc(14 * var(--pt));
+    padding: 0 calc(18 * var(--pt)) 0 calc(50% - 184 * var(--pt));
+    background: var(--menubar);
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    font-size: calc(13 * var(--pt));
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
 
-  [data-theme="dark"] .shot .img-dark { display: block; }
-  [data-theme="dark"] .shot .img-light { display: none; }
+  .menubar svg {
+    display: block;
+    width: calc(16 * var(--pt));
+    height: calc(16 * var(--pt));
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.8;
+  }
 
-  /* optical centering: the models window sits a touch lower than the player */
-  .shot-models { transform: translateY(clamp(10px, 1.5vw, 20px)); }
+  .menubar .active {
+    display: grid;
+    place-items: center;
+    width: calc(30 * var(--pt));
+    height: calc(22 * var(--pt));
+    border-radius: calc(6 * var(--pt));
+    background: var(--menubar-active);
+  }
+
+  .menubar .active img {
+    position: static;
+    width: calc(15 * var(--pt));
+    height: auto;
+    filter: var(--icon-filter);
+    transform: none;
+    transition: none;
+  }
+
+  /* the popover's left edge sits under the status item, as on macOS */
+  .shot-player .tile > img {
+    top: calc(40 * var(--pt));
+    left: calc(50% - 180 * var(--pt));
+    width: calc(360 * var(--pt));
+    filter:
+      drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.32))
+      drop-shadow(0 calc(14 * var(--pt)) calc(26 * var(--pt)) rgba(0, 0, 0, 0.16));
+  }
+
+  .menubar time { margin-left: auto; }
+
+  .shot-models .tile > img {
+    top: calc(40 * var(--pt));
+    left: calc(46 * var(--pt));   /* crops past "About", before the row actions */
+    width: calc(760 * var(--pt));
+    filter:
+      drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.32))
+      drop-shadow(0 calc(18 * var(--pt)) calc(36 * var(--pt)) rgba(0, 0, 0, 0.16));
+  }
 
   .shot figcaption {
-    margin-top: 14px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 0 2px;
+  }
+
+  .shot figcaption .idx {
+    grid-row: span 2;
+    padding-top: 3px;
     font-family: var(--mono);
-    font-size: 11.5px;
+    font-size: 11px;
     letter-spacing: 0.04em;
+    color: var(--fg-faint);
+  }
+
+  .shot figcaption strong {
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .shot figcaption span:last-child {
+    font-size: 13.5px;
+    line-height: 1.5;
     color: var(--fg-muted);
   }
 
-  .shot figcaption .idx { color: var(--fg-faint); margin-right: 10px; }
-
   .closing {
-    margin-top: clamp(40px, 7vh, 72px);
+    margin-top: clamp(64px, 10vh, 104px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -531,11 +638,11 @@
 
   .closing p { color: var(--fg-muted); font-size: 15px; }
 
-  @media (max-width: 860px) {
-    .shots { display: block; padding-bottom: 0; }
-    .shot { height: auto; }
-    .shot img { width: 100%; height: auto; }
-    .shot-models { transform: none; margin-top: 28px; }
+  @media (max-width: 760px) {
+    .gallery { grid-template-columns: minmax(0, 1fr); row-gap: 40px; }
+    /* stacked: fill the column, but never render larger than the Mac does */
+    .shot-player .tile { --pt: min(calc(100cqw / 420), 1px); height: calc(458 * var(--pt)); }
+    .shot-models .tile { --pt: calc(100cqw / 660); height: calc(470 * var(--pt)); }
   }
 
   /* ---------- scroll reveal ---------- */
@@ -574,8 +681,8 @@
     .theme-toggle svg { transition: opacity 180ms ease; transform: none; }
     html, body { transition: none; }
     .reveal { transform: none; transition: opacity 300ms ease; transition-delay: 0ms; }
-    .shot { clip-path: inset(0 0 0 0); transition: opacity 300ms ease; transition-delay: 0ms; }
-    .shot img { transform: none; transition: none; }
+    .shot { transform: none; transition: opacity 300ms ease; transition-delay: 0ms; }
+    .tile img { transform: none; transition: none; }
   }
 </style>
 </head>
@@ -675,24 +782,36 @@
       speak offline from then on.
     </p>
 
-    <div class="shots">
-      <figure class="shot shot-player" style="--rd:120ms">
-        <img class="img-light" src="resources/player.png"
-             alt="SayIt's menu-bar player showing a waveform, playback controls, and the spoken text with the current word highlighted"
-             width="812" height="850" loading="lazy" decoding="async">
-        <img class="img-dark" src="resources/player-dark.png"
-             alt="" aria-hidden="true"
-             width="812" height="850" loading="lazy" decoding="async">
-        <figcaption><span class="idx">01</span>The menu-bar player — waveform, seek, speed, history.</figcaption>
+    <div class="gallery">
+      <figure class="shot shot-player" style="--rd:80ms">
+        <div class="tile">
+          <div class="menubar" aria-hidden="true">
+            <span class="active"><img src="icon.svg" alt="" width="15" height="15"></span>
+            <svg viewBox="0 0 16 16"><path d="M1.8 6.2a9 9 0 0 1 12.4 0M4 8.6a5.8 5.8 0 0 1 8 0M6.2 11a2.6 2.6 0 0 1 3.6 0"/><circle cx="8" cy="13.2" r=".6" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><rect x="1.2" y="4.6" width="12" height="6.8" rx="2"/><path d="M14.8 6.8v2.4"/><rect x="3" y="6.4" width="7" height="3.2" rx=".8" fill="currentColor" stroke="none"/></svg>
+            <time>Wed 9:41</time>
+          </div>
+          <img src="resources/player.png"
+               alt="SayIt's menu-bar player reading a paragraph aloud, with a waveform, playback controls, and the current word highlighted"
+               width="720" height="756" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          <span class="idx">01</span>
+          <strong>Lives in your menu bar</strong>
+          <span>Follow each word, scrub the waveform, change the speed.</span>
+        </figcaption>
       </figure>
-      <figure class="shot shot-models" style="--rd:280ms">
-        <img class="img-light" src="resources/models.png"
-             alt="SayIt's model library listing open MLX models with sizes, licenses, and download buttons"
-             width="1744" height="1400" loading="lazy" decoding="async">
-        <img class="img-dark" src="resources/models-dark.png"
-             alt="" aria-hidden="true"
-             width="1744" height="1400" loading="lazy" decoding="async">
-        <figcaption><span class="idx">02</span>The model library — open models, one download away.</figcaption>
+      <figure class="shot shot-models" style="--rd:200ms">
+        <div class="tile">
+          <img src="resources/models.png"
+               alt="SayIt's model library listing open MLX speech models with their size, speed, languages, and license"
+               width="1520" height="1176" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          <span class="idx">02</span>
+          <strong>Open models, one click away</strong>
+          <span>Kokoro, Qwen3, OmniVoice and more — download once, run offline.</span>
+        </figcaption>
       </figure>
     </div>
 

@@ -8,6 +8,15 @@ options:
   groupSortPosition: top
 
 packages:
+  DramaTTS:
+    url: https://github.com/arraypress/swift-tts.git
+    exactVersion: 3.2.1
+  MLXSwiftLM:
+    url: https://github.com/ml-explore/mlx-swift-lm.git
+    revision: ee673d6a71d76e67b532dc7eaf91d92edc3bb8bb
+  Transformers:
+    url: https://github.com/huggingface/swift-transformers.git
+    exactVersion: 1.3.3
   PlaybackDSP:
     path: Packages/PlaybackDSP
   Sparkle:
@@ -15,7 +24,12 @@ packages:
     exactVersion: 2.9.6
   MLXAudio:
     url: https://github.com/Blaizzy/mlx-audio-swift.git
-    revision: bf14ae0c26e4e85553dd989571cae29d70fa6735
+    revision: 624fd5410b2fc8ea06f955500c9ac078e405261f
+  # MLX core 0.32.2 regresses Metal token-generation throughput by ~50%.
+  # Pin the last mlx-swift commit before that core update until fixed upstream.
+  MLXSwift:
+    url: https://github.com/ml-explore/mlx-swift.git
+    revision: ac4ae9a39af573d4135109d1640817147c79a5e7
   Hummingbird:
     url: https://github.com/hummingbird-project/hummingbird.git
     exactVersion: 2.22.0
@@ -41,13 +55,13 @@ settings:
     ARCHS: arm64
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
-    CURRENT_PROJECT_VERSION: 15
+    CURRENT_PROJECT_VERSION: 19
     DEAD_CODE_STRIPPING: true
     DEVELOPMENT_TEAM: D7AHD3GLH6
     ENABLE_APP_SANDBOX: true
     ENABLE_HARDENED_RUNTIME: true
     MACOSX_DEPLOYMENT_TARGET: "15.0"
-    MARKETING_VERSION: "0.1.9"
+    MARKETING_VERSION: "0.2.2"
     OTHER_SWIFT_FLAGS: "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)"
     SAYIT_APP_BUNDLE_IDENTIFIER: sh.sayit.mac
     SAYIT_APP_DISPLAY_NAME: Say It
@@ -101,16 +115,49 @@ targets:
         PRODUCT_NAME: SayItCore
         SKIP_INSTALL: true
 
+  DramaTTSLinkage:
+    # Keep upstream's static Tokenizers object out of the shared backend.
+    type: framework.static
+    platform: macOS
+    sources:
+      - path: Sources/DramaTTSLinkage
+    dependencies:
+      - package: DramaTTS
+        product: DramaTTS
+      - package: DramaTTS
+        product: SpeechSynthesizer
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: sh.sayit.mac.drama-linkage
+        SKIP_INSTALL: true
+    postBuildScripts:
+      - name: Use Shared Tokenizers
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          "${SRCROOT}/Scripts/prepare-static-drama-linkage.sh" \
+            "${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
+
   SayItBackend:
     type: framework
     platform: macOS
     sources:
       - path: Sources/SayItBackend
     dependencies:
+      - target: DramaTTSLinkage
+        link: true
+        embed: false
       - package: PlaybackDSP
         product: PlaybackDSP
       - target: SayItCore
       - target: SayItProtocol
+      - package: MLXSwift
+        product: MLX
+      - package: MLXSwift
+        product: MLXNN
+      - package: Transformers
+        product: Transformers
       - package: MLXAudio
         product: MLXAudioCore
       - package: MLXAudio
@@ -250,7 +297,6 @@ targets:
     entitlements:
       path: Config/SayItCLI.entitlements
       properties:
-        com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
           - group.sh.sayit.mac
     dependencies:

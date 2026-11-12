@@ -30,6 +30,16 @@ stay on your Mac.
   [Chatterbox](https://huggingface.co/mlx-community/Chatterbox-TTS-fp16), and
   [OmniVoice](https://huggingface.co/mlx-community/OmniVoice). Compatible
   community models can be added by Hugging Face repository ID.
+  [Phonon 31M English](https://huggingface.co/gradium/phonon-31m-en) is the first
+  recommended model and the default onboarding choice, with 37 English preset
+  voices, a default voice, and offline streaming playback. Import custom Phonon
+  `.safetensors` voice files in Settings → Voices; Say It keeps a local copy.
+  Cloning and voice design for Phonon happen in Gradium Studio before export.
+  New model downloads include all presets. Existing installations can get the
+  voice pack with **Update Voices**
+  in Settings → Models or Settings → Voices, without downloading the model again.
+- **Experimental Drama 3.** The standard Q4 checkpoint streams locally through
+  the upstream Swift library. See [details and memory requirements](docs/drama3.md).
 - **Create voices.** Models expose the features they support, from built-in
   voices and voice descriptions to random voice discovery and voice cloning.
 - **Efficient model loading.** Only one model is kept in memory, and it is
@@ -55,7 +65,7 @@ Only clone a voice when you have the speaker's permission.
 Say It requires macOS 15 or later on an Apple silicon Mac.
 
 1. Install and launch Say It.
-2. Choose and download a model during onboarding.
+2. Download Phonon, the default onboarding recommendation, or choose another model.
 3. Optionally allow Accessibility access, select text in another app, and press
    **Control–Option–S**. You can also copy text and press
    **Control–Option–V**, or choose **Services → Say It**.
@@ -74,10 +84,22 @@ printf 'Read standard input' | sayit
 sayit status
 sayit pause
 sayit resume
+sayit speak "Save this speech" --output ./speech.wav
+sayit speak "Generate silently at 1.2×" --output ./speech.wav --export-rate 1.2 --no-play
 sayit skill path
 ```
 
 Run `sayit --help` to see all commands and options.
+
+`--output` (or `-o`) writes a WAV to a new file in an existing directory and
+waits until it is saved. It cannot be combined with `--detach`. Add `--no-play`
+to generate silently. Existing files are never overwritten.
+
+`--export-rate` changes only the saved WAV's speed, preserving pitch; it defaults
+to 1× and requires `--output`. `--rate` continues to control playback only.
+`--pace` changes native delivery on supported models and is already part of the
+generated audio, so an export rate applies on top of that pace. History keeps
+the original generated audio, and exporting never changes the player's speed.
 
 ### Coding-agent voice mode
 
@@ -104,7 +126,9 @@ CLI.
 The native SwiftUI frontend is separate from a per-user backend service that
 owns model downloads, synthesis, playback, and history. The app and CLI talk to
 that service over XPC. A narrowly scoped accessibility helper retrieves the
-frontmost app's selection only when requested. An optional, token-protected HTTP
+frontmost app's selection only when requested. The CLI writes exported files
+using normal terminal file permissions; the background service stays sandboxed.
+An optional, token-protected HTTP
 server exposes the same synthesis engine to other local apps through a
 versioned REST API bound to `127.0.0.1`.
 

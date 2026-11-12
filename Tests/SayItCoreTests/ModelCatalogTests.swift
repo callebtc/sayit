@@ -8,11 +8,11 @@ struct ModelCatalogTests {
     func bundledCatalogIsValid() throws {
         let catalog = try ModelCatalogLoader().bundledCatalog()
 
-        #expect(catalog.models.count == 23)
-        #expect(catalog.models.first?.id == ModelID("kokoro-bf16"))
+        #expect(catalog.models.count == 25)
+        #expect(catalog.models.first?.id == ModelID("phonon-31m-en"))
         #expect(catalog.models.allSatisfy { $0.revision.count == 40 })
         #expect(catalog.models.allSatisfy {
-            ["0.1.3", "bf14ae0"].contains($0.testedMLXAudioVersion)
+            ["0.1.3", "bf14ae0", "624fd54", "624fd54 + DramaTTS 3.2.1"].contains($0.testedMLXAudioVersion)
         })
     }
 
@@ -56,6 +56,61 @@ struct ModelCatalogTests {
         }
     }
 
+    @Test("Phonon English is recommended with verified offline presets")
+    func phononEnglishCapabilities() throws {
+        let model = try #require(
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("phonon-31m-en")
+            }
+        )
+        #expect(model.stability == .recommended)
+        #expect(model.experience?.recommendationRank == 1)
+        #expect(model.isSelectable)
+        #expect(model.modelType == "phonon")
+        #expect(model.languages == ["en"])
+        #expect(model.defaultLanguage == "en")
+        #expect(model.voices.count == 38)
+        #expect(Set(model.voices).count == 38)
+        #expect(model.voices.contains("Zoey"))
+        #expect(model.voices.contains("Freya"))
+        #expect(model.voices.contains("Captain Silas Blackwater"))
+        #expect(model.supportsPhononVoiceImport)
+        #expect(model.defaultVoice == "default")
+        #expect(model.capabilities.presetVoices)
+        #expect(model.capabilities.streaming)
+        #expect(model.playbackMode == .progressive)
+        #expect(!model.capabilities.voiceCloning)
+        #expect(!model.capabilities.voiceDescription)
+        #expect(!model.capabilities.languageSelection)
+        #expect(!model.supportsNativeSpeakingPace)
+        #expect(model.license.commercialUseAllowed)
+        #expect(!model.license.requiresAcceptance)
+        #expect(model.downloadByteCount == 112_904_734)
+        let voices = model.files.filter { $0.path.hasPrefix("voices/") }
+        #expect(voices.count == 37)
+        #expect(voices.allSatisfy {
+            $0.source?.repository == "gradium/phonon-voices"
+                && $0.source?.revision == "0ee17205f254b5abc43b266c8a0f215565c352f7"
+        })
+        #expect(model.files.allSatisfy { $0.sha256?.count == 64 })
+        #expect(model.files.contains { $0.path == "default-voice.safetensors" })
+        #expect(!model.files.contains { $0.path.hasSuffix(".gguf") })
+    }
+
+    @Test("Standard Drama uses the pinned upstream checkpoint")
+    func drama3Variants() throws {
+        let models = try ModelCatalogLoader().bundledCatalog().models
+        let standard = try #require(models.first { $0.id.rawValue == "fish-drama3-standard-q4" })
+        #expect(standard.displayName == "Fish Audio Drama 3 Q4")
+        #expect(standard.modelType == "fish_drama3")
+        #expect(standard.isSelectable && standard.capabilities.streaming)
+        #expect(standard.playbackMode == .adaptive)
+        #expect(standard.repository == "mlx-community/fish-audio-drama-3-4bit")
+        #expect(standard.license.requiresAcceptance)
+        #expect(models.filter { $0.modelType == "fish_drama3" }.count == 1)
+        #expect(standard.license.url.absoluteString.contains(standard.repository))
+    }
+
     @Test("Hands-on recommendations lead the ranked catalog")
     func recommendedModelsAndRanking() throws {
         let models = try ModelCatalogLoader().bundledCatalog().models
@@ -67,6 +122,7 @@ struct ModelCatalogTests {
             }
 
         #expect(recommended.map(\.id.rawValue) == [
+            "phonon-31m-en",
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
             "qwen3-17b-customvoice-8bit",
@@ -78,7 +134,8 @@ struct ModelCatalogTests {
                 model.experience.map { ($0.recommendationRank, model.id) }
             }
             .sorted { $0.0 < $1.0 }
-        #expect(ranked.prefix(4).map { $0.1.rawValue } == [
+        #expect(ranked.prefix(5).map { $0.1.rawValue } == [
+            "phonon-31m-en",
             "kokoro-bf16",
             "qwen3-06b-base-8bit",
             "qwen3-17b-customvoice-8bit",
@@ -122,7 +179,9 @@ struct ModelCatalogTests {
     @Test("Hardware warning uses the seventy-percent boundary")
     func hardwareWarning() throws {
         let model = try #require(
-            ModelCatalogLoader().bundledCatalog().models.first
+            ModelCatalogLoader().bundledCatalog().models.first {
+                $0.id == ModelID("kokoro-bf16")
+            }
         )
         let advisor = HardwareAdvisor()
 

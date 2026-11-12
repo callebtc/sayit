@@ -69,6 +69,22 @@ public struct ModelCatalogLoader: Sendable {
                     reason: "preset voice capability must match the voice list"
                 )
             }
+            for file in model.files {
+                if let source = file.source {
+                    guard source.repository.split(separator: "/").count == 2,
+                          isImmutableRevision(source.revision),
+                          !source.path.isEmpty,
+                          !source.path.hasPrefix("/"),
+                          !source.path.split(separator: "/").contains(".."),
+                          file.byteCount > 0,
+                          file.sha256?.count == 64,
+                          file.sha256?.allSatisfy(\.isHexDigit) == true else {
+                        throw ModelCatalogError.invalidModel(
+                            model.id, reason: "invalid pinned file source"
+                        )
+                    }
+                }
+            }
             if let defaultVoice = model.defaultVoice {
                 guard model.voices.contains(defaultVoice) else {
                     throw ModelCatalogError.invalidModel(

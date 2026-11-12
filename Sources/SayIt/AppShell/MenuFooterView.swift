@@ -1,5 +1,6 @@
 import AppKit
 import SayItCore
+import SayItProtocol
 import SwiftUI
 
 struct MenuFooterView: View {
@@ -10,11 +11,14 @@ struct MenuFooterView: View {
     var body: some View {
         HStack(spacing: DesignTokens.compactSpacing) {
             modelMenu
-            Spacer()
             Button("Settings…", action: openSettingsWindow)
                 .buttonStyle(.sayItInline)
+                .fixedSize()
+                .layoutPriority(1)
             Button("Quit", action: state.quit)
                 .buttonStyle(.sayItInline)
+                .fixedSize()
+                .layoutPriority(1)
         }
         .font(.callout)
     }
@@ -36,19 +40,23 @@ struct MenuFooterView: View {
             HStack(spacing: 3) {
                 Image(systemName: "shippingbox")
                     .imageScale(.small)
+                    .fixedSize()
                 Text(modelLabel)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
             .font(.callout)
             .foregroundStyle(.secondary)
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .disabled(installedModels.isEmpty)
+        .accessibilityLabel(modelLabel)
         .help(
-            displayedModelID == state.settings.activeModelID
+            modelLabel + "\n" + (displayedModelID == state.settings.activeModelID
                 ? "Switch the speech model"
-                : "Model used for this audio. Pick another model to re-synthesize."
+                : "Model used for this audio. Pick another model to re-synthesize.")
         )
     }
 
@@ -61,14 +69,45 @@ struct MenuFooterView: View {
     }
 
     private var modelLabel: String {
-        let name = state.models.first(where: {
-            $0.id == displayedModelID
-        })?.displayName ?? displayedModelID.rawValue
-        guard displayedModelID == state.settings.activeModelID,
-              !state.settings.activeVoice.isEmpty else {
-            return name
+        Self.modelLabel(
+            for: displayedModelID,
+            models: state.models,
+            settings: state.settings,
+            profiles: state.voiceProfiles
+        )
+    }
+
+    static func modelLabel(
+        for modelID: ModelID,
+        models: [ModelDescriptor],
+        settings: AppSettings,
+        profiles: [VoiceProfileSnapshot]
+    ) -> String {
+        let model = models.first { $0.id == modelID }
+        let name = model?.displayName ?? modelID.rawValue
+        guard modelID == settings.activeModelID else { return name }
+
+        let voiceName: String?
+        switch settings.activeVoiceSelection {
+        case .preset(let voice):
+            voiceName = voice.isEmpty ? nil : voice
+        case .profile(let id):
+            voiceName = profiles.first {
+                $0.id == id && $0.modelID == modelID.rawValue
+            }?.displayName
+        case .automaticStable:
+            if model?.capabilities.supportsRandomVoiceSampling == true {
+                voiceName = "Random voice"
+            } else if model?.capabilities.voiceDescription == true {
+                voiceName = "Custom description"
+            } else {
+                voiceName = "Automatic"
+            }
+        case .randomPerParagraph:
+            voiceName = "Random voice every paragraph"
         }
-        return "\(name) · \(state.settings.activeVoice)"
+        guard let voiceName, !voiceName.isEmpty else { return name }
+        return "\(name) · \(voiceName)"
     }
 
     private var installedModels: [ModelDescriptor] {

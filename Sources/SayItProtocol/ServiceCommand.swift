@@ -22,6 +22,7 @@ public enum ServiceCommand: Codable, Sendable {
     case cancelModelInstall
     case removeModel(String)
     case voices(modelID: String?)
+    case importPhononVoice(modelID: String, name: String, data: Data)
     case startVoiceDiscovery(VoiceDiscoveryRequest)
     case startVoiceClone(VoiceCloneRequest)
     case cancelVoiceStudio
@@ -43,7 +44,7 @@ public enum ServiceCommand: Codable, Sendable {
     )
     case importLocalModel(bookmark: Data)
     case history
-    case exportHistory(UUID, format: String)
+    case exportHistory(UUID, format: String, rate: Double? = nil)
     case replayHistory(UUID)
     case regenerateHistory(UUID)
     case switchPlaybackModel(String)

@@ -23,10 +23,28 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "Packages/PlaybackDSP"),
+        .package(
+            url: "https://github.com/huggingface/swift-transformers.git",
+            exact: "1.3.3"
+        ),
+        .package(
+            url: "https://github.com/arraypress/swift-tts.git",
+            exact: "3.2.1"
+        ),
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift-lm.git",
+            revision: "ee673d6a71d76e67b532dc7eaf91d92edc3bb8bb"
+        ),
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6"),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
-            revision: "bf14ae0c26e4e85553dd989571cae29d70fa6735"
+            revision: "624fd5410b2fc8ea06f955500c9ac078e405261f"
+        ),
+        // MLX core 0.32.2 regresses Metal token-generation throughput by ~50%.
+        // Pin the last mlx-swift commit before that core update until fixed upstream.
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift.git",
+            revision: "ac4ae9a39af573d4135109d1640817147c79a5e7"
         ),
         .package(
             url: "https://github.com/apple/swift-openapi-generator",
@@ -73,8 +91,13 @@ let package = Package(
             name: "SayItBackend",
             dependencies: [
                 .product(name: "PlaybackDSP", package: "PlaybackDSP"),
+                .product(name: "DramaTTS", package: "swift-tts"),
+                .product(name: "SpeechSynthesizer", package: "swift-tts"),
                 "SayItCore",
                 "SayItProtocol",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "Transformers", package: "swift-transformers"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift")
             ],
@@ -186,6 +209,13 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("Carbon")
+            ]
+        ),
+        .testTarget(
+            name: "SayItCLITests",
+            dependencies: [
+                "SayItCLI",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
         ),
         .testTarget(

@@ -4,7 +4,7 @@ import Testing
 
 @Suite("Pitch-preserving playback DSP")
 struct TimeStretchTests {
-    static let rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    static let rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
 
     static func tone(sampleRate: Double, duration: Double = 3) -> [Float] {
         (0..<Int(sampleRate * duration)).map { frame in
@@ -48,7 +48,7 @@ struct TimeStretchTests {
 
     @Test("Invalid inputs fail and finalized streams cannot be reused")
     func invalidInputs() throws {
-        for rate in [0, -1, 3, Double.nan, Double.infinity] {
+        for rate in [0, -1, 0.49, 3.01, Double.nan, Double.infinity] {
             #expect(throws: TimeStretchStream.Failure.self) {
                 try TimeStretchStream(sampleRate: 24_000, rate: rate)
             }

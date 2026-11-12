@@ -4,13 +4,14 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
 @preconcurrency import MLXAudioTTS
-@preconcurrency import MLXLMCommon
 import SayItCore
+import SayItProtocol
 
 actor SynthesisActor: BackendSpeechSynthesizing {
     typealias ModelURLProvider = @Sendable (ModelID) async -> URL?
 
     private static let kokoroTokenBudget = 500
+    private static let minimumListItemPause: TimeInterval = 0.25
     // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
     // Short inputs let each request reach EOS instead of truncating mid-block.
     static let orpheusChunker = TextChunker(
@@ -46,6 +47,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     ) {
         self.modelURLProvider = modelURLProvider
         self.chunker = chunker
+    }
+
+    /// Insert silence at list boundaries even when paragraph pauses are disabled.
+    static func pauseFrameCount(
+        sampleRate: Double,
+        paragraphPause: Double,
+        startsListItem: Bool
+    ) -> Int {
+        let minimumPause = startsListItem ? minimumListItemPause : 0
+        return Int(sampleRate * max(paragraphPause, minimumPause))
     }
 
     func synthesize(
@@ -224,7 +235,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         // ObjectIdentifier without retaining it, so a freed address reused by
         // the next array would falsely hit that cache and replay stale audio.
         var referenceAudio: MLXArray?
-        if let reference {
+        let embeddingVoice = try phononEmbeddingVoice(reference, model: model)
+        if let reference, reference.kind == .audio {
             let audio = try loadReferenceAudio(
                 from: reference.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
@@ -270,7 +282,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let samples = try await SerializedSpeechModel(loadedModel)
             .generateSamples(
                 text: text,
-                voice: nil,
+                voice: embeddingVoice,
                 referenceAudio: SerializedMLXArray(referenceAudio),
                 refText: reference?.transcript,
                 language: language,
@@ -291,6 +303,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         operationID: UInt64,
         continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation
     ) async throws {
+        let requestStarted = ContinuousClock.now
+        func recordTiming(_ phase: SynthesisTiming.Phase, since start: ContinuousClock.Instant) {
+            let duration = start.duration(to: .now)
+            continuation.yield(.timing(SynthesisTiming(phase: phase,
+                duration: Double(duration.components.seconds)
+                    + Double(duration.components.attoseconds) / 1e18)))
+        }
         try checkOperation(operationID)
         if loadedModelID != request.model.id || loadedModel == nil {
             continuation.yield(.loadingModel(request.model.id))
@@ -301,6 +320,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             try checkOperation(operationID)
             continuation.yield(.modelLoaded(request.model.id))
         }
+        recordTiming(.modelLoad, since: requestStarted)
+        let voiceStarted = ContinuousClock.now
 
         guard let loadedModel else {
             throw SynthesisError.modelNotInstalled
@@ -312,9 +333,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         )
         applyModelSpecificTuning(request.voiceTuning, to: loadedModel)
 
-        var referenceAudio = try request.voiceReference.map {
-            try loadReferenceAudio(
-                from: $0.audioURL,
+        let embeddingVoice = try phononEmbeddingVoice(request.voiceReference, model: request.model)
+        var referenceAudio = try request.voiceReference.flatMap { reference -> MLXArray? in
+            guard reference.kind == .audio else { return nil }
+            return try loadReferenceAudio(
+                from: reference.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
             )
         }
@@ -365,10 +388,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceText = anchorText
         }
 
+        recordTiming(.voicePreparation, since: voiceStarted)
+        let listItemStartOffsets = Set(
+            request.cleanedText.listItemStartOffsets ?? []
+        )
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
+            listItemStartOffsets: listItemStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
         var conditioner = try PCMStreamConditioner(
@@ -398,14 +426,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
             let start = ContinuousClock.now
             var chunkSamples = 0
+            var deliveryCount = 0
+            var previousDeliverySeconds = 0.0
+            var maximumDeliveryGap = 0.0
+            var initialGenerationDuration = 0.0
+            var initialAudioDuration = 0.0
+            var recentDeliveries: [(seconds: Double, audio: Double)] = []
             let conditionerBeforeChunk = conditioner
             let usesReference = referenceAudio != nil
                 && request.voiceMode != .randomPerParagraph
-            let voiceArgument = usesReference
+            let voiceArgument = embeddingVoice ?? (usesReference
                 ? nil
                 : request.model.capabilities.voiceDescription
                     ? request.voiceDescription
-                    : request.voice
+                    : request.voice)
             var parameters = loadedModel.defaultGenerationParameters
             if let tuning = request.voiceTuning {
                 if let value = tuning.parameters["temperature"] {
@@ -429,7 +463,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     let pauseFrameCount = chunk.startsParagraph
                         && generatedSamples > 0
                         && chunkSamples == 0
-                        ? Int(Double(loadedModel.sampleRate) * paragraphPause)
+                        ? Self.pauseFrameCount(
+                            sampleRate: Double(loadedModel.sampleRate),
+                            paragraphPause: paragraphPause,
+                            startsListItem: listItemStartOffsets.contains(
+                                chunk.sourceRange.lowerBound
+                            )
+                        )
                         : 0
                     let speechStartFrames = conditioner.speechStartFrameOffset(
                         logicalChunkIndex: completedChunkCount,
@@ -453,9 +493,38 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         speechStartOffset: Double(speechStartFrames)
                             / Double(loadedModel.sampleRate)
                     )
+                    if generatedSamples == 0 {
+                        recordTiming(.firstAudio, since: requestStarted)
+                    }
                     continuation.yield(.audio(audio))
                     chunkSamples += conditioned.count
                     generatedSamples += conditioned.count
+                    if loadedModel is DramaLibraryModel {
+                        // Observe existing output only; sampling and PCM stay unchanged.
+                        let elapsed = start.duration(to: .now)
+                        let seconds = Double(elapsed.components.seconds)
+                            + Double(elapsed.components.attoseconds) / 1e18
+                        let gap = max(seconds - previousDeliverySeconds, 0)
+                        previousDeliverySeconds = seconds
+                        maximumDeliveryGap = max(maximumDeliveryGap, gap)
+                        if deliveryCount == 0 {
+                            initialGenerationDuration = seconds
+                            initialAudioDuration = Double(conditioned.count) / Double(loadedModel.sampleRate)
+                        }
+                        deliveryCount += 1
+                        recentDeliveries.append((gap, Double(conditioned.count) / Double(loadedModel.sampleRate)))
+                        if recentDeliveries.count > 4 { recentDeliveries.removeFirst() }
+                        let recentSeconds = recentDeliveries.reduce(0) { $0 + $1.seconds }
+                        let recentAudio = recentDeliveries.reduce(0) { $0 + $1.audio }
+                        let delivered = Double(chunkSamples) / Double(loadedModel.sampleRate)
+                        continuation.yield(.progress(SynthesisProgress(
+                            chunkIndex: completedChunkCount, generatedAudioDuration: delivered,
+                            generationDuration: seconds, recentRealTimeFactor: recentSeconds / recentAudio,
+                            deliveredAudioPieces: deliveryCount,
+                            maximumDeliveryGap: maximumDeliveryGap,
+                            initialGenerationDuration: initialGenerationDuration,
+                            initialAudioDuration: initialAudioDuration)))
+                    }
                 }
 
                 if let omniVoice = loadedModel as? OmniVoiceModel,
@@ -471,6 +540,23 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                             refText: usesReference ? referenceText : nil,
                             language: request.language,
                             parameters: omniVoiceParameters(from: tuning)
+                        )
+                    try checkOperation(operationID)
+                    try emit(samples)
+                } else if loadedModel is KokoroModel {
+                    // Kokoro emits a whole text chunk. Materialize it in the
+                    // generating task; the upstream stream proxy can evaluate
+                    // its lazy graph on a thread without its internal GPU streams.
+                    let samples = try await SerializedSpeechModel(loadedModel)
+                        .generateSamples(
+                            text: chunk.text,
+                            voice: voiceArgument,
+                            referenceAudio: SerializedMLXArray(
+                                usesReference ? referenceAudio : nil
+                            ),
+                            refText: usesReference ? referenceText : nil,
+                            language: request.language,
+                            generationParameters: parameters
                         )
                     try checkOperation(operationID)
                     try emit(samples)
@@ -511,6 +597,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             if chunkCursor == chunks.count - 1 {
                 let tail = conditioner.finish()
                 if !tail.isEmpty {
+                    if generatedSamples == 0 {
+                        recordTiming(.firstAudio, since: requestStarted)
+                    }
                     continuation.yield(
                         .audio(
                             AudioChunk(
@@ -549,6 +638,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         guard generatedSamples > 0 else {
             throw SynthesisError.generatedNoAudio
         }
+        recordTiming(.synthesisTotal, since: requestStarted)
         continuation.yield(.completed)
         continuation.finish()
     }
@@ -601,6 +691,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         try checkOperation(operationID)
         if loadedModelID != model.id {
             releaseLoadedModel()
+            try checkOperation(operationID)
         }
         guard loadedModel == nil else { return }
         let modelURL = await modelURLProvider(model.id)
@@ -612,6 +703,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let candidate: SpeechGenerationModel
         do {
             switch model.modelType.lowercased() {
+            case "fish_drama3":
+                candidate = try await DramaLibraryModel.fromDirectory(modelURL)
             case "omnivoice":
                 let hubCache = ProcessInfo.processInfo.environment[
                     "HF_HUB_CACHE"
@@ -645,7 +738,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             default:
                 candidate = try await TTS.loadModel(
                     modelRepo: modelURL.path,
-                    modelType: model.modelType,
+                    modelType: SupportedModelTypes.loaderType(for: model.modelType),
                     textProcessor: textProcessor
                 )
             }
@@ -757,8 +850,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         request: SpeechRequest,
         model: SpeechGenerationModel
     ) async throws -> [SpeechChunk] {
-        guard let loadedTextProcessor else { return [chunk] }
         let modelType = request.model.modelType.lowercased()
+        if modelType == "fish_drama3" {
+            // Bound each Drama 3 prompt using the existing text
+            // budget in UTF-8 bytes, as the reference implementation does.
+            return try chunker.fittingPieces(for: chunk) { text in
+                try Task.checkCancellation()
+                return text.utf8.count <= 300
+            }
+        }
+        guard let loadedTextProcessor else { return [chunk] }
         switch modelType {
         case "kokoro", "kokoro_tts":
             let language = request.language
@@ -902,6 +1003,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             synchronizeMLXIfLoaded()
             throw error
         }
+    }
+
+    private func phononEmbeddingVoice(
+        _ reference: VoiceReference?, model: ModelDescriptor
+    ) throws -> String? {
+        guard let reference, reference.kind == .phononEmbedding else { return nil }
+        guard SupportedModelTypes.areCompatible(model.modelType, "phonon") else {
+            throw ServiceFailure(
+                code: "voice.import_unsupported",
+                message: "This voice file requires a Phonon model."
+            )
+        }
+        try PhononVoiceFile.validate(Data(contentsOf: reference.audioURL, options: .mappedIfSafe))
+        return reference.audioURL.path
     }
 
     private func generateVoiceSampleAndQuiesce(

@@ -183,7 +183,7 @@ struct TextCleanerTests {
         #expect(result.cleanupSummary.removedCodeBlocks == 1)
     }
 
-    @Test("Lists, line breaks, and punctuation survive cleanup")
+    @Test("List content, line breaks, and punctuation survive cleanup")
     func preservesListsLineBreaksAndPunctuation() async throws {
         let input = """
         Groceries:
@@ -198,8 +198,8 @@ struct TextCleanerTests {
             TextSourcePayload(source: .clipboard, plainText: input)
         )
 
-        #expect(result.text.contains("- Milk, eggs"))
-        #expect(result.text.contains("- Bread (sourdough)"))
+        #expect(result.text.contains("Groceries:\nMilk, eggs"))
+        #expect(result.text.contains("\nBread (sourdough)"))
         #expect(result.text.contains("1. Preheat the oven.\n2. Bake for 20 minutes!"))
     }
 

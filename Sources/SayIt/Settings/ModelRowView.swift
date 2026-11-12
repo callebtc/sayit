@@ -66,6 +66,9 @@ struct ModelRowView: View {
                 Text("Unavailable in this version")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            } else if state.requestedModelInstallID == model.id
+                || state.downloadProgress?.modelID == model.id {
+                ModelDownloadControls(model: model, onRetry: downloadModel)
             } else if state.installedModelIDs.contains(model.id) {
                 if !model.isSelectable {
                     Text("Unavailable in this version")
@@ -86,6 +89,11 @@ struct ModelRowView: View {
                             "Its estimated peak memory exceeds 70% of this Mac’s physical memory. Other apps may become less responsive."
                         )
                     }
+                }
+                if model.isSelectable,
+                   state.modelsWithVoiceUpdates.contains(model.id) {
+                    Button("Update Voices", action: downloadModel)
+                        .disabled(state.modelInstallIsBusy)
                 }
                 Button(
                     "Delete",
@@ -108,88 +116,7 @@ struct ModelRowView: View {
                     Text("History audio is not affected.")
                 }
             } else {
-                if state.requestedModelInstallID == model.id {
-                    HStack(spacing: DesignTokens.compactSpacing) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Starting…")
-                        Button(
-                            "Cancel",
-                            systemImage: "xmark",
-                            action: state.cancelModelInstall
-                        )
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(CircularIconButtonStyle())
-                    }
-                    .foregroundStyle(.secondary)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel("Starting model download")
-                } else if let progress = state.downloadProgress,
-                          progress.modelID == model.id {
-                    HStack(spacing: DesignTokens.compactSpacing) {
-                        if showsDeterminateProgress(progress) {
-                            ProgressView(value: progress.fractionCompleted)
-                                .frame(width: 76)
-                                .accessibilityLabel(
-                                    "\(model.displayName) download"
-                                )
-                                .accessibilityValue(
-                                    Text(
-                                        progress.fractionCompleted,
-                                        format: .percent
-                                    )
-                                )
-                            Text(
-                                progress.fractionCompleted,
-                                format: .percent.precision(
-                                    .fractionLength(0)
-                                )
-                            )
-                            .monospacedDigit()
-                        } else {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 76)
-                            Text(statusTitle(for: progress.state))
-                                .foregroundStyle(.secondary)
-                        }
-                        if progress.state == .downloading {
-                            Text(
-                                "\(progress.bytesPerSecond, format: .byteCount(style: .file))/s"
-                            )
-                            .foregroundStyle(.secondary)
-                        }
-                        if progress.state == .failed
-                            || progress.state == .paused {
-                            Button(
-                                "Retry",
-                                systemImage: "arrow.clockwise",
-                                action: downloadModel
-                            )
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(CircularIconButtonStyle())
-                            .help("Resume the download")
-                            Button(
-                                "Remove",
-                                systemImage: "xmark",
-                                action: state.cancelModelInstall
-                            )
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(CircularIconButtonStyle())
-                            .help("Dismiss the download")
-                        } else if [.queued, .downloading, .verifying]
-                            .contains(progress.state) {
-                            Button(
-                                "Cancel",
-                                systemImage: "xmark",
-                                action: state.cancelModelInstall
-                            )
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(CircularIconButtonStyle())
-                            .help("Cancel the download")
-                        }
-                    }
-                } else if state.modelInstallError?.modelID == model.id {
+                if state.modelInstallError?.modelID == model.id {
                     Button(
                         "Retry",
                         systemImage: "arrow.clockwise",
@@ -222,32 +149,6 @@ struct ModelRowView: View {
             "checkmark.circle.fill"
         } else {
             "arrow.down.circle"
-        }
-    }
-
-    private func showsDeterminateProgress(
-        _ progress: ModelDownloadProgress
-    ) -> Bool {
-        switch progress.state {
-        case .downloading, .paused, .failed:
-            true
-        case .notInstalled, .queued, .canceling, .verifying, .installed:
-            false
-        }
-    }
-
-    private func statusTitle(for state: ModelInstallationState) -> String {
-        switch state {
-        case .notInstalled:
-            "Waiting"
-        case .queued:
-            "Starting…"
-        case .canceling:
-            "Canceling…"
-        case .verifying, .installed:
-            "Finishing…"
-        case .downloading, .paused, .failed:
-            "Downloading…"
         }
     }
 

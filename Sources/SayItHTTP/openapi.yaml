@@ -165,7 +165,7 @@ paths:
                 rate:
                   type: number
                   minimum: 0.5
-                  maximum: 2
+                  maximum: 3
       responses:
         "202":
           description: Command accepted
@@ -528,7 +528,7 @@ components:
           maxLength: 50
         origin:
           type: string
-          enum: [generated, recordedClone]
+          enum: [generated, recordedClone, importedFile]
         language:
           type: [string, "null"]
         duration:

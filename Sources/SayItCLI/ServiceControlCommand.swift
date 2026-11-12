@@ -137,7 +137,7 @@ enum CLIServiceJob {
     private static func candidates() -> [URL] {
         var urls: [URL] = []
         // argv[0] can be just "sayit" when launched through PATH. It is not
-        // necessarily a filesystem path, especially inside the CLI sandbox.
+        // necessarily a filesystem path.
         let executable = (Bundle.main.executableURL ?? URL(
             fileURLWithPath: CommandLine.arguments[0]
         )).resolvingSymlinksInPath()

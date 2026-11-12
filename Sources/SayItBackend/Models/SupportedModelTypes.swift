@@ -11,6 +11,7 @@ enum SupportedModelTypes {
         ["qwen3_tts"],
         ["qwen3", "qwen"],
         ["fish_speech", "fish_qwen3_omni"],
+        ["fish_drama3"],
         [
             "llama_tts", "llama3_tts", "llama3", "llama", "orpheus",
             "orpheus_tts"
@@ -18,6 +19,7 @@ enum SupportedModelTypes {
         ["csm", "sesame"],
         ["soprano_tts", "soprano"],
         ["pocket_tts"],
+        ["phonon", "gradium_phonon_tts"],
         ["chatterbox", "chatterbox_tts", "chatterbox_turbo"],
         ["kitten_tts", "kitten"],
         ["kokoro", "kokoro_tts"],
@@ -26,6 +28,11 @@ enum SupportedModelTypes {
     ]
 
     static let all = Set(aliases.flatMap { $0 })
+
+    static func loaderType(for modelType: String) -> String {
+        let type = modelType.lowercased()
+        return type == "gradium_phonon_tts" ? "phonon" : type
+    }
 
     static func areCompatible(_ catalogType: String, _ declaredType: String) -> Bool {
         let catalogType = catalogType.lowercased()
