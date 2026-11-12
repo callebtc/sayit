@@ -89,7 +89,7 @@ struct ProtocolRoundTripTests {
             from: SayItWireCodec.encode(request)
         )
         #expect(decodedRequest == request)
-        #expect(SayItProtocolVersion.current == 9)
+        #expect(SayItProtocolVersion.current == 10)
     }
 
     @Test
@@ -280,6 +280,35 @@ struct ProtocolRoundTripTests {
 
         #expect(submission.voice == "af_heart")
         #expect(submission.voiceSelection == nil)
+        #expect(submission.playbackEnabled == nil)
+    }
+
+    @Test("Silent speech and WAV export speed survive wire encoding independently")
+    func speechExportRoundTrip() throws {
+        let submission = SpeechSubmission(
+            text: "Save this speech", source: .commandLine,
+            speakingPace: 1.1, playbackRate: 1.5, playbackEnabled: false
+        )
+        let decoded = try SayItWireCodec.decode(
+            SpeechSubmission.self, from: SayItWireCodec.encode(submission)
+        )
+        #expect(decoded.playbackEnabled == false)
+        #expect(decoded.playbackRate == 1.5)
+        #expect(decoded.speakingPace == 1.1)
+        let id = UUID()
+        for rate in [nil, 1.2] as [Double?] {
+            let command = ServiceCommand.exportHistory(id, format: "wav", rate: rate)
+            let decodedCommand = try SayItWireCodec.decode(
+                ServiceCommand.self, from: SayItWireCodec.encode(command)
+            )
+            guard case .exportHistory(let exportedID, let format, let exportedRate) = decodedCommand else {
+                Issue.record("Expected a history export")
+                return
+            }
+            #expect(exportedID == id)
+            #expect(format == "wav")
+            #expect(exportedRate == rate)
+        }
     }
 
     @Test

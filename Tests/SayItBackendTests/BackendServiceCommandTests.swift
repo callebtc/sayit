@@ -1,3 +1,4 @@
+import AVFoundation
 import CryptoKit
 import Foundation
 import SayItCore
@@ -8,6 +9,125 @@ import Testing
 @Suite("Backend service commands", .serialized)
 @MainActor
 struct BackendServiceCommandTests {
+    @Test("Silent generation archives source audio and export speed never changes the player")
+    func silentSpeechExport() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        await fixture.service.start()
+        fixture.playback.rate = 1.7
+        fixture.playback.shouldStartWhenBuffered = true
+        let job = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: "Save this speech without playing.", source: .commandLine,
+                modelID: "kokoro-bf16", speakingPace: 1.25,
+                playbackRate: 2, playbackEnabled: false
+            )
+        ))))
+        try await waitForJobState(.completed, id: job.id, service: fixture.service)
+        #expect(fixture.playback.playCount == 0)
+        #expect(fixture.playback.state == .idle)
+        #expect(fixture.playback.rate == 1.7)
+        #expect(await fixture.synthesizer.requestedSpeakingPaces.last == .fast)
+        let item = try #require(try history(
+            await fixture.service.handle(.init(command: .history))
+        ).first { $0.id == job.id })
+        #expect(item.hasAudio)
+        #expect(item.duration == 1)
+        for rate in [1.0, 1.2] {
+            let file = try exportedFile(await fixture.service.handle(.init(command:
+                .exportHistory(job.id, format: "wav", rate: rate)
+            )))
+            let url = fixture.root.appending(path: "export.wav")
+            try file.data.write(to: url)
+            let audio = try AVAudioFile(forReading: url)
+            #expect(audio.processingFormat.sampleRate == 24_000)
+            #expect(audio.length == Int64((24_000 / rate).rounded()))
+            #expect(fixture.playback.rate == 1.7)
+        }
+        let afterExport = try #require(try history(
+            await fixture.service.handle(.init(command: .history))
+        ).first { $0.id == job.id })
+        #expect(afterExport.duration == 1)
+        #expect(isAccepted(await fixture.service.handle(.init(command: .replayHistory(job.id)))))
+        #expect(fixture.playback.rate == 1.7)
+
+        // A subsequent ordinary speech job still enters the playback path.
+        let spoken = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(text: "Read this aloud.", source: .commandLine,
+                             queuePolicy: .interruptCurrent)
+        ))))
+        try await waitForJobState(.playing, id: spoken.id, service: fixture.service)
+        #expect(fixture.playback.playCount > 0)
+        fixture.playback.finishForTesting()
+        try await waitForJobState(.completed, id: spoken.id, service: fixture.service)
+    }
+
+    @Test("Export validates speed and format without changing playback")
+    func invalidExportSpeed() async throws {
+        let fixture = try ServiceFixture(seedVoiceAndHistory: true)
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let id = try #require(fixture.historyID)
+        fixture.playback.rate = 1.5
+        for rate in [0, -1, 99, Double.nan, Double.infinity] {
+            let result = await fixture.service.handle(.init(command:
+                .exportHistory(id, format: "wav", rate: rate)
+            ))
+            #expect(try failure(result).code == "export.invalid_rate")
+        }
+        for format in ["text", "m4a"] {
+            let result = await fixture.service.handle(.init(command:
+                .exportHistory(id, format: format, rate: 1.2)
+            ))
+            #expect(try failure(result).code == "export.unsupported_rate_format")
+        }
+        #expect(fixture.playback.rate == 1.5)
+    }
+
+    @Test("Failed silent synthesis produces a failed job without starting playback")
+    func failedSilentSpeech() async throws {
+        let fixture = try ServiceFixture()
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let job = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(text: "Cannot generate.", source: .commandLine, playbackEnabled: false)
+        ))))
+        try await waitForJobState(.failed, id: job.id, service: fixture.service)
+        #expect(fixture.playback.playCount == 0)
+        let item = try #require(try history(
+            await fixture.service.handle(.init(command: .history))
+        ).first { $0.id == job.id })
+        #expect(!item.hasAudio)
+    }
+
+    @Test("Canceling silent generation leaves no completed audio or playback")
+    func canceledSilentSpeech() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let job = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "A sentence for the silent recording. ", count: 100),
+                source: .commandLine, playbackEnabled: false
+            )
+        ))))
+        try await waitForJobState(.synthesizing, id: job.id, service: fixture.service)
+        #expect(isAccepted(await fixture.service.handle(.init(command: .cancelJob(job.id)))))
+        try await waitForJobState(.canceled, id: job.id, service: fixture.service)
+        await gate.releaseNext()
+        await gate.releaseNext()
+        #expect(fixture.playback.playCount == 0)
+        let item = try #require(try history(
+            await fixture.service.handle(.init(command: .history))
+        ).first { $0.id == job.id })
+        #expect(!item.hasAudio)
+    }
+
     @Test("Phonon voice imports validate, persist, and route embeddings for previews")
     func phononVoiceImportLifecycle() async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
@@ -2775,6 +2895,7 @@ private actor BackendSynthesisEventGate {
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedModelIDs: [String] = []
     private(set) var requestedLanguages: [String?] = []
+    private(set) var requestedSpeakingPaces: [SpeakingPace] = []
     private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var referenceKinds: [VoiceReferenceKind] = []
@@ -2798,6 +2919,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
         requestedModelIDs.append(request.model.id.rawValue)
         requestedLanguages.append(request.language)
+        requestedSpeakingPaces.append(request.speakingPace)
         requestedVoiceDescriptions.append(request.voiceDescription)
         guard synthesizesAudio else {
             return AsyncThrowingStream { continuation in
@@ -2827,8 +2949,8 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                                 AudioChunk(
                                     requestID: request.id,
                                     index: index,
-                                    samples: [0.1],
-                                    sampleRate: 1,
+                                    samples: [Float](repeating: 0.1, count: 24_000),
+                                    sampleRate: 24_000,
                                     startsParagraph: chunk.startsParagraph
                                 )
                             )
@@ -2852,8 +2974,8 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                         AudioChunk(
                             requestID: request.id,
                             index: index,
-                            samples: [0.1],
-                            sampleRate: 1,
+                            samples: [Float](repeating: 0.1, count: 24_000),
+                            sampleRate: 24_000,
                             startsParagraph: chunk.startsParagraph
                         )
                     )

@@ -5,4 +5,5 @@ enum CLIExitCode {
     static let rejected = ExitCode(65)
     static let canceled = ExitCode(130)
     static let synthesisFailed = ExitCode(70)
+    static let outputFailed = ExitCode(74)
 }

@@ -44,7 +44,7 @@ public enum ServiceCommand: Codable, Sendable {
     )
     case importLocalModel(bookmark: Data)
     case history
-    case exportHistory(UUID, format: String)
+    case exportHistory(UUID, format: String, rate: Double? = nil)
     case replayHistory(UUID)
     case regenerateHistory(UUID)
     case switchPlaybackModel(String)
