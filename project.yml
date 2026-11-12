@@ -297,7 +297,6 @@ targets:
     entitlements:
       path: Config/SayItCLI.entitlements
       properties:
-        com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
           - group.sh.sayit.mac
     dependencies:

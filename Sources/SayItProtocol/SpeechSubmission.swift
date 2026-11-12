@@ -12,6 +12,8 @@ public struct SpeechSubmission: Codable, Sendable {
     public let voiceDescription: String?
     public let speakingPace: Double?
     public let playbackRate: Double?
+    /// Nil preserves playback for submissions from older clients and journals.
+    public let playbackEnabled: Bool?
     public let queuePolicy: QueuePolicy
     public let permitsLongText: Bool
 
@@ -27,6 +29,7 @@ public struct SpeechSubmission: Codable, Sendable {
         voiceDescription: String? = nil,
         speakingPace: Double? = nil,
         playbackRate: Double? = nil,
+        playbackEnabled: Bool? = nil,
         queuePolicy: QueuePolicy = .enqueue,
         permitsLongText: Bool = false
     ) {
@@ -41,6 +44,7 @@ public struct SpeechSubmission: Codable, Sendable {
         self.voiceDescription = voiceDescription
         self.speakingPace = speakingPace
         self.playbackRate = playbackRate
+        self.playbackEnabled = playbackEnabled
         self.queuePolicy = queuePolicy
         self.permitsLongText = permitsLongText
     }

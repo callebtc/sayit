@@ -84,10 +84,22 @@ printf 'Read standard input' | sayit
 sayit status
 sayit pause
 sayit resume
+sayit speak "Save this speech" --output ./speech.wav
+sayit speak "Generate silently at 1.2×" --output ./speech.wav --export-rate 1.2 --no-play
 sayit skill path
 ```
 
 Run `sayit --help` to see all commands and options.
+
+`--output` (or `-o`) writes a WAV to a new file in an existing directory and
+waits until it is saved. It cannot be combined with `--detach`. Add `--no-play`
+to generate silently. Existing files are never overwritten.
+
+`--export-rate` changes only the saved WAV's speed, preserving pitch; it defaults
+to 1× and requires `--output`. `--rate` continues to control playback only.
+`--pace` changes native delivery on supported models and is already part of the
+generated audio, so an export rate applies on top of that pace. History keeps
+the original generated audio, and exporting never changes the player's speed.
 
 ### Coding-agent voice mode
 
@@ -114,7 +126,9 @@ CLI.
 The native SwiftUI frontend is separate from a per-user backend service that
 owns model downloads, synthesis, playback, and history. The app and CLI talk to
 that service over XPC. A narrowly scoped accessibility helper retrieves the
-frontmost app's selection only when requested. An optional, token-protected HTTP
+frontmost app's selection only when requested. The CLI writes exported files
+using normal terminal file permissions; the background service stays sandboxed.
+An optional, token-protected HTTP
 server exposes the same synthesis engine to other local apps through a
 versioned REST API bound to `127.0.0.1`.
 

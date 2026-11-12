@@ -1,7 +1,9 @@
 import AVFoundation
 
 import Foundation
+import PlaybackDSP
 import SayItCore
+import SayItProtocol
 
 actor AudioArchive {
     private static let writeChunkFrameCount = 65_536
@@ -99,8 +101,23 @@ actor AudioArchive {
         try write(source: source, format: format, to: file)
     }
 
-    func convertToWAV(source: URL, destination: URL) throws {
-        let input = try AVAudioFile(forReading: source)
+    func convertToWAV(source: URL, destination: URL, rate: Double = 1) throws {
+        guard PlaybackRate.isSupported(rate) else {
+            throw ServiceFailure(
+                code: "export.invalid_rate",
+                message: "Choose an export rate from \(PlaybackRate.minimum) to \(PlaybackRate.maximum)."
+            )
+        }
+        let input = try AVAudioFile(
+            forReading: source,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        let format = input.processingFormat
+        guard format.channelCount == 1 else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let stretch = try TimeStretchStream(sampleRate: format.sampleRate, rate: rate)
         guard let buffer = AVAudioPCMBuffer(
             pcmFormat: input.processingFormat,
             frameCapacity: AVAudioFrameCount(Self.writeChunkFrameCount)
@@ -121,7 +138,22 @@ actor AudioArchive {
             )
             try input.read(into: buffer, frameCount: frameCount)
             guard buffer.frameLength > 0 else { break }
-            try output.write(from: buffer)
+            try Task.checkCancellation()
+            guard let channel = buffer.floatChannelData?[0] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            let samples = Array(UnsafeBufferPointer(
+                start: channel,
+                count: Int(buffer.frameLength)
+            ))
+            let processed = try stretch.process(samples)
+            if !processed.isEmpty {
+                try write(samples: processed, format: format, to: output)
+            }
+        }
+        let tail = try stretch.process([], final: true)
+        if !tail.isEmpty {
+            try write(samples: tail, format: format, to: output)
         }
     }
 
