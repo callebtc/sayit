@@ -296,13 +296,7 @@ struct ServiceSettingsView: View {
         Binding(
             get: { state.backgroundService.isEnabled },
             set: { enabled in
-                Task {
-                    if enabled {
-                        await state.backgroundService.enable()
-                    } else {
-                        await state.backgroundService.disable()
-                    }
-                }
+                state.setBackgroundServiceEnabled(enabled)
             }
         )
     }
