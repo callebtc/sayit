@@ -61,6 +61,7 @@ final class ScriptedConnectionRegistration: ServiceConnectionRegistration {
     private var restartContinuation: CheckedContinuation<Void, Never>?
     private var ensureContinuation: CheckedContinuation<Void, Never>?
 
+    func setUserDisabled(_ disabled: Bool) { isUserDisabled = disabled }
     func refresh() {}
     func ensureRunning() async {
         effects.append("ensure")

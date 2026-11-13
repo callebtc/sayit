@@ -20,11 +20,14 @@ final class ServiceConnection {
         let cancel: () -> Void
         let join: () async -> Void
     }
-    private struct Completion: Sendable {
-        let result: Result<ServiceResponse, any Error>
+    private struct Freshness: Sendable {
         let epoch: UInt64
         let cursor: UInt64?
         let checksCursor: Bool
+    }
+    private struct Completion: Sendable {
+        let result: Result<ServiceResponse, any Error>
+        let freshness: Freshness
     }
 
     private let transport: any ServiceConnectionTransport
@@ -69,8 +72,7 @@ final class ServiceConnection {
         reset()
         let startedEpoch = epoch
         publish(isEnabled ? .connecting : .disabled, text: nil)
-        let task = own { [self] in
-            defer { registrationTask = nil }
+        await runRegistration(for: startedEpoch) { [self] in
             if let enabledIntent {
                 if enabledIntent { await registration.enable() }
                 else { await registration.disable() }
@@ -81,42 +83,36 @@ final class ServiceConnection {
                 try check(startedEpoch)
             }
         }
-        registrationTask = task
-        _ = await task.result
-        guard lifecycle == .running, epoch == startedEpoch else { return }
-        startPolling()
     }
 
     /// Commands are forwarded once. Recovery only retries synchronization.
     func send(_ command: ServiceCommand) async throws -> ServiceResponse {
         try Task.checkCancellation()
         guard canSend else { throw CancellationError() }
-        let requestedEpoch = epoch
-        let requestedCursor = cursor
         let isStateRequest: Bool
         switch command {
         case .snapshot, .events, .waitForEvents: isStateRequest = true
         default: isStateRequest = false
         }
+        let requestedFreshness = freshness(checksCursor: isStateRequest)
         let task = own { [self] in
             do {
-                try check(requestedEpoch)
+                try check(requestedFreshness.epoch)
                 let response = try await transport.send(command)
-                try check(requestedEpoch, cursor: requestedCursor, checksCursor: isStateRequest)
+                try check(requestedFreshness)
                 if isStateRequest {
                     try accept(response, for: command)
                 }
                 return Completion(
-                    result: .success(response), epoch: epoch, cursor: cursor,
-                    checksCursor: isStateRequest
+                    result: .success(response), freshness: freshness(checksCursor: isStateRequest)
                 )
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                try check(requestedEpoch, cursor: requestedCursor, checksCursor: isStateRequest)
+                try check(requestedFreshness)
                 // A failure begun before a fresh snapshot cannot retire the
                 // connection whose health that newer snapshot established.
-                if error is SayItXPCClientError, cursor != requestedCursor {
+                if error is SayItXPCClientError, cursor != requestedFreshness.cursor {
                     throw CancellationError()
                 }
                 if error is SayItXPCClientError || isStateRequest {
@@ -132,7 +128,7 @@ final class ServiceConnection {
         }
         // Finishing the owned task and resuming its caller are separate turns.
         // Recheck here as well, before a response can reach app projections.
-        try check(completion.epoch, cursor: completion.cursor, checksCursor: completion.checksCursor)
+        try check(completion.freshness)
         return try completion.result.get()
     }
 
@@ -147,6 +143,9 @@ final class ServiceConnection {
 
     func setEnabled(_ enabled: Bool) async {
         guard lifecycle != .suspended, lifecycle != .stopped else { return }
+        // Persist before draining: suspension may supersede the physical change,
+        // and a successful update or quit discards this instance's intent.
+        registration.setUserDisabled(!enabled)
         if lifecycle == .idle {
             enabledIntent = enabled
             publish(enabled ? .connecting : .disabled, text: nil)
@@ -164,8 +163,7 @@ final class ServiceConnection {
         await invalidateTransport()
         await joinWork()
         guard lifecycle == .running, epoch == requestedEpoch else { return }
-        let task = own { [self] in
-            defer { registrationTask = nil }
+        await runRegistration(for: requestedEpoch) { [self] in
             if enabled {
                 await registration.enable()
             } else {
@@ -174,10 +172,6 @@ final class ServiceConnection {
             try check(requestedEpoch, requiresEnabled: false)
             enabledIntent = nil
         }
-        registrationTask = task
-        _ = await task.result
-        guard lifecycle == .running, epoch == requestedEpoch else { return }
-        startPolling()
     }
 
     func setPlaybackSurfaceVisible(_ visible: Bool) {
@@ -208,16 +202,39 @@ final class ServiceConnection {
 
     private func check(
         _ requestedEpoch: UInt64,
-        cursor requestedCursor: UInt64? = nil,
-        checksCursor: Bool = false,
         requiresEnabled: Bool = true
     ) throws {
         try Task.checkCancellation()
         guard lifecycle == .running, epoch == requestedEpoch,
-              (!requiresEnabled || isEnabled),
-              (!checksCursor || cursor == requestedCursor) else {
+              (!requiresEnabled || isEnabled) else {
             throw CancellationError()
         }
+    }
+
+    private func freshness(checksCursor: Bool) -> Freshness {
+        Freshness(epoch: epoch, cursor: cursor, checksCursor: checksCursor)
+    }
+
+    private func check(_ requestedFreshness: Freshness) throws {
+        try check(requestedFreshness.epoch)
+        guard !requestedFreshness.checksCursor || cursor == requestedFreshness.cursor else {
+            throw CancellationError()
+        }
+    }
+
+    private func runRegistration(
+        for requestedEpoch: UInt64,
+        operation: @escaping @MainActor () async throws -> Void
+    ) async {
+        let task = own { [self] in
+            defer { registrationTask = nil }
+            try check(requestedEpoch, requiresEnabled: false)
+            try await operation()
+        }
+        registrationTask = task
+        _ = await task.result
+        guard lifecycle == .running, epoch == requestedEpoch else { return }
+        startPolling()
     }
 
     private func reset(transportFailure: Bool = false) {
@@ -361,7 +378,7 @@ final class ServiceConnection {
         )
         _ = scheduleRepair(automatically: true, afterMismatch: mismatch)
         let completion = Completion(
-            result: .failure(error), epoch: epoch, cursor: cursor, checksCursor: true
+            result: .failure(error), freshness: freshness(checksCursor: true)
         )
         await invalidateTransport()
         return completion

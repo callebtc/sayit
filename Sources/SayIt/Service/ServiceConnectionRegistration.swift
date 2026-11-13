@@ -4,6 +4,7 @@ protocol ServiceConnectionRegistration {
     var isWorking: Bool { get }
     var requiresApproval: Bool { get }
     var errorMessage: String? { get }
+    func setUserDisabled(_ disabled: Bool)
     func refresh()
     func ensureRunning() async
     func enable() async
