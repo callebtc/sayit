@@ -4,7 +4,14 @@ import Foundation
 final class UpdateTaskBarrier {
     private var finished = false
 
-    static func wait(for tasks: [Task<Void, Never>], until deadline: Date) async throws {
+    static func wait(
+        for tasks: [Task<Void, Never>],
+        until deadline: Date,
+        now: () -> Date = { Date.now },
+        sleep: (TimeInterval) async throws -> Void = {
+            try await Task.sleep(for: .seconds($0))
+        }
+    ) async throws {
         let barrier = UpdateTaskBarrier()
         let waiter = Task {
             for task in tasks { await task.value }
@@ -13,9 +20,10 @@ final class UpdateTaskBarrier {
         defer { waiter.cancel() }
         while !barrier.finished {
             try Task.checkCancellation()
-            guard Date.now < deadline else { throw BarrierError.timedOut }
-            try await Task.sleep(for: .milliseconds(50))
+            guard now() < deadline else { throw BarrierError.timedOut }
+            try await sleep(0.05)
         }
+        guard now() <= deadline else { throw BarrierError.timedOut }
     }
 
     enum BarrierError: Error { case timedOut }

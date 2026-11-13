@@ -15,25 +15,23 @@ final class AppState {
     let playback = PlaybackController()
     let history = HistoryStore()
     let launchAtLogin = LaunchAtLoginController()
-    let backgroundService = BackgroundServiceController()
-    let selectionService = SelectionServiceController()
+    let backgroundService: BackgroundServiceController
+    let selectionService: SelectionServiceController
     let commandLineInstaller = CommandLineInstallController()
     let voicePreview = VoicePreviewPlayer()
 
-    private let client = SayItXPCClient()
+    private let connection: ServiceConnection
+    private let lifecycleOperations: AppLifecycleOperations
     private let migration = BackendMigrationCoordinator()
-    let updates = UpdateController()
+    let updates: UpdateController
     private(set) var isPreparingUpdate = false
     private(set) var isPreparedForUpdate = false
     private var startupTask: Task<Void, Never>?
-    private var pollingTask: Task<Void, Never>?
     private var settingsPushTask: Task<Void, Never>?
     private var modelSelectionTask: Task<Void, Never>?
     private var modelSelectionGeneration: UInt64 = 0
     private var modelInstallRequestTask: Task<Void, Never>?
     private var modelInstallRequestGeneration: UInt64 = 0
-    private var serviceRepairTask: Task<Void, Never>?
-    private var automaticServiceRecovery = AutomaticServiceRecovery()
     private var isTerminating = false
     private var selectionRequestTask: Task<Void, Never>?
     @ObservationIgnored
@@ -42,9 +40,6 @@ final class AppState {
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
     private var lastVoicesRevision: UInt64?
-    private var lastServiceRevision: UInt64?
-    @ObservationIgnored
-    private var serviceConnectionGeneration: UInt64 = 0
     @ObservationIgnored
     private var activeJobID: UUID?
     private var downloadByteCounts: [ModelID: Int64] = [:]
@@ -80,12 +75,35 @@ final class AppState {
         isMenuPresented || isAppWindowPresented
     }
 
-    private init() {
-        settings = AppSettings()
+    init(
+        connection: ServiceConnection? = nil,
+        settings: AppSettings = AppSettings(),
+        updates: UpdateController = UpdateController(),
+        lifecycleOperations: AppLifecycleOperations? = nil
+    ) {
+        self.settings = settings
+        self.updates = updates
+        let backgroundService = BackgroundServiceController()
+        let selectionService = SelectionServiceController()
+        self.backgroundService = backgroundService
+        self.selectionService = selectionService
+        self.connection = connection ?? ServiceConnection(
+            transport: XPCServiceConnectionTransport(),
+            registration: backgroundService,
+            applicationVersion: Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String ?? "0.1.0"
+        )
+        self.lifecycleOperations = lifecycleOperations ?? .live(
+            selection: selectionService, background: backgroundService
+        )
         models = (try? ModelCatalogLoader().bundledCatalog().models) ?? []
         isShowingOnboarding = Self.shouldPresentOnboarding(
             onboardingComplete: settings.onboardingComplete
         )
+        self.connection.onOutput = { [weak self] output in
+            self?.applyConnectionOutput(output)
+        }
         updates.prepareForInstallation = { [weak self] in
             try await self?.prepareForUpdate()
         }
@@ -105,7 +123,7 @@ final class AppState {
     }
 
     func startup() async {
-        guard !isPreparingUpdate else { return }
+        guard !isPreparingUpdate, !isTerminating else { return }
         if let startupTask {
             await startupTask.value
             return
@@ -126,6 +144,7 @@ final class AppState {
                 settings: settings.backendSnapshot()
             )
         } catch {
+            guard !Task.isCancelled, !isPreparingUpdate, !isTerminating else { return }
             presentError(
                 "Existing Say It data could not be migrated. The original data was left unchanged."
             )
@@ -133,12 +152,11 @@ final class AppState {
             return
         }
 
-        if !backgroundService.isUserDisabled {
-            await backgroundService.ensureRunning()
-        }
-
-        startPolling()
-        await selectionService.restoreAfterUpdate()
+        guard !Task.isCancelled, !isPreparingUpdate, !isTerminating else { return }
+        await connection.start()
+        guard !Task.isCancelled, !isPreparingUpdate, !isTerminating else { return }
+        await lifecycleOperations.restoreSelection()
+        guard !Task.isCancelled, !isPreparingUpdate, !isTerminating else { return }
         updates.start()
     }
 
@@ -342,6 +360,7 @@ final class AppState {
     func setMenuPresented(_ isPresented: Bool) {
         guard isMenuPresented != isPresented else { return }
         isMenuPresented = isPresented
+        connection.setPlaybackSurfaceVisible(isPlaybackSurfacePresented)
         if isPresented { updates.userDidInteract() }
         menuActivityTask?.cancel()
         menuActivityTask = nil
@@ -366,6 +385,7 @@ final class AppState {
     func setAppWindowPresented(_ isPresented: Bool) {
         guard isAppWindowPresented != isPresented else { return }
         isAppWindowPresented = isPresented
+        connection.setPlaybackSurfaceVisible(isPlaybackSurfacePresented)
         if isPresented && NSApp.isActive { updates.userDidInteract() }
     }
 
@@ -409,6 +429,8 @@ final class AppState {
                     return
                 }
                 modelInstallRequestTask = nil
+            } catch is CancellationError {
+                return
             } catch {
                 guard generation == modelInstallRequestGeneration else {
                     return
@@ -462,10 +484,13 @@ final class AppState {
         Task { [weak self] in
             await installRequestTask?.value
             guard let self else { return }
+            defer { isCancelingModelInstall = false }
             do {
                 let response = try await send(.cancelModelInstall)
                 try requireSuccess(response)
                 try await reloadServiceSnapshot()
+            } catch is CancellationError {
+                return
             } catch {
                 if let progress = downloadProgress,
                    progress.state == .canceling {
@@ -483,7 +508,6 @@ final class AppState {
                 }
                 presentError(error.localizedDescription)
             }
-            isCancelingModelInstall = false
         }
     }
 
@@ -554,6 +578,8 @@ final class AppState {
             }
             voiceStudio = studio
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             presentError(error.localizedDescription)
             return false
@@ -570,6 +596,8 @@ final class AppState {
             voiceStudio = nil
             await refreshVoices()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             presentError(error.localizedDescription)
             return false
@@ -590,6 +618,8 @@ final class AppState {
                     return
                 }
                 try voicePreview.play(data: file.data, id: candidate.id)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -617,6 +647,8 @@ final class AppState {
                 return
             }
             voiceStudio = studio
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -703,6 +735,8 @@ final class AppState {
                 return
             }
             try voicePreview.play(data: file.data, id: profile.id)
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -733,6 +767,8 @@ final class AppState {
             try requireSuccess(response)
             await refreshModels()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             presentError(error.localizedDescription)
             return false
@@ -874,6 +910,8 @@ final class AppState {
                     return
                 }
                 save(file)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -907,6 +945,8 @@ final class AppState {
                     return
                 }
                 save(file)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -932,6 +972,8 @@ final class AppState {
             oneTimeTokenSecret = creation.secret
             await loadTokens()
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             apiTokenErrorMessage = error.localizedDescription
             return false
@@ -953,6 +995,8 @@ final class AppState {
                 try requireSuccess(response)
                 apiTokenErrorMessage = nil
                 await loadTokens()
+            } catch is CancellationError {
+                return
             } catch {
                 apiTokenErrorMessage = error.localizedDescription
             }
@@ -969,6 +1013,8 @@ final class AppState {
             do {
                 let response = try await send(.updateSettings(snapshot))
                 try requireSuccess(response)
+            } catch is CancellationError {
+                return
             } catch {
                 httpAPIErrorMessage = error.localizedDescription
             }
@@ -976,41 +1022,29 @@ final class AppState {
     }
 
     func restartBackgroundService() {
-        scheduleServiceRepair(
-            afterMismatch: serviceConnection == .updateRequired,
-            automatically: false
-        )
+        Task { await connection.restart() }
     }
 
     func enableBackgroundService() {
-        Task {
-            resetServiceRevisionTracking()
-            await backgroundService.enable()
-            await client.invalidate()
-            serviceConnection = .connecting
-        }
+        setBackgroundServiceEnabled(true)
+    }
+
+    func setBackgroundServiceEnabled(_ enabled: Bool) {
+        guard !isPreparingUpdate, !isTerminating else { return }
+        Task { await connection.setEnabled(enabled) }
     }
 
     func terminateBackgroundServiceForQuit() async {
-        guard !isPreparedForUpdate else { return }
         isTerminating = true
-        serviceRepairTask?.cancel()
-        await serviceRepairTask?.value
-        serviceRepairTask = nil
-        menuActivityTask?.cancel()
-        menuActivityTask = nil
+        cancelAppTasks()
+        await connection.stop()
+        for task in pendingAppTasks { await task.value }
+        clearAppTasks()
         isMenuPresented = false
         isAppWindowPresented = false
-        pollingTask?.cancel()
-        resetServiceRevisionTracking()
-        await client.invalidate()
-        await pollingTask?.value
-        pollingTask = nil
-        selectionRequestTask?.cancel()
-        await selectionRequestTask?.value
-        selectionRequestTask = nil
-        await selectionService.terminateForQuit()
-        await backgroundService.terminateForQuit()
+        guard !isPreparedForUpdate else { return }
+        await lifecycleOperations.terminateSelectionForQuit()
+        await lifecycleOperations.terminateBackgroundForQuit()
     }
 
     private func restoreSelectionTarget(
@@ -1043,55 +1077,57 @@ final class AppState {
         updates.checkForUpdates()
     }
 
-    private func prepareForUpdate() async throws {
-        guard !isPreparedForUpdate else { return }
-        guard !isPreparingUpdate else { throw ServiceJobTermination.StopError.failed }
-        isPreparingUpdate = true
-        backgroundService.isPreparingUpdate = true
-        selectionService.isPreparingUpdate = true
-        let deadline = Date.now.addingTimeInterval(15)
-        if selectionService.wasRunning {
-            UserDefaults.standard.set(true, forKey: "restoreSelectionAfterUpdate")
-        }
-        NotificationCenter.default.post(name: .sayItWillInstallUpdate, object: nil)
-        voicePreview.stop()
-        menuActivityTask?.cancel()
-        pollingTask?.cancel()
-        settingsPushTask?.cancel()
-        modelSelectionTask?.cancel()
-        modelInstallRequestTask?.cancel()
-        serviceRepairTask?.cancel()
-        selectionRequestTask?.cancel()
-        await client.invalidate()
-        // Capture tasks before clearing their slots; cancellation-aware XPC calls
-        // are invalidated above so they cannot reconnect during preparation.
-        let pending = [menuActivityTask, pollingTask, settingsPushTask,
-                       modelSelectionTask, modelInstallRequestTask,
-                       serviceRepairTask, selectionRequestTask].compactMap { $0 }
-        try await UpdateTaskBarrier.wait(for: pending, until: deadline)
+    private var pendingAppTasks: [Task<Void, Never>] {
+        [startupTask, menuActivityTask, settingsPushTask, modelSelectionTask,
+         modelInstallRequestTask, selectionRequestTask].compactMap { $0 }
+    }
+
+    private func cancelAppTasks() {
+        for task in pendingAppTasks { task.cancel() }
+    }
+
+    private func clearAppTasks() {
+        startupTask = nil
         menuActivityTask = nil
-        pollingTask = nil
         settingsPushTask = nil
         modelSelectionTask = nil
         modelInstallRequestTask = nil
-        serviceRepairTask = nil
         selectionRequestTask = nil
-        try await selectionService.terminateForUpdate(deadline: deadline)
-        try await backgroundService.terminateForUpdate(deadline: deadline)
+    }
+
+    private func prepareForUpdate() async throws {
+        guard !isPreparedForUpdate else { return }
+        guard !isPreparingUpdate, !isTerminating else {
+            throw ServiceJobTermination.StopError.failed
+        }
+        isPreparingUpdate = true
+        backgroundService.isPreparingUpdate = true
+        selectionService.isPreparingUpdate = true
+        let deadline = lifecycleOperations.now().addingTimeInterval(15)
+        lifecycleOperations.rememberSelectionForUpdate()
+        NotificationCenter.default.post(name: .sayItWillInstallUpdate, object: nil)
+        voicePreview.stop()
+        cancelAppTasks()
+        try await connection.suspend(until: deadline)
+        try await UpdateTaskBarrier.wait(
+            for: pendingAppTasks, until: deadline,
+            now: lifecycleOperations.now, sleep: lifecycleOperations.sleep
+        )
+        clearAppTasks()
+        try await lifecycleOperations.terminateSelectionForUpdate(deadline)
+        try await lifecycleOperations.terminateBackgroundForUpdate(deadline)
         isPreparedForUpdate = true
     }
 
     private func recoverAfterCanceledUpdate() async {
-        isPreparingUpdate = false
+        guard !isTerminating else { return }
         backgroundService.isPreparingUpdate = false
         selectionService.isPreparingUpdate = false
+        await connection.start()
+        guard !isTerminating else { return }
+        isPreparingUpdate = false
         isPreparedForUpdate = false
-        pollingTask = nil
-        serviceRepairTask = nil
-        resetServiceRevisionTracking()
-        await backgroundService.ensureRunning()
-        await selectionService.restoreAfterUpdate()
-        startPolling()
+        await lifecycleOperations.restoreSelection()
     }
 
     var applicationDisplayVersion: String {
@@ -1116,192 +1152,6 @@ final class AppState {
             : nil
     }
 
-    private func startPolling() {
-        guard !isPreparingUpdate, pollingTask == nil else { return }
-        pollingTask = Task { [weak self] in
-            var retryDelay = Duration.milliseconds(250)
-            while !Task.isCancelled {
-                guard let self, !self.isTerminating else { return }
-                self.backgroundService.refresh()
-                guard !self.backgroundService.isUserDisabled else {
-                    if self.serviceConnection != .disabled {
-                        self.resetServiceRevisionTracking()
-                        self.serviceConnection = .disabled
-                    }
-                    try? await Task.sleep(for: .seconds(1))
-                    continue
-                }
-                // Do not reconnect to the old endpoint while replacing it.
-                if self.serviceRepairTask != nil || self.backgroundService.isWorking {
-                    try? await Task.sleep(for: .milliseconds(100))
-                    continue
-                }
-                do {
-                    try await self.synchronizeServiceState()
-                    retryDelay = .milliseconds(250)
-                } catch is CancellationError {
-                    return
-                } catch let failure as ServiceFailure
-                    where failure.code == "protocol.version_mismatch" {
-                    guard !Task.isCancelled, self.serviceRepairTask == nil else { continue }
-                    self.resetServiceRevisionTracking()
-                    await self.client.invalidate()
-                    if self.serviceConnection != .updateRequired {
-                        self.serviceConnection = .updateRequired
-                    }
-                    if self.statusText != "Service update required" {
-                        self.statusText = "Service update required"
-                    }
-                    self.scheduleServiceRepair(afterMismatch: true)
-                    try? await Task.sleep(for: .seconds(2))
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    guard self.serviceRepairTask == nil else { continue }
-                    self.resetServiceRevisionTracking()
-                    if self.serviceConnection != .offline {
-                        self.serviceConnection = .offline
-                    }
-                    if self.statusText != "Background service unavailable" {
-                        self.statusText = "Background service unavailable"
-                    }
-                    await self.client.invalidate()
-                    self.scheduleServiceRepair()
-                    try? await Task.sleep(for: retryDelay)
-                    retryDelay = min(retryDelay * 2, .seconds(8))
-                }
-            }
-        }
-    }
-
-    private func scheduleServiceRepair(
-        afterMismatch: Bool = false,
-        automatically: Bool = true
-    ) {
-        guard serviceRepairTask == nil,
-              !isPreparingUpdate,
-              !isTerminating,
-              !backgroundService.isUserDisabled,
-              !backgroundService.isWorking,
-              !backgroundService.requiresApproval else {
-            return
-        }
-        if automatically && !automaticServiceRecovery.beginAttempt() { return }
-        let failedState: ServiceConnectionState = afterMismatch ? .updateRequired : .offline
-        serviceConnection = .recovering
-        statusText = "Reconnecting background service…"
-        // Invalidate requests already in flight before yielding to the repair task.
-        resetServiceRevisionTracking()
-        serviceRepairTask = Task { [weak self] in
-            guard let self else { return }
-            defer { self.serviceRepairTask = nil }
-            do {
-                if automatically {
-                    try await Task.sleep(for: .seconds(1))
-                }
-                try Task.checkCancellation()
-                guard !self.backgroundService.isUserDisabled else {
-                    self.serviceConnection = .disabled
-                    return
-                }
-                await self.client.invalidate()
-                await self.backgroundService.restart()
-                try Task.checkCancellation()
-                self.resetServiceRevisionTracking()
-                await self.client.invalidate()
-                if self.backgroundService.errorMessage != nil {
-                    self.serviceConnection = failedState
-                    self.statusText = "Background service needs attention"
-                } else {
-                    // Registration isn't proof of health. Polling must obtain a
-                    // compatible snapshot before restoring playback or retry budget.
-                    self.serviceConnection = .recovering
-                    self.statusText = "Connecting to service"
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                self.serviceConnection = failedState
-            }
-        }
-    }
-
-    private func synchronizeServiceState() async throws {
-        let requestedRevision = lastServiceRevision
-        let requestedGeneration = serviceConnectionGeneration
-        guard let requestedRevision else {
-            try await reloadServiceSnapshot()
-            return
-        }
-        let response = try await send(
-            .waitForEvents(
-                after: requestedRevision,
-                playbackInterval: Self.playbackRefreshInterval(
-                    isPlaybackSurfacePresented: isPlaybackSurfacePresented
-                )
-            )
-        )
-        guard Self.isServiceStateRequestCurrent(
-            requestedRevision: requestedRevision,
-            currentRevision: lastServiceRevision,
-            requestedGeneration: requestedGeneration,
-            currentGeneration: serviceConnectionGeneration
-        ) else {
-            return
-        }
-        guard case .events(let events) = response else {
-            try requireSuccess(response)
-            throw ServiceFailure(
-                code: "service.invalid_events",
-                message: "The service returned an invalid event response."
-            )
-        }
-        guard let event = events.last else { return }
-        guard Self.shouldApplyEvent(
-            id: event.id,
-            after: requestedRevision
-        ) else {
-            return
-        }
-        try Self.validateServiceSnapshot(event.snapshot, applicationVersion: applicationVersion)
-        apply(event.snapshot)
-    }
-
-    nonisolated static func validateServiceSnapshot(
-        _ snapshot: ServiceSnapshot,
-        applicationVersion: String
-    ) throws {
-        guard snapshot.protocolVersion == SayItProtocolVersion.current,
-              snapshot.serviceVersion == applicationVersion else {
-            throw ServiceFailure(
-                code: "protocol.version_mismatch",
-                message: "The background service does not match this version of Say It."
-            )
-        }
-    }
-
-    nonisolated static func shouldApplyEvent(
-        id: UInt64,
-        after revision: UInt64?
-    ) -> Bool {
-        guard let revision else { return true }
-        return id > revision
-    }
-
-    nonisolated static func isServiceStateRequestCurrent(
-        requestedRevision: UInt64?,
-        currentRevision: UInt64?,
-        requestedGeneration: UInt64,
-        currentGeneration: UInt64
-    ) -> Bool {
-        requestedGeneration == currentGeneration
-            && requestedRevision == currentRevision
-    }
-
-    nonisolated static func playbackRefreshInterval(
-        isPlaybackSurfacePresented: Bool
-    ) -> TimeInterval {
-        isPlaybackSurfacePresented ? 0.25 : 1
-    }
 
     nonisolated static func shouldPresentOnboarding(
         onboardingComplete: Bool
@@ -1318,46 +1168,31 @@ final class AppState {
     }
 
     private func reloadServiceSnapshot() async throws {
-        guard serviceRepairTask == nil, !backgroundService.isWorking else { return }
-        let requestedRevision = lastServiceRevision
-        let requestedGeneration = serviceConnectionGeneration
-        let response = try await send(.snapshot)
-        guard Self.isServiceStateRequestCurrent(
-            requestedRevision: requestedRevision,
-            currentRevision: lastServiceRevision,
-            requestedGeneration: requestedGeneration,
-            currentGeneration: serviceConnectionGeneration
-        ) else {
-            return
+        try await connection.refresh()
+    }
+
+    private func applyConnectionOutput(_ output: ServiceConnection.Output) {
+        switch output {
+        case .state(let state, let text):
+            serviceConnection = state
+            if let text { statusText = text }
+        case .reset(let transportFailure):
+            lastModelsRevision = nil
+            lastHistoryRevision = nil
+            lastDiagnosticsRevision = nil
+            lastVoicesRevision = nil
+            if transportFailure {
+                modelIDToSelectAfterInstallation = nil
+                requestedModelInstallID = nil
+            }
+        case .snapshot(let snapshot):
+            apply(snapshot)
         }
-        guard case .snapshot(let snapshot) = response else {
-            try requireSuccess(response)
-            throw ServiceFailure(
-                code: "service.invalid_snapshot",
-                message: "The service returned an invalid state snapshot."
-            )
-        }
-        try Self.validateServiceSnapshot(snapshot, applicationVersion: applicationVersion)
-        apply(snapshot)
     }
 
     private func apply(_ snapshot: ServiceSnapshot) {
-        guard Self.shouldApplyEvent(
-            id: snapshot.revision,
-            after: lastServiceRevision
-        ) else {
-            return
-        }
-        automaticServiceRecovery.didConnect()
-        lastServiceRevision = snapshot.revision
         activeJobID = snapshot.confirmationJobs.first?.id
             ?? snapshot.activeJob?.id
-        let onlineConnection = ServiceConnectionState.online(
-            version: snapshot.serviceVersion
-        )
-        if serviceConnection != onlineConnection {
-            serviceConnection = onlineConnection
-        }
         if let serviceError = snapshot.lastError {
             if statusText != snapshot.statusText {
                 statusText = snapshot.statusText
@@ -1501,6 +1336,8 @@ final class AppState {
                     (ModelID($0.id), $0.downloadByteCount)
                 }
             )
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -1514,6 +1351,8 @@ final class AppState {
                 return
             }
             history.apply(snapshots)
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -1527,6 +1366,8 @@ final class AppState {
                 return
             }
             diagnosticEvents = snapshots.map(\.event)
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -1540,6 +1381,8 @@ final class AppState {
                 return
             }
             voiceProfiles = profiles
+        } catch is CancellationError {
+            return
         } catch {
             presentError(error.localizedDescription)
         }
@@ -1554,6 +1397,8 @@ final class AppState {
             }
             apiTokens = tokens
             apiTokenErrorMessage = nil
+        } catch is CancellationError {
+            return
         } catch {
             apiTokenErrorMessage = error.localizedDescription
         }
@@ -1572,6 +1417,8 @@ final class AppState {
             do {
                 let response = try await self.send(.updateSettings(snapshot))
                 try self.requireSuccess(response)
+            } catch is CancellationError {
+                return
             } catch {
                 self.presentError(error.localizedDescription)
             }
@@ -1619,6 +1466,8 @@ final class AppState {
             do {
                 let response = try await send(.submit(submission))
                 try requireSuccess(response)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -1630,6 +1479,8 @@ final class AppState {
             do {
                 let response = try await send(command)
                 try requireSuccess(response)
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -1642,6 +1493,8 @@ final class AppState {
                 let response = try await send(command)
                 try requireSuccess(response)
                 try await reloadServiceSnapshot()
+            } catch is CancellationError {
+                return
             } catch {
                 presentError(error.localizedDescription)
             }
@@ -1651,32 +1504,8 @@ final class AppState {
     private func send(
         _ command: ServiceCommand
     ) async throws -> ServiceResponse {
-        guard !isPreparingUpdate else { throw CancellationError() }
-        let requestedGeneration = serviceConnectionGeneration
-        do {
-            return try await client.send(command)
-        } catch {
-            if error is SayItXPCClientError,
-               requestedGeneration == serviceConnectionGeneration,
-               serviceRepairTask == nil {
-                modelIDToSelectAfterInstallation = nil
-                requestedModelInstallID = nil
-                resetServiceRevisionTracking()
-                serviceConnection = .offline
-                statusText = "Background service unavailable"
-                await client.invalidate()
-            }
-            throw error
-        }
-    }
-
-    private func resetServiceRevisionTracking() {
-        serviceConnectionGeneration &+= 1
-        lastServiceRevision = nil
-        lastModelsRevision = nil
-        lastHistoryRevision = nil
-        lastDiagnosticsRevision = nil
-        lastVoicesRevision = nil
+        guard !isPreparingUpdate, !isTerminating else { throw CancellationError() }
+        return try await connection.send(command)
     }
 
     private func requireSuccess(_ response: ServiceResponse) throws {
