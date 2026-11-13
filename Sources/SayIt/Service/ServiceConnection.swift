@@ -29,7 +29,7 @@ final class ServiceConnection {
 
     private let transport: any ServiceConnectionTransport
     private let registration: any ServiceConnectionRegistration
-    private let clock: ServiceConnectionClock
+    private let clock: LifecycleClock
     private let applicationVersion: String
     private var lifecycle = Lifecycle.idle
     private var epoch: UInt64 = 0
@@ -38,6 +38,7 @@ final class ServiceConnection {
     private var retryDelay: TimeInterval = 0.25
     private var isPlaybackSurfaceVisible = false
     private var enabledIntent: Bool?
+    private var enabledChangeEpoch: UInt64?
     private var work: [UUID: Work] = [:]
     private var pollTask: Task<Void, any Error>?
     private var registrationTask: Task<Void, any Error>?
@@ -47,7 +48,7 @@ final class ServiceConnection {
         transport: any ServiceConnectionTransport,
         registration: any ServiceConnectionRegistration,
         applicationVersion: String,
-        clock: ServiceConnectionClock = .system
+        clock: LifecycleClock = .system
     ) {
         self.transport = transport
         self.registration = registration
@@ -64,6 +65,7 @@ final class ServiceConnection {
         guard epoch == requestedEpoch, lifecycle != .stopped,
               !Task.isCancelled else { return }
         lifecycle = .running
+        enabledChangeEpoch = nil
         reset()
         let startedEpoch = epoch
         publish(isEnabled ? .connecting : .disabled, text: nil)
@@ -153,6 +155,10 @@ final class ServiceConnection {
         enabledIntent = enabled
         reset()
         let requestedEpoch = epoch
+        enabledChangeEpoch = requestedEpoch
+        defer {
+            if enabledChangeEpoch == requestedEpoch { enabledChangeEpoch = nil }
+        }
         cancelWork()
         publish(enabled ? .connecting : .disabled, text: nil)
         await invalidateTransport()
@@ -183,12 +189,7 @@ final class ServiceConnection {
         close(.suspended)
         // Invalidation is itself tracked so deadline expiry cannot lose it.
         beginInvalidation()
-        while !work.isEmpty {
-            try Task.checkCancellation()
-            guard clock.now() < deadline else { throw UpdateTaskBarrier.BarrierError.timedOut }
-            try await clock.sleep(0.05)
-        }
-        guard clock.now() <= deadline else { throw UpdateTaskBarrier.BarrierError.timedOut }
+        try await clock.wait(until: deadline) { work.isEmpty }
     }
 
     func stop() async {
@@ -202,7 +203,7 @@ final class ServiceConnection {
     private var isEnabled: Bool { enabledIntent ?? !registration.isUserDisabled }
     private var canSend: Bool {
         lifecycle == .running && isEnabled && registrationTask == nil
-            && invalidationTask == nil && !registration.isWorking
+            && invalidationTask == nil && enabledChangeEpoch == nil && !registration.isWorking
     }
 
     private func check(
@@ -254,10 +255,10 @@ final class ServiceConnection {
     }
 
     private func joinWork() async {
-        while !work.isEmpty {
-            let pending = Array(work.values)
-            for item in pending { await item.join() }
-        }
+        // Join the work inherited by this action. A concurrent start may open
+        // a replacement; its new poll must not become part of an older drain.
+        let pending = Array(work.values)
+        for item in pending { await item.join() }
     }
 
     private func beginInvalidation() {
@@ -372,7 +373,8 @@ final class ServiceConnection {
         afterMismatch: Bool
     ) -> Task<Void, any Error>? {
         guard lifecycle == .running, isEnabled, registrationTask == nil,
-              !registration.isWorking, !registration.requiresApproval else { return nil }
+              enabledChangeEpoch == nil, !registration.isWorking,
+              !registration.requiresApproval else { return nil }
         if automatically {
             guard automaticAttempts < 2 else { return nil }
             automaticAttempts += 1

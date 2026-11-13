@@ -7,10 +7,7 @@ final class UpdateTaskBarrier {
     static func wait(
         for tasks: [Task<Void, Never>],
         until deadline: Date,
-        now: () -> Date = { Date.now },
-        sleep: (TimeInterval) async throws -> Void = {
-            try await Task.sleep(for: .seconds($0))
-        }
+        clock: LifecycleClock = .system
     ) async throws {
         let barrier = UpdateTaskBarrier()
         let waiter = Task {
@@ -18,13 +15,8 @@ final class UpdateTaskBarrier {
             barrier.finished = true
         }
         defer { waiter.cancel() }
-        while !barrier.finished {
-            try Task.checkCancellation()
-            guard now() < deadline else { throw BarrierError.timedOut }
-            try await sleep(0.05)
-        }
-        guard now() <= deadline else { throw BarrierError.timedOut }
+        try await clock.wait(until: deadline) { barrier.finished }
     }
 
-    enum BarrierError: Error { case timedOut }
+    typealias BarrierError = LifecycleClock.WaitError
 }

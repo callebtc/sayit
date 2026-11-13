@@ -120,4 +120,64 @@ struct ServiceConnectionLifecycleTests {
         #expect(f.connection.state == .disabled)
         await f.connection.stop()
     }
+
+    @Test("Concurrent resume callers join only the canceled work they inherited")
+    func concurrentResume() async throws {
+        let f = ConnectionFixture()
+        f.registration.holdsRestart = true
+        await f.connection.start()
+        await f.until { f.transport.requests.count == 1 }
+        let repair = Task { await f.connection.restart() }
+        await f.until { f.registration.restartCount == 1 }
+        let deadline = f.clock.date.addingTimeInterval(1)
+        do {
+            try await f.advancing { try await f.connection.suspend(until: deadline) }
+            Issue.record("Suspension acknowledged a held restart")
+        } catch { #expect(error is UpdateTaskBarrier.BarrierError) }
+        f.registration.holdsEnsure = true
+        var resumed = 0
+        let first = Task { await f.connection.start(); resumed += 1 }
+        let second = Task { await f.connection.start(); resumed += 1 }
+        await f.settle()
+        f.registration.releaseRestart()
+        await repair.value
+        await f.until { f.registration.effects.filter { $0 == "ensure" }.count == 2 }
+        await f.settle()
+        // One caller resumes registration. Its sibling must finish idempotently
+        // instead of joining newly created registration or polling work.
+        #expect(resumed == 1)
+        f.registration.releaseEnsure()
+        await f.settle()
+        await f.connection.stop()
+        await first.value
+        await second.value
+    }
+
+    @Test("Enable transitions keep the send gate closed while canceled requests drain")
+    func sendsDuringEnableDrain() async {
+        let f = ConnectionFixture()
+        await f.connection.start()
+        await f.until { f.transport.requests.count == 1 }
+        f.transport.heldRequests.insert(1)
+        let old = Task { try await f.connection.send(.models) }
+        await f.until { f.transport.requests.count == 2 }
+        let toggle = Task { await f.connection.setEnabled(true) }
+        await f.until { f.transport.invalidations > 0 }
+        await f.settle()
+        var canceled = false
+        let command = Task {
+            do { _ = try await f.connection.send(.clear) }
+            catch is CancellationError { canceled = true }
+            catch { Issue.record("Unexpected error: \(error)") }
+        }
+        await f.settle()
+        #expect(f.transport.requests.count == 2)
+        #expect(canceled)
+        command.cancel()
+        await command.value
+        f.transport.reply(1, .models([]))
+        _ = await old.result
+        await toggle.value
+        await f.connection.stop()
+    }
 }

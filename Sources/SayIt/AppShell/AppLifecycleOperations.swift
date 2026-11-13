@@ -4,8 +4,7 @@ import Foundation
 /// preparation/recovery ordering remains in the production AppState methods.
 @MainActor
 struct AppLifecycleOperations {
-    var now: () -> Date
-    var sleep: (TimeInterval) async throws -> Void
+    var clock: LifecycleClock
     var rememberSelectionForUpdate: () -> Void
     var restoreSelection: () async -> Void
     var terminateSelectionForUpdate: (Date) async throws -> Void
@@ -18,8 +17,7 @@ struct AppLifecycleOperations {
         background: BackgroundServiceController
     ) -> AppLifecycleOperations {
         AppLifecycleOperations(
-            now: { Date.now },
-            sleep: { try await Task.sleep(for: .seconds($0)) },
+            clock: .system,
             rememberSelectionForUpdate: {
                 if selection.wasRunning {
                     UserDefaults.standard.set(true, forKey: "restoreSelectionAfterUpdate")

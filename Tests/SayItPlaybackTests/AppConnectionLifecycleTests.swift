@@ -214,8 +214,7 @@ private final class AppConnectionFixture {
         self.suiteName = suiteName
         defaults = try #require(UserDefaults(suiteName: suiteName))
         let operations = AppLifecycleOperations(
-            now: { self.connection.clock.date },
-            sleep: { try await self.connection.clock.sleep($0) },
+            clock: connection.clock.adapter,
             rememberSelectionForUpdate: { self.helperEffects.append("remember selection") },
             restoreSelection: { self.helperEffects.append("restore selection") },
             terminateSelectionForUpdate: { deadline in

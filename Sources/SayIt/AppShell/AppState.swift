@@ -1103,7 +1103,7 @@ final class AppState {
         isPreparingUpdate = true
         backgroundService.isPreparingUpdate = true
         selectionService.isPreparingUpdate = true
-        let deadline = lifecycleOperations.now().addingTimeInterval(15)
+        let deadline = lifecycleOperations.clock.now().addingTimeInterval(15)
         lifecycleOperations.rememberSelectionForUpdate()
         NotificationCenter.default.post(name: .sayItWillInstallUpdate, object: nil)
         voicePreview.stop()
@@ -1111,7 +1111,7 @@ final class AppState {
         try await connection.suspend(until: deadline)
         try await UpdateTaskBarrier.wait(
             for: pendingAppTasks, until: deadline,
-            now: lifecycleOperations.now, sleep: lifecycleOperations.sleep
+            clock: lifecycleOperations.clock
         )
         clearAppTasks()
         try await lifecycleOperations.terminateSelectionForUpdate(deadline)

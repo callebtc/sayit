@@ -57,10 +57,17 @@ final class ScriptedConnectionRegistration: ServiceConnectionRegistration {
     var errorMessage: String?
     private(set) var effects: [String] = []
     var holdsRestart = false
+    var holdsEnsure = false
     private var restartContinuation: CheckedContinuation<Void, Never>?
+    private var ensureContinuation: CheckedContinuation<Void, Never>?
 
     func refresh() {}
-    func ensureRunning() async { effects.append("ensure") }
+    func ensureRunning() async {
+        effects.append("ensure")
+        if holdsEnsure {
+            await withCheckedContinuation { ensureContinuation = $0 }
+        }
+    }
     func enable() async { isUserDisabled = false; effects.append("enable") }
     func disable() async { isUserDisabled = true; effects.append("disable") }
     func restart() async {
@@ -76,6 +83,12 @@ final class ScriptedConnectionRegistration: ServiceConnectionRegistration {
         restartContinuation = nil
     }
 
+    func releaseEnsure() {
+        holdsEnsure = false
+        ensureContinuation?.resume()
+        ensureContinuation = nil
+    }
+
     var restartCount: Int { effects.filter { $0 == "restart" }.count }
 }
 
@@ -89,8 +102,8 @@ final class ScriptedConnectionClock {
     }
     private var pending: [UUID: Sleep] = [:]
 
-    var adapter: ServiceConnectionClock {
-        ServiceConnectionClock(now: { self.date }, sleep: { try await self.sleep($0) })
+    var adapter: LifecycleClock {
+        LifecycleClock(now: { self.date }, sleep: { try await self.sleep($0) })
     }
 
     func sleep(_ seconds: TimeInterval) async throws {
