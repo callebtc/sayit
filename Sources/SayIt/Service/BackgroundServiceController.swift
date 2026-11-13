@@ -98,19 +98,23 @@ final class BackgroundServiceController {
         }
     }
 
-    func enable() async {
-        guard !isPreparingUpdate else { return }
+    func setUserDisabled(_ disabled: Bool) {
         UserDefaults.standard.set(
-            false,
+            disabled,
             forKey: Self.userDisabledDefaultsKey
         )
+    }
+
+    func enable() async {
+        guard !isPreparingUpdate else { return }
+        setUserDisabled(false)
         await ensureRunning()
     }
 
     func disable() async {
         guard !isPreparingUpdate else { return }
         // Preserve the user's intent even if stopping the system job fails.
-        UserDefaults.standard.set(true, forKey: Self.userDisabledDefaultsKey)
+        setUserDisabled(true)
         hasStartedService = false
         await perform {
             #if DEBUG || SAYIT_LOCAL_BUILD
