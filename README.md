@@ -38,6 +38,9 @@ stay on your Mac.
   New model downloads include all presets. Existing installations can get the
   voice pack with **Update Voices**
   in Settings → Models or Settings → Voices, without downloading the model again.
+  [Underdog Woof](https://huggingface.co/ConwayResearch/Underdog-Woof) is an
+  experimental 40.6 MB English model with two preset voices, Juno and Mira, for
+  non-commercial use. Voice by Underdog Woof ([underdog.ai](https://underdog.ai)).
 - **Experimental Drama 3.** The standard Q4 checkpoint streams locally through
   the upstream Swift library. See [details and memory requirements](docs/drama3.md).
 - **Create voices.** Models expose the features they support, from built-in

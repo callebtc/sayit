@@ -1023,6 +1023,18 @@ actor ModelManager: ModelManaging {
         model: ModelDescriptor,
         files: [ModelFileDescriptor]
     ) throws {
+        // Woof ships NumPy weights without an MLX config.
+        if SupportedModelTypes.areCompatible(model.modelType, "underdog_woof") {
+            guard files.contains(where: {
+                $0.path == WoofModel.weightsFileName && $0.byteCount > 0
+            }) else {
+                throw ModelManagerError.incompleteSnapshot
+            }
+            for file in files {
+                try verify(url.appending(path: file.path), descriptor: file)
+            }
+            return
+        }
         let config = url.appending(path: "config.json")
         guard let configData = try? Data(contentsOf: config),
               let configJSON = try? JSONSerialization.jsonObject(

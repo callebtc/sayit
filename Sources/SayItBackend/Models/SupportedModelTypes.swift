@@ -24,7 +24,8 @@ enum SupportedModelTypes {
         ["kitten_tts", "kitten"],
         ["kokoro", "kokoro_tts"],
         ["omnivoice"],
-        ["indextts", "index_tts"]
+        ["indextts", "index_tts"],
+        ["underdog_woof"]
     ]
 
     static let all = Set(aliases.flatMap { $0 })

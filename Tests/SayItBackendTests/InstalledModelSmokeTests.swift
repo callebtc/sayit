@@ -119,23 +119,24 @@ struct InstalledModelSmokeTests {
         await synthesizer.unloadModel()
     }
 
-    @Test("Configured Phonon stream cancels, restarts, and reloads", .timeLimit(.minutes(1)))
-    func configuredPhononRestartsAfterCancellation() async throws {
+    @Test("Configured Phonon or Woof speech cancels, restarts, and reloads", .timeLimit(.minutes(1)))
+    func configuredModelRestartsAfterCancellation() async throws {
         let environment = ProcessInfo.processInfo.environment
-        guard auditValue("SAYIT_MODEL_AUDIT_ID", in: environment) == "phonon-31m-en",
+        guard let modelID = auditValue("SAYIT_MODEL_AUDIT_ID", in: environment),
+              ["phonon-31m-en", "underdog-woof"].contains(modelID),
               let root = auditValue("SAYIT_MODEL_AUDIT_ROOT", in: environment) else {
             return
         }
         let model = try #require(
             ModelCatalogLoader().bundledCatalog().models.first {
-                $0.id == ModelID("phonon-31m-en")
+                $0.id == ModelID(modelID)
             }
         )
         let directory = URL(filePath: root, directoryHint: .isDirectory)
             .appending(path: model.id.rawValue)
             .appending(path: model.revision)
         let synthesizer = SynthesisActor { id in id == model.id ? directory : nil }
-        let longRequest = phononRequest(
+        let longRequest = smokeRequest(
             model: model,
             text: String(repeating: "This passage tests interruption during streamed speech. ", count: 100)
         )
@@ -165,7 +166,7 @@ struct InstalledModelSmokeTests {
 
         for reload in [false, true] {
             if reload { await synthesizer.unloadModel() }
-            let request = phononRequest(model: model, text: "Speech restarts clearly after stopping.")
+            let request = smokeRequest(model: model, text: "Speech restarts clearly after stopping.")
             var samples: [Float] = []
             var audioEvents = 0
             var loaded = false
@@ -195,14 +196,14 @@ struct InstalledModelSmokeTests {
         await synthesizer.unloadModel()
     }
 
-    private func phononRequest(model: ModelDescriptor, text: String) -> SpeechRequest {
+    private func smokeRequest(model: ModelDescriptor, text: String) -> SpeechRequest {
         SpeechRequest(
             cleanedText: CleanedText(
-                text: text, title: "Phonon smoke test", detectedLanguage: "en",
+                text: text, title: "Speech smoke test", detectedLanguage: "en",
                 cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
                 requiresLongTextConfirmation: false
             ),
-            model: model, voice: "default", language: "en", source: .preview
+            model: model, voice: model.defaultVoice, language: "en", source: .preview
         )
     }
 
