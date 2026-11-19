@@ -2,11 +2,16 @@ import Foundation
 import Observation
 import PlaybackDSP
 import SayItCore
-import SayItProtocol
 
 @MainActor
 @Observable
-final class PlaybackController: BackendPlaybackControlling {
+final class PlaybackController {
+    enum Output: Equatable, Sendable {
+        case state(PlaybackState)
+        case failure(String)
+        case externalControl
+    }
+
     static let modelSwitchFadeDuration: Duration = .milliseconds(24)
     static let timeStretchEngineName = TimeStretchStream.engineName
     static let schedulingHorizon: TimeInterval = 12
@@ -114,18 +119,12 @@ final class PlaybackController: BackendPlaybackControlling {
     ] = [:]
 
     @ObservationIgnored
-    var onFailure: (@MainActor (String) -> Void)?
-
-    @ObservationIgnored
-    var onExternalControl: (@MainActor () -> Void)?
-
-    @ObservationIgnored
-    var onStateChange: (@MainActor (PlaybackState) -> Void)?
+    var onOutput: (@MainActor (Output) -> Void) = { _ in }
 
     private(set) var state: PlaybackState = .idle {
         didSet {
             guard state != oldValue else { return }
-            onStateChange?(state)
+            onOutput(.state(state))
         }
     }
     private(set) var elapsed: TimeInterval = 0
@@ -134,16 +133,10 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var amplitudes: [Float] = []
     private(set) var currentTitle = ""
     private(set) var currentModelID: String?
-    private(set) var spokenText = ""
-    private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
 
-    var preferredStartBufferDuration: TimeInterval {
-        bufferPolicy.preferredSourceLead
-    }
-
-    var shouldStartWhenBuffered: Bool {
-        guard state == .preparing || state == .buffering else {
+    private var shouldStartForBufferedAudio: Bool {
+        guard hasStoredAudio, state == .preparing || state == .buffering else {
             return false
         }
         return bufferPolicy.shouldStart(
@@ -223,9 +216,15 @@ final class PlaybackController: BackendPlaybackControlling {
         requestID: UUID,
         title: String,
         estimatedDuration: TimeInterval,
-        modelID: String?
+        modelID: String?,
+        playbackMode: PlaybackMode = .progressive,
+        rate: Double? = nil
     ) {
         stop()
+        self.playbackMode = playbackMode
+        if let rate {
+            self.rate = PlaybackRate.clamped(rate)
+        }
         self.requestID = requestID
         currentTitle = title
         currentModelID = modelID
@@ -261,24 +260,11 @@ final class PlaybackController: BackendPlaybackControlling {
         if state == .preparing || state == .buffering {
             state = .buffering
         }
-        updateNowPlaying()
-    }
-
-    func setSpokenText(_ text: String) {
-        spokenText = text
-        spokenChunks = []
-    }
-
-    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        if let last = spokenChunks.last, last.textStart == chunk.textStart {
-            spokenChunks[spokenChunks.count - 1] = chunk
+        if shouldStartForBufferedAudio {
+            try startPlayback()
         } else {
-            spokenChunks.append(chunk)
+            updateNowPlaying()
         }
-    }
-
-    func setPlaybackMode(_ mode: PlaybackMode) {
-        playbackMode = mode
     }
 
     func observeSynthesisMetrics(_ metrics: SynthesisMetrics) {
@@ -287,6 +273,9 @@ final class PlaybackController: BackendPlaybackControlling {
             ?? SynthesisPerformanceEstimator()
         estimator.record(metrics)
         performanceByModelID[currentModelID] = estimator
+        if shouldStartForBufferedAudio {
+            play()
+        }
     }
 
     func play() {
@@ -320,15 +309,7 @@ final class PlaybackController: BackendPlaybackControlling {
         finishStopping()
     }
 
-    func stopSmoothly() async {
-        await performSmoothStop(duration: Self.smoothStopFadeDuration)
-    }
-
-    func stopForModelSwitch() async {
-        await performSmoothStop(duration: Self.modelSwitchFadeDuration)
-    }
-
-    private func performSmoothStop(duration: Duration) async {
+    func stopSmoothly(forModelSwitch: Bool = false) async {
         cancelAudioConfigurationRecovery()
         stopTransitionGeneration &+= 1
         let generation = stopTransitionGeneration
@@ -339,6 +320,9 @@ final class PlaybackController: BackendPlaybackControlling {
             return
         }
 
+        let duration = forModelSwitch
+            ? Self.modelSwitchFadeDuration
+            : Self.smoothStopFadeDuration
         do {
             let actualDuration = try scheduleFadeOut(
                 from: currentPlaybackTime(),
@@ -416,8 +400,6 @@ final class PlaybackController: BackendPlaybackControlling {
         requestID = nil
         currentTitle = ""
         currentModelID = nil
-        spokenText = ""
-        spokenChunks = []
         failureMessage = nil
         elapsed = 0
         lastStablePlaybackTime = 0
@@ -440,7 +422,7 @@ final class PlaybackController: BackendPlaybackControlling {
             reportFailure(error)
             return
         }
-        if state == .buffering {
+        if shouldStartForBufferedAudio {
             play()
         } else {
             finishPlaybackIfReady()
@@ -993,7 +975,7 @@ final class PlaybackController: BackendPlaybackControlling {
         failureMessage = message
         state = .failed
         updateNowPlaying()
-        onFailure?(message)
+        onOutput(.failure(message))
     }
 
     private func resetAmplitudeAnalysis(sampleRate: Double) {
@@ -1104,7 +1086,7 @@ final class PlaybackController: BackendPlaybackControlling {
             guard PlaybackRate.isSupported(requestedRate) else { return }
             rate = PlaybackRate.normalized(requestedRate)
         }
-        onExternalControl?()
+        onOutput(.externalControl)
     }
 
     private func updateNowPlaying(throttleTimeline: Bool = false) {

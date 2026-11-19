@@ -278,24 +278,37 @@ final class PlaybackControllerFixture {
     let clock = VirtualPlaybackClock()
     let controller: PlaybackController
 
-    private(set) var failures: [String] = []
-    private(set) var externalControlCount = 0
-    private(set) var stateChanges: [PlaybackState] = []
+    private(set) var outputs: [PlaybackController.Output] = []
 
-    init() {
+    var failures: [String] {
+        outputs.compactMap { output in
+            if case .failure(let message) = output { return message }
+            return nil
+        }
+    }
+
+    var externalControlCount: Int {
+        outputs.count { output in
+            if case .externalControl = output { return true }
+            return false
+        }
+    }
+
+    var stateChanges: [PlaybackState] {
+        outputs.compactMap { output in
+            if case .state(let state) = output { return state }
+            return nil
+        }
+    }
+
+    init(usesLiveClock: Bool = false) {
         controller = PlaybackController(
             audioOutput: audioOutput,
             mediaSession: mediaSession,
-            clock: clock
+            clock: usesLiveClock ? LivePlaybackClock() : clock
         )
-        controller.onFailure = { [weak self] message in
-            self?.failures.append(message)
-        }
-        controller.onExternalControl = { [weak self] in
-            self?.externalControlCount += 1
-        }
-        controller.onStateChange = { [weak self] state in
-            self?.stateChanges.append(state)
+        controller.onOutput = { [weak self] output in
+            self?.outputs.append(output)
         }
     }
 
@@ -364,5 +377,25 @@ final class PlaybackControllerFixture {
     func advance(by duration: Duration) async {
         clock.advance(by: duration)
         await settle()
+    }
+
+    func seedStoredAudio(
+        duration: Double = 2.0,
+        title: String = "Seeded Audio",
+        modelID: String? = nil,
+        paused: Bool = false
+    ) throws {
+        let id = UUID()
+        controller.prepare(
+            requestID: id,
+            title: title,
+            estimatedDuration: duration,
+            modelID: modelID
+        )
+        try enqueue(requestID: id, duration: duration)
+        controller.finishBuffering()
+        if paused {
+            controller.pause()
+        }
     }
 }
