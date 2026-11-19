@@ -378,4 +378,24 @@ final class PlaybackControllerFixture {
         clock.advance(by: duration)
         await settle()
     }
+
+    func seedStoredAudio(
+        duration: Double = 2.0,
+        title: String = "Seeded Audio",
+        modelID: String? = nil,
+        paused: Bool = false
+    ) throws {
+        let id = UUID()
+        controller.prepare(
+            requestID: id,
+            title: title,
+            estimatedDuration: duration,
+            modelID: modelID
+        )
+        try enqueue(requestID: id, duration: duration)
+        controller.finishBuffering()
+        if paused {
+            controller.pause()
+        }
+    }
 }

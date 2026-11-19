@@ -156,17 +156,14 @@ struct BackendServiceCommandTests {
             $0.playback.spokenText == text
         }
         await gate.releaseNext()
-        for _ in 0..<300 {
-            guard fixture.playback.generatedDuration < 1 else { break }
-            try await Task.sleep(for: .milliseconds(10))
+        let afterFirstAudio = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 1
         }
-        let afterFirstAudio = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
 
         // Second fragment in the same chunk updates amplitudes without changing spokenChunks.
         await gate.releaseNext()
-        for _ in 0..<300 {
-            guard fixture.playback.generatedDuration < 2 else { break }
-            try await Task.sleep(for: .milliseconds(10))
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 2
         }
         let waveform = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: afterFirstAudio.revision, playbackInterval: 1)
@@ -246,6 +243,189 @@ struct BackendServiceCommandTests {
         #expect(reset.snapshot.playback.spokenChunks.isEmpty)
         await gate.releaseAll()
         _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Waveform and timing revisions stay synchronized on chunk boundary without metrics")
+    func waveformUpdatesOnChunkBoundaryWithoutMetrics() async throws {
+        let gate = BackendSynthesisEventGate()
+        let text = Array(repeating: "word", count: 20_000).joined(separator: " ")
+        let chunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: text)
+        let first = try #require(chunks.first)
+        let second = try #require(chunks.dropFirst().first)
+        let quietSamples = (0..<36_000).map { frame in
+            Float(0.1 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let loudSamples = (0..<24_000).map { frame in
+            Float(0.6 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate,
+            synthesisScript: { request in
+                [
+                    [
+                        .chunkStarted(index: 0, chunk: first),
+                        .audio(AudioChunk(
+                            requestID: request.id, index: 0,
+                            samples: quietSamples, sampleRate: 24_000,
+                            startsParagraph: first.startsParagraph
+                        ))
+                    ],
+                    [
+                        .chunkStarted(index: 1, chunk: second),
+                        .audio(AudioChunk(
+                            requestID: request.id, index: 1,
+                            samples: loudSamples, sampleRate: 24_000,
+                            startsParagraph: second.startsParagraph
+                        ))
+                    ],
+                    [.completed]
+                ]
+            }
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        await fixture.service.start()
+
+        _ = try submittedJob(await fixture.service.handle(.init(
+            command: .submit(SpeechSubmission(
+                text: text, source: .preview,
+                modelID: "kokoro-bf16", permitsLongText: true
+            ))
+        )))
+        await gate.releaseNext()
+        let afterFirst = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.state == PlaybackState.playing.rawValue
+                && $0.playback.generatedDuration >= 1.5
+        }
+
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 2.5
+        }
+        let delta = try #require(try events(await fixture.service.handle(.init(
+            command: .events(after: afterFirst.revision)
+        ))).first)
+        #expect(delta.snapshot.playback.includesWaveform)
+        #expect(!delta.snapshot.playback.amplitudes.isEmpty)
+
+        await gate.releaseAll()
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("History replay cancels queued jobs before awaiting active synthesis cancellation")
+    func replayHistoryCancelsQueuedJobsBeforeSuspension() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: "SayItReplayRace-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let playbackFixture = PlaybackControllerFixture(usesLiveClock: true)
+
+        actor CancelCompletingSynthesizer: BackendSpeechSynthesizing {
+            private let audioOutput: ScriptedPlaybackAudioOutput
+            private var startWaiter: CheckedContinuation<Void, Never>?
+            private var cancelContinuation: CheckedContinuation<Void, Never>?
+            private var started = false
+
+            init(audioOutput: ScriptedPlaybackAudioOutput) {
+                self.audioOutput = audioOutput
+            }
+
+            func waitUntilStarted() async {
+                guard !started else { return }
+                await withCheckedContinuation { startWaiter = $0 }
+            }
+
+            func synthesize(_ request: SpeechRequest) async -> AsyncThrowingStream<SynthesisEvent, Error> {
+                AsyncThrowingStream { continuation in
+                    let task = Task {
+                        continuation.yield(.modelLoaded(request.model.id))
+                        self.markStarted()
+                        await withCheckedContinuation { self.cancelContinuation = $0 }
+                        continuation.finish(throwing: CancellationError())
+                    }
+                    continuation.onTermination = { @Sendable _ in task.cancel() }
+                }
+            }
+
+            private func markStarted() {
+                started = true
+                startWaiter?.resume()
+                startWaiter = nil
+            }
+
+            func cancelCurrentRequest() async {
+                await MainActor.run { audioOutput.completeAllBuffers() }
+                cancelContinuation?.resume()
+                cancelContinuation = nil
+            }
+
+            func unloadModel() async {}
+            func updateConfiguration(chunkTarget _: Int, chunkDelay _: Double, paragraphPause _: Double, idleUnloadDelay _: Double) async {}
+            func prepareDependencies(for _: ModelDescriptor) async throws {}
+            func generateVoiceSample(model _: ModelDescriptor, text _: String, language _: String?, tuning _: VoiceSynthesisTuning, seed _: UInt64, reference _: VoiceReference?) async throws -> GeneratedVoiceSample {
+                GeneratedVoiceSample(samples: [0], sampleRate: 24_000)
+            }
+        }
+
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let model = try #require(catalog.models.first)
+        let relativePath = "\(model.id.rawValue)/\(model.revision)"
+        let modelDir = directories.models.appending(path: relativePath, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        try JSONEncoder.sayIt.encode(ModelInstallation(
+            modelID: model.id, revision: model.revision,
+            installedBytes: model.estimatedDiskBytes, verifiedAt: .now,
+            dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
+            relativePath: relativePath
+        )).write(to: modelDir.appending(path: "installation.json"))
+
+        let store = try HistoryStore(directories: directories)
+        let request = SpeechRequest(
+            cleanedText: CleanedText(
+                text: "Saved text", title: "Saved title",
+                detectedLanguage: "en",
+                cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
+                requiresLongTextConfirmation: false
+            ),
+            model: model, voice: model.defaultVoice, language: "en", source: .frontend
+        )
+        try store.begin(request)
+        let audioURL = directories.historyAudio.appending(path: "\(request.id.uuidString).m4a")
+        try Data([1, 2, 3]).write(to: audioURL)
+        try store.complete(id: request.id, duration: 2, audioRelativePath: "\(request.id.uuidString).m4a", audioByteCount: 3)
+
+        let tone = playbackFixture.makeTone(duration: 2)
+        playbackFixture.audioOutput.fileOpeners[audioURL] = {
+            ScriptedPlaybackAudioFile(sampleRate: 24_000, chunks: [tone])
+        }
+
+        let synthesizer = CancelCompletingSynthesizer(audioOutput: playbackFixture.audioOutput)
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playbackFixture.controller,
+            synthesizer: synthesizer
+        )
+        await service.start()
+
+        _ = try submittedJob(await service.handle(.init(command: .submit(SpeechSubmission(
+            text: "Active", source: .frontend, modelID: model.id.rawValue, permitsLongText: true
+        )))))
+        await synthesizer.waitUntilStarted()
+        let queued = try submittedJob(await service.handle(.init(command: .submit(SpeechSubmission(
+            text: "Queued", source: .frontend, modelID: model.id.rawValue, queuePolicy: .enqueue, permitsLongText: true
+        )))))
+
+        #expect(isAccepted(await service.handle(.init(command: .replayHistory(request.id)))))
+        let jobs = try jobList(await service.handle(.init(command: .jobs)))
+        #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
+        await service.shutdown()
     }
 
     @Test("Lifecycle, protocol, event, and error commands remain coherent")
@@ -2654,18 +2834,11 @@ private final class ServiceFixture {
         modelID: String? = nil,
         paused: Bool = false
     ) throws {
-        let id = UUID()
-        playback.prepare(
-            requestID: id,
-            title: "Seeded Audio",
-            estimatedDuration: duration,
-            modelID: modelID
+        try playbackFixture.seedStoredAudio(
+            duration: duration,
+            modelID: modelID,
+            paused: paused
         )
-        try playbackFixture.enqueue(requestID: id, duration: duration)
-        playback.finishBuffering()
-        if paused {
-            playback.pause()
-        }
     }
 
     func seedInstallation(modelID: String) throws {

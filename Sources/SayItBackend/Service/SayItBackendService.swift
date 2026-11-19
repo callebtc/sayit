@@ -72,7 +72,7 @@ public final class SayItBackendService: SayItService {
                 lastAmplitudes = playback.amplitudes
                 waveformRevision = revision
             }
-            let chunks = spokenChunks
+            let chunks = transcript.chunks
             if lastSpokenChunks != chunks {
                 // Only the last existing anchor can be finalized; text resets
                 // invalidate every anchor, even when the next text is identical.
@@ -1764,7 +1764,7 @@ public final class SayItBackendService: SayItService {
                 submission.playbackRate ?? settings.playbackRate
             )
         )
-        assignSpokenTranscript(
+        transcript.assign(
             cleaned.text,
             language: request.language,
             setsPlaybackContext: submission.source != .preview
@@ -1814,12 +1814,12 @@ public final class SayItBackendService: SayItService {
             statusText = "Creating an article voice"
             updateJob(request.id, state: .synthesizing, progress: 0.12)
         case .chunkStarted(_, let chunk):
-            registerSpokenChunk(chunk)
+            transcript.registerChunk(chunk)
         case .audio(let chunk):
             let revisionBeforeAudio = revision
-            flushPendingSpokenChunk(speechStartOffset: chunk.speechStartOffset)
+            transcript.flushPendingChunk(speechStartOffset: chunk.speechStartOffset)
             try playback.enqueue(chunk)
-            spokenAudioCursor = playback.generatedDuration
+            transcript.updateAudioCursor(playback.generatedDuration)
             if playback.state == .playing {
                 statusText = "Playing"
                 updateJob(request.id, state: .playing, progress: playbackProgress)
@@ -1831,7 +1831,11 @@ public final class SayItBackendService: SayItService {
                 revision &+= 1
             }
         case .metrics(let metrics):
-            finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
+            if transcript.finalizeLastChunk(
+                audioEnd: playback.generatedDuration + metrics.trailingAudioDuration
+            ) {
+                revision &+= 1
+            }
             playback.observeSynthesisMetrics(metrics)
             if playback.state == .playing {
                 statusText = "Playing"
@@ -1853,7 +1857,9 @@ public final class SayItBackendService: SayItService {
             )
             diagnosticsRevision &+= 1
         case .completed:
-            finalizeSpokenChunk(audioEnd: playback.generatedDuration)
+            if transcript.finalizeLastChunk(audioEnd: playback.generatedDuration) {
+                revision &+= 1
+            }
             playback.finishBuffering()
             if playback.state == .playing {
                 statusText = "Playing"
@@ -1869,7 +1875,7 @@ public final class SayItBackendService: SayItService {
     }
 
     private func archiveCompletedRequest(_ request: SpeechRequest) async throws {
-        let spokenChunks = self.spokenChunks
+        let spokenChunks = transcript.chunks
         do {
             let archive = try await playback.archive(using: audioArchive)
             do {
@@ -2086,95 +2092,13 @@ public final class SayItBackendService: SayItService {
         )
     }
 
-    private var spokenText = ""
-    private var spokenChunks: [PlaybackTextChunk] = []
-    private var playbackContext: PlaybackContext?
-    private var spokenTextCharacterCount = 0
-    private var lastRecordedTextEnd = 0
-    private var pendingSpokenSourceRange: Range<Int>?
-    private var spokenAudioCursor: TimeInterval = 0
-
-    private func assignSpokenTranscript(
-        _ text: String,
-        chunks: [PlaybackTextChunk] = [],
-        language: String? = nil,
-        setsPlaybackContext: Bool = true
-    ) {
-        spokenText = text
-        spokenChunks = chunks
-        spokenTextCharacterCount = text.count
-        lastRecordedTextEnd = 0
-        if setsPlaybackContext {
-            playbackContext = PlaybackContext(
-                text: text,
-                language: language
-            )
-        }
-        pendingSpokenSourceRange = nil
-        spokenAudioCursor = 0
-    }
-
-    private func clearSpokenTranscript() {
-        spokenText = ""
-        spokenChunks = []
-        playbackContext = nil
-        spokenTextCharacterCount = 0
-        lastRecordedTextEnd = 0
-        pendingSpokenSourceRange = nil
-        spokenAudioCursor = 0
-    }
-
-    private func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        if let last = spokenChunks.last, last.textStart == chunk.textStart {
-            spokenChunks[spokenChunks.count - 1] = chunk
-        } else {
-            spokenChunks.append(chunk)
-        }
-    }
-
-    private func registerSpokenChunk(_ chunk: SpeechChunk) {
-        let range = chunk.sourceRange
-        guard range.lowerBound >= lastRecordedTextEnd,
-              range.upperBound <= spokenTextCharacterCount,
-              !range.isEmpty else {
-            pendingSpokenSourceRange = nil
-            return
-        }
-        pendingSpokenSourceRange = range
-    }
-
-    private func finalizeSpokenChunk(audioEnd: TimeInterval) {
-        guard let chunk = spokenChunks.last, chunk.audioEnd == nil else { return }
-        appendSpokenChunk(PlaybackTextChunk(
-            textStart: chunk.textStart,
-            textEnd: chunk.textEnd,
-            audioStart: chunk.audioStart,
-            audioEnd: max(audioEnd, chunk.audioStart)
-        ))
-        revision &+= 1
-    }
-
-    private func flushPendingSpokenChunk(speechStartOffset: TimeInterval) {
-        guard let range = pendingSpokenSourceRange else {
-            return
-        }
-        pendingSpokenSourceRange = nil
-        finalizeSpokenChunk(audioEnd: spokenAudioCursor)
-        appendSpokenChunk(
-            PlaybackTextChunk(
-                textStart: range.lowerBound,
-                textEnd: range.upperBound,
-                audioStart: spokenAudioCursor + max(speechStartOffset, 0)
-            )
-        )
-        lastRecordedTextEnd = range.upperBound
-    }
+    private var transcript = SpokenTranscriptState()
 
     private var currentPlaybackContent: PlaybackContentState {
         PlaybackContentState(
             currentTitle: playback.currentTitle,
             modelID: playback.currentModelID,
-            spokenText: spokenText
+            spokenText: transcript.text
         )
     }
 
@@ -2202,7 +2126,7 @@ public final class SayItBackendService: SayItService {
     private func playbackStateDidChange(_ state: PlaybackState) {
         switch state {
         case .idle:
-            clearSpokenTranscript()
+            transcript.reset()
         case .playing:
             updateActiveJobState(.playing)
         case .paused:
@@ -2380,7 +2304,7 @@ public final class SayItBackendService: SayItService {
                 modelID: playbackContent.modelID,
                 amplitudes: playback.amplitudes,
                 spokenText: playbackContent.spokenText,
-                spokenChunks: spokenChunks,
+                spokenChunks: transcript.chunks,
                 includesContent: true
             ),
             download: downloadProgress?.serviceSnapshot,
@@ -2972,14 +2896,11 @@ public final class SayItBackendService: SayItService {
             )
         } catch {
             if playback.state == .idle, previousPlaybackState != .idle {
-                if activeJobID != nil {
-                    await cancelActiveJob(startNext: false, stopPlayback: false)
-                }
-                cancelQueuedJobs()
+                await cancelSupersededSpeechForReplay()
             }
             throw error
         }
-        assignSpokenTranscript(
+        transcript.assign(
             item.cleanedText,
             chunks: timing,
             language: item.language
@@ -2987,10 +2908,14 @@ public final class SayItBackendService: SayItService {
         errorMessage = nil
         statusText = "Playing"
         revision &+= 1
+        await cancelSupersededSpeechForReplay()
+    }
+
+    private func cancelSupersededSpeechForReplay() async {
+        cancelQueuedJobs()
         if activeJobID != nil {
             await cancelActiveJob(startNext: false, stopPlayback: false)
         }
-        cancelQueuedJobs()
     }
 
     private func regenerateHistory(_ id: UUID) async throws -> SpeechJob {
@@ -3026,7 +2951,7 @@ public final class SayItBackendService: SayItService {
                 message: "Install the model before selecting it."
             )
         }
-        let context = playback.state == .idle ? nil : playbackContext
+        let context = playback.state == .idle ? nil : transcript.playbackContext
         if id != ModelID(settingsStore.value.activeModelID) {
             try await selectModel(id)
         }

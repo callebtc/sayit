@@ -199,7 +199,10 @@ struct SpeechQueuePolicyTests {
             playback: fixture.controller
         )
         await service.start()
-        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
+        try fixture.seedStoredAudio(
+            title: "Active Speech",
+            modelID: originalID.rawValue
+        )
 
         let active = try submittedJob(
             await service.handle(
@@ -282,40 +285,27 @@ struct SpeechQueuePolicyTests {
             playback: fixture.controller
         )
         await service.start()
-        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
+        try fixture.seedStoredAudio(
+            title: "Active Speech",
+            modelID: originalID.rawValue
+        )
         var staleSettings = try snapshot(
             await service.handle(ServiceRequest(command: .snapshot))
         ).settings
         staleSettings.speakingPace = SpeakingPace.fast.rawValue
 
-        let selection = Task {
-            await service.handle(
-                ServiceRequest(command: .selectModel(replacementID.rawValue))
+        let (selectionResponse, settingsResponse) =
+            await runCommandDuringModelSwitchFade(
+                .updateSettings(staleSettings),
+                selecting: replacementID,
+                service: service,
+                fixture: fixture
             )
-        }
-        await fixture.until {
-            fixture.clock.pendingSleepDurations.contains(
-                PlaybackController.modelSwitchFadeDuration
-            )
-        }
-        let settingsTask = Task {
-            await service.handle(
-                ServiceRequest(command: .updateSettings(staleSettings))
-            )
-        }
-        await fixture.settle()
-        #expect(
-            fixture.clock.pendingSleepDurations.contains(
-                PlaybackController.modelSwitchFadeDuration
-            )
-        )
-        await fixture.advance(by: PlaybackController.modelSwitchFadeDuration)
-        let settingsResponse = await settingsTask.value
         guard case .accepted = settingsResponse else {
             Issue.record("Expected the settings update to be accepted.")
             return
         }
-        guard case .accepted = await selection.value else {
+        guard case .accepted = selectionResponse else {
             Issue.record("Expected the model switch to be accepted.")
             return
         }
@@ -354,33 +344,20 @@ struct SpeechQueuePolicyTests {
             playback: fixture.controller
         )
         await service.start()
-        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
-
-        let selection = Task {
-            await service.handle(
-                ServiceRequest(command: .selectModel(replacementID.rawValue))
-            )
-        }
-        await fixture.until {
-            fixture.clock.pendingSleepDurations.contains(
-                PlaybackController.modelSwitchFadeDuration
-            )
-        }
-        let rateTask = Task {
-            await service.handle(
-                ServiceRequest(command: .setPlaybackRate(1.5))
-            )
-        }
-        await fixture.settle()
-        #expect(
-            fixture.clock.pendingSleepDurations.contains(
-                PlaybackController.modelSwitchFadeDuration
-            )
+        try fixture.seedStoredAudio(
+            title: "Active Speech",
+            modelID: originalID.rawValue
         )
-        await fixture.advance(by: PlaybackController.modelSwitchFadeDuration)
-        let rateResponse = await rateTask.value
+
+        let (selectionResponse, rateResponse) =
+            await runCommandDuringModelSwitchFade(
+                .setPlaybackRate(1.5),
+                selecting: replacementID,
+                service: service,
+                fixture: fixture
+            )
         guard case .accepted = rateResponse,
-              case .accepted = await selection.value else {
+              case .accepted = selectionResponse else {
             Issue.record("Expected both serialized settings commands to succeed.")
             return
         }
@@ -421,20 +398,16 @@ struct SpeechQueuePolicyTests {
             playback: fixture.controller
         )
         await service.start()
-        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
+        try fixture.seedStoredAudio(
+            title: "Active Speech",
+            modelID: originalID.rawValue
+        )
 
-        let firstSelection = Task {
-            await service.handle(
-                ServiceRequest(
-                    command: .selectModel(firstReplacementID.rawValue)
-                )
-            )
-        }
-        await fixture.until {
-            fixture.clock.pendingSleepDurations.contains(
-                PlaybackController.modelSwitchFadeDuration
-            )
-        }
+        let firstSelection = await startModelSwitchWaitingForFade(
+            service: service,
+            fixture: fixture,
+            modelID: firstReplacementID
+        )
         let finalResponse = await service.handle(
             ServiceRequest(command: .selectModel(finalReplacementID.rawValue))
         )
@@ -666,18 +639,47 @@ struct SpeechQueuePolicyTests {
         )
     }
 
-    private func seedPlayingAudio(
-        on fixture: PlaybackControllerFixture,
-        modelID: String
-    ) throws {
-        let id = UUID()
-        fixture.controller.prepare(
-            requestID: id,
-            title: "Active Speech",
-            estimatedDuration: 2,
-            modelID: modelID
+    private func startModelSwitchWaitingForFade(
+        service: SayItBackendService,
+        fixture: PlaybackControllerFixture,
+        modelID: ModelID
+    ) async -> Task<ServiceResponse, Never> {
+        let selection = Task {
+            await service.handle(
+                ServiceRequest(command: .selectModel(modelID.rawValue))
+            )
+        }
+        await fixture.until {
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
+        }
+        return selection
+    }
+
+    private func runCommandDuringModelSwitchFade(
+        _ command: ServiceCommand,
+        selecting replacementID: ModelID,
+        service: SayItBackendService,
+        fixture: PlaybackControllerFixture
+    ) async -> (selection: ServiceResponse, command: ServiceResponse) {
+        let selection = await startModelSwitchWaitingForFade(
+            service: service,
+            fixture: fixture,
+            modelID: replacementID
         )
-        try fixture.enqueue(requestID: id, duration: 2)
-        fixture.controller.finishBuffering()
+        let commandTask = Task {
+            await service.handle(ServiceRequest(command: command))
+        }
+        await fixture.settle()
+        #expect(
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
+        )
+        await fixture.advance(by: PlaybackController.modelSwitchFadeDuration)
+        let commandResponse = await commandTask.value
+        let selectionResponse = await selection.value
+        return (selectionResponse, commandResponse)
     }
 }

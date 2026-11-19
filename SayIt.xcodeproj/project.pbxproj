@@ -430,6 +430,7 @@
 		D35472040E92E56DCA04F3B2 /* RetentionCandidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10A73BA42E64EDE0FFA4E02 /* RetentionCandidate.swift */; };
 		D35F468DCB178331DDEC4CB7 /* PlaybackContentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C8B25B86087F7FC6D9EBD10 /* PlaybackContentState.swift */; };
 		D4D31CB39994BECADB00C9B1 /* PlaybackSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F08886A5C4C21F1818E471 /* PlaybackSectionView.swift */; };
+		D5E72E7BE8C1BD3297BD7A5B /* SpokenTranscriptState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596089B80C6E8ADDB5A0446F /* SpokenTranscriptState.swift */; };
 		D6412CDA4CB9297F9C24C1DA /* SpeechSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087891890981FE4C0A6CD185 /* SpeechSettingsView.swift */; };
 		D65FDDFC9889D3AD5650B13B /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD8B7FE7FADB3FA2DEA3D88 /* GeneralSettingsView.swift */; };
 		D67A9EF822F5729F3536E29A /* openapi.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 4D514FBB81728B5F7E53FCCE /* openapi.yaml */; };
@@ -995,6 +996,7 @@
 		5784B7D83A0972C04D932513 /* VoiceReferenceFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceReferenceFormat.swift; sourceTree = "<group>"; };
 		5842EBC765548471AD55DED2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		5893C6A2226C5DB7DD366D9A /* VoiceProfileSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfileSnapshot.swift; sourceTree = "<group>"; };
+		596089B80C6E8ADDB5A0446F /* SpokenTranscriptState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenTranscriptState.swift; sourceTree = "<group>"; };
 		5AA4152BB6F9DD6B8ECC9E54 /* PlaybackRateRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRateRequest.swift; sourceTree = "<group>"; };
 		5CC29C1C1131C5748DA67D61 /* SayItHTTPServer+PlaybackRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+PlaybackRoutes.swift"; sourceTree = "<group>"; };
 		5CFAF4C57B11EC6D0AF7F1FA /* SayItHTTPServer+SettingsRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SayItHTTPServer+SettingsRoutes.swift"; sourceTree = "<group>"; };
@@ -1764,6 +1766,7 @@
 				2E46EB83C78D6FE379603B90 /* SayItBackendService.swift */,
 				42453BD4A1521C07FC437B41 /* ServiceEventHub.swift */,
 				0BE5C34234C6C62438D71E5A /* SpeechJobSource+TriggerSource.swift */,
+				596089B80C6E8ADDB5A0446F /* SpokenTranscriptState.swift */,
 			);
 			path = Service;
 			sourceTree = "<group>";
@@ -2948,6 +2951,7 @@
 				FCCC10F5D9C4F8CFED7E15FD /* ServiceEventHub.swift in Sources */,
 				05F4361DDBD00ADEC9FA4D25 /* SpeechItem.swift in Sources */,
 				BF93DE1D2B25E06EC0FA2815 /* SpeechJobSource+TriggerSource.swift in Sources */,
+				D5E72E7BE8C1BD3297BD7A5B /* SpokenTranscriptState.swift in Sources */,
 				4F4C80F9B704A34D4DE00AEB /* String+Padding.swift in Sources */,
 				E70CB86990DB91139F05A377 /* SupportedModelTypes.swift in Sources */,
 				AC7F2812FD464707EE4D6006 /* SynthesisActor.swift in Sources */,
