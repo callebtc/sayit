@@ -18,71 +18,414 @@ struct BackendServiceCommandTests {
             await fixture.service.start()
             let id = try #require(fixture.historyID)
             #expect(isAccepted(await fixture.service.handle(.init(command: .replayHistory(id)))))
-            #expect(fixture.playback.spokenText == "Saved text")
-            #expect(fixture.playback.spokenChunks == (includesTiming ? [
+            let replayed = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+            #expect(replayed.playback.spokenText == "Saved text")
+            #expect(replayed.playback.spokenChunks == (includesTiming ? [
                 PlaybackTextChunk(textStart: 0, textEnd: 10, audioStart: 0.25, audioEnd: 2)
             ] : []))
+
+            #expect(isAccepted(await fixture.service.handle(.init(command: .clear))))
+            let cleared = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+            #expect(cleared.playback.state == PlaybackState.idle.rawValue)
+            #expect(cleared.playback.spokenText.isEmpty)
+            #expect(cleared.playback.spokenChunks.isEmpty)
         }
+    }
+
+    @Test("Transcript clears on remote stop and preserves prior state on failed file replay")
+    func transcriptClearsOnIdleAndPreservesOnFailedReplay() async throws {
+        let fixture = try ServiceFixture(
+            seedVoiceAndHistory: true,
+            seedPlaybackTiming: true,
+            extraHistory: [
+                (text: "Broken opener", title: "Unopened", includesTiming: false),
+                (text: "Corrupt stream", title: "Corrupt", includesTiming: false)
+            ]
+        )
+        defer { fixture.remove() }
+        await fixture.service.start()
+        let validID = try #require(fixture.historyID)
+        let unopenedID = fixture.extraHistoryItems[0].id
+        let corruptID = fixture.extraHistoryItems[1].id
+        let corruptURL = fixture.extraHistoryItems[1].audioURL
+        #expect(isAccepted(await fixture.service.handle(.init(command: .replayHistory(validID)))))
+
+        // Remote stop returns playback to .idle and clears coordinator transcript state.
+        fixture.playbackFixture.mediaSession.sendRemoteCommand(.stop)
+        let afterRemoteStop = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(afterRemoteStop.playback.state == PlaybackState.idle.rawValue)
+        #expect(afterRemoteStop.playback.spokenText.isEmpty)
+        #expect(afterRemoteStop.playback.spokenChunks.isEmpty)
+
+        // Failed file open keeps prior active history transcript intact.
+        #expect(isAccepted(await fixture.service.handle(.init(command: .replayHistory(validID)))))
+        let unopenedResponse = await fixture.service.handle(.init(command: .replayHistory(unopenedID)))
+        guard case .failure = unopenedResponse else {
+            Issue.record("Expected unreadable history audio to fail replay.")
+            return
+        }
+        let preserved = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(preserved.playback.state == PlaybackState.playing.rawValue)
+        #expect(preserved.playback.currentTitle == "Saved title")
+        #expect(preserved.playback.spokenText == "Saved text")
+        #expect(preserved.playback.spokenChunks == [
+            PlaybackTextChunk(textStart: 0, textEnd: 10, audioStart: 0.25, audioEnd: 2)
+        ])
+
+        // Mid-stream decode failure stops to .idle and clears coordinator transcript state.
+        let tone = fixture.playbackFixture.makeTone(duration: 0.5)
+        fixture.playbackFixture.audioOutput.fileOpeners[corruptURL] = {
+            ScriptedPlaybackAudioFile(
+                sampleRate: 24_000,
+                chunks: [tone, tone],
+                chunkReadFailure: (index: 1, error: PlaybackError.unsupportedAudioFile)
+            )
+        }
+        let corruptResponse = await fixture.service.handle(.init(command: .replayHistory(corruptID)))
+        guard case .failure = corruptResponse else {
+            Issue.record("Expected corrupt history stream to fail replay.")
+            return
+        }
+        let afterDecodeFailure = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(afterDecodeFailure.playback.state == PlaybackState.idle.rawValue)
+        #expect(afterDecodeFailure.playback.spokenText.isEmpty)
+        #expect(afterDecodeFailure.playback.spokenChunks.isEmpty)
     }
 
     @Test("Waveform changes omit long transcripts and timing updates send only changed suffixes")
     func independentPlaybackRevisions() async throws {
-        let fixture = try ServiceFixture()
+        let gate = BackendSynthesisEventGate()
+        let text = Array(repeating: "word", count: 20_000).joined(separator: " ")
+        let textChunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: text)
+        let firstSourceChunk = try #require(textChunks.first)
+        let secondSourceChunk = try #require(textChunks.dropFirst().first)
+        let quietTone = (0..<24_000).map { frame in
+            Float(0.2 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let loudTone = (0..<24_000).map { frame in
+            Float(0.6 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate,
+            synthesisScript: { request in
+                [
+                    [.chunkStarted(index: 0, chunk: firstSourceChunk),
+                     .audio(AudioChunk(
+                         requestID: request.id, index: 0,
+                         samples: quietTone, sampleRate: 24_000,
+                         startsParagraph: firstSourceChunk.startsParagraph
+                     ))],
+                    [.audio(AudioChunk(
+                        requestID: request.id, index: 0,
+                        samples: loudTone, sampleRate: 24_000,
+                        startsParagraph: false
+                    ))],
+                    [.metrics(SynthesisMetrics(
+                        chunkIndex: 0, generationDuration: 0.2,
+                        audioDuration: 2, trailingAudioDuration: 0
+                    ))],
+                    [.chunkStarted(index: 1, chunk: secondSourceChunk),
+                     .audio(AudioChunk(
+                         requestID: request.id, index: 1,
+                         samples: quietTone, sampleRate: 24_000,
+                         startsParagraph: secondSourceChunk.startsParagraph
+                     ))],
+                    [.metrics(SynthesisMetrics(
+                        chunkIndex: 1, generationDuration: 0.2,
+                        audioDuration: 1, trailingAudioDuration: 0
+                    ))],
+                    [.completed]
+                ]
+            }
+        )
         defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
-        fixture.playback.setSpokenText(String(repeating: "word ", count: 100_000))
-        await fixture.service.reportServiceError("Initial content")
-        let full = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
-        fixture.playback.setAmplitudesForTesting([0.2, 0.8])
-        await fixture.service.reportServiceError("Waveform updated")
+
+        _ = try submittedJob(await fixture.service.handle(.init(
+            command: .submit(SpeechSubmission(
+                text: text, source: .preview,
+                modelID: fixture.seedModelID, permitsLongText: true
+            ))
+        )))
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.spokenText == text
+        }
+        await gate.releaseNext()
+        let afterFirstAudio = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 1
+        }
+
+        // Second fragment in the same chunk updates amplitudes without changing spokenChunks.
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 2
+        }
         let waveform = try #require(try events(await fixture.service.handle(.init(
-            command: .waitForEvents(after: full.revision, playbackInterval: 1)
+            command: .waitForEvents(after: afterFirstAudio.revision, playbackInterval: 1)
         ))).first)
         #expect(!waveform.snapshot.playback.includesContent)
         #expect(waveform.snapshot.playback.spokenText.isEmpty)
         #expect(waveform.snapshot.playback.includesWaveform)
         #expect(!waveform.snapshot.playback.includesTiming)
+        #expect(!waveform.snapshot.playback.amplitudes.isEmpty)
         #expect(try SayItWireCodec.encode(waveform.snapshot.playback).count < 2_000)
 
-        let first = PlaybackTextChunk(textStart: 0, textEnd: 20, audioStart: 0, audioEnd: 2)
-        fixture.playback.appendSpokenChunk(first)
-        await fixture.service.reportServiceError("First passage")
+        let firstFinalized = PlaybackTextChunk(
+            textStart: firstSourceChunk.sourceRange.lowerBound,
+            textEnd: firstSourceChunk.sourceRange.upperBound,
+            audioStart: 0,
+            audioEnd: 2
+        )
+        await gate.releaseNext()
         let initialTiming = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: waveform.id, playbackInterval: 1)
         ))).first)
         #expect(initialTiming.snapshot.playback.includesTiming)
-        #expect(initialTiming.snapshot.playback.spokenChunks == [first])
+        #expect(initialTiming.snapshot.playback.spokenChunks == [firstFinalized])
         #expect(!initialTiming.snapshot.playback.includesWaveform)
-        let second = PlaybackTextChunk(textStart: 21, textEnd: 40, audioStart: 3)
-        fixture.playback.appendSpokenChunk(second)
-        await fixture.service.reportServiceError("Second passage")
+
+        let secondOpen = PlaybackTextChunk(
+            textStart: secondSourceChunk.sourceRange.lowerBound,
+            textEnd: secondSourceChunk.sourceRange.upperBound,
+            audioStart: 2
+        )
+        await gate.releaseNext()
         let appended = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: initialTiming.id, playbackInterval: 1)
         ))).first)
         #expect(appended.snapshot.playback.timingStartIndex == 1)
-        #expect(appended.snapshot.playback.spokenChunks == [second])
-        let finalized = PlaybackTextChunk(textStart: 21, textEnd: 40, audioStart: 3, audioEnd: 6)
-        fixture.playback.appendSpokenChunk(finalized)
-        await fixture.service.reportServiceError("Finalized passage")
+        #expect(appended.snapshot.playback.spokenChunks == [secondOpen])
+
+        let secondFinalized = PlaybackTextChunk(
+            textStart: secondSourceChunk.sourceRange.lowerBound,
+            textEnd: secondSourceChunk.sourceRange.upperBound,
+            audioStart: 2,
+            audioEnd: 3
+        )
+        await gate.releaseNext()
         let final = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: appended.id, playbackInterval: 1)
         ))).first)
         #expect(final.snapshot.playback.timingStartIndex == 1)
-        #expect(final.snapshot.playback.spokenChunks == [finalized])
+        #expect(final.snapshot.playback.spokenChunks == [secondFinalized])
+        #expect(!final.snapshot.playback.includesWaveform)
+
         // A reader that missed several events receives all missing anchors.
         let catchingUp = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: waveform.id, playbackInterval: 1)
         ))).first)
         #expect(catchingUp.snapshot.playback.timingStartIndex == 0)
-        #expect(catchingUp.snapshot.playback.spokenChunks == [first, finalized])
-        fixture.playback.setSpokenText(full.playback.spokenText)
-        await fixture.service.reportServiceError("Same text, new playback")
+        #expect(catchingUp.snapshot.playback.spokenChunks == [firstFinalized, secondFinalized])
+
+        // Re-submitting identical text resets timing anchors even when spokenText is unchanged.
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.estimatedDuration == 3
+        }
+        _ = try submittedJob(await fixture.service.handle(.init(
+            command: .submit(SpeechSubmission(
+                text: text, source: .preview,
+                modelID: fixture.seedModelID,
+                queuePolicy: .replaceAll,
+                permitsLongText: true
+            ))
+        )))
         let reset = try #require(try events(await fixture.service.handle(.init(
             command: .waitForEvents(after: final.id, playbackInterval: 1)
         ))).first)
         #expect(reset.snapshot.playback.includesTiming)
         #expect(reset.snapshot.playback.timingStartIndex == 0)
         #expect(reset.snapshot.playback.spokenChunks.isEmpty)
+        await gate.releaseAll()
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("Waveform and timing revisions stay synchronized on chunk boundary without metrics")
+    func waveformUpdatesOnChunkBoundaryWithoutMetrics() async throws {
+        let gate = BackendSynthesisEventGate()
+        let text = Array(repeating: "word", count: 20_000).joined(separator: " ")
+        let chunks = TextChunker(
+            targetCharacterCount: 2_000,
+            hardCharacterLimit: 2_500
+        ).chunks(for: text)
+        let first = try #require(chunks.first)
+        let second = try #require(chunks.dropFirst().first)
+        let quietSamples = (0..<36_000).map { frame in
+            Float(0.1 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let loudSamples = (0..<24_000).map { frame in
+            Float(0.6 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+        }
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate,
+            synthesisScript: { request in
+                [
+                    [
+                        .chunkStarted(index: 0, chunk: first),
+                        .audio(AudioChunk(
+                            requestID: request.id, index: 0,
+                            samples: quietSamples, sampleRate: 24_000,
+                            startsParagraph: first.startsParagraph
+                        ))
+                    ],
+                    [
+                        .chunkStarted(index: 1, chunk: second),
+                        .audio(AudioChunk(
+                            requestID: request.id, index: 1,
+                            samples: loudSamples, sampleRate: 24_000,
+                            startsParagraph: second.startsParagraph
+                        ))
+                    ],
+                    [.completed]
+                ]
+            }
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: "kokoro-bf16")
+        await fixture.service.start()
+
+        _ = try submittedJob(await fixture.service.handle(.init(
+            command: .submit(SpeechSubmission(
+                text: text, source: .preview,
+                modelID: "kokoro-bf16", permitsLongText: true
+            ))
+        )))
+        await gate.releaseNext()
+        let afterFirst = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.state == PlaybackState.playing.rawValue
+                && $0.playback.generatedDuration >= 1.5
+        }
+
+        await gate.releaseNext()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.playback.generatedDuration >= 2.5
+        }
+        let delta = try #require(try events(await fixture.service.handle(.init(
+            command: .events(after: afterFirst.revision)
+        ))).first)
+        #expect(delta.snapshot.playback.includesWaveform)
+        #expect(!delta.snapshot.playback.amplitudes.isEmpty)
+
+        await gate.releaseAll()
+        _ = await fixture.service.handle(.init(command: .clear))
+    }
+
+    @Test("History replay cancels queued jobs before awaiting active synthesis cancellation")
+    func replayHistoryCancelsQueuedJobsBeforeSuspension() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: "SayItReplayRace-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directories = try AppDirectories.testing(root: root)
+        let playbackFixture = PlaybackControllerFixture(usesLiveClock: true)
+
+        actor CancelCompletingSynthesizer: BackendSpeechSynthesizing {
+            private let audioOutput: ScriptedPlaybackAudioOutput
+            private var startWaiter: CheckedContinuation<Void, Never>?
+            private var cancelContinuation: CheckedContinuation<Void, Never>?
+            private var started = false
+
+            init(audioOutput: ScriptedPlaybackAudioOutput) {
+                self.audioOutput = audioOutput
+            }
+
+            func waitUntilStarted() async {
+                guard !started else { return }
+                await withCheckedContinuation { startWaiter = $0 }
+            }
+
+            func synthesize(_ request: SpeechRequest) async -> AsyncThrowingStream<SynthesisEvent, Error> {
+                AsyncThrowingStream { continuation in
+                    let task = Task {
+                        continuation.yield(.modelLoaded(request.model.id))
+                        self.markStarted()
+                        await withCheckedContinuation { self.cancelContinuation = $0 }
+                        continuation.finish(throwing: CancellationError())
+                    }
+                    continuation.onTermination = { @Sendable _ in task.cancel() }
+                }
+            }
+
+            private func markStarted() {
+                started = true
+                startWaiter?.resume()
+                startWaiter = nil
+            }
+
+            func cancelCurrentRequest() async {
+                await MainActor.run { audioOutput.completeAllBuffers() }
+                cancelContinuation?.resume()
+                cancelContinuation = nil
+            }
+
+            func unloadModel() async {}
+            func updateConfiguration(chunkTarget _: Int, chunkDelay _: Double, paragraphPause _: Double, idleUnloadDelay _: Double) async {}
+            func prepareDependencies(for _: ModelDescriptor) async throws {}
+            func generateVoiceSample(model _: ModelDescriptor, text _: String, language _: String?, tuning _: VoiceSynthesisTuning, seed _: UInt64, reference _: VoiceReference?) async throws -> GeneratedVoiceSample {
+                GeneratedVoiceSample(samples: [0], sampleRate: 24_000)
+            }
+        }
+
+        let catalog = try ModelCatalogLoader().bundledCatalog()
+        let model = try #require(catalog.models.first)
+        let relativePath = "\(model.id.rawValue)/\(model.revision)"
+        let modelDir = directories.models.appending(path: relativePath, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        try JSONEncoder.sayIt.encode(ModelInstallation(
+            modelID: model.id, revision: model.revision,
+            installedBytes: model.estimatedDiskBytes, verifiedAt: .now,
+            dependenciesVerifiedAt: .now,
+            dependenciesFingerprint: catalog.dependencyFingerprint(for: model),
+            relativePath: relativePath
+        )).write(to: modelDir.appending(path: "installation.json"))
+
+        let store = try HistoryStore(directories: directories)
+        let request = SpeechRequest(
+            cleanedText: CleanedText(
+                text: "Saved text", title: "Saved title",
+                detectedLanguage: "en",
+                cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
+                requiresLongTextConfirmation: false
+            ),
+            model: model, voice: model.defaultVoice, language: "en", source: .frontend
+        )
+        try store.begin(request)
+        let audioURL = directories.historyAudio.appending(path: "\(request.id.uuidString).m4a")
+        try Data([1, 2, 3]).write(to: audioURL)
+        try store.complete(id: request.id, duration: 2, audioRelativePath: "\(request.id.uuidString).m4a", audioByteCount: 3)
+
+        let tone = playbackFixture.makeTone(duration: 2)
+        playbackFixture.audioOutput.fileOpeners[audioURL] = {
+            ScriptedPlaybackAudioFile(sampleRate: 24_000, chunks: [tone])
+        }
+
+        let synthesizer = CancelCompletingSynthesizer(audioOutput: playbackFixture.audioOutput)
+        let service = try SayItBackendService(
+            directories: directories,
+            playback: playbackFixture.controller,
+            synthesizer: synthesizer
+        )
+        await service.start()
+
+        _ = try submittedJob(await service.handle(.init(command: .submit(SpeechSubmission(
+            text: "Active", source: .frontend, modelID: model.id.rawValue, permitsLongText: true
+        )))))
+        await synthesizer.waitUntilStarted()
+        let queued = try submittedJob(await service.handle(.init(command: .submit(SpeechSubmission(
+            text: "Queued", source: .frontend, modelID: model.id.rawValue, queuePolicy: .enqueue, permitsLongText: true
+        )))))
+
+        #expect(isAccepted(await service.handle(.init(command: .replayHistory(request.id)))))
+        let jobs = try jobList(await service.handle(.init(command: .jobs)))
+        #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
+        await service.shutdown()
     }
 
     @Test("Lifecycle, protocol, event, and error commands remain coherent")
@@ -301,6 +644,7 @@ struct BackendServiceCommandTests {
         }
         defer { fixture.remove() }
         await fixture.service.start()
+        try fixture.seedStoredAudio()
         #expect(
             isAccepted(
                 await fixture.service.handle(.init(command: .play))
@@ -366,6 +710,7 @@ struct BackendServiceCommandTests {
         }
         defer { fixture.remove() }
         await fixture.service.start()
+        try fixture.seedStoredAudio()
         #expect(
             isAccepted(
                 await fixture.service.handle(.init(command: .play))
@@ -386,7 +731,7 @@ struct BackendServiceCommandTests {
             )
         }
         await sleepGate.waitUntilSleeping()
-        fixture.playback.finishForTesting()
+        fixture.playbackFixture.audioOutput.completeAllBuffers()
         await sleepGate.resume()
 
         let event = try #require(try events(await response.value).first)
@@ -402,6 +747,7 @@ struct BackendServiceCommandTests {
         }
         defer { fixture.remove() }
         await fixture.service.start()
+        try fixture.seedStoredAudio()
         #expect(
             isAccepted(
                 await fixture.service.handle(.init(command: .play))
@@ -410,7 +756,7 @@ struct BackendServiceCommandTests {
         let playing = try snapshot(
             await fixture.service.handle(.init(command: .snapshot))
         )
-        fixture.playback.finishForTesting()
+        fixture.playbackFixture.audioOutput.completeAllBuffers()
 
         let response = await fixture.service.handle(
             .init(
@@ -435,6 +781,7 @@ struct BackendServiceCommandTests {
         }
         defer { fixture.remove() }
         await fixture.service.start()
+        try fixture.seedStoredAudio()
         #expect(
             isAccepted(
                 await fixture.service.handle(.init(command: .play))
@@ -460,8 +807,7 @@ struct BackendServiceCommandTests {
             )
         }
         await sleepGate.waitUntilSleeping()
-        fixture.playback.play()
-        fixture.playback.notifyExternalControl()
+        fixture.playbackFixture.mediaSession.sendRemoteCommand(.play)
 
         let event = try #require(try events(await response.value).first)
         await sleepGate.resume()
@@ -569,15 +915,16 @@ struct BackendServiceCommandTests {
         let fixture = try ServiceFixture()
         defer { fixture.remove() }
         await fixture.service.start()
+        try fixture.seedStoredAudio(duration: 20, paused: true)
 
         #expect(
             isAccepted(await fixture.service.handle(.init(command: .play)))
         )
-        #expect(fixture.playback.playCount == 1)
+        #expect(fixture.playback.state == .playing)
         #expect(
             isAccepted(await fixture.service.handle(.init(command: .pause)))
         )
-        #expect(fixture.playback.pauseCount == 1)
+        #expect(fixture.playback.state == .paused)
         #expect(
             isAccepted(
                 await fixture.service.handle(.init(command: .seek(12.5)))
@@ -634,7 +981,8 @@ struct BackendServiceCommandTests {
         #expect(
             isAccepted(await fixture.service.handle(.init(command: .clear)))
         )
-        #expect(fixture.playback.stopCount >= 1)
+        #expect(fixture.playback.state == .idle)
+        #expect(fixture.playbackFixture.audioOutput.pauseEngineCount >= 1)
     }
 
     @Test("Settings validation covers every backend constraint")
@@ -1045,7 +1393,7 @@ struct BackendServiceCommandTests {
         #expect(replaying.activeJob == nil)
         #expect(replaying.queuedJobs.isEmpty)
         #expect(replaying.playback.state == PlaybackState.playing.rawValue)
-        #expect(fixture.playback.playedFileTitle == "Saved title")
+        #expect(replaying.playback.currentTitle == "Saved title")
         #expect(jobs.first(where: { $0.id == active.id })?.state == .canceled)
         #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
     }
@@ -1118,15 +1466,14 @@ struct BackendServiceCommandTests {
                 )
             )
         )
-        for _ in 0..<300 {
-            guard fixture.playback.spokenChunks.isEmpty else { break }
-            try await Task.sleep(for: .milliseconds(10))
+        let replayedSnapshot = try await waitForServiceSnapshot(fixture.service) {
+            !$0.playback.spokenChunks.isEmpty
         }
 
-        let ranges = fixture.playback.spokenChunks.map {
+        let ranges = replayedSnapshot.playback.spokenChunks.map {
             $0.textStart..<$0.textEnd
         }
-        let spokenText = fixture.playback.spokenText
+        let spokenText = replayedSnapshot.playback.spokenText
         let spokenWords = ranges.flatMap { range in
             let lower = spokenText.index(
                 spokenText.startIndex,
@@ -1139,7 +1486,7 @@ struct BackendServiceCommandTests {
         #expect(ranges.count == 1)
         #expect(spokenWords == text.split(whereSeparator: \.isWhitespace))
         #expect(
-            fixture.playback.spokenChunks.map(\.audioStart)
+            replayedSnapshot.playback.spokenChunks.map(\.audioStart)
                 == [0]
         )
 
@@ -1230,12 +1577,10 @@ struct BackendServiceCommandTests {
                     )
                 )
             )
-            for _ in 0..<300 {
-                guard fixture.playback.spokenText != expectedText else { break }
-                try await Task.sleep(for: .milliseconds(10))
+            let spoken = try await waitForServiceSnapshot(fixture.service) {
+                $0.playback.spokenText == expectedText
             }
-
-            #expect(fixture.playback.spokenText == expectedText)
+            #expect(spoken.playback.spokenText == expectedText)
             _ = await fixture.service.handle(.init(command: .clear))
         }
     }
@@ -1568,8 +1913,11 @@ struct BackendServiceCommandTests {
                 )
             )
         )
-        #expect(fixture.playback.playedFileTitle == "Saved title")
-        #expect(fixture.playback.spokenText == "Saved text")
+        let replayed = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(replayed.playback.currentTitle == "Saved title")
+        #expect(replayed.playback.spokenText == "Saved text")
         #expect(
             isAccepted(
                 await fixture.service.handle(
@@ -1842,7 +2190,10 @@ struct BackendServiceCommandTests {
         )
         #expect(loadFailure == "synthesis.failed")
         #expect(fixture.playback.rate == 1.25)
-        #expect(fixture.playback.spokenText == "Valid preset reaches model loading.")
+        let failedSnapshot = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(failedSnapshot.playback.spokenText.isEmpty)
 
         let localizedLoadFailure = try await terminalErrorCode(
             for: SpeechSubmission(
@@ -1880,7 +2231,9 @@ struct BackendServiceCommandTests {
         let fixture = try ServiceFixture(synthesizesAudio: true)
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: "kokoro-bf16")
-        fixture.playback.enqueueError = PlaybackError.couldNotStartEngine
+        fixture.playbackFixture.audioOutput.ensureEngineRunningOutcomes = [
+            .failure(PlaybackError.couldNotStartEngine)
+        ]
         await fixture.service.start()
 
         let errorCode = try await terminalErrorCode(
@@ -1894,6 +2247,13 @@ struct BackendServiceCommandTests {
         )
 
         #expect(errorCode == "playback.failed")
+        let diagnostics = try diagnosticList(
+            await fixture.service.handle(.init(command: .diagnostics))
+        )
+        #expect(diagnostics.contains {
+            $0.category == DiagnosticCategory.playback.rawValue
+                && $0.code == "playback.failed"
+        })
     }
 
     @Test("Installed models validate and complete voice-studio workflows")
@@ -2384,29 +2744,34 @@ struct BackendServiceCommandTests {
 private final class ServiceFixture {
     let root: URL
     let directories: AppDirectories
-    let playback: RecordingBackendPlayback
+    let playbackFixture: PlaybackControllerFixture
+    var playback: PlaybackController { playbackFixture.controller }
     let synthesizer: DeterministicSynthesizer
     let service: SayItBackendService
     let seedModelID = "qwen3-06b-base-8bit"
     private(set) var profileID: UUID?
     private(set) var historyID: UUID?
+    private(set) var extraHistoryItems: [(id: UUID, audioURL: URL)] = []
 
     init(
         seedVoiceAndHistory: Bool = false,
         seedPlaybackTiming: Bool = false,
+        extraHistory: [(text: String, title: String, includesTiming: Bool)] = [],
         synthesizesAudio: Bool = false,
         synthesisEventGate: BackendSynthesisEventGate? = nil,
         downloadCatalog: ModelCatalog? = nil,
         downloadSession: URLSession? = nil,
         dependencyPreparationGate: DependencyPreparationGate? = nil,
         eventSleep: ServiceEventHub.Sleep? = nil,
-        synthesisStallTimeout: Duration = .seconds(300)
+        synthesisStallTimeout: Duration = .seconds(300),
+        synthesisScript: DeterministicSynthesizer.ScriptBuilder? = nil
     ) throws {
         root = FileManager.default.temporaryDirectory.appending(
             path: "SayItServiceTests-\(UUID().uuidString)",
             directoryHint: .isDirectory
         )
         directories = try AppDirectories.testing(root: root)
+        playbackFixture = PlaybackControllerFixture(usesLiveClock: true)
         if seedVoiceAndHistory {
             profileID = UUID()
             try Self.seedProfile(
@@ -2414,14 +2779,27 @@ private final class ServiceFixture {
                 modelID: seedModelID,
                 directories: directories
             )
-            historyID = try Self.seedHistory(
+            let history = try Self.seedHistory(
                 directories: directories, includesTiming: seedPlaybackTiming
             )
+            historyID = history.id
+            let tone = playbackFixture.makeTone(duration: 2.0)
+            playbackFixture.audioOutput.fileOpeners[history.audioURL] = {
+                ScriptedPlaybackAudioFile(sampleRate: 24_000, chunks: [tone])
+            }
         }
-        playback = RecordingBackendPlayback()
+        for item in extraHistory {
+            extraHistoryItems.append(try Self.seedHistory(
+                directories: directories,
+                text: item.text,
+                title: item.title,
+                includesTiming: item.includesTiming
+            ))
+        }
         synthesizer = DeterministicSynthesizer(
             synthesizesAudio: synthesizesAudio,
             eventGate: synthesisEventGate,
+            scriptBuilder: synthesisScript,
             dependencyPreparationGate: dependencyPreparationGate
         )
         let modelManager: ModelManager?
@@ -2438,7 +2816,7 @@ private final class ServiceFixture {
         service = try SayItBackendService(
             directories: directories,
             serviceVersion: "test-version",
-            playback: playback,
+            playback: playbackFixture.controller,
             synthesizer: synthesizer,
             catalogOverride: downloadCatalog,
             modelManagerOverride: modelManager,
@@ -2449,6 +2827,18 @@ private final class ServiceFixture {
 
     func remove() {
         try? FileManager.default.removeItem(at: root)
+    }
+
+    func seedStoredAudio(
+        duration: Double = 2.0,
+        modelID: String? = nil,
+        paused: Bool = false
+    ) throws {
+        try playbackFixture.seedStoredAudio(
+            duration: duration,
+            modelID: modelID,
+            paused: paused
+        )
     }
 
     func seedInstallation(modelID: String) throws {
@@ -2547,16 +2937,18 @@ private final class ServiceFixture {
 
     private static func seedHistory(
         directories: AppDirectories,
+        text: String = "Saved text",
+        title: String = "Saved title",
         includesTiming: Bool
-    ) throws -> UUID {
+    ) throws -> (id: UUID, audioURL: URL) {
         let store = try HistoryStore(directories: directories)
         let model = try #require(
             ModelCatalogLoader().bundledCatalog().models.first
         )
         let request = SpeechRequest(
             cleanedText: CleanedText(
-                text: "Saved text",
-                title: "Saved title",
+                text: text,
+                title: title,
                 detectedLanguage: "en",
                 cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
                 requiresLongTextConfirmation: false
@@ -2568,9 +2960,8 @@ private final class ServiceFixture {
         )
         try store.begin(request)
         let relativePath = "\(request.id.uuidString).m4a"
-        try Data([1, 2, 3]).write(
-            to: directories.historyAudio.appending(path: relativePath)
-        )
+        let audioURL = directories.historyAudio.appending(path: relativePath)
+        try Data([1, 2, 3]).write(to: audioURL)
         try store.complete(
             id: request.id,
             duration: 2,
@@ -2580,7 +2971,7 @@ private final class ServiceFixture {
                 PlaybackTextChunk(textStart: 0, textEnd: 10, audioStart: 0.25, audioEnd: 2)
             ] : []
         )
-        return request.id
+        return (request.id, audioURL)
     }
 }
 
@@ -2648,9 +3039,23 @@ private actor BackendSynthesisEventGate {
         }
         waiters.removeFirst().resume()
     }
+
+    func releaseAll() {
+        permits += 100
+        while !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        }
+    }
 }
 
 private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
+    typealias ScriptBuilder = @Sendable (SpeechRequest) -> [[SynthesisEvent]]
+
+    private static let sampleRate = 24_000.0
+    private static let oneSecondTone: [Float] = (0..<24_000).map { frame in
+        Float(0.1 * sin(2 * .pi * 220 * Double(frame) / 24_000))
+    }
+
     private(set) var requestedModelIDs: [String] = []
     private(set) var requestedLanguages: [String?] = []
     private(set) var requestedVoiceDescriptions: [String?] = []
@@ -2658,15 +3063,18 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
     private let eventGate: BackendSynthesisEventGate?
+    private let scriptBuilder: ScriptBuilder?
     private let dependencyPreparationGate: DependencyPreparationGate?
 
     init(
         synthesizesAudio: Bool = false,
         eventGate: BackendSynthesisEventGate? = nil,
+        scriptBuilder: ScriptBuilder? = nil,
         dependencyPreparationGate: DependencyPreparationGate? = nil
     ) {
         self.synthesizesAudio = synthesizesAudio
         self.eventGate = eventGate
+        self.scriptBuilder = scriptBuilder
         self.dependencyPreparationGate = dependencyPreparationGate
     }
 
@@ -2684,17 +3092,39 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                 )
             }
         }
+        if let eventGate, let scriptBuilder {
+            let steps = scriptBuilder(request)
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    continuation.yield(.modelLoaded(request.model.id))
+                    for step in steps {
+                        await eventGate.wait()
+                        guard !Task.isCancelled else { break }
+                        for event in step {
+                            continuation.yield(event)
+                        }
+                    }
+                    continuation.finish()
+                }
+                continuation.onTermination = { @Sendable _ in
+                    task.cancel()
+                }
+            }
+        }
         let chunks = TextChunker(
             targetCharacterCount: 2_000,
             hardCharacterLimit: 2_500
         ).chunks(for: request.cleanedText.text)
+        let samples = Self.oneSecondTone
+        let sampleRate = Self.sampleRate
         if let eventGate, chunks.count >= 2 {
             return AsyncThrowingStream { continuation in
-                Task {
+                let task = Task {
                     continuation.yield(.modelLoaded(request.model.id))
                     for (index, chunk) in chunks.prefix(2).enumerated() {
                         if index > 0 {
                             await eventGate.wait()
+                            guard !Task.isCancelled else { break }
                         }
                         continuation.yield(
                             .chunkStarted(index: index, chunk: chunk)
@@ -2704,16 +3134,23 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                                 AudioChunk(
                                     requestID: request.id,
                                     index: index,
-                                    samples: [0.1],
-                                    sampleRate: 1,
+                                    samples: samples,
+                                    sampleRate: sampleRate,
                                     startsParagraph: chunk.startsParagraph
                                 )
                             )
                         )
                     }
                     await eventGate.wait()
+                    guard !Task.isCancelled else {
+                        continuation.finish()
+                        return
+                    }
                     continuation.yield(.completed)
                     continuation.finish()
+                }
+                continuation.onTermination = { @Sendable _ in
+                    task.cancel()
                 }
             }
         }
@@ -2728,8 +3165,8 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
                         AudioChunk(
                             requestID: request.id,
                             index: index,
-                            samples: [0.1],
-                            sampleRate: 1,
+                            samples: samples,
+                            sampleRate: sampleRate,
                             startsParagraph: chunk.startsParagraph
                         )
                     )
@@ -2776,135 +3213,6 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
             },
             sampleRate: 24_000
         )
-    }
-}
-
-@MainActor
-private final class RecordingBackendPlayback: BackendPlaybackControlling {
-    var onFailure: (@MainActor (String) -> Void)?
-    var onExternalControl: (@MainActor () -> Void)?
-    var onStateChange: (@MainActor (PlaybackState) -> Void)?
-    private(set) var state: PlaybackState = .idle {
-        didSet {
-            guard state != oldValue else { return }
-            onStateChange?(state)
-        }
-    }
-    private(set) var elapsed: TimeInterval = 0
-    private(set) var generatedDuration: TimeInterval = 0
-    private(set) var estimatedDuration: TimeInterval = 0
-    private(set) var amplitudes: [Float] = []
-    private(set) var currentTitle = ""
-    private(set) var currentModelID: String?
-    private(set) var spokenText = ""
-    private(set) var spokenChunks: [PlaybackTextChunk] = []
-    private(set) var playCount = 0
-    private(set) var pauseCount = 0
-    private(set) var stopCount = 0
-    private(set) var playedFileTitle: String?
-    var enqueueError: Error?
-    var shouldStartWhenBuffered = false
-    var showTitleInNowPlaying = false
-    var rate: Double = 1
-    var volume: Double = 1
-    var backwardSkipInterval: TimeInterval = 15
-    var forwardSkipInterval: TimeInterval = 30
-
-    func prepare(
-        requestID _: UUID,
-        title: String,
-        estimatedDuration: TimeInterval,
-        modelID: String?
-    ) {
-        currentTitle = title
-        currentModelID = modelID
-        self.estimatedDuration = estimatedDuration
-        state = .preparing
-    }
-
-    func setAmplitudesForTesting(_ values: [Float]) {
-        amplitudes = values
-    }
-
-    func enqueue(_ chunk: AudioChunk) throws {
-        if let enqueueError {
-            throw enqueueError
-        }
-        generatedDuration += chunk.duration
-        state = .buffering
-    }
-
-    func setSpokenText(_ text: String) {
-        spokenText = text
-        spokenChunks = []
-    }
-
-    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        if let last = spokenChunks.last, last.textStart == chunk.textStart {
-            spokenChunks[spokenChunks.count - 1] = chunk
-        } else {
-            spokenChunks.append(chunk)
-        }
-    }
-
-    func play() {
-        playCount += 1
-        state = .playing
-    }
-
-    func pause() {
-        pauseCount += 1
-        state = .paused
-    }
-
-    func stop() {
-        stopCount += 1
-        state = .idle
-        elapsed = 0
-        generatedDuration = 0
-        estimatedDuration = 0
-        currentTitle = ""
-        currentModelID = nil
-    }
-
-    func stopForModelSwitch() async {
-        stop()
-    }
-
-    func seek(to seconds: TimeInterval) {
-        elapsed = seconds
-    }
-
-    func skip(by seconds: TimeInterval) {
-        elapsed += seconds
-    }
-
-    func finishBuffering() {
-        state = .playing
-    }
-
-    func finishForTesting() {
-        state = .finished
-    }
-
-    func notifyExternalControl() {
-        onExternalControl?()
-    }
-
-    func archive(
-        using _: AudioArchive
-    ) async throws -> AudioArchiveResult {
-        throw ServiceFailure(
-            code: "test.archive_unavailable",
-            message: "Not used by these tests."
-        )
-    }
-
-    func playFile(at _: URL, title: String, modelID: String?) throws {
-        playedFileTitle = title
-        currentTitle = title
-        currentModelID = modelID
-        state = .playing
     }
 }
 
