@@ -1,7 +1,4 @@
-@preconcurrency import AVFoundation
-
 import Foundation
-@preconcurrency import MediaPlayer
 import Observation
 import PlaybackDSP
 import SayItCore
@@ -16,25 +13,85 @@ final class PlaybackController: BackendPlaybackControlling {
     static let schedulingChunkDuration: TimeInterval = 2
     static let fileReadFrameCount = 65_536
 
-    static func preferredStartBufferDuration(
-        for rate: Double
-    ) -> TimeInterval {
-        PlaybackBufferPolicy.progressiveBaseLead * max(rate, 1)
+    private static let timelineInterval: Duration = .milliseconds(250)
+    private static let smoothStopFadeDuration: Duration = .milliseconds(12)
+    private static let nowPlayingThrottleInterval: Duration = .milliseconds(500)
+    private static let routeRecoveryDebounceDelay: Duration = .milliseconds(150)
+    private static let routeRecoveryRetryDelays: [Duration] = [
+        .zero,
+        .milliseconds(100),
+        .milliseconds(250),
+        .milliseconds(500)
+    ]
+
+    private struct FrameHorizon {
+        let horizonFrameCount: Int64
+        let chunkFrameCount: Int64
+        private(set) var nextFrame: Int64
+        private(set) var scheduledFrameCount: Int64 = 0
+
+        init(
+            sampleRate: Double,
+            horizonDuration: TimeInterval,
+            chunkDuration: TimeInterval,
+            startingAt startFrame: Int64 = 0
+        ) {
+            horizonFrameCount = max(
+                Int64((sampleRate * horizonDuration).rounded()),
+                1
+            )
+            chunkFrameCount = max(
+                Int64((sampleRate * chunkDuration).rounded()),
+                1
+            )
+            nextFrame = max(startFrame, 0)
+        }
+
+        func nextRange(availableFrameCount: Int64) -> Range<Int64>? {
+            guard nextFrame < availableFrameCount,
+                  scheduledFrameCount < horizonFrameCount else {
+                return nil
+            }
+            let available = availableFrameCount - nextFrame
+            let horizonRemaining = horizonFrameCount - scheduledFrameCount
+            let count = min(chunkFrameCount, available, horizonRemaining)
+            guard count > 0 else { return nil }
+            return nextFrame..<(nextFrame + count)
+        }
+
+        mutating func didSchedule(_ range: Range<Int64>) {
+            guard range.lowerBound == nextFrame, !range.isEmpty else { return }
+            nextFrame = range.upperBound
+            scheduledFrameCount += Int64(range.count)
+        }
+
+        mutating func didComplete(frameCount: Int64) {
+            scheduledFrameCount = max(scheduledFrameCount - frameCount, 0)
+        }
+
+        mutating func reset(startingAt startFrame: Int64) {
+            nextFrame = max(startFrame, 0)
+            scheduledFrameCount = 0
+        }
     }
 
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private let audioOutput: any PlaybackAudioOutput
+    private let mediaSession: any PlaybackMediaSession
+    private let clock: any PlaybackClock
     private var timeStretch: TimeStretchStream?
     private var processingIsComplete = false
     private var pendingSourceFrames: Int64 = 0
     private var scheduledOutputFrames: Int64 = 0
     private var renderRate: Double = 1
-    private let timeline = TimelineDriver()
-    private var audioConfigurationTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var timelineTask: Task<Void, Never>?
+    private var timelineGeneration: UInt64 = 0
+    @ObservationIgnored
     private var audioConfigurationRecoveryTask: Task<Void, Never>?
+    @ObservationIgnored
     private var completionWatchdogTask: Task<Void, Never>?
     private var pcmStore: PCMStore?
-    private var frameScheduler: PCMFrameScheduler?
+    private var frameHorizon: FrameHorizon?
     private var sampleRate: Double = 24_000
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
@@ -43,12 +100,11 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduledBufferCount = 0
     private var shouldFadeInNextScheduledBuffer = false
     private var synthesisIsComplete = false
-    private var isReconfiguringAudioGraph = false
     private var amplitudeWindows: [Float] = []
     private var amplitudePendingEnergy = Double.zero
     private var amplitudePendingSampleCount = 0
     private var amplitudeWindowFrameCount = 1_200
-    private var lastNowPlayingTimelineUpdate = Date.distantPast
+    private var lastNowPlayingTimelineUpdate: ContinuousClock.Instant?
     private var stopTransitionGeneration = 0
     private var audioConfigurationRecoveryGeneration = 0
     private var lastStablePlaybackTime: TimeInterval = 0
@@ -81,9 +137,11 @@ final class PlaybackController: BackendPlaybackControlling {
     private(set) var spokenText = ""
     private(set) var spokenChunks: [PlaybackTextChunk] = []
     private(set) var failureMessage: String?
+
     var preferredStartBufferDuration: TimeInterval {
         bufferPolicy.preferredSourceLead
     }
+
     var shouldStartWhenBuffered: Bool {
         guard state == .preparing || state == .buffering else {
             return false
@@ -97,12 +155,15 @@ final class PlaybackController: BackendPlaybackControlling {
             )
         )
     }
+
     var showTitleInNowPlaying = false {
         didSet { updateNowPlaying() }
     }
+
     var rate: Double = 1 {
         didSet {
             guard rate != oldValue else { return }
+            cancelAudioConfigurationRecovery()
             let wasPlaying = state == .playing
             let anchor = currentPlaybackTime()
             do {
@@ -119,32 +180,43 @@ final class PlaybackController: BackendPlaybackControlling {
             updateNowPlaying()
         }
     }
+
     var volume: Double = 1 {
         didSet {
-            player.volume = Float(volume)
-        }
-    }
-    var backwardSkipInterval: TimeInterval = 15 {
-        didSet {
-            MPRemoteCommandCenter.shared()
-                .skipBackwardCommand.preferredIntervals = [
-                    NSNumber(value: backwardSkipInterval)
-                ]
-        }
-    }
-    var forwardSkipInterval: TimeInterval = 30 {
-        didSet {
-            MPRemoteCommandCenter.shared()
-                .skipForwardCommand.preferredIntervals = [
-                    NSNumber(value: forwardSkipInterval)
-                ]
+            audioOutput.setVolume(Float(volume))
         }
     }
 
-    init() {
-        engine.attach(player)
+    var backwardSkipInterval: TimeInterval = 15 {
+        didSet {
+            mediaSession.setBackwardSkipInterval(backwardSkipInterval)
+        }
+    }
+
+    var forwardSkipInterval: TimeInterval = 30 {
+        didSet {
+            mediaSession.setForwardSkipInterval(forwardSkipInterval)
+        }
+    }
+
+    init(
+        audioOutput: any PlaybackAudioOutput = LivePlaybackAudioOutput(),
+        mediaSession: any PlaybackMediaSession = LivePlaybackMediaSession(),
+        clock: any PlaybackClock = LivePlaybackClock()
+    ) {
+        self.audioOutput = audioOutput
+        self.mediaSession = mediaSession
+        self.clock = clock
+        audioOutput.onConfigurationChange = { [weak self] in
+            self?.scheduleAudioConfigurationRecovery()
+        }
         configureRemoteCommands()
-        monitorAudioConfiguration()
+    }
+
+    deinit {
+        timelineTask?.cancel()
+        completionWatchdogTask?.cancel()
+        audioConfigurationRecoveryTask?.cancel()
     }
 
     func prepare(
@@ -174,7 +246,7 @@ final class PlaybackController: BackendPlaybackControlling {
         if pcmStore == nil {
             sampleRate = chunk.sampleRate
             pcmStore = try PCMStore(sampleRate: chunk.sampleRate)
-            frameScheduler = makeFrameScheduler(sampleRate: chunk.sampleRate)
+            frameHorizon = makeFrameHorizon(sampleRate: chunk.sampleRate)
             resetAmplitudeAnalysis(sampleRate: chunk.sampleRate)
         }
 
@@ -184,7 +256,7 @@ final class PlaybackController: BackendPlaybackControlling {
         try pcmStore.append(chunk.samples)
         generatedDuration = Double(pcmStore.frameCount) / sampleRate
         appendAmplitudeSamples(chunk.samples)
-        try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+        try prepareAudioGraph(sampleRate: sampleRate)
         try scheduleAvailableAudio()
         if state == .preparing || state == .buffering {
             state = .buffering
@@ -228,14 +300,16 @@ final class PlaybackController: BackendPlaybackControlling {
 
     func pause() {
         guard state == .playing else { return }
-        elapsed = AudioRouteRecoveryPolicy.stableAnchor(
+        elapsed = Self.stablePlaybackAnchor(
             lastRendered: lastStablePlaybackTime,
             fallback: currentPlaybackTime(),
             duration: generatedDuration
         )
         lastStablePlaybackTime = elapsed
         cancelAudioConfigurationRecovery()
-        player.pause()
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
+        audioOutput.pause()
         stopTimeline()
         state = .paused
         updateNowPlaying()
@@ -247,7 +321,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func stopSmoothly() async {
-        await performSmoothStop(duration: .milliseconds(12))
+        await performSmoothStop(duration: Self.smoothStopFadeDuration)
     }
 
     func stopForModelSwitch() async {
@@ -260,7 +334,7 @@ final class PlaybackController: BackendPlaybackControlling {
         let generation = stopTransitionGeneration
         requestID = nil
 
-        guard player.isPlaying, hasStoredAudio else {
+        guard audioOutput.isPlaying, hasStoredAudio else {
             finishStopping()
             return
         }
@@ -272,7 +346,9 @@ final class PlaybackController: BackendPlaybackControlling {
             )
             stopTimeline()
             state = .paused
-            try await Task.sleep(for: actualDuration)
+            if actualDuration > .zero {
+                try await clock.sleep(for: actualDuration)
+            }
         } catch {
             guard generation == stopTransitionGeneration else { return }
             finishStopping()
@@ -303,23 +379,22 @@ final class PlaybackController: BackendPlaybackControlling {
             startingAt: startFrame,
             count: requestedFrames
         )
-        let buffer = try makeBuffer(
-            samples: PCMTransitionRamp.fadeOut(samples),
-            sampleRate: sampleRate
-        )
+        guard !samples.isEmpty else {
+            return .zero
+        }
+        let fadedSamples = PCMTransitionRamp.fadeOut(samples)
 
         invalidateScheduledAudio()
         scheduleOffset = target
-        if configuredSampleRate == nil {
-            try prepareAudioGraph(for: buffer.format)
-        } else {
-            try ensureEngineRunning()
-        }
-        try validatePlayerFormat(for: buffer)
-        player.scheduleBuffer(buffer)
-        player.volume = Float(volume)
-        player.play()
-        return .seconds(Double(samples.count) / sampleRate)
+        try prepareAudioGraph(sampleRate: sampleRate)
+        try audioOutput.scheduleBuffer(
+            fadedSamples,
+            sampleRate: sampleRate,
+            completion: nil
+        )
+        audioOutput.setVolume(Float(volume))
+        audioOutput.play()
+        return .seconds(Double(fadedSamples.count) / sampleRate)
     }
 
     private static func timeInterval(for duration: Duration) -> TimeInterval {
@@ -333,10 +408,10 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
-        engine.pause()
-        player.volume = Float(volume)
+        audioOutput.pauseEngine()
+        audioOutput.setVolume(Float(volume))
         pcmStore = nil
-        frameScheduler = nil
+        frameHorizon = nil
         resetAmplitudeAnalysis(sampleRate: sampleRate)
         requestID = nil
         currentTitle = ""
@@ -351,8 +426,9 @@ final class PlaybackController: BackendPlaybackControlling {
         scheduleOffset = 0
         synthesisIsComplete = false
         configuredSampleRate = nil
+        lastNowPlayingTimelineUpdate = nil
         state = .idle
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        mediaSession.clearNowPlaying()
     }
 
     func finishBuffering() {
@@ -397,7 +473,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func skip(by seconds: TimeInterval) {
-        let current = AudioRouteRecoveryPolicy.stableAnchor(
+        let current = Self.stablePlaybackAnchor(
             lastRendered: lastStablePlaybackTime,
             fallback: currentPlaybackTime(),
             duration: generatedDuration
@@ -417,49 +493,39 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func playFile(at url: URL, title: String, modelID: String?) throws {
-        let file = try AVAudioFile(
-            forReading: url,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
+        let file = try audioOutput.openAudioFile(
+            at: url,
+            chunkFrameCount: Self.fileReadFrameCount
         )
-        guard file.length > 0 else {
-            throw PlaybackError.unsupportedAudioFile
-        }
 
         stop()
         requestID = UUID()
         currentTitle = title
         currentModelID = modelID
-        sampleRate = file.processingFormat.sampleRate
+        sampleRate = file.sampleRate
         pcmStore = try PCMStore(sampleRate: sampleRate)
-        frameScheduler = makeFrameScheduler(sampleRate: sampleRate)
+        frameHorizon = makeFrameHorizon(sampleRate: sampleRate)
         resetAmplitudeAnalysis(sampleRate: sampleRate)
 
         do {
-            try importAudioFile(file)
+            while let samples = try file.readNextChunk() {
+                guard !samples.isEmpty else { break }
+                try pcmStore?.append(samples)
+                appendAmplitudeSamples(samples)
+            }
             guard hasStoredAudio else {
                 throw PlaybackError.unsupportedAudioFile
             }
             generatedDuration = Double(pcmStore?.frameCount ?? 0) / sampleRate
             estimatedDuration = generatedDuration
             synthesisIsComplete = true
-            try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+            try prepareAudioGraph(sampleRate: sampleRate)
             try scheduleAvailableAudio()
             try startPlayback()
         } catch {
             stop()
             throw error
         }
-    }
-
-    func exportWAV(to destination: URL, using archive: AudioArchive) async throws {
-        guard let pcmStore, pcmStore.frameCount > 0 else {
-            throw SynthesisError.generatedNoAudio
-        }
-        try await archive.writeWAV(
-            source: pcmStore.snapshot(),
-            destination: destination
-        )
     }
 
     private func startPlayback() throws {
@@ -472,13 +538,13 @@ final class PlaybackController: BackendPlaybackControlling {
             try rescheduleAudio(from: min(elapsed, generatedDuration))
         }
 
-        try ensureEngineRunning()
+        try audioOutput.ensureEngineRunning()
         guard scheduledBufferCount > 0 else {
             finishPlaybackIfReady()
             return
         }
-        if !player.isPlaying {
-            player.play()
+        if !audioOutput.isPlaying {
+            audioOutput.play()
         }
         failureMessage = nil
         state = .playing
@@ -488,140 +554,45 @@ final class PlaybackController: BackendPlaybackControlling {
         updateNowPlaying()
     }
 
-    private func prepareAudioGraph(for format: AVAudioFormat) throws {
-        if let configuredSampleRate {
-            guard sampleRatesMatch(configuredSampleRate, format.sampleRate),
-                  format.channelCount == 1 else {
-                throw PlaybackError.inconsistentSampleRate
-            }
-            try ensureEngineRunning()
-            return
-        }
-        try configureAudioGraph(for: format)
-    }
-
-    private func configureAudioGraph(for format: AVAudioFormat) throws {
-        let outputFormat = engine.outputNode.inputFormat(forBus: 0)
-        guard outputFormat.channelCount > 0, outputFormat.sampleRate > 0 else {
-            throw PlaybackError.noOutputDevice
-        }
-
-        isReconfiguringAudioGraph = true
-        defer { isReconfiguringAudioGraph = false }
-        engine.stop()
-        player.stop()
-        engine.disconnectNodeOutput(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        engine.prepare()
-        configuredSampleRate = format.sampleRate
-        try ensureEngineRunning()
-    }
-
-    private func ensureEngineRunning() throws {
-        guard !engine.isRunning else { return }
-        let outputFormat = engine.outputNode.inputFormat(forBus: 0)
-        guard outputFormat.channelCount > 0, outputFormat.sampleRate > 0 else {
-            throw PlaybackError.noOutputDevice
-        }
-        do {
-            try engine.start()
-        } catch {
-            throw PlaybackError.couldNotStartEngine
-        }
-    }
-
-    private func validatePlayerFormat(for buffer: AVAudioPCMBuffer) throws {
-        let outputFormat = player.outputFormat(forBus: 0)
-        guard outputFormat.channelCount == buffer.format.channelCount,
-              sampleRatesMatch(
-                outputFormat.sampleRate,
-                buffer.format.sampleRate
-              ) else {
-            throw PlaybackError.audioFormatMismatch
-        }
-    }
-
-    private func makeBuffer(
-        samples: [Float],
-        sampleRate: Double
-    ) throws -> AVAudioPCMBuffer {
-        guard !samples.isEmpty else {
-            throw PlaybackError.emptyAudio
-        }
+    private func prepareAudioGraph(sampleRate: Double) throws {
         guard sampleRate.isFinite, sampleRate > 0 else {
             throw PlaybackError.invalidSampleRate
         }
-        guard samples.count <= Int(UInt32.max) else {
-            throw PlaybackError.audioTooLarge
-        }
-        guard samples.allSatisfy(\.isFinite) else {
-            throw PlaybackError.invalidSamples
-        }
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: sampleRate,
-            channels: 1,
-            interleaved: false
-        ),
-        let buffer = AVAudioPCMBuffer(
-            pcmFormat: format,
-            frameCapacity: AVAudioFrameCount(samples.count)
-        ),
-        let channel = buffer.floatChannelData?[0] else {
-            throw PlaybackError.audioFormatMismatch
-        }
-        buffer.frameLength = AVAudioFrameCount(samples.count)
-        samples.withUnsafeBufferPointer { source in
-            guard let address = source.baseAddress else { return }
-            channel.update(from: address, count: samples.count)
-        }
-        return buffer
-    }
-
-    private func monoSamples(from buffer: AVAudioPCMBuffer) throws -> [Float] {
-        guard let channels = buffer.floatChannelData,
-              buffer.format.channelCount > 0,
-              buffer.frameLength > 0 else {
-            throw PlaybackError.unsupportedAudioFile
-        }
-        let channelCount = Int(buffer.format.channelCount)
-        let frameCount = Int(buffer.frameLength)
-        if channelCount == 1 {
-            return Array(
-                UnsafeBufferPointer(
-                    start: channels[0],
-                    count: frameCount
-                )
-            )
-        }
-
-        var samples = [Float](repeating: 0, count: frameCount)
-        for channelIndex in 0..<channelCount {
-            let channel = channels[channelIndex]
-            for frameIndex in 0..<frameCount {
-                samples[frameIndex] += channel[frameIndex] / Float(channelCount)
+        if let configuredSampleRate {
+            guard sampleRatesMatch(configuredSampleRate, sampleRate) else {
+                throw PlaybackError.inconsistentSampleRate
             }
+            try audioOutput.ensureEngineRunning()
+            return
         }
-        return samples
+        try audioOutput.configureGraph(sampleRate: sampleRate)
+        configuredSampleRate = sampleRate
     }
 
     private func schedule(
-        _ buffer: AVAudioPCMBuffer,
+        _ samples: [Float],
         sourceFrameCount: Int64
-    ) {
+    ) throws {
         let generation = scheduleGeneration
         scheduledBufferCount += 1
-        scheduledOutputFrames += Int64(buffer.frameLength)
-        player.scheduleBuffer(
-            buffer,
-            completionCallbackType: .dataPlayedBack
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        scheduledOutputFrames += Int64(samples.count)
+        do {
+            try audioOutput.scheduleBuffer(
+                samples,
+                sampleRate: sampleRate
+            ) { [weak self] in
                 self?.scheduledBufferFinished(
                     generation: generation,
                     frameCount: sourceFrameCount
                 )
             }
+        } catch {
+            scheduledBufferCount = max(scheduledBufferCount - 1, 0)
+            scheduledOutputFrames = max(
+                scheduledOutputFrames - Int64(samples.count),
+                0
+            )
+            throw error
         }
     }
 
@@ -631,7 +602,7 @@ final class PlaybackController: BackendPlaybackControlling {
     ) {
         guard generation == scheduleGeneration else { return }
         scheduledBufferCount = max(scheduledBufferCount - 1, 0)
-        frameScheduler?.didComplete(frameCount: frameCount)
+        frameHorizon?.didComplete(frameCount: frameCount)
         do {
             try scheduleAvailableAudio()
         } catch {
@@ -652,11 +623,11 @@ final class PlaybackController: BackendPlaybackControlling {
         timeStretch = nil
         processingIsComplete = false
         renderRate = rate
-        if var frameScheduler {
-            frameScheduler.reset(startingAt: frameScheduler.nextFrame)
-            self.frameScheduler = frameScheduler
+        if var frameHorizon {
+            frameHorizon.reset(startingAt: frameHorizon.nextFrame)
+            self.frameHorizon = frameHorizon
         }
-        player.stop()
+        audioOutput.stopPlayer()
     }
 
     private func rescheduleAudio(from seconds: TimeInterval) throws {
@@ -668,19 +639,26 @@ final class PlaybackController: BackendPlaybackControlling {
             availableFrameCount
         )
         scheduleOffset = Double(startFrame) / sampleRate
-        frameScheduler?.reset(startingAt: startFrame)
+        frameHorizon?.reset(startingAt: startFrame)
         shouldFadeInNextScheduledBuffer = startFrame < availableFrameCount
         try scheduleAvailableAudio()
     }
 
     private func scheduleAvailableAudio() throws {
-        guard let pcmStore, var frameScheduler, !processingIsComplete else { return }
+        guard let pcmStore, var frameHorizon, !processingIsComplete else {
+            return
+        }
         if timeStretch == nil {
             renderRate = rate
-            timeStretch = try TimeStretchStream(sampleRate: sampleRate, rate: renderRate)
+            timeStretch = try TimeStretchStream(
+                sampleRate: sampleRate,
+                rate: renderRate
+            )
         }
         guard let timeStretch else { return }
-        while let range = frameScheduler.nextRange(availableFrameCount: pcmStore.frameCount) {
+        while let range = frameHorizon.nextRange(
+            availableFrameCount: pcmStore.frameCount
+        ) {
             let samples = try pcmStore.readFrames(
                 startingAt: range.lowerBound,
                 count: Int(range.count)
@@ -690,51 +668,47 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             let output = try timeStretch.process(samples)
             pendingSourceFrames += Int64(range.count)
-            frameScheduler.didSchedule(range)
+            frameHorizon.didSchedule(range)
             try scheduleProcessedAudio(output)
         }
-        if synthesisIsComplete, frameScheduler.nextFrame == pcmStore.frameCount {
+        if synthesisIsComplete, frameHorizon.nextFrame == pcmStore.frameCount {
             let tail = try timeStretch.process([], final: true)
             try scheduleProcessedAudio(tail)
             // A unity-rate stream has no delayed output to attach this accounting to.
             if pendingSourceFrames > 0 {
-                frameScheduler.didComplete(frameCount: pendingSourceFrames)
+                frameHorizon.didComplete(frameCount: pendingSourceFrames)
                 pendingSourceFrames = 0
             }
             processingIsComplete = true
         }
-        self.frameScheduler = frameScheduler
+        self.frameHorizon = frameHorizon
     }
 
     private func scheduleProcessedAudio(_ output: [Float]) throws {
         guard !output.isEmpty else { return }
         var samples = output
         if shouldFadeInNextScheduledBuffer {
-            samples = PCMTransitionRamp.fadeInHead(samples, frameCount: transitionFrameCount)
+            samples = PCMTransitionRamp.fadeInHead(
+                samples,
+                frameCount: transitionFrameCount
+            )
             shouldFadeInNextScheduledBuffer = false
         }
-        let buffer = try makeBuffer(samples: samples, sampleRate: sampleRate)
-        if configuredSampleRate == nil {
-            try prepareAudioGraph(for: buffer.format)
-        } else {
-            try ensureEngineRunning()
-        }
-        try validatePlayerFormat(for: buffer)
-        schedule(buffer, sourceFrameCount: pendingSourceFrames)
+        try prepareAudioGraph(sampleRate: sampleRate)
+        try schedule(samples, sourceFrameCount: pendingSourceFrames)
         pendingSourceFrames = 0
     }
 
     private func currentPlaybackTime() -> TimeInterval {
-        guard player.isPlaying,
-              let nodeTime = player.lastRenderTime,
-              let playerTime = player.playerTime(forNodeTime: nodeTime),
-              playerTime.sampleRate > 0 else {
+        guard audioOutput.isPlaying,
+              let rendered = audioOutput.renderedPosition(),
+              rendered.sampleRate > 0 else {
             return elapsed
         }
+        let renderedFrames = max(min(rendered.frame, scheduledOutputFrames), 0)
         return min(
             scheduleOffset
-                + Double(min(playerTime.sampleTime, scheduledOutputFrames))
-                    / playerTime.sampleRate * renderRate,
+                + Double(renderedFrames) / rendered.sampleRate * renderRate,
             generatedDuration
         )
     }
@@ -800,9 +774,11 @@ final class PlaybackController: BackendPlaybackControlling {
         )
         let delay = remaining / max(rate, 0.1) + 0.75
         let generation = scheduleGeneration
+        let clock = self.clock
         completionWatchdogTask = Task { @MainActor [weak self] in
             do {
-                try await Task.sleep(for: .seconds(delay))
+                try await clock.sleep(for: .seconds(delay))
+                try Task.checkCancellation()
             } catch {
                 return
             }
@@ -828,48 +804,59 @@ final class PlaybackController: BackendPlaybackControlling {
         lastStablePlaybackTime = elapsed
         invalidateScheduledAudio()
         let frame = Int64((elapsed * sampleRate).rounded(.down))
-        frameScheduler?.reset(startingAt: frame)
+        frameHorizon?.reset(startingAt: frame)
         scheduleOffset = Double(frame) / sampleRate
         state = .buffering
         updateNowPlaying()
     }
 
     private func startTimeline() {
-        timeline.start { [weak self] in
-            guard let self, self.state == .playing else { return }
-            self.elapsed = self.currentPlaybackTime()
-            self.lastStablePlaybackTime = self.elapsed
-            self.updateNowPlaying(throttleTimeline: true)
+        guard timelineTask == nil else { return }
+        timelineGeneration &+= 1
+        let activeGeneration = timelineGeneration
+        let clock = self.clock
+        timelineTask = Task { @MainActor [weak self] in
+            do {
+                while !Task.isCancelled {
+                    try await clock.sleep(for: Self.timelineInterval)
+                    try Task.checkCancellation()
+                    guard let self,
+                          self.timelineGeneration == activeGeneration else {
+                        return
+                    }
+                    if self.state == .playing {
+                        self.elapsed = self.currentPlaybackTime()
+                        self.lastStablePlaybackTime = self.elapsed
+                        self.updateNowPlaying(throttleTimeline: true)
+                    }
+                }
+            } catch {
+                // Cancellation and clock failures both end this cadence.
+            }
+            self?.clearTimelineIfCurrent(activeGeneration)
         }
     }
 
     private func stopTimeline() {
-        timeline.stop()
+        timelineGeneration &+= 1
+        timelineTask?.cancel()
+        timelineTask = nil
     }
 
-    private func monitorAudioConfiguration() {
-        audioConfigurationTask = Task { @MainActor [weak self] in
-            guard let engine = self?.engine else { return }
-            for await _ in NotificationCenter.default.notifications(
-                named: .AVAudioEngineConfigurationChange,
-                object: engine
-            ) {
-                guard !Task.isCancelled, let self else { return }
-                self.scheduleAudioConfigurationRecovery()
-            }
-        }
+    private func clearTimelineIfCurrent(_ completedGeneration: UInt64) {
+        guard timelineGeneration == completedGeneration else { return }
+        timelineTask = nil
     }
 
     private func scheduleAudioConfigurationRecovery() {
-        guard !isReconfiguringAudioGraph,
-              configuredSampleRate != nil,
+        guard configuredSampleRate != nil,
               hasStoredAudio,
               state != .idle,
               state != .finished else {
             return
         }
         let previousState = state
-        let resumeTime = AudioRouteRecoveryPolicy.stableAnchor(
+        let resumeTime = Self.stablePlaybackAnchor(
             lastRendered: lastStablePlaybackTime,
             fallback: elapsed,
             duration: generatedDuration
@@ -877,19 +864,19 @@ final class PlaybackController: BackendPlaybackControlling {
         audioConfigurationRecoveryGeneration &+= 1
         let generation = audioConfigurationRecoveryGeneration
         audioConfigurationRecoveryTask?.cancel()
+        let clock = self.clock
         audioConfigurationRecoveryTask = Task { @MainActor [weak self] in
             do {
-                try await Task.sleep(
-                    for: AudioRouteRecoveryPolicy.debounceDelay
-                )
-                var lastError: Error?
-                for delay in AudioRouteRecoveryPolicy.retryDelays {
+                try await clock.sleep(for: Self.routeRecoveryDebounceDelay)
+                try Task.checkCancellation()
+                var lastError: (any Error)?
+                for delay in Self.routeRecoveryRetryDelays {
                     if delay > .zero {
-                        try await Task.sleep(for: delay)
+                        try await clock.sleep(for: delay)
+                        try Task.checkCancellation()
                     }
                     guard let self,
-                          generation
-                            == self.audioConfigurationRecoveryGeneration,
+                          generation == self.audioConfigurationRecoveryGeneration,
                           self.hasStoredAudio else {
                         return
                     }
@@ -902,14 +889,13 @@ final class PlaybackController: BackendPlaybackControlling {
                         return
                     } catch {
                         lastError = error
-                        guard AudioRouteRecoveryPolicy.canRetry(error) else {
+                        guard Self.canRetryAudioConfigurationError(error) else {
                             break
                         }
                     }
                 }
                 guard let self,
-                      generation
-                        == self.audioConfigurationRecoveryGeneration,
+                      generation == self.audioConfigurationRecoveryGeneration,
                       let lastError else {
                     return
                 }
@@ -919,8 +905,7 @@ final class PlaybackController: BackendPlaybackControlling {
                 return
             } catch {
                 guard let self,
-                      generation
-                        == self.audioConfigurationRecoveryGeneration else {
+                      generation == self.audioConfigurationRecoveryGeneration else {
                     return
                 }
                 self.audioConfigurationRecoveryTask = nil
@@ -935,8 +920,7 @@ final class PlaybackController: BackendPlaybackControlling {
     ) throws {
         invalidateScheduledAudio()
         configuredSampleRate = nil
-        let format = try monoFormat(sampleRate: sampleRate)
-        try configureAudioGraph(for: format)
+        try prepareAudioGraph(sampleRate: sampleRate)
         try rescheduleAudio(from: resumeTime)
         elapsed = resumeTime
         lastStablePlaybackTime = resumeTime
@@ -954,56 +938,41 @@ final class PlaybackController: BackendPlaybackControlling {
         audioConfigurationRecoveryTask = nil
     }
 
-    private func monoFormat(sampleRate: Double) throws -> AVAudioFormat {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: sampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw PlaybackError.audioFormatMismatch
+    private static func stablePlaybackAnchor(
+        lastRendered: TimeInterval,
+        fallback: TimeInterval,
+        duration: TimeInterval
+    ) -> TimeInterval {
+        let rendered = lastRendered.isFinite ? lastRendered : 0
+        let fallback = fallback.isFinite ? fallback : 0
+        let duration = duration.isFinite ? max(duration, 0) : 0
+        return min(max(rendered, fallback, 0), duration)
+    }
+
+    private static func canRetryAudioConfigurationError(_ error: any Error) -> Bool {
+        switch error {
+        case PlaybackError.noOutputDevice,
+             PlaybackError.couldNotStartEngine:
+            true
+        default:
+            false
         }
-        return format
     }
 
     private var hasStoredAudio: Bool {
         (pcmStore?.frameCount ?? 0) > 0
     }
 
-    private func makeFrameScheduler(
+    private func makeFrameHorizon(
         sampleRate: Double,
         startingAt startFrame: Int64 = 0
-    ) -> PCMFrameScheduler {
-        PCMFrameScheduler(
+    ) -> FrameHorizon {
+        FrameHorizon(
             sampleRate: sampleRate,
             horizonDuration: Self.schedulingHorizon,
             chunkDuration: Self.schedulingChunkDuration,
             startingAt: startFrame
         )
-    }
-
-    private func importAudioFile(_ file: AVAudioFile) throws {
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: file.processingFormat,
-            frameCapacity: AVAudioFrameCount(Self.fileReadFrameCount)
-        ) else {
-            throw PlaybackError.unsupportedAudioFile
-        }
-
-        while file.framePosition < file.length {
-            let remaining = file.length - file.framePosition
-            let frameCount = AVAudioFrameCount(
-                min(
-                    remaining,
-                    AVAudioFramePosition(Self.fileReadFrameCount)
-                )
-            )
-            try file.read(into: buffer, frameCount: frameCount)
-            guard buffer.frameLength > 0 else { break }
-            let samples = try monoSamples(from: buffer)
-            try pcmStore?.append(samples)
-            appendAmplitudeSamples(samples)
-        }
     }
 
     private func sampleRatesMatch(_ lhs: Double, _ rhs: Double) -> Bool {
@@ -1012,11 +981,13 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func reportFailure(_ error: Error, shouldResume: Bool = false) {
         cancelAudioConfigurationRecovery()
+        completionWatchdogTask?.cancel()
+        completionWatchdogTask = nil
         stopTimeline()
         if shouldResume {
             elapsed = currentPlaybackTime()
         }
-        player.pause()
+        audioOutput.pause()
         let message = (error as? LocalizedError)?.errorDescription
             ?? "Audio playback failed."
         failureMessage = message
@@ -1100,190 +1071,62 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func configureRemoteCommands() {
-        let commands = MPRemoteCommandCenter.shared()
-        commands.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.play()
-                self.onExternalControl?()
-            }
-            return .success
+        mediaSession.configureRemoteCommands(
+            supportedPlaybackRates: PlaybackRate.presets,
+            backwardSkipInterval: backwardSkipInterval,
+            forwardSkipInterval: forwardSkipInterval
+        ) { [weak self] command in
+            self?.handleRemoteCommand(command)
         }
-        commands.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.pause()
-                self.onExternalControl?()
+    }
+
+    private func handleRemoteCommand(_ command: PlaybackRemoteCommand) {
+        switch command {
+        case .play:
+            play()
+        case .pause:
+            pause()
+        case .togglePlayPause:
+            if state == .playing {
+                pause()
+            } else {
+                play()
             }
-            return .success
+        case .stop:
+            stop()
+        case .nextTrack, .skipForward:
+            skip(by: forwardSkipInterval)
+        case .previousTrack, .skipBackward:
+            skip(by: -backwardSkipInterval)
+        case .seek(let position):
+            seek(to: position)
+        case .changePlaybackRate(let requestedRate):
+            guard PlaybackRate.isSupported(requestedRate) else { return }
+            rate = PlaybackRate.normalized(requestedRate)
         }
-        commands.togglePlayPauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                if self.state == .playing {
-                    self.pause()
-                } else {
-                    self.play()
-                }
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.stopCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.stop()
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.nextTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.skip(by: self.forwardSkipInterval)
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.previousTrackCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.skip(by: -self.backwardSkipInterval)
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.skipBackwardCommand.preferredIntervals = [
-            NSNumber(value: backwardSkipInterval)
-        ]
-        commands.skipBackwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.skip(by: -self.backwardSkipInterval)
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.skipForwardCommand.preferredIntervals = [
-            NSNumber(value: forwardSkipInterval)
-        ]
-        commands.skipForwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.skip(by: self.forwardSkipInterval)
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let position = event as? MPChangePlaybackPositionCommandEvent else {
-                return .commandFailed
-            }
-            Task { @MainActor in
-                guard let self else { return }
-                self.seek(to: position.positionTime)
-                self.onExternalControl?()
-            }
-            return .success
-        }
-        commands.changePlaybackRateCommand.supportedPlaybackRates =
-            PlaybackRate.presets.map { NSNumber(value: $0) }
-        commands.changePlaybackRateCommand.addTarget { [weak self] event in
-            guard let rateEvent = event as? MPChangePlaybackRateCommandEvent,
-                  PlaybackRate.isSupported(
-                    Double(rateEvent.playbackRate)
-                  ) else {
-                return .commandFailed
-            }
-            Task { @MainActor in
-                guard let self else { return }
-                self.rate = PlaybackRate.normalized(
-                    Double(rateEvent.playbackRate)
-                )
-                self.onExternalControl?()
-            }
-            return .success
-        }
+        onExternalControl?()
     }
 
     private func updateNowPlaying(throttleTimeline: Bool = false) {
         guard state != .idle else { return }
+        let current = clock.now
         if throttleTimeline,
-           Date.now.timeIntervalSince(lastNowPlayingTimelineUpdate) < 0.5 {
+           let lastNowPlayingTimelineUpdate,
+           lastNowPlayingTimelineUpdate.duration(to: current)
+            < Self.nowPlayingThrottleInterval {
             return
         }
-        lastNowPlayingTimelineUpdate = .now
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: showTitleInNowPlaying && !currentTitle.isEmpty
-                ? currentTitle
-                : "Say It",
-            MPMediaItemPropertyPlaybackDuration: generatedDuration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
-            MPNowPlayingInfoPropertyPlaybackRate: state == .playing ? rate : 0
-        ]
-    }
-}
-
-extension PlaybackController {
-    @MainActor
-    final class TimelineDriver {
-        typealias Sleep = @Sendable (Duration) async throws -> Void
-
-        static let interval = Duration.milliseconds(250)
-
-        private let sleep: Sleep
-        private var task: Task<Void, Never>?
-        private var generation: UInt64 = 0
-
-        var isActive: Bool {
-            task != nil
-        }
-
-        init(
-            sleep: @escaping Sleep = { duration in
-                try await Task.sleep(for: duration)
-            }
-        ) {
-            self.sleep = sleep
-        }
-
-        deinit {
-            task?.cancel()
-        }
-
-        func start(
-            onTick: @escaping @MainActor @Sendable () -> Void
-        ) {
-            guard task == nil else { return }
-            generation &+= 1
-            let activeGeneration = generation
-            let sleep = self.sleep
-            task = Task { @MainActor [weak self] in
-                do {
-                    while !Task.isCancelled {
-                        try await sleep(Self.interval)
-                        try Task.checkCancellation()
-                        guard self?.generation == activeGeneration else {
-                            return
-                        }
-                        onTick()
-                    }
-                } catch {
-                    // Cancellation and clock failures both end this cadence.
-                }
-                self?.clearIfCurrent(activeGeneration)
-            }
-        }
-
-        func stop() {
-            generation &+= 1
-            task?.cancel()
-            task = nil
-        }
-
-        private func clearIfCurrent(_ completedGeneration: UInt64) {
-            guard generation == completedGeneration else { return }
-            task = nil
-        }
+        lastNowPlayingTimelineUpdate = current
+        let title = showTitleInNowPlaying && !currentTitle.isEmpty
+            ? currentTitle
+            : "Say It"
+        mediaSession.publishNowPlaying(
+            PlaybackNowPlayingInfo(
+                title: title,
+                duration: generatedDuration,
+                elapsed: elapsed,
+                playbackRate: state == .playing ? rate : 0
+            )
+        )
     }
 }
