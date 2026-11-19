@@ -44,9 +44,6 @@ final class ScriptedPlaybackAudioOutput: PlaybackAudioOutput {
     private(set) var isPlaying = false
     private(set) var volume: Float = 1
     private(set) var configuredSampleRates: [Double] = []
-    private(set) var ensureEngineRunningCount = 0
-    private(set) var playCount = 0
-    private(set) var pauseCount = 0
     private(set) var stopPlayerCount = 0
     private(set) var pauseEngineCount = 0
     private(set) var scheduledBuffers: [ScheduledBuffer] = []
@@ -74,7 +71,6 @@ final class ScriptedPlaybackAudioOutput: PlaybackAudioOutput {
     }
 
     func ensureEngineRunning() throws {
-        ensureEngineRunningCount += 1
         if !ensureEngineRunningOutcomes.isEmpty {
             try ensureEngineRunningOutcomes.removeFirst().get()
         }
@@ -82,12 +78,10 @@ final class ScriptedPlaybackAudioOutput: PlaybackAudioOutput {
 
     func play() {
         isPlaying = true
-        playCount += 1
     }
 
     func pause() {
         isPlaying = false
-        pauseCount += 1
     }
 
     func stopPlayer() {
@@ -160,7 +154,6 @@ final class ScriptedPlaybackAudioOutput: PlaybackAudioOutput {
 final class ScriptedPlaybackMediaSession: PlaybackMediaSession {
     private(set) var publishedInfos: [PlaybackNowPlayingInfo] = []
     private(set) var clearNowPlayingCount = 0
-    private(set) var clearRemoteCommandsCount = 0
     private(set) var supportedPlaybackRates: [Double] = []
     private(set) var backwardSkipInterval: TimeInterval?
     private(set) var forwardSkipInterval: TimeInterval?
@@ -195,11 +188,6 @@ final class ScriptedPlaybackMediaSession: PlaybackMediaSession {
         forwardSkipInterval = interval
     }
 
-    func clearRemoteCommands() {
-        clearRemoteCommandsCount += 1
-        handler = nil
-    }
-
     func sendRemoteCommand(_ command: PlaybackRemoteCommand) {
         handler?(command)
     }
@@ -217,7 +205,6 @@ final class VirtualPlaybackClock: PlaybackClock {
     private(set) var now: ContinuousClock.Instant = ContinuousClock.now
     private(set) var sleepDurations: [Duration] = []
     private(set) var cancelledSleepDurations: [Duration] = []
-    var queuedSleepErrors: [any Error] = []
     private var pendingSleeps: [PendingSleep] = []
 
     var pendingSleepCount: Int {
@@ -230,9 +217,6 @@ final class VirtualPlaybackClock: PlaybackClock {
 
     func sleep(for duration: Duration) async throws {
         sleepDurations.append(duration)
-        if !queuedSleepErrors.isEmpty {
-            throw queuedSleepErrors.removeFirst()
-        }
         let id = UUID()
         let deadline = now.advanced(by: max(duration, .zero))
         try await withTaskCancellationHandler {

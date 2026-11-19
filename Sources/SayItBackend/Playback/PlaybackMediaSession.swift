@@ -12,5 +12,4 @@ protocol PlaybackMediaSession: AnyObject, Sendable {
     )
     func setBackwardSkipInterval(_ interval: TimeInterval)
     func setForwardSkipInterval(_ interval: TimeInterval)
-    func clearRemoteCommands()
 }

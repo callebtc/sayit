@@ -953,8 +953,7 @@ struct PlaybackControllerTests {
 
     @Test("User controls cancel pending route recovery")
     func routeRecoveryCancelledByUserControls() async throws {
-        let controls: [String] = ["pause", "seek", "stop", "smoothStop"]
-        for control in controls {
+        for control in RecoveryCancellingControl.allCases {
             let fixture = PlaybackControllerFixture()
             let controller = fixture.controller
             let id = UUID()
@@ -978,28 +977,116 @@ struct PlaybackControllerTests {
             let graphsBeforeControl = fixture.audioOutput.configuredSampleRates.count
 
             switch control {
-            case "pause":
+            case .pause:
                 controller.pause()
-            case "seek":
+            case .seek:
                 controller.seek(to: 0.5)
-            case "stop":
+            case .stop:
                 controller.stop()
-            case "smoothStop":
+            case .smoothStop:
                 let task = Task { await controller.stopSmoothly() }
                 await fixture.until {
                     fixture.clock.pendingSleepDurations.contains(.milliseconds(12))
                 }
                 await fixture.advance(by: .milliseconds(12))
                 await task.value
-            default:
-                Issue.record("Unknown control case \(control)")
             }
 
+            await fixture.settle()
+            #expect(
+                fixture.clock.cancelledSleepDurations.contains(.milliseconds(150))
+            )
             await fixture.advance(by: .milliseconds(200))
             #expect(controller.state != .failed)
             #expect(fixture.failures.isEmpty)
             #expect(fixture.audioOutput.configuredSampleRates.count == graphsBeforeControl)
         }
+    }
+
+    @Test("Enqueue validation, buffer scheduling rollback, and engine start failures surface errors cleanly")
+    func enqueueAndPlaybackFailurePaths() throws {
+        let fixture = PlaybackControllerFixture()
+        let controller = fixture.controller
+        let activeID = UUID()
+
+        controller.prepare(
+            requestID: activeID,
+            title: "Failures",
+            estimatedDuration: 1.0,
+            modelID: nil
+        )
+        #expect(fixture.stateChanges.last == .preparing)
+
+        // Mismatched request chunks are ignored without side effects.
+        try fixture.enqueue(requestID: UUID(), duration: 0.5)
+        #expect(controller.generatedDuration == 0)
+        #expect(controller.state == .preparing)
+
+        // Empty samples and invalid sample rates fail before storing audio.
+        #expect(throws: PlaybackError.emptyAudio) {
+            try controller.enqueue(
+                AudioChunk(
+                    requestID: activeID,
+                    index: 0,
+                    samples: [],
+                    sampleRate: 24_000,
+                    startsParagraph: false
+                )
+            )
+        }
+        #expect(throws: PlaybackError.invalidSampleRate) {
+            try controller.enqueue(
+                AudioChunk(
+                    requestID: activeID,
+                    index: 0,
+                    samples: [0.1, 0.2],
+                    sampleRate: 0,
+                    startsParagraph: false
+                )
+            )
+        }
+
+        // Inconsistent sample rate on subsequent chunk is rejected.
+        try fixture.enqueue(requestID: activeID, duration: 0.5, sampleRate: 24_000)
+        #expect(throws: PlaybackError.inconsistentSampleRate) {
+            try fixture.enqueue(
+                requestID: activeID,
+                duration: 0.5,
+                sampleRate: 44_100,
+                index: 1
+            )
+        }
+
+        // Scheduling failure rolls back scheduled counts and transitions cleanly to failed on play().
+        fixture.audioOutput.scheduleBufferError = PlaybackError.audioFormatMismatch
+        controller.seek(to: 0.1)
+        #expect(controller.state == .failed)
+        #expect(
+            controller.failureMessage
+                == PlaybackError.audioFormatMismatch.errorDescription
+        )
+        #expect(fixture.failures.count == 1)
+        #expect(fixture.audioOutput.activeBuffers.isEmpty)
+
+        // Recovering via play() after clearing scheduleBufferError still detects engine-start failure.
+        fixture.audioOutput.scheduleBufferError = nil
+        fixture.audioOutput.ensureEngineRunningOutcomes = [
+            .success(()),
+            .failure(PlaybackError.couldNotStartEngine)
+        ]
+        controller.play()
+        #expect(controller.state == .failed)
+        #expect(
+            controller.failureMessage
+                == PlaybackError.couldNotStartEngine.errorDescription
+        )
+        #expect(fixture.failures.count == 2)
+        #expect(fixture.stateChanges.last == .failed)
+
+        // A subsequent play() succeeds once the engine starts cleanly.
+        controller.play()
+        #expect(controller.state == .playing)
+        #expect(controller.failureMessage == nil)
     }
 
     @Test("File replay rejects unsupported files without discarding prior playback and reads chunks")
@@ -1059,6 +1146,13 @@ struct PlaybackControllerTests {
         }
         #expect(controller.state == .idle)
     }
+}
+
+private enum RecoveryCancellingControl: CaseIterable {
+    case pause
+    case seek
+    case stop
+    case smoothStop
 }
 
 private struct TestClockFailure: Error {}
