@@ -581,6 +581,40 @@ struct PlaybackControllerTests {
         #expect(supersedeFixture.controller.currentTitle == "Next")
     }
 
+    @Test(
+        "Seeking and resuming supersedes an in-flight smooth stop",
+        arguments: [false, true]
+    )
+    func seekSupersedesSmoothStop(forModelSwitch: Bool) async throws {
+        let fixture = PlaybackControllerFixture()
+        let controller = fixture.controller
+        try fixture.seedStoredAudio(duration: 2)
+
+        let fadeDuration: Duration = forModelSwitch
+            ? .milliseconds(24)
+            : .milliseconds(12)
+        let oldStop = Task {
+            await controller.stopSmoothly(forModelSwitch: forModelSwitch)
+        }
+        await fixture.until {
+            fixture.clock.pendingSleepDurations.contains(fadeDuration)
+        }
+        #expect(controller.state == .paused)
+
+        controller.seek(to: 0.5)
+        controller.play()
+        #expect(controller.state == .playing)
+        #expect(abs(controller.elapsed - 0.5) < 0.000_001)
+
+        await fixture.advance(by: fadeDuration)
+        await oldStop.value
+
+        #expect(controller.state == .playing)
+        #expect(controller.generatedDuration == 2)
+        #expect(abs(controller.elapsed - 0.5) < 0.000_001)
+        controller.stop()
+    }
+
     @Test("Completion watchdog re-arms on partial progress and forces completion on stalled callbacks")
     func completionWatchdogRearmingAndForcedCompletion() async throws {
         let fixture = PlaybackControllerFixture()

@@ -613,6 +613,8 @@ final class PlaybackController {
     }
 
     private func rescheduleAudio(from seconds: TimeInterval) throws {
+        // Rescheduling supersedes a smooth stop still waiting for its fade.
+        stopTransitionGeneration &+= 1
         let target = min(max(seconds, 0), generatedDuration)
         invalidateScheduledAudio()
         let availableFrameCount = pcmStore?.frameCount ?? 0
