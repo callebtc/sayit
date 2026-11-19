@@ -15,9 +15,10 @@ struct SpeechQueuePolicyTests {
         defer {
             try? FileManager.default.removeItem(at: root)
         }
+        let fixture = PlaybackControllerFixture(usesLiveClock: true)
         let service = try SayItBackendService(
             directories: AppDirectories.testing(root: root),
-            playback: MockPlaybackController()
+            playback: fixture.controller
         )
         await service.start()
 
@@ -50,9 +51,10 @@ struct SpeechQueuePolicyTests {
         defer {
             try? FileManager.default.removeItem(at: root)
         }
+        let fixture = PlaybackControllerFixture(usesLiveClock: true)
         let service = try SayItBackendService(
             directories: AppDirectories.testing(root: root),
-            playback: MockPlaybackController()
+            playback: fixture.controller
         )
         await service.start()
 
@@ -191,12 +193,13 @@ struct SpeechQueuePolicyTests {
             catalog: catalog,
             directories: directories
         )
-        let playback = MockPlaybackController()
+        let fixture = PlaybackControllerFixture(usesLiveClock: true)
         let service = try SayItBackendService(
             directories: directories,
-            playback: playback
+            playback: fixture.controller
         )
         await service.start()
+        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
 
         let active = try submittedJob(
             await service.handle(
@@ -248,7 +251,8 @@ struct SpeechQueuePolicyTests {
         #expect(switched.queuedJobs.isEmpty)
         #expect(jobs.first(where: { $0.id == active.id })?.state == .canceled)
         #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
-        #expect(playback.modelSwitchStopCount == 1)
+        #expect(fixture.controller.state == .idle)
+        #expect(fixture.audioOutput.pauseEngineCount >= 1)
         await service.shutdown()
     }
 
@@ -272,13 +276,13 @@ struct SpeechQueuePolicyTests {
                 directories: directories
             )
         }
-        let playback = MockPlaybackController()
-        playback.modelSwitchStopDelay = .milliseconds(75)
+        let fixture = PlaybackControllerFixture()
         let service = try SayItBackendService(
             directories: directories,
-            playback: playback
+            playback: fixture.controller
         )
         await service.start()
+        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
         var staleSettings = try snapshot(
             await service.handle(ServiceRequest(command: .snapshot))
         ).settings
@@ -289,10 +293,24 @@ struct SpeechQueuePolicyTests {
                 ServiceRequest(command: .selectModel(replacementID.rawValue))
             )
         }
-        try await waitForModelSwitchStop(playback, count: 1)
-        let settingsResponse = await service.handle(
-            ServiceRequest(command: .updateSettings(staleSettings))
+        await fixture.until {
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
+        }
+        let settingsTask = Task {
+            await service.handle(
+                ServiceRequest(command: .updateSettings(staleSettings))
+            )
+        }
+        await fixture.settle()
+        #expect(
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
         )
+        await fixture.advance(by: PlaybackController.modelSwitchFadeDuration)
+        let settingsResponse = await settingsTask.value
         guard case .accepted = settingsResponse else {
             Issue.record("Expected the settings update to be accepted.")
             return
@@ -330,23 +348,37 @@ struct SpeechQueuePolicyTests {
                 directories: directories
             )
         }
-        let playback = MockPlaybackController()
-        playback.modelSwitchStopDelay = .milliseconds(75)
+        let fixture = PlaybackControllerFixture()
         let service = try SayItBackendService(
             directories: directories,
-            playback: playback
+            playback: fixture.controller
         )
         await service.start()
+        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
 
         let selection = Task {
             await service.handle(
                 ServiceRequest(command: .selectModel(replacementID.rawValue))
             )
         }
-        try await waitForModelSwitchStop(playback, count: 1)
-        let rateResponse = await service.handle(
-            ServiceRequest(command: .setPlaybackRate(1.5))
+        await fixture.until {
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
+        }
+        let rateTask = Task {
+            await service.handle(
+                ServiceRequest(command: .setPlaybackRate(1.5))
+            )
+        }
+        await fixture.settle()
+        #expect(
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
         )
+        await fixture.advance(by: PlaybackController.modelSwitchFadeDuration)
+        let rateResponse = await rateTask.value
         guard case .accepted = rateResponse,
               case .accepted = await selection.value else {
             Issue.record("Expected both serialized settings commands to succeed.")
@@ -358,7 +390,7 @@ struct SpeechQueuePolicyTests {
         )
         #expect(updated.settings.activeModelID == replacementID.rawValue)
         #expect(updated.settings.playbackRate == 1.5)
-        #expect(playback.rate == 1.5)
+        #expect(fixture.controller.rate == 1.5)
         await service.shutdown()
     }
 
@@ -383,13 +415,13 @@ struct SpeechQueuePolicyTests {
                 directories: directories
             )
         }
-        let playback = MockPlaybackController()
-        playback.modelSwitchStopDelay = .milliseconds(75)
+        let fixture = PlaybackControllerFixture()
         let service = try SayItBackendService(
             directories: directories,
-            playback: playback
+            playback: fixture.controller
         )
         await service.start()
+        try seedPlayingAudio(on: fixture, modelID: originalID.rawValue)
 
         let firstSelection = Task {
             await service.handle(
@@ -398,7 +430,11 @@ struct SpeechQueuePolicyTests {
                 )
             )
         }
-        try await waitForModelSwitchStop(playback, count: 1)
+        await fixture.until {
+            fixture.clock.pendingSleepDurations.contains(
+                PlaybackController.modelSwitchFadeDuration
+            )
+        }
         let finalResponse = await service.handle(
             ServiceRequest(command: .selectModel(finalReplacementID.rawValue))
         )
@@ -418,7 +454,7 @@ struct SpeechQueuePolicyTests {
             await service.handle(ServiceRequest(command: .diagnostics))
         )
         #expect(updated.settings.activeModelID == finalReplacementID.rawValue)
-        #expect(playback.modelSwitchStopCount == 2)
+        #expect(fixture.controller.state == .idle)
         #expect(superseded.code == "service.request_canceled")
         #expect(
             diagnostics.filter { $0.code == "model.switch_started" }.count == 2
@@ -444,7 +480,7 @@ struct SpeechQueuePolicyTests {
 
         let original = try SayItBackendService(
             directories: AppDirectories.testing(root: root),
-            playback: MockPlaybackController()
+            playback: PlaybackControllerFixture().controller
         )
         await original.start()
         let active = try submittedJob(
@@ -482,7 +518,7 @@ struct SpeechQueuePolicyTests {
 
         let restored = try SayItBackendService(
             directories: AppDirectories.testing(root: root),
-            playback: MockPlaybackController()
+            playback: PlaybackControllerFixture().controller
         )
         await restored.start()
         let restoredSnapshot = try snapshot(
@@ -630,128 +666,18 @@ struct SpeechQueuePolicyTests {
         )
     }
 
-    private func waitForModelSwitchStop(
-        _ playback: MockPlaybackController,
-        count: Int
-    ) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(1))
-        while playback.modelSwitchStopCount < count {
-            guard ContinuousClock.now < deadline else {
-                Issue.record("Timed out waiting for the model switch to start.")
-                return
-            }
-            try await Task.sleep(for: .milliseconds(1))
-        }
-    }
-}
-
-@MainActor
-private final class MockPlaybackController: BackendPlaybackControlling {
-    var onFailure: (@MainActor (String) -> Void)?
-    var onExternalControl: (@MainActor () -> Void)?
-    var onStateChange: (@MainActor (PlaybackState) -> Void)?
-    private(set) var state: PlaybackState = .idle {
-        didSet {
-            guard state != oldValue else { return }
-            onStateChange?(state)
-        }
-    }
-    private(set) var elapsed: TimeInterval = 0
-    private(set) var generatedDuration: TimeInterval = 0
-    private(set) var estimatedDuration: TimeInterval = 0
-    private(set) var amplitudes: [Float] = []
-    private(set) var currentTitle = ""
-    private(set) var currentModelID: String?
-    private(set) var spokenText = ""
-    private(set) var spokenChunks: [PlaybackTextChunk] = []
-    var shouldStartWhenBuffered = false
-    var showTitleInNowPlaying = false
-    var rate: Double = 1
-    var volume: Double = 1
-    var backwardSkipInterval: TimeInterval = 15
-    var forwardSkipInterval: TimeInterval = 30
-    private(set) var modelSwitchStopCount = 0
-    var modelSwitchStopDelay: Duration?
-
-    func prepare(
-        requestID: UUID,
-        title: String,
-        estimatedDuration: TimeInterval,
-        modelID: String?
-    ) {
-        currentTitle = title
-        currentModelID = modelID
-        self.estimatedDuration = estimatedDuration
-        state = .preparing
-    }
-
-    func enqueue(_ chunk: AudioChunk) throws {
-        generatedDuration += Double(chunk.samples.count) / chunk.sampleRate
-        state = .buffering
-    }
-
-    func setSpokenText(_ text: String) {
-        spokenText = text
-        spokenChunks = []
-    }
-
-    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        if let last = spokenChunks.last, last.textStart == chunk.textStart {
-            spokenChunks[spokenChunks.count - 1] = chunk
-        } else {
-            spokenChunks.append(chunk)
-        }
-    }
-
-    func play() {
-        state = .playing
-    }
-
-    func pause() {
-        state = .paused
-    }
-
-    func stop() {
-        state = .idle
-        elapsed = 0
-        generatedDuration = 0
-        estimatedDuration = 0
-        currentTitle = ""
-        currentModelID = nil
-    }
-
-    func stopForModelSwitch() async {
-        modelSwitchStopCount += 1
-        if let modelSwitchStopDelay {
-            try? await Task.sleep(for: modelSwitchStopDelay)
-        }
-        stop()
-    }
-
-    func seek(to seconds: TimeInterval) {
-        elapsed = seconds
-    }
-
-    func skip(by seconds: TimeInterval) {
-        elapsed += seconds
-    }
-
-    func finishBuffering() {
-        state = .playing
-    }
-
-    func archive(
-        using archive: AudioArchive
-    ) async throws -> AudioArchiveResult {
-        throw ServiceFailure(
-            code: "test.archive_unavailable",
-            message: "Archiving is not used by queue tests."
+    private func seedPlayingAudio(
+        on fixture: PlaybackControllerFixture,
+        modelID: String
+    ) throws {
+        let id = UUID()
+        fixture.controller.prepare(
+            requestID: id,
+            title: "Active Speech",
+            estimatedDuration: 2,
+            modelID: modelID
         )
-    }
-
-    func playFile(at url: URL, title: String, modelID: String?) throws {
-        currentTitle = title
-        currentModelID = modelID
-        state = .playing
+        try fixture.enqueue(requestID: id, duration: 2)
+        fixture.controller.finishBuffering()
     }
 }

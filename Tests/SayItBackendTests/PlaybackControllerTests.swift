@@ -8,54 +8,66 @@ import Testing
 @Suite("Playback controller behavior")
 @MainActor
 struct PlaybackControllerTests {
-    @Test("Buffering policies control start readiness across modes and metrics")
+    @Test("Buffering policies auto-start playback across modes and completion")
     func bufferingPolicies() throws {
         let fixture = PlaybackControllerFixture()
         let controller = fixture.controller
-        let id = UUID()
+        let progressiveID = UUID()
 
-        controller.setPlaybackMode(.progressive)
         controller.prepare(
-            requestID: id,
+            requestID: progressiveID,
             title: "Progressive",
             estimatedDuration: 10,
-            modelID: "model-a"
+            modelID: "model-a",
+            playbackMode: .progressive
         )
-        #expect(abs(controller.preferredStartBufferDuration - 1.2) < 0.000_001)
-        try fixture.enqueue(requestID: id, duration: 1.1)
-        #expect(!controller.shouldStartWhenBuffered)
-        try fixture.enqueue(requestID: id, duration: 0.2, index: 1)
-        #expect(controller.shouldStartWhenBuffered)
+        try fixture.enqueue(requestID: progressiveID, duration: 1.1)
+        #expect(controller.state == .buffering)
+        try fixture.enqueue(requestID: progressiveID, duration: 0.2, index: 1)
+        #expect(controller.state == .playing)
 
-        controller.setPlaybackMode(.buffered)
-        #expect(abs(controller.preferredStartBufferDuration - 2.5) < 0.000_001)
-        #expect(!controller.shouldStartWhenBuffered)
-        try fixture.enqueue(requestID: id, duration: 1.3, index: 2)
-        #expect(controller.shouldStartWhenBuffered)
+        let bufferedID = UUID()
+        controller.prepare(
+            requestID: bufferedID,
+            title: "Buffered",
+            estimatedDuration: 10,
+            modelID: "model-a",
+            playbackMode: .buffered
+        )
+        try fixture.enqueue(requestID: bufferedID, duration: 2.4)
+        #expect(controller.state == .buffering)
+        try fixture.enqueue(requestID: bufferedID, duration: 0.2, index: 1)
+        #expect(controller.state == .playing)
 
-        controller.setPlaybackMode(.completeFirst)
-        #expect(controller.preferredStartBufferDuration == .infinity)
-        #expect(!controller.shouldStartWhenBuffered)
+        let completeID = UUID()
+        controller.prepare(
+            requestID: completeID,
+            title: "Complete First",
+            estimatedDuration: 10,
+            modelID: "model-a",
+            playbackMode: .completeFirst
+        )
+        try fixture.enqueue(requestID: completeID, duration: 5.0)
+        #expect(controller.state == .buffering)
         controller.finishBuffering()
         #expect(controller.state == .playing)
-        #expect(!controller.shouldStartWhenBuffered)
     }
 
-    @Test("Adaptive and metric-driven buffering ignores invalid observations")
+    @Test("Adaptive and metric-driven buffering ignores invalid observations and auto-starts")
     func adaptiveAndMetricDrivenBuffering() throws {
         let fixture = PlaybackControllerFixture()
         let controller = fixture.controller
 
         let unmeasuredID = UUID()
-        controller.setPlaybackMode(.adaptive)
         controller.prepare(
             requestID: unmeasuredID,
             title: "Adaptive",
             estimatedDuration: 20,
-            modelID: "adaptive-fast"
+            modelID: "adaptive-fast",
+            playbackMode: .adaptive
         )
         try fixture.enqueue(requestID: unmeasuredID, duration: 5)
-        #expect(!controller.shouldStartWhenBuffered)
+        #expect(controller.state == .buffering)
 
         // Invalid and non-finite metrics must not influence readiness.
         controller.observeSynthesisMetrics(
@@ -93,7 +105,7 @@ struct PlaybackControllerTests {
                 audioDuration: .infinity
             )
         )
-        #expect(!controller.shouldStartWhenBuffered)
+        #expect(controller.state == .buffering)
 
         controller.observeSynthesisMetrics(
             SynthesisMetrics(
@@ -102,7 +114,7 @@ struct PlaybackControllerTests {
                 audioDuration: 4
             )
         )
-        #expect(controller.shouldStartWhenBuffered)
+        #expect(controller.state == .playing)
 
         // Slow adaptive model requires enough lead to outlast remaining generation.
         let slowID = UUID()
@@ -110,7 +122,8 @@ struct PlaybackControllerTests {
             requestID: slowID,
             title: "Adaptive Slow",
             estimatedDuration: 11.4,
-            modelID: "adaptive-slow"
+            modelID: "adaptive-slow",
+            playbackMode: .adaptive
         )
         controller.observeSynthesisMetrics(
             SynthesisMetrics(
@@ -121,19 +134,20 @@ struct PlaybackControllerTests {
         )
         // At 5.4s buffered and 6.0s remaining, adjustedLoad=2.0 -> need 6.4s.
         try fixture.enqueue(requestID: slowID, duration: 5.4)
-        #expect(!controller.shouldStartWhenBuffered)
+        #expect(controller.state == .buffering)
         // At 6.4s buffered and 5.0s remaining, need (2.0-1)*5.0 + 0.4 = 5.4s.
         try fixture.enqueue(requestID: slowID, duration: 1.0, index: 1)
-        #expect(controller.shouldStartWhenBuffered)
+        #expect(controller.state == .playing)
 
         // Progressive rate-adjusted sustainability: rtf=0.6 is sustainable at 1x, not at 2x.
-        let rateID = UUID()
-        controller.setPlaybackMode(.progressive)
+        let slowRateID = UUID()
         controller.prepare(
-            requestID: rateID,
-            title: "Rate Sustainability",
+            requestID: slowRateID,
+            title: "Rate Sustainability 2x",
             estimatedDuration: 10,
-            modelID: "medium-model"
+            modelID: "medium-model",
+            playbackMode: .progressive,
+            rate: 2.0
         )
         controller.observeSynthesisMetrics(
             SynthesisMetrics(
@@ -142,11 +156,21 @@ struct PlaybackControllerTests {
                 audioDuration: 10
             )
         )
-        try fixture.enqueue(requestID: rateID, duration: 0.2)
-        #expect(controller.shouldStartWhenBuffered)
-        controller.rate = 2
-        #expect(!controller.shouldStartWhenBuffered)
+        try fixture.enqueue(requestID: slowRateID, duration: 0.2)
+        #expect(controller.state == .buffering)
         controller.finishBuffering()
+        #expect(controller.state == .playing)
+
+        let fastRateID = UUID()
+        controller.prepare(
+            requestID: fastRateID,
+            title: "Rate Sustainability 1x",
+            estimatedDuration: 10,
+            modelID: "medium-model",
+            playbackMode: .progressive,
+            rate: 1.0
+        )
+        try fixture.enqueue(requestID: fastRateID, duration: 0.2)
         #expect(controller.state == .playing)
     }
 
@@ -156,32 +180,53 @@ struct PlaybackControllerTests {
         let controller = fixture.controller
         let id = UUID()
 
-        controller.setPlaybackMode(.progressive)
         controller.prepare(
             requestID: id,
             title: "Rolling",
-            estimatedDuration: 30,
-            modelID: "rolling-model"
+            estimatedDuration: 10.4,
+            modelID: "rolling-model",
+            playbackMode: .adaptive
         )
-        for index in 0..<20 {
+        for index in 0..<8 {
             controller.observeSynthesisMetrics(
                 SynthesisMetrics(
                     chunkIndex: index,
-                    generationDuration: Double(index),
-                    audioDuration: 100
+                    generationDuration: 4,
+                    audioDuration: 1
                 )
             )
         }
-        // Last 12 observations are 8...19; 90th percentile index ceil(0.9*12)-1 = 10 -> 18.
-        // preferredStartBufferDuration = (18 + 0.4) * 1 = 18.4.
-        #expect(abs(controller.preferredStartBufferDuration - 18.4) < 0.000_001)
+        for index in 8..<18 {
+            controller.observeSynthesisMetrics(
+                SynthesisMetrics(
+                    chunkIndex: index,
+                    generationDuration: 1.5,
+                    audioDuration: 1
+                )
+            )
+        }
+        controller.observeSynthesisMetrics(
+            SynthesisMetrics(chunkIndex: 18, generationDuration: 2, audioDuration: 1)
+        )
+        controller.observeSynthesisMetrics(
+            SynthesisMetrics(chunkIndex: 19, generationDuration: 4, audioDuration: 1)
+        )
+        // Last 12 observations are ten 1.5s, one 2.0, one 4.0 -> 90th percentile = 2.0.
+        // At 5.3s buffered (5.1s remaining), required lead = (2.0-1)*5.1 + 0.4 = 5.5s.
+        try fixture.enqueue(requestID: id, duration: 5.3)
+        #expect(controller.state == .buffering)
+        // At 5.5s buffered (4.9s remaining), required lead = (2.0-1)*4.9 + 0.4 = 5.3s <= 5.5s.
+        try fixture.enqueue(requestID: id, duration: 0.2, index: 1)
+        #expect(controller.state == .playing)
 
         // Metrics observed without an active modelID are ignored.
+        let unattributedID = UUID()
         controller.prepare(
-            requestID: UUID(),
+            requestID: unattributedID,
             title: "No Model",
             estimatedDuration: 10,
-            modelID: nil
+            modelID: nil,
+            playbackMode: .progressive
         )
         controller.observeSynthesisMetrics(
             SynthesisMetrics(
@@ -190,7 +235,8 @@ struct PlaybackControllerTests {
                 audioDuration: 10
             )
         )
-        #expect(abs(controller.preferredStartBufferDuration - 1.2) < 0.000_001)
+        try fixture.enqueue(requestID: unattributedID, duration: 1.2)
+        #expect(controller.state == .playing)
     }
 
     @Test(
@@ -204,12 +250,12 @@ struct PlaybackControllerTests {
         let sampleRate = 24_000.0
         let inputSamples = fixture.makeTone(sampleRate: sampleRate, duration: 1.0)
 
-        controller.rate = rate
         controller.prepare(
             requestID: id,
             title: "Sonic \(rate)x",
             estimatedDuration: 1.0,
-            modelID: nil
+            modelID: nil,
+            rate: rate
         )
         try controller.enqueue(
             AudioChunk(
@@ -244,13 +290,16 @@ struct PlaybackControllerTests {
         let id = UUID()
         let sampleRate = 24_000.0
 
-        controller.rate = 0.5
+        let scheduledBeforePrepare = fixture.audioOutput.scheduledBuffers.count
         controller.prepare(
             requestID: id,
             title: "Speed Controls",
             estimatedDuration: 2.0,
-            modelID: nil
+            modelID: nil,
+            rate: 0.5
         )
+        // Passing initial rate into prepare must not reschedule any prior audio before stopping.
+        #expect(fixture.audioOutput.scheduledBuffers.count == scheduledBeforePrepare)
         try fixture.enqueue(requestID: id, duration: 2.0, sampleRate: sampleRate)
         controller.finishBuffering()
         #expect(controller.state == .playing)
@@ -418,11 +467,7 @@ struct PlaybackControllerTests {
         #expect(controller.state == .playing)
 
         let stopTask = Task {
-            if forModelSwitch {
-                await controller.stopForModelSwitch()
-            } else {
-                await controller.stopSmoothly()
-            }
+            await controller.stopSmoothly(forModelSwitch: forModelSwitch)
         }
         await fixture.until {
             fixture.clock.pendingSleepDurations.contains(expectedDuration)
@@ -462,7 +507,7 @@ struct PlaybackControllerTests {
         )
 
         let stopTask = Task {
-            await controller.stopForModelSwitch()
+            await controller.stopSmoothly(forModelSwitch: true)
         }
         await fixture.until {
             fixture.clock.pendingSleepDurations.contains(.seconds(0.005))
@@ -725,6 +770,7 @@ struct PlaybackControllerTests {
         fixture.mediaSession.sendRemoteCommand(.pause)
         #expect(controller.state == .paused)
         #expect(fixture.externalControlCount == 1)
+        #expect(Array(fixture.outputs.suffix(2)) == [.state(.paused), .externalControl])
 
         fixture.mediaSession.sendRemoteCommand(.play)
         #expect(controller.state == .playing)
@@ -765,6 +811,7 @@ struct PlaybackControllerTests {
         fixture.mediaSession.sendRemoteCommand(.stop)
         #expect(controller.state == .idle)
         #expect(fixture.externalControlCount == 11)
+        #expect(Array(fixture.outputs.suffix(2)) == [.state(.idle), .externalControl])
         #expect(fixture.mediaSession.clearNowPlayingCount >= 1)
     }
 
@@ -1066,6 +1113,13 @@ struct PlaybackControllerTests {
                 == PlaybackError.audioFormatMismatch.errorDescription
         )
         #expect(fixture.failures.count == 1)
+        #expect(
+            Array(fixture.outputs.suffix(2))
+                == [
+                    .state(.failed),
+                    .failure(PlaybackError.audioFormatMismatch.errorDescription ?? "")
+                ]
+        )
         #expect(fixture.audioOutput.activeBuffers.isEmpty)
 
         // Recovering via play() after clearing scheduleBufferError still detects engine-start failure.
@@ -1082,11 +1136,38 @@ struct PlaybackControllerTests {
         )
         #expect(fixture.failures.count == 2)
         #expect(fixture.stateChanges.last == .failed)
+        #expect(
+            fixture.outputs.last
+                == .failure(PlaybackError.couldNotStartEngine.errorDescription ?? "")
+        )
 
         // A subsequent play() succeeds once the engine starts cleanly.
         controller.play()
         #expect(controller.state == .playing)
         #expect(controller.failureMessage == nil)
+
+        // Passing a new rate into prepare stops active audio first without rescheduling it,
+        // and initial enqueue auto-start throws engine-start failures synchronously.
+        let scheduledBeforeNext = fixture.audioOutput.scheduledBuffers.count
+        let syncFailID = UUID()
+        controller.prepare(
+            requestID: syncFailID,
+            title: "Sync Auto-Start Failure",
+            estimatedDuration: 2.0,
+            modelID: nil,
+            playbackMode: .progressive,
+            rate: 1.5
+        )
+        #expect(fixture.audioOutput.scheduledBuffers.count == scheduledBeforeNext)
+        fixture.audioOutput.ensureEngineRunningOutcomes = [
+            .success(()),
+            .failure(PlaybackError.couldNotStartEngine)
+        ]
+        let failuresBeforeSyncThrow = fixture.failures.count
+        #expect(throws: PlaybackError.couldNotStartEngine) {
+            try fixture.enqueue(requestID: syncFailID, duration: 2.0)
+        }
+        #expect(fixture.failures.count == failuresBeforeSyncThrow)
     }
 
     @Test("File replay rejects unsupported files without discarding prior playback and reads chunks")

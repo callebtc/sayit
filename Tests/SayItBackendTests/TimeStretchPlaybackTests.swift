@@ -21,7 +21,6 @@ struct TimeStretchPlaybackTests {
         let playback = PlaybackController()
         defer { playback.stop() }
         playback.volume = 0
-        playback.rate = 1.5
         let id = UUID()
         let samples = (0..<24_000).map { frame in
             Float(0.1 * sin(2 * .pi * 220 * Double(frame) / 24_000))
@@ -30,7 +29,8 @@ struct TimeStretchPlaybackTests {
             requestID: id,
             title: "DSP smoke fixture",
             estimatedDuration: 1,
-            modelID: nil
+            modelID: nil,
+            rate: 1.5
         )
         try playback.enqueue(
             AudioChunk(

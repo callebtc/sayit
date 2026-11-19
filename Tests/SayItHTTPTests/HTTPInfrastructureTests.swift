@@ -240,6 +240,26 @@ struct HTTPInfrastructureTests {
             ) {
                 #expect($0.status == .accepted)
             }
+            let unseededElapsed = await MainActor.run { fixture.playback.elapsed }
+            #expect(unseededElapsed == 0)
+
+            try await MainActor.run {
+                try seedStoredAudio(on: fixture.playback, duration: 20, paused: true)
+            }
+            try await client.execute(
+                uri: "/v1/playback/seek",
+                method: .post,
+                headers: jsonHeaders,
+                body: ByteBuffer(
+                    bytes: try SayItWireCodec.encode(
+                        SecondsRequest(seconds: 12)
+                    )
+                )
+            ) {
+                #expect($0.status == .accepted)
+            }
+            let seekedElapsed = await MainActor.run { fixture.playback.elapsed }
+            #expect(seekedElapsed == 12)
 
             var badKeyHeaders = jsonHeaders
             badKeyHeaders[
@@ -319,7 +339,7 @@ struct HTTPInfrastructureTests {
 @MainActor
 private final class HTTPBackendFixture {
     let root: URL
-    let playback: HTTPTestPlayback
+    let playback: PlaybackController
     let backend: SayItBackendService
 
     init() throws {
@@ -327,7 +347,7 @@ private final class HTTPBackendFixture {
             path: "SayItHTTPTests-\(UUID().uuidString)"
         )
         let directories = try AppDirectories.testing(root: root)
-        playback = HTTPTestPlayback()
+        playback = makeHeadlessPlaybackController()
         backend = try SayItBackendService(
             directories: directories,
             playback: playback
@@ -336,86 +356,5 @@ private final class HTTPBackendFixture {
 
     func remove() {
         try? FileManager.default.removeItem(at: root)
-    }
-}
-
-@MainActor
-private final class HTTPTestPlayback: BackendPlaybackControlling {
-    var onFailure: (@MainActor (String) -> Void)?
-    var onExternalControl: (@MainActor () -> Void)?
-    var onStateChange: (@MainActor (PlaybackState) -> Void)?
-    private(set) var state: PlaybackState = .idle {
-        didSet {
-            guard state != oldValue else { return }
-            onStateChange?(state)
-        }
-    }
-    private(set) var elapsed: TimeInterval = 0
-    private(set) var generatedDuration: TimeInterval = 0
-    private(set) var estimatedDuration: TimeInterval = 0
-    private(set) var amplitudes: [Float] = []
-    private(set) var currentTitle = ""
-    private(set) var currentModelID: String?
-    private(set) var spokenText = ""
-    private(set) var spokenChunks: [PlaybackTextChunk] = []
-    var shouldStartWhenBuffered = false
-    var showTitleInNowPlaying = false
-    var rate: Double = 1
-    var volume: Double = 1
-    var backwardSkipInterval: TimeInterval = 15
-    var forwardSkipInterval: TimeInterval = 30
-
-    func prepare(
-        requestID _: UUID,
-        title: String,
-        estimatedDuration: TimeInterval,
-        modelID: String?
-    ) {
-        currentTitle = title
-        currentModelID = modelID
-        self.estimatedDuration = estimatedDuration
-        state = .preparing
-    }
-
-    func enqueue(_ chunk: AudioChunk) throws {
-        generatedDuration += chunk.duration
-    }
-
-    func setSpokenText(_ text: String) {
-        spokenText = text
-    }
-
-    func appendSpokenChunk(_ chunk: PlaybackTextChunk) {
-        spokenChunks.append(chunk)
-    }
-
-    func play() { state = .playing }
-    func pause() { state = .paused }
-
-    func stop() {
-        state = .idle
-        elapsed = 0
-        generatedDuration = 0
-        currentModelID = nil
-    }
-
-    func stopForModelSwitch() async {
-        stop()
-    }
-
-    func seek(to seconds: TimeInterval) { elapsed = seconds }
-    func skip(by seconds: TimeInterval) { elapsed += seconds }
-    func finishBuffering() { state = .playing }
-
-    func archive(
-        using _: AudioArchive
-    ) async throws -> AudioArchiveResult {
-        throw CocoaError(.featureUnsupported)
-    }
-
-    func playFile(at _: URL, title: String, modelID: String?) throws {
-        currentTitle = title
-        currentModelID = modelID
-        state = .playing
     }
 }
