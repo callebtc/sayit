@@ -8,6 +8,32 @@ extension SayItHTTPServer {
         scope: APITokenScope,
         isWrite: Bool
     ) async throws -> APITokenMetadata {
+        let metadata = try await authorizedToken(for: request, scope: scope)
+        let permitted = await rateLimiter.consume(
+            key: "\(metadata.id.uuidString):\(isWrite ? "write" : "read")",
+            limit: isWrite ? 60 : 600
+        )
+        guard permitted else {
+            throw HTTPAPIError(
+                status: 429,
+                code: "request.rate_limited",
+                message: "Too many requests. Try again in one minute."
+            )
+        }
+        return metadata
+    }
+
+    func confirmAuthorizedToken(
+        _ request: Request,
+        scope: APITokenScope
+    ) async throws {
+        _ = try await authorizedToken(for: request, scope: scope)
+    }
+
+    private func authorizedToken(
+        for request: Request,
+        scope: APITokenScope
+    ) async throws -> APITokenMetadata {
         guard isAllowedHost(request.head.authority) else {
             throw HTTPAPIError(
                 status: 400,
@@ -25,16 +51,11 @@ extension SayItHTTPServer {
             )
         }
         let token = String(authorization.dropFirst("Bearer ".count))
-        let metadata: APITokenMetadata
         do {
             if let tokenAuthorizer {
-                metadata = try await tokenAuthorizer(token, scope)
-            } else {
-                metadata = try await backend.authorize(
-                    token: token,
-                    for: scope
-                )
+                return try await tokenAuthorizer(token, scope)
             }
+            return try await backend.authorize(token: token, for: scope)
         } catch let failure as ServiceFailure {
             throw HTTPAPIError(
                 status: failure.code == "authentication.insufficient_scope"
@@ -44,18 +65,6 @@ extension SayItHTTPServer {
                 message: failure.message
             )
         }
-        let permitted = await rateLimiter.consume(
-            key: "\(metadata.id.uuidString):\(isWrite ? "write" : "read")",
-            limit: isWrite ? 60 : 600
-        )
-        guard permitted else {
-            throw HTTPAPIError(
-                status: 429,
-                code: "request.rate_limited",
-                message: "Too many requests. Try again in one minute."
-            )
-        }
-        return metadata
     }
 
     func response(

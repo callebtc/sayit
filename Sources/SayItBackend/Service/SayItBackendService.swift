@@ -18,6 +18,7 @@ public final class SayItBackendService: SayItService {
     private let diagnostics: DiagnosticRecorder
     private let huggingFaceTokenStore: KeychainTokenStore
     private let apiTokenStore = APITokenStore()
+    private let apiTokenRevocationRegistry = APITokenRevocationRegistry()
     private let settingsStore: BackendSettingsStore
     private let jobJournalStore: JobJournalStore
     private let communityModelResolver = CommunityModelResolver()
@@ -371,6 +372,12 @@ public final class SayItBackendService: SayItService {
         try await apiTokenStore.authorize(token, required: scope)
     }
 
+    public func watchAPITokenRevocation(
+        _ tokenID: UUID
+    ) async -> APITokenRevocationWatch {
+        await apiTokenRevocationRegistry.watch(tokenID)
+    }
+
     public func reportServiceError(_ message: String) async {
         errorMessage = message
         statusText = "Needs attention"
@@ -604,6 +611,7 @@ public final class SayItBackendService: SayItService {
             )
         case .revokeToken(let id):
             try await apiTokenStore.revoke(id)
+            await apiTokenRevocationRegistry.revoke(id)
             return .accepted
         }
     }
