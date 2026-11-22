@@ -91,6 +91,7 @@
 		237FCE4FBE1E65624CCBEF35 /* DiagnosticExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F03C694936914BB34739D7 /* DiagnosticExport.swift */; };
 		245C2FAE01D5A6E480FDE344 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CD60AA5995AA06BA6024DA /* PlaybackController.swift */; };
 		24FCB6E59B79022AB028FB48 /* HTTPAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803A1EDA343EA0D66099E704 /* HTTPAPIError.swift */; };
+		256427291EF8B87812124DA1 /* PocketTTSStreamRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC72224132F7AF4034E1AF6D /* PocketTTSStreamRunner.swift */; };
 		25C973535C87B9998DBFE308 /* PasteboardPayloadReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3DE2FFBD6C986ADC44745A /* PasteboardPayloadReader.swift */; };
 		25D11135F95A13A7365EB6C8 /* UpdatePreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4AB25E3B53A67164622701F /* UpdatePreferencesTests.swift */; };
 		26837F03C8591D15D7A5C6EA /* CLIOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A39863383170BD4A8E9A68C /* CLIOutput.swift */; };
@@ -195,6 +196,7 @@
 		59E60BE2337AAC7BE1F4D5E2 /* SpeechSynthesizer in Frameworks */ = {isa = PBXBuildFile; productRef = F45A7417F7C6986DC7FAA79C /* SpeechSynthesizer */; };
 		5A2DF64A186464BD8109F198 /* VoiceRibbonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396BF40EFF07BE5F08721894 /* VoiceRibbonView.swift */; };
 		5A820100F57FE500E4159648 /* PCMStoreSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6221BD9BAE2E457693E6687A /* PCMStoreSnapshot.swift */; };
+		5A9ED4CEA6A9B4AE6352B3AB /* PocketTTSSentenceSplitterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6300B807ED37A5454C6FD638 /* PocketTTSSentenceSplitterTests.swift */; };
 		5DBE85D10EE4AA2D6E8D03E9 /* DownloadSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265041B71D43DEB315A8ADD8 /* DownloadSnapshot.swift */; };
 		5E463C8DB9A3EE6B6DCD969B /* SayItCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; };
 		5E4F195C99A8660397FBB6A6 /* StopCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3143D35E528697F33A92BD89 /* StopCommand.swift */; };
@@ -213,6 +215,7 @@
 		62C279877D1C9CDFE521893A /* VoiceCloneRequirementsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4704665E76548BC4B54EAAE2 /* VoiceCloneRequirementsSnapshot.swift */; };
 		62F3FD33DADA0A478557C864 /* RetentionPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82A3C306187C92E98BA08E3 /* RetentionPlannerTests.swift */; };
 		64E597F0729C5832060A65D1 /* MLXAudioTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 5EE1786A722735766F45829F /* MLXAudioTTS */; };
+		65230F292787D33623F9730F /* PocketTTSSentenceSplitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EAF175C830A9E97A975BA55 /* PocketTTSSentenceSplitter.swift */; };
 		6537DC9EFCE177CE55FF242D /* SpeechAudioCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8EBE5B271FE3440BCFC059 /* SpeechAudioCollector.swift */; };
 		655F0772A2C3FA320720CA2A /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		65660AA297D0C8DC90D9D553 /* SayItHTTPServer+Upload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5C8FD44D6CA11CEA0B6212 /* SayItHTTPServer+Upload.swift */; };
@@ -1001,6 +1004,7 @@
 		4D729DABFED5F7B60D702ACD /* CLIExportDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIExportDestination.swift; sourceTree = "<group>"; };
 		4E19E0A44E938CCC17DEF7EE /* SayItSelectionAgentMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItSelectionAgentMain.swift; sourceTree = "<group>"; };
 		4E8C5D4E319B7ED9AA559B65 /* JSONEncoder+SayIt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSONEncoder+SayIt.swift"; sourceTree = "<group>"; };
+		4EAF175C830A9E97A975BA55 /* PocketTTSSentenceSplitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketTTSSentenceSplitter.swift; sourceTree = "<group>"; };
 		4ED5A1F0B187E695CA0512A6 /* SeekCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekCommand.swift; sourceTree = "<group>"; };
 		4EE5F90F8700618CBFF89611 /* CleanedText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanedText.swift; sourceTree = "<group>"; };
 		4FA2774E4BA33E2F3264E324 /* RecentHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentHistoryView.swift; sourceTree = "<group>"; };
@@ -1033,6 +1037,7 @@
 		61A4DC744C75D2B42E40DFCC /* SayItService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItService.swift; sourceTree = "<group>"; };
 		6221BD9BAE2E457693E6687A /* PCMStoreSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMStoreSnapshot.swift; sourceTree = "<group>"; };
 		6262901F90523430DD888CF9 /* HTTPVoiceRouteIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPVoiceRouteIntegrationTests.swift; sourceTree = "<group>"; };
+		6300B807ED37A5454C6FD638 /* PocketTTSSentenceSplitterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketTTSSentenceSplitterTests.swift; sourceTree = "<group>"; };
 		6517CAB9846FFD0FD879B897 /* PlaybackRate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRate.swift; sourceTree = "<group>"; };
 		66F395CE405E435EB38E630E /* ServiceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSettingsView.swift; sourceTree = "<group>"; };
 		697EA1C1EA6477FAFCEF30B8 /* ModelDescriptor+VoiceImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelDescriptor+VoiceImport.swift"; sourceTree = "<group>"; };
@@ -1279,6 +1284,7 @@
 		EA8D307832CC5ACBCD2B6430 /* ModelCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogTests.swift; sourceTree = "<group>"; };
 		EBFE78D84F25DC3D40DC991F /* ModelInstallation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallation.swift; sourceTree = "<group>"; };
 		EC5F705C24B015E2C6127021 /* SpeechAudioCollectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechAudioCollectorTests.swift; sourceTree = "<group>"; };
+		EC72224132F7AF4034E1AF6D /* PocketTTSStreamRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketTTSStreamRunner.swift; sourceTree = "<group>"; };
 		EC76CEA03D4FFD60C2E74C9D /* VoiceCloneDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCloneDraft.swift; sourceTree = "<group>"; };
 		ECC95C922639DA5E240A1C7A /* SayItCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItCommand.swift; sourceTree = "<group>"; };
 		ED0C604213EDC08A37F2295E /* ErrorStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStatusView.swift; sourceTree = "<group>"; };
@@ -1689,6 +1695,8 @@
 				1EDA5F9F1746A54AFE89FD61 /* DramaLibraryModel.swift */,
 				8C462F1A523FD96FFB614980 /* KittenVoiceArchiveConverter.swift */,
 				1C1B942725B7DC902DCDE1DC /* MLXCachePolicy.swift */,
+				4EAF175C830A9E97A975BA55 /* PocketTTSSentenceSplitter.swift */,
+				EC72224132F7AF4034E1AF6D /* PocketTTSStreamRunner.swift */,
 				0C8EBE5B271FE3440BCFC059 /* SpeechAudioCollector.swift */,
 				0C900418213D0916ED7E5673 /* SynthesisActor.swift */,
 				FDF73CF550608FF1F4C96C1B /* SynthesisError.swift */,
@@ -2361,6 +2369,7 @@
 				7788701BD9D8381F56DAAE18 /* PhononVoiceFixture.swift */,
 				D07BCC4B6990BB603ECCEF34 /* PlaybackBufferPolicyTests.swift */,
 				E34A1926523800EBB0B6959D /* PlaybackControllerBoundaryTests.swift */,
+				6300B807ED37A5454C6FD638 /* PocketTTSSentenceSplitterTests.swift */,
 				C24BB3FA53E080276A116642 /* ServiceEventHubTests.swift */,
 				EC5F705C24B015E2C6127021 /* SpeechAudioCollectorTests.swift */,
 				C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */,
@@ -3054,6 +3063,8 @@
 				F91574B1116374158B4593EF /* PlaybackContext.swift in Sources */,
 				E0D9FF0CFEFFF92FA76A2283 /* PlaybackController.swift in Sources */,
 				8C37C42D200745BF0203A5AD /* PlaybackError.swift in Sources */,
+				65230F292787D33623F9730F /* PocketTTSSentenceSplitter.swift in Sources */,
+				256427291EF8B87812124DA1 /* PocketTTSStreamRunner.swift in Sources */,
 				A39B77F55EC1AAE939D53C10 /* ResolvedVoice.swift in Sources */,
 				7AE751EA7DE12B38E00969F8 /* SayItBackendService.swift in Sources */,
 				FCCC10F5D9C4F8CFED7E15FD /* ServiceEventHub.swift in Sources */,
@@ -3498,6 +3509,7 @@
 				BEE898863BECEB90DC95B2C5 /* PhononVoiceFixture.swift in Sources */,
 				0F8D81FFA4D5DA431F4127F1 /* PlaybackBufferPolicyTests.swift in Sources */,
 				2AA1EDF6AE8183DA3C9C6B6F /* PlaybackControllerBoundaryTests.swift in Sources */,
+				5A9ED4CEA6A9B4AE6352B3AB /* PocketTTSSentenceSplitterTests.swift in Sources */,
 				168A63FEEDC7C157E117CB1C /* ServiceEventHubTests.swift in Sources */,
 				70C44C30462D596798F7514C /* SpeechAudioCollectorTests.swift in Sources */,
 				F88A3CF15CA4053F7D587898 /* SpeechQueuePolicyTests.swift in Sources */,
