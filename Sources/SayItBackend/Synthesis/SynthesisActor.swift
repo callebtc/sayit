@@ -35,6 +35,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private var idleUnloadDelay: Double = 600
     private var loadedModel: SpeechGenerationModel?
     private var loadedModelID: ModelID?
+    private var loadedModelURL: URL?
     private var loadedTextProcessor: (any TextProcessor)?
     private var retainedReferenceAudio: MLXArray?
     private var operationGeneration: UInt64 = 0
@@ -279,15 +280,28 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 sampleRate: Double(loadedModel.sampleRate)
             )
         }
-        let samples = try await SerializedSpeechModel(loadedModel)
-            .generateSamples(
+        let samples: [Float]
+        if let pocketTTS = loadedModel as? PocketTTSModel,
+           let modelURL = loadedModelURL {
+            samples = try PocketTTSStreamRunner.generateSamples(
+                model: pocketTTS,
+                modelFolder: modelURL,
                 text: text,
                 voice: embeddingVoice,
-                referenceAudio: SerializedMLXArray(referenceAudio),
-                refText: reference?.transcript,
-                language: language,
+                referenceAudio: referenceAudio,
                 generationParameters: parameters
             )
+        } else {
+            samples = try await SerializedSpeechModel(loadedModel)
+                .generateSamples(
+                    text: text,
+                    voice: embeddingVoice,
+                    referenceAudio: SerializedMLXArray(referenceAudio),
+                    refText: reference?.transcript,
+                    language: language,
+                    generationParameters: parameters
+                )
+        }
         try checkOperation(operationID)
         guard !samples.isEmpty else {
             throw SynthesisError.generatedNoAudio
@@ -560,6 +574,22 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         )
                     try checkOperation(operationID)
                     try emit(samples)
+                } else if let pocketTTS = loadedModel as? PocketTTSModel,
+                          let modelURL = loadedModelURL {
+                    let stream = PocketTTSStreamRunner.generateSamplesStream(
+                        model: pocketTTS,
+                        modelFolder: modelURL,
+                        text: chunk.text,
+                        voice: voiceArgument,
+                        referenceAudio: usesReference ? referenceAudio : nil,
+                        generationParameters: parameters,
+                        streamingInterval: request.model.playbackMode
+                            == .progressive ? 0.32 : 2
+                    )
+                    for try await samples in stream {
+                        try checkOperation(operationID)
+                        try emit(samples)
+                    }
                 } else {
                     let stream = SerializedSpeechModel(loadedModel)
                         .generateSamplesStream(
@@ -761,6 +791,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         )
         loadedModel = candidate
         loadedModelID = model.id
+        loadedModelURL = modelURL
         loadedTextProcessor = textProcessor
     }
 
@@ -1054,12 +1085,14 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private func releaseLoadedModel() {
         guard loadedModel != nil || retainedReferenceAudio != nil else {
             loadedModelID = nil
+            loadedModelURL = nil
             loadedTextProcessor = nil
             return
         }
         Stream.gpu.synchronize()
         loadedModel = nil
         loadedModelID = nil
+        loadedModelURL = nil
         loadedTextProcessor = nil
         retainedReferenceAudio = nil
         Memory.clearCache()
