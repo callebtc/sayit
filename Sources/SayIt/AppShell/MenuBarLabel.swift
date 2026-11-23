@@ -1,25 +1,17 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarLabel: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var frameIndex = 0
 
-    private var isActive: Bool {
-        state.playback.state == .playing
-            || state.playback.state == .preparing
-            || state.playback.state == .buffering
+    private var animation: MenuBarIconAnimation {
+        MenuBarIconAnimation(playbackState: state.playback.state)
     }
 
     var body: some View {
         icon
-            .opacity(isActive ? 0.72 : 1)
-            .overlay(alignment: .bottomTrailing) {
-                if isActive {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 5, height: 5)
-                        .accessibilityHidden(true)
-                }
-            }
             .overlay(alignment: .topTrailing) {
                 if state.errorMessage != nil {
                     Circle()
@@ -40,12 +32,48 @@ struct MenuBarLabel: View {
             .background {
                 AppWindowCoordinator()
             }
+            .task(id: AnimationKey(animation: animation, reduceMotion: reduceMotion)) {
+                await runAnimation()
+            }
     }
 
     private var icon: some View {
-        Image("MenuBarIcon")
+        iconImage
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: 19, height: 19)
     }
+
+    private var iconImage: Image {
+        guard animation.isAnimated else {
+            return Image("MenuBarIcon")
+        }
+        if reduceMotion,
+           let still = MenuBarIconRenderer.image(for: animation.reducedMotionFrame) {
+            return Image(nsImage: still)
+        }
+        guard let frames = MenuBarIconRenderer.frames(for: animation), !frames.isEmpty else {
+            return Image("MenuBarIcon")
+        }
+        return Image(nsImage: frames[frameIndex % frames.count])
+    }
+
+    private func runAnimation() async {
+        frameIndex = 0
+        guard animation.isAnimated, !reduceMotion else { return }
+        let interval = animation.frameInterval
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: interval)
+            } catch {
+                return
+            }
+            frameIndex = (frameIndex + 1) % animation.frameCount
+        }
+    }
+}
+
+private struct AnimationKey: Equatable {
+    let animation: MenuBarIconAnimation
+    let reduceMotion: Bool
 }
