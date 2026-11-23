@@ -1,0 +1,64 @@
+import CoreGraphics
+
+/// The Say It logo split into its head and sound-wave shapes so the menu bar
+/// icon can animate the waves independently. Path data comes from
+/// `public/icon.svg`, the same artwork the `MenuBarIcon` PNGs were made from.
+struct MenuBarGlyph {
+    /// The silhouette without any sound waves.
+    let head: CGPath
+    /// Sound waves ordered from the mouth outward.
+    let waves: [CGPath]
+    /// Bounds of the full logo (head and waves) in artwork coordinates.
+    let bounds: CGRect
+    /// Where the processing spinner sits, replacing the waves.
+    let spinnerCenter: CGPoint
+    let spinnerRadius: CGFloat
+    let spinnerLineWidth: CGFloat
+
+    @MainActor static let logo: MenuBarGlyph? = try? MenuBarGlyph(pathData: logoPathData)
+
+    init(pathData: String) throws {
+        let subpaths = try SVGPathParser.subpaths(from: pathData)
+        guard subpaths.count == 4 else {
+            throw SVGPathParser.Error.missingMoveTo
+        }
+        head = subpaths[0]
+        // The artwork lists the waves from the outside in.
+        waves = subpaths[1...].reversed()
+        bounds = subpaths.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
+
+        let waveBounds = waves.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
+        spinnerLineWidth = 20
+        spinnerRadius = 44
+        // Keep the spinner's inner edge where the innermost wave starts so it
+        // never touches the mouth.
+        spinnerCenter = CGPoint(
+            x: waveBounds.minX + spinnerRadius + spinnerLineWidth / 2,
+            y: waveBounds.midY
+        )
+    }
+
+    static let logoPathData = """
+        M 36,209 c -0.05,-24.49 5.15,-47.81 15.61,-69.95 c 44.67,-87.88 168.43,-98.57 251.06,-65.3 \
+        c 25.2,10.17 56.97,30.79 49.17,62.69 c -0.35,2.04 -2.37,5.14 -2.01,7.06 \
+        c 6.74,15.29 10.92,33.27 9.11,50 c -0.29,7.45 -5.87,13.15 -4.27,20.54 \
+        c 10.72,14.77 21.56,29.45 32.54,44.05 c 3.91,6.07 2.55,13.92 -3.23,18.24 \
+        c -16.24,7.06 -30.58,7.43 -23.85,30.17 c 0.21,2.45 -0.86,4.06 -3.2,4.84 \
+        c -6.99,2.65 -13.89,5.47 -20.7,8.47 c -0.1,0.7 0.16,1.23 0.78,1.58 \
+        c 6.55,3.82 13.06,7.69 19.54,11.61 c 1.72,1.46 2.13,3.25 1.25,5.35 \
+        c -8.25,13.2 -12.22,27.59 -11.9,43.15 c -1.84,14.8 -11.41,20.38 -25.4,21.28 \
+        c -19.85,-1.08 -39.47,-2.23 -59.07,-5.78 c -3.74,-0.37 -6.12,1.26 -7.17,4.9 \
+        c -3.61,14.43 2.81,35.42 6.82,49.6 c 0.09,3.11 -1.44,4.62 -4.57,4.54 \
+        c -52.67,0.06 -105.34,0 -158,-0.18 c -2.32,-1.05 -3.19,-2.84 -2.59,-5.37 \
+        c 7.03,-25.77 19.21,-81.91 3.91,-104.88 c -40.14,-35.51 -63.1,-82.66 -63.83,-136.61 Z \
+        M 446.92,274 c 1.12,-8.23 11.29,-10.43 15.34,-2.94 c 23.14,35.18 23.35,82.48 1.38,118.24 \
+        c -6.59,13.08 -20.59,4.69 -15.7,-5.14 c 21.8,-33.07 21.13,-73.91 -0.49,-106.87 \
+        c -0.4,-1.06 -0.57,-2.16 -0.53,-3.29 Z \
+        M 421.89,291 c 0.38,-7.15 9.23,-10.8 14.18,-4.82 c 18.52,27.29 18.58,62.4 0.27,89.8 \
+        c -6.15,7.51 -17.01,1.29 -13.74,-7.95 c 15.24,-22.59 15.08,-51.17 -0.08,-73.75 \
+        c -0.44,-1.05 -0.65,-2.14 -0.63,-3.28 Z \
+        M 397.44,355 c 0.42,-4.11 4.49,-8.28 5.5,-12.61 c 3.6,-11.81 1.65,-21.77 -4.79,-32.04 \
+        c -3.02,-8.84 7.4,-14.99 13.72,-7.78 c 11.73,17.32 11.72,39.57 0.24,57.01 \
+        c -4.72,6.69 -13.91,3.3 -14.67,-4.58 Z
+        """
+}
