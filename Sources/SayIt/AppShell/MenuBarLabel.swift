@@ -41,12 +41,16 @@ struct MenuBarLabel: View {
         iconImage
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 19, height: 19)
+            .frame(
+                width: MenuBarIconRenderer.canvasSize.width,
+                height: MenuBarIconRenderer.canvasSize.height
+            )
     }
 
     private var iconImage: Image {
         guard animation.isAnimated else {
-            return Image("MenuBarIcon")
+            return MenuBarIconRenderer.frames(for: .still)?.first.map(Image.init(nsImage:))
+                ?? Image("MenuBarIcon")
         }
         if reduceMotion,
            let still = MenuBarIconRenderer.image(for: animation.reducedMotionFrame) {

@@ -5,7 +5,7 @@ import SayItCore
 enum MenuBarIconFrame: Equatable, Sendable {
     /// The logo with each sound wave (mouth outward) at the given opacity.
     case waves(opacities: [Double])
-    /// The head with a spinner in place of the waves, rotated by `turns`
+    /// The head alone with a spinner cut out of it, rotated by `turns`
     /// (0 to 1 is one full clockwise revolution).
     case spinner(turns: Double)
 
@@ -79,7 +79,7 @@ enum MenuBarIconAnimation: Equatable, Sendable {
         }
     }
 
-    static let dimWaveOpacity = 0.25
+    static let dimWaveOpacity = 0.4
     private static let cascadeStagger = 1.0 / 6.0
 
     /// Each wave brightens quickly, then fades back while the next one lights.

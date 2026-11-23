@@ -81,26 +81,54 @@ struct MenuBarIconAnimationTests {
     }
 
     @MainActor
-    @Test("The spinner stays clear of the face and inside the canvas")
+    @Test("The spinner ring sits entirely inside the head")
     func spinnerPlacement() throws {
         let glyph = try #require(MenuBarGlyph.logo)
-        let reach = glyph.spinnerRadius + glyph.spinnerLineWidth / 2
-        let innermostWave = glyph.waves[0].boundingBoxOfPath
-        #expect(glyph.spinnerCenter.x - reach >= innermostWave.minX - 0.5)
+        let center = glyph.spinnerCenter
+        let edges = [
+            glyph.spinnerRadius - glyph.spinnerLineWidth / 2,
+            glyph.spinnerRadius + glyph.spinnerLineWidth / 2,
+        ]
+        for step in 0..<72 {
+            let angle = CGFloat(step) / 72 * 2 * .pi
+            for radius in edges {
+                let point = CGPoint(
+                    x: center.x + radius * cos(angle),
+                    y: center.y + radius * sin(angle)
+                )
+                #expect(glyph.head.contains(point), "ring leaves the head at \(point)")
+            }
+        }
+    }
 
-        // The renderer fits `bounds` into 17pt of a 19pt canvas, leaving
-        // 1pt either side; the spinner may use that margin but not exceed it.
-        let marginInArtwork = glyph.bounds.width / 17
-        #expect(glyph.spinnerCenter.x + reach <= glyph.bounds.maxX + marginInArtwork)
+    @MainActor
+    @Test("The icon leans toward its visual weight without extra padding")
+    func layoutCentersVisualWeight() throws {
+        let canvas = MenuBarIconRenderer.canvasSize
+        let visualCenter = try #require(MenuBarIconRenderer.visualCenterX)
+        let content = try #require(MenuBarIconRenderer.contentFrame)
+        // The head outweighs the waves, so the slot's center sits between
+        // the visual center and the bounding box's center.
+        #expect(visualCenter < canvas.width / 2)
+        #expect(canvas.width / 2 < content.midX)
+        // The logo fills the slot's width apart from rounding up to a whole
+        // point and the shift toward the visual center.
+        #expect(content.minX >= -0.001)
+        #expect(content.maxX <= canvas.width + 0.001)
+        #expect(canvas.width - content.width < 4)
+        #expect(abs(content.height - MenuBarIconRenderer.contentHeight) < 0.001)
+        #expect(content.minY >= 0 && content.maxY <= canvas.height)
     }
 
     @MainActor
     @Test("Rendered frames are menu bar sized template images")
     func renderedFrames() throws {
-        for animation in [MenuBarIconAnimation.processing, .speaking] {
+        let size = MenuBarIconRenderer.canvasSize
+        #expect(size.height == 19)
+        for animation in [MenuBarIconAnimation.still, .processing, .speaking] {
             let frames = try #require(MenuBarIconRenderer.frames(for: animation))
             #expect(frames.count == animation.frameCount)
-            #expect(frames.allSatisfy { $0.isTemplate && $0.size == CGSize(width: 19, height: 19) })
+            #expect(frames.allSatisfy { $0.isTemplate && $0.size == size })
         }
     }
 }
