@@ -59,7 +59,10 @@ enum MenuBarIconRenderer {
             }
         case .spinner(let turns):
             let start = CGFloat(turns) * 2 * .pi
-            // A three-quarter arc reads as "busy" even at menu bar size.
+            // A three-quarter arc reads as "busy" even at menu bar size. It
+            // is cleared out of the filled head so the template image keeps
+            // a single color in light and dark menu bars.
+            context.setBlendMode(.clear)
             context.setLineWidth(glyph.spinnerLineWidth)
             context.setLineCap(.round)
             context.addArc(

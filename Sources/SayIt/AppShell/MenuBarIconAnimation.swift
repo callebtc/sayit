@@ -5,7 +5,7 @@ import SayItCore
 enum MenuBarIconFrame: Equatable, Sendable {
     /// The logo with each sound wave (mouth outward) at the given opacity.
     case waves(opacities: [Double])
-    /// The head with a spinner in place of the waves, rotated by `turns`
+    /// The head alone with a spinner cut out of it, rotated by `turns`
     /// (0 to 1 is one full clockwise revolution).
     case spinner(turns: Double)
 

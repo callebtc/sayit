@@ -10,7 +10,8 @@ struct MenuBarGlyph {
     let waves: [CGPath]
     /// Bounds of the full logo (head and waves) in artwork coordinates.
     let bounds: CGRect
-    /// Where the processing spinner sits, replacing the waves.
+    /// Where the processing spinner is cut out of the head, roughly where
+    /// the brain would be. The waves are hidden while it spins.
     let spinnerCenter: CGPoint
     let spinnerRadius: CGFloat
     let spinnerLineWidth: CGFloat
@@ -27,15 +28,11 @@ struct MenuBarGlyph {
         waves = subpaths[1...].reversed()
         bounds = subpaths.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
 
-        let waveBounds = waves.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
-        spinnerLineWidth = 20
-        spinnerRadius = 44
-        // Keep the spinner's inner edge where the innermost wave starts so it
-        // never touches the mouth.
-        spinnerCenter = CGPoint(
-            x: waveBounds.minX + spinnerRadius + spinnerLineWidth / 2,
-            y: waveBounds.midY
-        )
+        // Artwork coordinates inside the cranium, well clear of the face and
+        // the back of the head. Tests check the ring stays inside the head.
+        spinnerLineWidth = 38
+        spinnerRadius = 72
+        spinnerCenter = CGPoint(x: 185, y: 205)
     }
 
     static let logoPathData = """

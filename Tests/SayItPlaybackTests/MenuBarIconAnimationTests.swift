@@ -81,17 +81,24 @@ struct MenuBarIconAnimationTests {
     }
 
     @MainActor
-    @Test("The spinner stays clear of the face and inside the canvas")
+    @Test("The spinner ring sits entirely inside the head")
     func spinnerPlacement() throws {
         let glyph = try #require(MenuBarGlyph.logo)
-        let reach = glyph.spinnerRadius + glyph.spinnerLineWidth / 2
-        let innermostWave = glyph.waves[0].boundingBoxOfPath
-        #expect(glyph.spinnerCenter.x - reach >= innermostWave.minX - 0.5)
-
-        // The renderer fits `bounds` into 17pt of a 19pt canvas, leaving
-        // 1pt either side; the spinner may use that margin but not exceed it.
-        let marginInArtwork = glyph.bounds.width / 17
-        #expect(glyph.spinnerCenter.x + reach <= glyph.bounds.maxX + marginInArtwork)
+        let center = glyph.spinnerCenter
+        let edges = [
+            glyph.spinnerRadius - glyph.spinnerLineWidth / 2,
+            glyph.spinnerRadius + glyph.spinnerLineWidth / 2,
+        ]
+        for step in 0..<72 {
+            let angle = CGFloat(step) / 72 * 2 * .pi
+            for radius in edges {
+                let point = CGPoint(
+                    x: center.x + radius * cos(angle),
+                    y: center.y + radius * sin(angle)
+                )
+                #expect(glyph.head.contains(point), "ring leaves the head at \(point)")
+            }
+        }
     }
 
     @MainActor
