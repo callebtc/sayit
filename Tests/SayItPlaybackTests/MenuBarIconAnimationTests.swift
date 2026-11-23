@@ -102,12 +102,33 @@ struct MenuBarIconAnimationTests {
     }
 
     @MainActor
+    @Test("The icon leans toward its visual weight without extra padding")
+    func layoutCentersVisualWeight() throws {
+        let canvas = MenuBarIconRenderer.canvasSize
+        let visualCenter = try #require(MenuBarIconRenderer.visualCenterX)
+        let content = try #require(MenuBarIconRenderer.contentFrame)
+        // The head outweighs the waves, so the slot's center sits between
+        // the visual center and the bounding box's center.
+        #expect(visualCenter < canvas.width / 2)
+        #expect(canvas.width / 2 < content.midX)
+        // The logo fills the slot's width apart from rounding up to a whole
+        // point and the shift toward the visual center.
+        #expect(content.minX >= -0.001)
+        #expect(content.maxX <= canvas.width + 0.001)
+        #expect(canvas.width - content.width < 4)
+        #expect(abs(content.height - MenuBarIconRenderer.contentHeight) < 0.001)
+        #expect(content.minY >= 0 && content.maxY <= canvas.height)
+    }
+
+    @MainActor
     @Test("Rendered frames are menu bar sized template images")
     func renderedFrames() throws {
-        for animation in [MenuBarIconAnimation.processing, .speaking] {
+        let size = MenuBarIconRenderer.canvasSize
+        #expect(size.height == 19)
+        for animation in [MenuBarIconAnimation.still, .processing, .speaking] {
             let frames = try #require(MenuBarIconRenderer.frames(for: animation))
             #expect(frames.count == animation.frameCount)
-            #expect(frames.allSatisfy { $0.isTemplate && $0.size == CGSize(width: 19, height: 19) })
+            #expect(frames.allSatisfy { $0.isTemplate && $0.size == size })
         }
     }
 }

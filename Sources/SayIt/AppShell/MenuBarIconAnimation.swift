@@ -79,7 +79,7 @@ enum MenuBarIconAnimation: Equatable, Sendable {
         }
     }
 
-    static let dimWaveOpacity = 0.25
+    static let dimWaveOpacity = 0.4
     private static let cascadeStagger = 1.0 / 6.0
 
     /// Each wave brightens quickly, then fades back while the next one lights.

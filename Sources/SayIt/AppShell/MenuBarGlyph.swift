@@ -4,12 +4,21 @@ import CoreGraphics
 /// icon can animate the waves independently. Path data comes from
 /// `public/icon.svg`, the same artwork the `MenuBarIcon` PNGs were made from.
 struct MenuBarGlyph {
+    /// How much the sound waves grow, about the mouth, compared with the
+    /// artwork. At menu bar size the original waves are under half a point
+    /// thick and nearly disappear.
+    static let waveScale: CGFloat = 1.75
+
     /// The silhouette without any sound waves.
     let head: CGPath
-    /// Sound waves ordered from the mouth outward.
+    /// Sound waves ordered from the mouth outward, enlarged by `waveScale`.
     let waves: [CGPath]
     /// Bounds of the full logo (head and waves) in artwork coordinates.
     let bounds: CGRect
+    /// The horizontal center of the logo's filled area. The head carries most
+    /// of the weight, so centering on this, rather than on `bounds`, keeps the
+    /// icon from looking shifted left next to other menu bar items.
+    let visualCenterX: CGFloat
     /// Where the processing spinner is cut out of the head, roughly where
     /// the brain would be. The waves are hidden while it spins.
     let spinnerCenter: CGPoint
@@ -25,14 +34,65 @@ struct MenuBarGlyph {
         }
         head = subpaths[0]
         // The artwork lists the waves from the outside in.
-        waves = subpaths[1...].reversed()
-        bounds = subpaths.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
+        let artworkWaves = Array(subpaths[1...].reversed())
+        let artworkWaveBounds = artworkWaves.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
+        let mouth = CGPoint(x: artworkWaveBounds.minX, y: artworkWaveBounds.midY)
+        var enlarge = CGAffineTransform(translationX: mouth.x, y: mouth.y)
+            .scaledBy(x: Self.waveScale, y: Self.waveScale)
+            .translatedBy(x: -mouth.x, y: -mouth.y)
+        waves = artworkWaves.map { $0.copy(using: &enlarge) ?? $0 }
+
+        let shapes = [head] + waves
+        bounds = shapes.reduce(CGRect.null) { $0.union($1.boundingBoxOfPath) }
+        visualCenterX = Self.areaCentroidX(of: shapes, in: bounds)
 
         // Artwork coordinates inside the cranium, well clear of the face and
         // the back of the head. Tests check the ring stays inside the head.
         spinnerLineWidth = 38
         spinnerRadius = 72
         spinnerCenter = CGPoint(x: 185, y: 205)
+    }
+
+    /// Rasterizes the shapes and returns the x coordinate of their filled
+    /// area's centroid, in artwork coordinates.
+    private static func areaCentroidX(of shapes: [CGPath], in bounds: CGRect) -> CGFloat {
+        let pixelsPerUnit: CGFloat = 0.5
+        let width = Int((bounds.width * pixelsPerUnit).rounded(.up))
+        let height = Int((bounds.height * pixelsPerUnit).rounded(.up))
+        guard width > 0, height > 0,
+              let context = CGContext(
+                  data: nil,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: width,
+                  space: CGColorSpaceCreateDeviceGray(),
+                  bitmapInfo: CGImageAlphaInfo.none.rawValue
+              )
+        else {
+            return bounds.midX
+        }
+        context.scaleBy(x: pixelsPerUnit, y: pixelsPerUnit)
+        context.translateBy(x: -bounds.minX, y: -bounds.minY)
+        context.setFillColor(gray: 1, alpha: 1)
+        for shape in shapes {
+            context.addPath(shape)
+        }
+        context.fillPath()
+
+        guard let data = context.data else { return bounds.midX }
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height)
+        var total = 0.0
+        var weightedX = 0.0
+        for row in 0..<height {
+            for column in 0..<width {
+                let coverage = Double(pixels[row * width + column])
+                total += coverage
+                weightedX += coverage * (Double(column) + 0.5)
+            }
+        }
+        guard total > 0 else { return bounds.midX }
+        return bounds.minX + CGFloat(weightedX / total) / pixelsPerUnit
     }
 
     static let logoPathData = """
