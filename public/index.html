@@ -479,78 +479,120 @@
     color: var(--fg-muted);
   }
 
-  /* Both screenshots render at one shared point scale (1124px gallery = 1:1
-     with the Mac), so their text sizes match; every length below is in cqw of
-     the gallery so the composition scales as a single unit. */
-  .gallery {
-    container-type: inline-size;
-    margin-top: clamp(54px, 9vh, 92px);
-    display: grid;
-    grid-template-columns: 38fr 60fr;
-    column-gap: 2cqw;
-    row-gap: 22px;
-    --tile-h: 40cqw;
-    --pt: calc(100cqw / 1124);   /* one macOS point */
+  .showcase-sub kbd {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    padding: 2px 7px;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    color: var(--fg);
+    white-space: nowrap;
   }
 
-  .shot {
-    margin: 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    opacity: 0;
-    transform: translateY(18px);
-    transition: opacity 700ms ease, transform 900ms var(--ease-out);
-    transition-delay: var(--rd, 0ms);
+  /* ---------- demo: select, press, listen ---------- */
+
+  /* The stage is laid out at a fixed design size and scaled as one unit, so
+     the cursor, the selection and the player stay locked together. */
+  .demo {
+    margin-top: clamp(48px, 8vh, 84px);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --sel: rgba(10, 132, 255, 0.36);
+    --sel-dim: rgba(10, 132, 255, 0.11);
+    --win-bg: #1c1c1e;
+    --win-bar: #242426;
+    --win-ink: #ecebe6;
+    --win-muted: rgba(236, 235, 230, 0.46);
+    --win-line: rgba(255, 255, 255, 0.08);
+    --pop-bg: rgba(42, 42, 45, 0.9);
+    --pop-line: rgba(255, 255, 255, 0.1);
+    --pop-btn: rgba(255, 255, 255, 0.09);
+    --pop-ink: #f1f0ec;
+    --pop-muted: rgba(241, 240, 236, 0.46);
+    --pop-bar: rgba(241, 240, 236, 0.2);
+    --key-top: #3b3b3e;
+    --key-bot: #2c2c2e;
+    --key-edge: #141415;
+    --key-ink: #f2f1ed;
+    --hero-a: #2a2825;
+    --hero-b: #25242b;
+    --serif: ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif;
+    --spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   }
 
-  .shot.is-in { opacity: 1; transform: none; }
+  [data-theme="light"] .demo {
+    --accent: #007aff;
+    --accent-soft: rgba(0, 122, 255, 0.14);
+    --sel: rgba(0, 122, 255, 0.22);
+    --sel-dim: rgba(0, 122, 255, 0.07);
+    --win-bg: #fffefb;
+    --win-bar: #f3f1ec;
+    --win-ink: #22211e;
+    --win-muted: rgba(34, 33, 30, 0.42);
+    --win-line: rgba(23, 23, 20, 0.09);
+    --pop-bg: rgba(250, 249, 246, 0.92);
+    --pop-line: rgba(23, 23, 20, 0.09);
+    --pop-btn: rgba(23, 23, 20, 0.06);
+    --pop-ink: #1d1d1b;
+    --pop-muted: rgba(29, 29, 27, 0.45);
+    --pop-bar: rgba(29, 29, 27, 0.18);
+    --key-top: #ffffff;
+    --key-bot: #f1efea;
+    --key-edge: #cdcac2;
+    --key-ink: #2a2926;
+    --hero-a: #f1ebe1;
+    --hero-b: #e8e6f1;
+  }
 
-  .tile {
+  .demo-frame {
     position: relative;
-    height: var(--tile-h);
     overflow: clip;
-    border-radius: calc(22 * var(--pt));
+    aspect-ratio: 1080 / 600;      /* replaced by the measured height */
+    border-radius: 22px;
     background:
       radial-gradient(120% 85% at 22% 0%, var(--tile-hi) 0%, transparent 62%),
       linear-gradient(180deg, var(--tile-top), var(--tile-bottom));
     box-shadow: inset 0 0 0 1px var(--line);
-    transition: background-color 300ms ease;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  .tile img {
+  .stage {
     position: absolute;
-    display: block;
-    height: auto;
-    transform: translateY(calc(26 * var(--pt)));
-    transition: transform 1300ms var(--ease-out);
-    transition-delay: calc(var(--rd, 0ms) + 120ms);
+    left: 0;
+    top: 0;
+    width: 1080px;
+    transform-origin: 0 0;
+    font-family: var(--sans);
+    color: var(--fg);
   }
 
-  .shot.is-in .tile img { transform: none; }
-
-  /* menu-bar strip the player hangs from */
-  .menubar {
+  /* menu bar */
+  .d-menubar {
     position: absolute;
     inset: 0 0 auto 0;
-    height: calc(30 * var(--pt));
+    z-index: 2;
+    height: 28px;
     display: flex;
     align-items: center;
-    gap: calc(14 * var(--pt));
-    padding: 0 calc(18 * var(--pt)) 0 calc(50% - 184 * var(--pt));
+    gap: 18px;
+    padding: 0 18px;
     background: var(--menubar);
     border-bottom: 1px solid var(--line);
-    color: var(--fg);
-    font-size: calc(13 * var(--pt));
+    font-size: 13px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 
-  .menubar svg {
+  .d-menubar .app { font-weight: 700; }
+  .d-menubar .menus { display: flex; gap: 18px; color: var(--fg-muted); }
+  .d-menubar .right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+  .d-menubar svg {
     display: block;
-    width: calc(16 * var(--pt));
-    height: calc(16 * var(--pt));
+    width: 16px;
+    height: 16px;
     fill: none;
     stroke: currentColor;
     stroke-width: 1.6;
@@ -559,54 +601,444 @@
     opacity: 0.8;
   }
 
-  .menubar .active {
+  .d-sayit {
+    position: relative;
     display: grid;
     place-items: center;
-    width: calc(30 * var(--pt));
-    height: calc(22 * var(--pt));
-    border-radius: calc(6 * var(--pt));
-    background: var(--menubar-active);
+    width: 30px;
+    height: 22px;
+    border-radius: 6px;
+    transition: background-color 200ms ease;
   }
 
-  .menubar .active img {
-    position: static;
-    width: calc(15 * var(--pt));
-    height: auto;
-    filter: var(--icon-filter);
+  .d-sayit img { width: 15px; height: auto; display: block; filter: var(--icon-filter); }
+  .d-sayit.on { background: var(--menubar-active); }
+
+  .d-sayit::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 8px;
+    border: 1.5px solid var(--accent);
+    opacity: 0;
+  }
+
+  .d-sayit.speaking::after { animation: d-ping 1.6s ease-out infinite; }
+
+  @keyframes d-ping {
+    0% { transform: scale(0.9); opacity: 0.55; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* the article window */
+  .d-window {
+    position: absolute;
+    z-index: 1;
+    left: 44px;
+    top: 56px;
+    width: 640px;
+    overflow: hidden;
+    border-radius: 14px;
+    background: var(--win-bg);
+    color: var(--win-ink);
+    box-shadow:
+      0 0 0 1px var(--win-line),
+      0 1px 2px rgba(0, 0, 0, 0.08),
+      0 28px 60px -18px rgba(0, 0, 0, 0.38);
+    transition: background-color 300ms ease, color 300ms ease;
+  }
+
+  .d-toolbar {
+    position: relative;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    background: var(--win-bar);
+    border-bottom: 1px solid var(--win-line);
+  }
+
+  .d-lights { display: flex; gap: 7px; }
+  .d-lights i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+  .d-lights i:nth-child(2) { background: #febc2e; }
+  .d-lights i:nth-child(3) { background: #28c840; }
+
+  .d-url {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 24px;
+    width: 260px;
+    border-radius: 7px;
+    background: var(--pop-btn);
+    font-size: 12px;
+    color: var(--win-muted);
+  }
+
+  .d-url svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+  .d-body { padding: 28px 44px 34px; }
+
+  .d-hero {
+    height: 86px;
+    margin-bottom: 22px;
+    border-radius: 10px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(115deg, var(--hero-a), var(--hero-b));
+  }
+
+  .d-hero pre {
+    margin: 0;
+    font: 11px/12px var(--mono);
+    letter-spacing: 0.2em;
+    color: var(--win-muted);
+  }
+
+  .d-kicker {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--win-muted);
+  }
+
+  .d-title {
+    margin-top: 8px;
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+  }
+
+  .d-text {
+    margin-top: 16px;
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+  }
+
+  .d-text p + p { margin-top: 12px; }
+
+  .d-text .w { transition: background-color 90ms linear, color 260ms ease; }
+  .d-text .w.sel { background: var(--sel); }
+  .d-text.reading .w { color: var(--win-muted); }
+  .d-text.reading .w.sel { background: var(--sel-dim); }
+  .d-text.reading .w.past, .d-text.reading .w.now { color: var(--win-ink); }
+
+  .d-text .t, .p-text .pw {
+    border-radius: 4px;
+    padding: 0 0.1em;
+    margin: 0 -0.1em;
+    transition: background-color 140ms ease, color 140ms ease;
+  }
+
+  .d-text .w.now .t { background: var(--accent-soft); color: var(--accent); }
+
+  /* the hotkey */
+  .d-keys {
+    position: absolute;
+    z-index: 5;
+    display: flex;
+    gap: 12px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .key {
+    position: relative;
+    width: 70px;
+    height: 70px;
+    padding: 9px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-radius: 15px;
+    background: linear-gradient(180deg, var(--key-top), var(--key-bot));
+    color: var(--key-ink);
+    box-shadow:
+      0 0 0 1px var(--key-edge),
+      0 5px 0 var(--key-edge),
+      0 18px 26px -8px rgba(0, 0, 0, 0.38);
+    opacity: 0;
+    transform: translateY(18px) scale(0.86);
+    transition:
+      opacity 220ms ease,
+      transform 460ms var(--spring),
+      box-shadow 90ms ease;
+    transition-delay: calc(var(--i) * 70ms), calc(var(--i) * 70ms), 0ms;
+  }
+
+  .key .g { align-self: flex-end; font-size: 21px; line-height: 1; transition: color 90ms ease; }
+  .key .n { font-size: 10.5px; letter-spacing: 0.01em; opacity: 0.7; }
+  .key.letter { align-items: center; justify-content: center; font-size: 26px; font-weight: 500; }
+
+  .d-keys.on .key { opacity: 1; transform: none; }
+
+  .d-keys.on .key.down {
+    transform: translateY(5px);
+    transition: opacity 220ms ease, transform 90ms ease, box-shadow 90ms ease;
+    box-shadow:
+      0 0 0 1px var(--key-edge),
+      0 0 0 var(--key-edge),
+      0 0 0 5px var(--accent-soft),
+      0 8px 14px -8px rgba(0, 0, 0, 0.3);
+  }
+
+  .key.down .g, .key.letter.down { color: var(--accent); }
+
+  .d-keys.out .key {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.94);
+    transition: opacity 240ms ease, transform 300ms var(--ease-out);
+    transition-delay: calc(var(--i) * 40ms);
+  }
+
+  /* the menu-bar player, after the real one */
+  .d-player {
+    position: absolute;
+    z-index: 4;
+    top: 36px;
+    right: 28px;
+    width: 344px;
+    overflow: hidden;
+    border-radius: 14px;
+    color: var(--pop-ink);
+    background: var(--pop-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+    box-shadow:
+      0 0 0 1px var(--pop-line),
+      0 30px 60px -18px rgba(0, 0, 0, 0.45);
+    transform-origin: 50% 0;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.94);
+    transition: opacity 200ms ease, transform 300ms var(--ease-out);
+  }
+
+  .d-player.on {
+    opacity: 1;
     transform: none;
-    transition: none;
+    transition: opacity 200ms ease, transform 520ms var(--spring);
   }
 
-  /* the popover's left edge sits under the status item, as on macOS */
-  .shot-player .tile > img {
-    top: calc(40 * var(--pt));
-    left: calc(50% - 180 * var(--pt));
-    width: calc(360 * var(--pt));
-    filter:
-      drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.32))
-      drop-shadow(0 calc(14 * var(--pt)) calc(26 * var(--pt)) rgba(0, 0, 0, 0.16));
+  .p-head { padding: 14px 16px 12px; border-bottom: 1px solid var(--pop-line); }
+  .p-head strong { display: block; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .p-head span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--pop-muted); }
+
+  .p-wave {
+    height: 46px;
+    margin: 12px 16px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
-  .menubar time { margin-left: auto; }
-
-  .shot-models .tile > img {
-    top: calc(40 * var(--pt));
-    left: calc(46 * var(--pt));   /* crops past "About", before the row actions */
-    width: calc(760 * var(--pt));
-    filter:
-      drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.32))
-      drop-shadow(0 calc(18 * var(--pt)) calc(36 * var(--pt)) rgba(0, 0, 0, 0.16));
+  .p-wave i {
+    width: 2.6px;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--pop-bar);
+    transform: scaleY(0.06);
+    transition: transform 520ms var(--spring), background-color 120ms ease;
+    transition-delay: calc(var(--i) * 7ms), 0ms;
   }
 
-  .shot figcaption {
+  .d-player.on .p-wave i { transform: scaleY(var(--h)); }
+  .p-wave i.on { background: var(--accent); }
+
+  .p-times {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 16px 0;
+    font-size: 11.5px;
+    color: var(--pop-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .p-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 16px 14px;
+  }
+
+  .p-ctrl svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .p-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--pop-btn);
+  }
+
+  .p-speed {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 11px 0 9px;
+    border-radius: 999px;
+    background: var(--pop-btn);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .p-play {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    margin: 0 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .p-play svg { position: absolute; width: 14px; height: 14px; fill: currentColor; stroke: none; transition: opacity 160ms ease, transform 220ms var(--spring); }
+  .p-play .i-play { opacity: 0; transform: scale(0.5); }
+  .p-play.paused .i-play { opacity: 1; transform: translateX(1px); }
+  .p-play.paused .i-pause { opacity: 0; transform: scale(0.5); }
+
+  .p-ctrl .p-x { margin-left: auto; }
+
+  .p-text {
+    height: 112px;
+    margin: 0 10px;
+    padding: 0 6px;
+    overflow: hidden;
+    border-top: 1px solid var(--pop-line);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 12px, #000 calc(100% - 14px), transparent 100%);
+  }
+
+  .p-text-inner {
+    padding: 12px 0;
+    font-size: 13px;
+    line-height: 22px;
+    color: var(--pop-muted);
+    transition: transform 500ms var(--ease-out);
+  }
+
+  .p-text .pw.past { color: var(--pop-ink); }
+  .p-text .pw.now { color: var(--accent); background: var(--accent-soft); }
+
+  .p-foot {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 11px 16px;
+    border-top: 1px solid var(--pop-line);
+    font-size: 12.5px;
+  }
+
+  .p-foot .p-model { display: flex; align-items: center; gap: 6px; margin-right: auto; }
+  .p-foot svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
+
+  /* the pointer */
+  .d-cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 10;
+    width: 0;
+    height: 0;
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  .d-cursor svg { position: absolute; display: block; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35)); }
+  .d-cursor .c-arrow { left: -3px; top: -2px; width: 22px; height: 26px; }
+  .d-cursor .c-ibeam { left: -5px; top: -11px; width: 10px; height: 22px; opacity: 0; }
+  .d-cursor.ibeam .c-arrow { opacity: 0; }
+  .d-cursor.ibeam .c-ibeam { opacity: 1; }
+
+  .d-click {
+    position: absolute;
+    z-index: 9;
+    left: 0;
+    top: 0;
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* portrait stage for narrow screens */
+  .is-portrait .d-menubar .menus { display: none; }
+  .is-portrait .d-menubar .wifi { display: none; }
+  .is-portrait .d-window { left: 12px; top: 40px; width: 376px; border-radius: 12px; }
+  .is-portrait .d-url { width: 190px; }
+  .is-portrait .d-body { padding: 22px 24px 26px; }
+  .is-portrait .d-hero { display: none; }
+  .is-portrait .d-title { font-size: 25px; }
+  .is-portrait .d-text { font-size: 15.5px; line-height: 1.6; }
+  .is-portrait .d-player { left: 12px; right: 12px; width: auto; transform-origin: 50% 100%; }
+  .is-portrait .p-text { display: none; }
+
+  /* steps + sound */
+  .demo-foot {
+    margin-top: 26px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 40px;
+    align-items: start;
+  }
+
+  .steps {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
+
+  .step {
     display: grid;
     grid-template-columns: auto 1fr;
     column-gap: 14px;
     row-gap: 4px;
-    padding: 0 2px;
   }
 
-  .shot figcaption .idx {
+  .step .bar {
+    grid-column: 1 / -1;
+    height: 2px;
+    margin-bottom: 14px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--line);
+  }
+
+  .step .bar i {
+    display: block;
+    height: 100%;
+    background: var(--fg);
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+
+  .step .idx {
     grid-row: span 2;
     padding-top: 3px;
     font-family: var(--mono);
@@ -615,16 +1047,68 @@
     color: var(--fg-faint);
   }
 
-  .shot figcaption strong {
+  .step strong {
     font-size: 14.5px;
     font-weight: 600;
     letter-spacing: -0.01em;
+    opacity: 0.5;
+    transition: opacity 300ms ease;
   }
 
-  .shot figcaption span:last-child {
+  .step.active strong, .step.done strong { opacity: 1; }
+
+  .step span:last-child {
     font-size: 13.5px;
     line-height: 1.5;
     color: var(--fg-muted);
+  }
+
+  .sound {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 18px 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--chip);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: var(--fg);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 560;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 160ms var(--ease-out), border-color 160ms ease, background-color 300ms ease;
+  }
+
+  .sound:active { transform: scale(0.97); }
+  .sound:focus-visible { outline: 1.5px solid var(--focus); outline-offset: 3px; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .sound:hover { border-color: var(--line-strong); }
+  }
+
+  .sound .eq { display: flex; align-items: center; gap: 2px; height: 14px; }
+  .sound .eq i { width: 2.5px; height: 100%; border-radius: 2px; background: currentColor; transform: scaleY(0.3); }
+  .sound[aria-pressed="true"] .eq i { animation: eq 900ms ease-in-out infinite alternate; }
+  .sound[aria-pressed="true"] .eq i:nth-child(2) { animation-delay: -300ms; }
+  .sound[aria-pressed="true"] .eq i:nth-child(3) { animation-delay: -600ms; }
+  .sound[aria-pressed="true"] .eq i:nth-child(4) { animation-delay: -150ms; }
+
+  @keyframes eq {
+    from { transform: scaleY(0.25); }
+    to { transform: scaleY(1); }
+  }
+
+  /* nudge the muted visitor while the voice is reading */
+  .sound.nudge { border-color: var(--line-strong); animation: nudge 2.4s ease-in-out infinite; }
+
+  @keyframes nudge {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 0 5px var(--line); }
   }
 
   .closing {
@@ -639,10 +1123,13 @@
   .closing p { color: var(--fg-muted); font-size: 15px; }
 
   @media (max-width: 760px) {
-    .gallery { grid-template-columns: minmax(0, 1fr); row-gap: 40px; }
-    /* stacked: fill the column, but never render larger than the Mac does */
-    .shot-player .tile { --pt: min(calc(100cqw / 420), 1px); height: calc(458 * var(--pt)); }
-    .shot-models .tile { --pt: calc(100cqw / 660); height: calc(470 * var(--pt)); }
+    .demo-frame { border-radius: 16px; }
+    .demo-foot { grid-template-columns: minmax(0, 1fr); row-gap: 22px; }
+    .steps { gap: 14px; }
+    .step { column-gap: 8px; }
+    .step span:last-child { display: none; }
+    .step strong { font-size: 13.5px; }
+    .sound { justify-self: stretch; justify-content: center; }
   }
 
   /* ---------- scroll reveal ---------- */
@@ -681,8 +1168,7 @@
     .theme-toggle svg { transition: opacity 180ms ease; transform: none; }
     html, body { transition: none; }
     .reveal { transform: none; transition: opacity 300ms ease; transition-delay: 0ms; }
-    .shot { transform: none; transition: opacity 300ms ease; transition-delay: 0ms; }
-    .tile img { transform: none; transition: none; }
+    .demo *, .demo *::before, .demo *::after { transition: none !important; animation: none !important; }
   }
 </style>
 </head>
@@ -774,45 +1260,95 @@
 
 <section class="showcase" id="how">
   <div class="showcase-inner">
-    <p class="eyebrow reveal">A first look</p>
-    <h2 class="showcase-title reveal" style="--rd:70ms">Press a hotkey. It&nbsp;reads.</h2>
+    <p class="eyebrow reveal">How it works</p>
+    <h2 class="showcase-title reveal" style="--rd:70ms">Select. Press. Listen.</h2>
     <p class="showcase-sub reveal" style="--rd:140ms">
-      The player floats in your menu bar — follow the spoken word, scrub the
-      waveform, change the speed. Models download once from Hugging Face and
-      speak offline from then on.
+      Highlight text in any app and press <kbd>⌃⌥S</kbd>. SayIt reads it aloud
+      with an open model running on your Mac, and follows along word by word
+      from the menu bar.
     </p>
 
-    <div class="gallery">
-      <figure class="shot shot-player" style="--rd:80ms">
-        <div class="tile">
-          <div class="menubar" aria-hidden="true">
-            <span class="active"><img src="icon.svg" alt="" width="15" height="15"></span>
-            <svg viewBox="0 0 16 16"><path d="M1.8 6.2a9 9 0 0 1 12.4 0M4 8.6a5.8 5.8 0 0 1 8 0M6.2 11a2.6 2.6 0 0 1 3.6 0"/><circle cx="8" cy="13.2" r=".6" fill="currentColor"/></svg>
-            <svg viewBox="0 0 16 16"><rect x="1.2" y="4.6" width="12" height="6.8" rx="2"/><path d="M14.8 6.8v2.4"/><rect x="3" y="6.4" width="7" height="3.2" rx=".8" fill="currentColor" stroke="none"/></svg>
-            <time>Wed 9:41</time>
+    <div class="demo reveal" style="--rd:200ms" id="demo">
+      <div class="demo-frame" id="demoFrame">
+        <div class="stage" id="stage" role="img"
+             aria-label="Animation: a pointer selects two paragraphs of an article, presses Control-Option-S, and SayIt's menu-bar player reads the text aloud while highlighting each word.">
+
+          <div class="d-menubar" aria-hidden="true">
+            <span class="app">Reader</span>
+            <span class="menus"><span>File</span><span>Edit</span><span>View</span><span>Window</span></span>
+            <span class="right">
+              <span class="d-sayit" id="dIcon"><img src="icon.svg" alt="" width="15" height="15"></span>
+              <svg class="wifi" viewBox="0 0 16 16"><path d="M1.8 6.2a9 9 0 0 1 12.4 0M4 8.6a5.8 5.8 0 0 1 8 0M6.2 11a2.6 2.6 0 0 1 3.6 0"/><circle cx="8" cy="13.2" r=".6" fill="currentColor"/></svg>
+              <svg viewBox="0 0 16 16"><rect x="1.2" y="4.6" width="12" height="6.8" rx="2"/><path d="M14.8 6.8v2.4"/><rect x="3" y="6.4" width="7" height="3.2" rx=".8" fill="currentColor" stroke="none"/></svg>
+              <span>Mon 9:41</span>
+            </span>
           </div>
-          <img src="resources/player.png"
-               alt="SayIt's menu-bar player reading a paragraph aloud, with a waveform, playback controls, and the current word highlighted"
-               width="720" height="756" loading="lazy" decoding="async">
+
+          <div class="d-window" id="dWindow">
+            <div class="d-toolbar" aria-hidden="true">
+              <span class="d-lights"><i></i><i></i><i></i></span>
+              <span class="d-url"><svg viewBox="0 0 10 10"><rect x="1.5" y="4.4" width="7" height="4.6" rx="1"/><path d="M3.1 4.4V3a1.9 1.9 0 0 1 3.8 0v1.4"/></svg>fieldnotes.blog</span>
+            </div>
+            <div class="d-body">
+              <div class="d-hero" aria-hidden="true"><pre id="dHero"></pre></div>
+              <p class="d-kicker">Essay · 2 min read</p>
+              <h3 class="d-title">The lost art of being read&nbsp;to</h3>
+              <div class="d-text" id="dText">
+                <p>Remember being read to as a child? Someone else carried the words, and all you had to do was listen. Somewhere along the way, reading turned into work: endless tabs, long emails, articles saved for later.</p>
+                <p>Say It gives that feeling back. Select any text, press a shortcut, and a natural voice reads it aloud, right on your Mac. So lean back, close your eyes, and let your Mac do the reading.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-keys" id="dKeys" aria-hidden="true">
+            <span class="key" style="--i:0"><span class="g">⌃</span><span class="n">control</span></span>
+            <span class="key" style="--i:1"><span class="g">⌥</span><span class="n">option</span></span>
+            <span class="key letter" style="--i:2">S</span>
+          </div>
+
+          <div class="d-player" id="dPlayer" aria-hidden="true">
+            <div class="p-head"><strong>Say It</strong><span id="pStatus">Generating…</span></div>
+            <div class="p-wave" id="pWave"></div>
+            <div class="p-times"><span id="pElapsed">00:00</span><span>00:32</span></div>
+            <div class="p-ctrl">
+              <span class="p-btn"><svg viewBox="0 0 16 16"><path d="M2.5 6.2h2.2L8 3.6v8.8L4.7 9.8H2.5z" fill="currentColor"/><path d="M10.6 5.8a3 3 0 0 1 0 4.4M12.4 4.2a5.4 5.4 0 0 1 0 7.6"/></svg></span>
+              <span class="p-speed"><svg viewBox="0 0 16 16"><circle cx="8" cy="9" r="5.6"/><path d="M8 9V6.4M6.4 1.8h3.2"/></svg>1.0×</span>
+              <span class="p-btn"><svg viewBox="0 0 16 16"><path d="M3.4 8a4.9 4.9 0 1 0 1.7-3.7"/><path d="M3.2 2.6v2.6h2.6"/><text x="8.2" y="10.3" font-size="5.2" text-anchor="middle" fill="currentColor" stroke="none" font-weight="700">15</text></svg></span>
+              <span class="p-play" id="pPlay">
+                <svg class="i-pause" viewBox="0 0 14 14"><rect x="3" y="2.2" width="2.8" height="9.6" rx="1"/><rect x="8.2" y="2.2" width="2.8" height="9.6" rx="1"/></svg>
+                <svg class="i-play" viewBox="0 0 14 14"><path d="M4 2.4v9.2a.6.6 0 0 0 .9.5l7-4.6a.6.6 0 0 0 0-1L4.9 1.9a.6.6 0 0 0-.9.5z"/></svg>
+              </span>
+              <span class="p-btn"><svg viewBox="0 0 16 16"><path d="M12.6 8a4.9 4.9 0 1 1-1.7-3.7"/><path d="M12.8 2.6v2.6h-2.6"/><text x="7.8" y="10.3" font-size="5.2" text-anchor="middle" fill="currentColor" stroke="none" font-weight="700">30</text></svg></span>
+              <span class="p-btn p-x"><svg viewBox="0 0 16 16"><path d="M4.8 4.8l6.4 6.4M11.2 4.8l-6.4 6.4"/></svg></span>
+            </div>
+            <div class="p-text"><div class="p-text-inner" id="pText"></div></div>
+            <div class="p-foot">
+              <span class="p-model"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M2.5 5 8 8.2 13.5 5M8 8.2v6"/></svg>Fish Audio · smooth bae<svg viewBox="0 0 16 16" style="width:10px;height:10px"><path d="M4 6l4 4 4-4"/></svg></span>
+              <span>Settings…</span>
+              <span>Quit</span>
+            </div>
+          </div>
+
+          <span class="d-click" id="dClick" aria-hidden="true"></span>
+          <div class="d-cursor" id="dCursor" aria-hidden="true">
+            <svg class="c-arrow" viewBox="0 0 22 26"><path d="M3 2v18.2l4.6-4.3 3.1 7.1 3.1-1.3-3-7h6.4z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            <svg class="c-ibeam" viewBox="0 0 10 22"><path d="M2 1.5c1.6 0 2.4.6 3 1.4.6-.8 1.4-1.4 3-1.4M2 20.5c1.6 0 2.4-.6 3-1.4.6.8 1.4 1.4 3 1.4M5 3v16" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/><path d="M2 1.5c1.6 0 2.4.6 3 1.4.6-.8 1.4-1.4 3-1.4M2 20.5c1.6 0 2.4-.6 3-1.4.6.8 1.4 1.4 3 1.4M5 3v16" fill="none" stroke="#111" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
         </div>
-        <figcaption>
-          <span class="idx">01</span>
-          <strong>Lives in your menu bar</strong>
-          <span>Follow each word, scrub the waveform, change the speed.</span>
-        </figcaption>
-      </figure>
-      <figure class="shot shot-models" style="--rd:200ms">
-        <div class="tile">
-          <img src="resources/models.png"
-               alt="SayIt's model library listing open MLX speech models with their size, speed, languages, and license"
-               width="1520" height="1176" loading="lazy" decoding="async">
-        </div>
-        <figcaption>
-          <span class="idx">02</span>
-          <strong>Open models, one click away</strong>
-          <span>Kokoro, Qwen3, OmniVoice and more — download once, run offline.</span>
-        </figcaption>
-      </figure>
+      </div>
+
+      <div class="demo-foot">
+        <ol class="steps">
+          <li class="step"><span class="bar"><i></i></span><span class="idx">01</span><strong>Select text</strong><span>In any app: a page, a PDF, an email.</span></li>
+          <li class="step"><span class="bar"><i></i></span><span class="idx">02</span><strong>Press ⌃⌥S</strong><span>Or pick Services → Say It.</span></li>
+          <li class="step"><span class="bar"><i></i></span><span class="idx">03</span><strong>Listen</strong><span>Follow each word from the menu bar.</span></li>
+        </ol>
+        <button class="sound" id="demoSound" type="button" aria-pressed="false">
+          <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="label">Play with sound</span>
+        </button>
+      </div>
+      <audio id="demoAudio" src="resources/say-it-demo.m4a" preload="none"></audio>
     </div>
 
     <div class="closing reveal">
@@ -1150,8 +1686,439 @@
     }
   }, { rootMargin: "0px 0px -100px 0px", threshold: 0 });
 
-  var revealEls = document.querySelectorAll(".reveal, .shot");
+  var revealEls = document.querySelectorAll(".reveal");
   for (var ri = 0; ri < revealEls.length; ri++) revealObserver.observe(revealEls[ri]);
+
+  /* ------------------------------------------------------------------ */
+  /* Demo: a pointer selects an article, presses ⌃⌥S, and the menu-bar  */
+  /* player reads it with audio pre-generated by Say It itself          */
+  /* ------------------------------------------------------------------ */
+
+  (function demo() {
+    var root = document.getElementById("demo");
+    if (!root) return;
+
+    var frame = document.getElementById("demoFrame");
+    var stage = document.getElementById("stage");
+    var win = document.getElementById("dWindow");
+    var textEl = document.getElementById("dText");
+    var pTextBox = textEl && document.querySelector(".p-text");
+    var pText = document.getElementById("pText");
+    var player = document.getElementById("dPlayer");
+    var icon = document.getElementById("dIcon");
+    var keysEl = document.getElementById("dKeys");
+    var keyEls = keysEl.querySelectorAll(".key");
+    var cursor = document.getElementById("dCursor");
+    var ring = document.getElementById("dClick");
+    var statusEl = document.getElementById("pStatus");
+    var elapsedEl = document.getElementById("pElapsed");
+    var playEl = document.getElementById("pPlay");
+    var waveEl = document.getElementById("pWave");
+    var heroEl = document.getElementById("dHero");
+    var soundBtn = document.getElementById("demoSound");
+    var soundLabel = soundBtn.querySelector(".label");
+    var stepEls = root.querySelectorAll(".step");
+    var stepBars = root.querySelectorAll(".step .bar i");
+    var audio = document.getElementById("demoAudio");
+
+    // Word timings of resources/say-it-demo.m4a ("smooth bae", 1.2×), from a
+    // whisper alignment: [start, end] in seconds, one pair per word.
+    var TIMES = [[0.02,0.76],[0.76,1.25],[1.25,1.61],[1.61,1.85],[1.85,1.99],[1.99,2.08],[2.08,2.88],[2.88,3.48],[3.48,3.82],[3.82,4.42],[4.42,4.72],[4.72,5.12],[5.12,5.46],[5.46,5.8],[5.8,6.14],[6.14,6.48],[6.48,6.71],[6.71,6.97],[6.97,7.26],[7.26,8.32],[8.32,8.98],[8.98,9.34],[9.34,9.57],[9.57,9.94],[9.94,11.19],[11.19,11.35],[11.35,11.61],[11.61,12.32],[12.32,13.09],[13.09,13.76],[13.76,14.33],[14.33,15.48],[15.48,16.28],[16.28,16.47],[16.47,16.7],[16.7,17.32],[17.68,17.71],[17.71,17.87],[17.87,18.41],[18.41,18.84],[18.84,19.61],[19.61,20.4],[20.4,21.07],[21.07,21.4],[21.4,22.14],[22.14,22.5],[22.5,22.58],[22.58,23.28],[23.28,23.56],[23.56,23.66],[23.66,24.3],[24.3,24.77],[24.77,25.24],[25.24,25.42],[25.42,26.31],[26.31,26.39],[26.39,26.57],[26.57,27.22],[27.22,27.52],[27.55,27.74],[27.74,28.18],[28.18,28.84],[28.84,29.39],[29.39,30.3],[30.3,30.55],[30.55,30.58],[30.58,30.76],[30.76,31.14],[31.14,31.48],[31.48,31.57],[31.57,31.76],[31.76,32.24]];
+    // loudness envelope of the same file, 64 bins
+    var ENV = [0.92,0.81,0.62,0.51,0.4,0.12,0.79,0.49,0.66,0.39,0.45,0.87,0.64,0.6,0.45,0.12,0.53,0.82,0.72,0.31,0.8,0.66,0.59,0.12,0.76,0.61,0.54,0.74,0.8,0.59,0.7,0.68,0.6,0.56,0.12,0.73,0.74,0.65,0.73,0.12,0.56,0.81,0.66,0.12,0.82,0.47,0.77,0.76,0.72,0.84,0.69,0.72,0.85,0.29,0.59,1.0,0.7,0.76,0.84,0.41,0.85,0.89,0.62,0.47];
+    var DUR = 32.3;
+
+    // the timeline, in seconds
+    var T = {
+      move0: 0.5, move1: 1.55,          // glide to the first word
+      down: 1.7, drag0: 1.8, drag1: 3.7, up: 3.82,
+      away0: 3.95, away1: 4.7,          // step aside
+      keys: 4.2, k0: 4.75, k1: 4.95, k2: 5.15, release: 5.6, keysOut: 5.85,
+      pop: 5.95, speak: 6.75
+    };
+    T.end = T.speak + DUR;
+    T.close = T.end + 1.6;
+    T.clear = T.close + 0.35;
+    T.loop = T.close + 1.6;
+    var PHASES = [[T.move0, T.up], [T.keys, T.speak], [T.speak, T.end]];
+
+    /* ---- build the words: article spans and the player's copy ---- */
+
+    var words = [], pWords = [];
+    var paras = textEl.querySelectorAll("p");
+    for (var pi = 0; pi < paras.length; pi++) {
+      var list = paras[pi].textContent.trim().split(/\s+/);
+      paras[pi].textContent = "";
+      for (var wi = 0; wi < list.length; wi++) {
+        var w = document.createElement("span");
+        w.className = "w";
+        var tt = document.createElement("span");
+        tt.className = "t";
+        tt.textContent = list[wi];
+        w.appendChild(tt);
+        if (wi < list.length - 1) w.appendChild(document.createTextNode(" "));
+        paras[pi].appendChild(w);
+        words.push(w);
+
+        var pw = document.createElement("span");
+        pw.className = "pw";
+        pw.textContent = list[wi];
+        pText.appendChild(pw);
+        pText.appendChild(document.createTextNode(" "));
+        pWords.push(pw);
+      }
+    }
+    if (words.length !== TIMES.length) return;   // copy and audio must agree
+
+    var bars = [];
+    for (var bi = 0; bi < ENV.length; bi++) {
+      var bar = document.createElement("i");
+      bar.style.setProperty("--i", bi);
+      bar.style.setProperty("--h", Math.max(0.1, ENV[bi]).toFixed(2));
+      waveEl.appendChild(bar);
+      bars.push(bar);
+    }
+
+    /* ---- layout: one design size per orientation, scaled as a unit ---- */
+
+    var DW = 1080, DH = 600, scale = 1, portrait = false;
+    var rects = [], textBox = null, P = {};
+
+    function rel(el) {
+      var s = stage.getBoundingClientRect();
+      var r = el.getBoundingClientRect();
+      return { x: (r.left - s.left) / scale, y: (r.top - s.top) / scale,
+               w: r.width / scale, h: r.height / scale };
+    }
+
+    function measure() {
+      var fw = frame.clientWidth;
+      if (!fw) return;
+      portrait = fw < 700;
+      root.classList.toggle("is-portrait", portrait);
+      DW = portrait ? 400 : 1080;
+      scale = fw / DW;
+      stage.style.width = DW + "px";
+      stage.style.transform = "scale(" + scale + ")";
+
+      var winBottom = win.offsetTop + win.offsetHeight;
+      if (portrait) {
+        player.style.top = (winBottom + 14) + "px";
+        DH = winBottom + 14 + player.offsetHeight + 14;
+      } else {
+        player.style.top = "";
+        DH = Math.max(winBottom, player.offsetTop + player.offsetHeight) + 34;
+      }
+      stage.style.height = DH + "px";
+      frame.style.aspectRatio = "auto";
+      frame.style.height = (DH * scale) + "px";
+
+      rects = [];
+      for (var i = 0; i < words.length; i++) rects.push(rel(words[i].firstChild));
+      textBox = rel(textEl);
+
+      var px = player.offsetLeft, py = player.offsetTop;
+      var pw = player.offsetWidth, ph = player.offsetHeight;
+      keysEl.style.left = (px + pw / 2) + "px";
+      keysEl.style.top = (py + ph * (portrait ? 0.5 : 0.42)) + "px";
+
+      var wr = win.offsetLeft + win.offsetWidth;
+      P.rest = portrait ? { x: DW - 70, y: py + ph * 0.75 } : { x: px + pw * 0.62, y: DH - 60 };
+      P.park = portrait ? { x: DW - 58, y: winBottom + 5 } : { x: wr + 46, y: win.offsetTop + win.offsetHeight * 0.72 };
+      lastNow = -2;
+      render(t, true);
+    }
+
+    /* ---- easing ---- */
+
+    function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+    function prog(v, a, b) { return clamp((v - a) / (b - a), 0, 1); }
+    function ease(u) { return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; }
+    function lerp(a, b, u) { return a + (b - a) * u; }
+    function fmt(s) {
+      s = Math.floor(s);
+      return "00:" + (s < 10 ? "0" : "") + s;
+    }
+
+    /* ---- render: everything is a pure function of t ---- */
+
+    var lastSel = -1, lastNow = -2, lastBars = -1, lastStatus = "", lastElapsed = "";
+    var flags = {};
+
+    function setClass(el, key, name, on) {
+      if (flags[key] === on) return;
+      flags[key] = on;
+      el.classList.toggle(name, on);
+    }
+
+    function selectionAt(cx, cy) {
+      var n = 0;
+      for (var i = 0; i < rects.length; i++) {
+        var r = rects[i];
+        var above = r.y + r.h < cy - 1;
+        var sameLine = !above && r.y <= cy + 1;
+        if (above || (sameLine && r.x + r.w * 0.3 < cx)) n = i + 1;
+        else break;
+      }
+      return n;
+    }
+
+    function cursorAt(time) {
+      var first = rects[0], last = rects[rects.length - 1];
+      var s = { x: first.x - 1, y: first.y + first.h / 2 };
+      var e = { x: last.x + last.w + 2, y: last.y + last.h / 2 };
+      if (time < T.move1) {
+        var u = ease(prog(time, T.move0, T.move1));
+        return { x: lerp(P.rest.x, s.x, u), y: lerp(P.rest.y, s.y, u) - Math.sin(Math.PI * u) * 40, drag: false };
+      }
+      if (time < T.drag0) return { x: s.x, y: s.y, drag: false };
+      if (time < T.away0) {
+        var d = ease(prog(time, T.drag0, T.drag1));
+        return { x: lerp(s.x, e.x, d) + Math.sin(Math.PI * d) * 26, y: lerp(s.y, e.y, d), drag: time < T.up };
+      }
+      if (time < T.clear + 0.5) {
+        var a = ease(prog(time, T.away0, T.away1));
+        return { x: lerp(e.x, P.park.x, a), y: lerp(e.y, P.park.y, a) + Math.sin(Math.PI * a) * 14, drag: false };
+      }
+      var b = ease(prog(time, T.clear + 0.5, T.loop));
+      return { x: lerp(P.park.x, P.rest.x, b), y: lerp(P.park.y, P.rest.y, b), drag: false };
+    }
+
+    function render(time, force) {
+      if (!rects.length) return;
+
+      // pointer
+      var c = cursorAt(time);
+      cursor.style.transform = "translate(" + c.x.toFixed(1) + "px," + c.y.toFixed(1) + "px)";
+      var overText = c.drag || (c.x > textBox.x - 4 && c.x < textBox.x + textBox.w + 4 &&
+                                c.y > textBox.y - 4 && c.y < textBox.y + textBox.h + 4);
+      setClass(cursor, "ibeam", "ibeam", overText);
+
+      var rp = prog(time, T.down, T.down + 0.5);
+      if (rp > 0 && rp < 1) {
+        ring.style.opacity = (1 - rp) * 0.9;
+        ring.style.transform = "translate(" + c.x + "px," + c.y + "px) scale(" + (0.3 + rp * 0.9) + ")";
+      } else if (ring.style.opacity !== "0") {
+        ring.style.opacity = "0";
+      }
+
+      // selection
+      var sel = 0;
+      if (time >= T.drag0 && time < T.up) sel = selectionAt(c.x, c.y);
+      else if (time >= T.up && time < T.clear) sel = words.length;
+      if (sel !== lastSel || force) {
+        for (var i = 0; i < words.length; i++) {
+          var on = i < sel;
+          if (force || (on !== (i < lastSel))) words[i].classList.toggle("sel", on);
+        }
+        lastSel = sel;
+      }
+
+      // hotkey
+      setClass(keysEl, "keysOn", "on", time >= T.keys && time < T.keysOut + 0.6);
+      setClass(keysEl, "keysOut", "out", time >= T.keysOut);
+      var kt = [T.k0, T.k1, T.k2];
+      for (var k = 0; k < 3; k++) setClass(keyEls[k], "key" + k, "down", time >= kt[k] && time < T.release);
+
+      // player
+      var open = time >= T.pop && time < T.close;
+      setClass(player, "player", "on", open);
+      setClass(icon, "icon", "on", open);
+      var at = time - T.speak;
+      var speaking = at >= 0 && at < DUR;
+      setClass(icon, "speaking", "speaking", speaking);
+      setClass(playEl, "paused", "paused", time >= T.end);
+      setClass(textEl, "reading", "reading", at >= 0 && time < T.clear);
+
+      var status = at < 0 ? "Generating…" : speaking ? "Playing" : "Finished";
+      if (status !== lastStatus) { statusEl.textContent = status; lastStatus = status; }
+      var el = fmt(clamp(at, 0, DUR));
+      if (el !== lastElapsed) { elapsedEl.textContent = el; lastElapsed = el; }
+
+      var nb = open ? Math.round(clamp(at / DUR, 0, 1) * bars.length) : 0;
+      if (nb !== lastBars) {
+        for (var b = 0; b < bars.length; b++) bars[b].classList.toggle("on", b < nb);
+        lastBars = nb;
+      }
+
+      // the spoken word
+      var now = -1;
+      if (speaking) {
+        for (var j = 0; j < TIMES.length && TIMES[j][0] <= at + 0.04; j++) now = j;
+      } else if (at >= DUR && time < T.clear) {
+        now = words.length;              // everything read
+      }
+      if (now !== lastNow) {
+        for (var m = 0; m < words.length; m++) {
+          var past = m < now, cur = m === now;
+          words[m].classList.toggle("past", past);
+          words[m].classList.toggle("now", cur);
+          pWords[m].classList.toggle("past", past);
+          pWords[m].classList.toggle("now", cur);
+        }
+        if (now >= 0 && now < words.length && !portrait) {
+          var maxScroll = Math.max(0, pText.offsetHeight - pTextBox.clientHeight);
+          var y = clamp(pWords[now].offsetTop - 34, 0, maxScroll);
+          pText.style.transform = "translateY(" + (-y) + "px)";
+        } else if (now < 0) {
+          pText.style.transform = "";
+        }
+        if (now >= 0 && now < words.length && now !== lastNow && running) ripple();
+        lastNow = now;
+      }
+
+      // steps
+      for (var s = 0; s < 3; s++) {
+        var ph = PHASES[s];
+        var f = prog(time, ph[0], ph[1]);
+        stepBars[s].style.transform = "scaleX(" + f.toFixed(3) + ")";
+        setClass(stepEls[s], "step" + s, "active", time >= ph[0] && time < ph[1]);
+        setClass(stepEls[s], "done" + s, "done", time >= ph[1] && time < T.loop);
+      }
+
+      setClass(soundBtn, "nudge", "nudge", speaking && !soundOn);
+      drawHero(time, at, speaking);
+    }
+
+    // the article's ASCII hero breathes, and swells with the voice
+    var RAMPC = [" ", "·", ":", "~", "=", "+", "*"];
+    var lastHero = -1;
+    function drawHero(time, at, speaking) {
+      if (portrait) return;
+      var frameNo = Math.floor(time * 14);
+      if (frameNo === lastHero) return;
+      lastHero = frameNo;
+      var level = speaking ? ENV[clamp(Math.floor(at / DUR * ENV.length), 0, ENV.length - 1)] : 0;
+      var amp = 0.55 + level * 1.5;
+      var cols = 44, rowsN = 6, out = "";
+      for (var y = 0; y < rowsN; y++) {
+        var line = "";
+        for (var x = 0; x < cols; x++) {
+          var env = Math.sin(Math.PI * (x + 0.5) / cols);
+          var h = 2.5 + amp * env * Math.sin(x * 0.42 - time * 2.4) * (0.75 + 0.25 * Math.sin(x * 0.13 + time));
+          var d = Math.abs(y - h);
+          var v = clamp(1.25 - d * 0.62, 0, 1);
+          line += RAMPC[Math.round(v * (RAMPC.length - 1))];
+        }
+        out += line + (y < rowsN - 1 ? "\n" : "");
+      }
+      heroEl.textContent = out;
+    }
+
+    // each spoken word drops a ripple into the page's wave field
+    function ripple() {
+      var r = frame.getBoundingClientRect();
+      var side = Math.random() < 0.5;
+      var x = side ? r.left - rand(16, 70) : r.right + rand(16, 70);
+      var y = r.top + r.height * rand(0.15, 0.85) + (window.scrollY || 0);
+      disturb(x / CELL, y / CELL, rand(0.5, 0.9));
+    }
+
+    /* ---- clock, sound, visibility ---- */
+
+    var t = 0, running = false, visible = false, raf = 0, prevNow = 0;
+    var soundOn = false, playPending = false, waitAudio = 0;
+    var STILL = T.speak + 9.4;   // reduced motion: one representative frame
+
+    function playAt(at) {
+      playPending = true;
+      try { audio.currentTime = at; } catch (e) {}
+      var p = audio.play();
+      if (p && p.then) {
+        p.then(function () { playPending = false; },
+               function () { playPending = false; setSound(false); });
+      } else {
+        playPending = false;
+      }
+    }
+
+    function frameTick(now) {
+      if (!running) return;
+      raf = requestAnimationFrame(frameTick);
+      var dt = Math.min((now - prevNow) / 1000, 0.1);
+      prevNow = now;
+
+      var at = t - T.speak;
+      if (soundOn && at >= 0 && at < DUR && !audio.ended) {
+        if (audio.paused) {
+          if (!playPending) playAt(at);
+          waitAudio += dt;
+          if (waitAudio > 4) { setSound(false); t += dt; }   // never hang on a stalled file
+        } else {
+          waitAudio = 0;
+          t = Math.max(t, T.speak + audio.currentTime);      // the audio is the clock
+        }
+      } else {
+        t += dt;
+      }
+
+      if (t >= T.loop) {
+        t = 0;
+        if (soundOn) setSound(false);   // with sound, the demo plays once
+      }
+      if (reduceMotion && !soundOn) { stop(); t = STILL; }
+      render(t);
+    }
+
+    function start() {
+      if (running || !visible || document.hidden) return;
+      if (reduceMotion && !soundOn) { render(STILL); return; }
+      running = true;
+      prevNow = performance.now();
+      raf = requestAnimationFrame(frameTick);
+    }
+
+    function stop() {
+      running = false;
+      cancelAnimationFrame(raf);
+      if (!audio.paused) audio.pause();
+    }
+
+    function setSound(on) {
+      soundOn = on;
+      waitAudio = 0;
+      soundBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      soundLabel.textContent = on ? "Sound on" : "Play with sound";
+      if (!on) audio.pause();
+    }
+
+    soundBtn.addEventListener("click", function () {
+      if (soundOn) { setSound(false); return; }
+      audio.preload = "auto";
+      // unlock playback inside the gesture, then let the timeline start it
+      audio.muted = true;
+      var p = audio.play();
+      var settle = function () { audio.pause(); audio.muted = false; };
+      if (p && p.then) p.then(settle, settle); else settle();
+      setSound(true);
+      if (reduceMotion) t = T.speak;
+      else if (t > T.move0) t = 0;              // replay the whole gesture, with sound
+      flags = {}; lastSel = -1; lastNow = -2; lastBars = -1;
+      render(t, true);
+      stop();
+      start();
+    });
+
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible) { audio.preload = "auto"; start(); } else stop();
+      }, { threshold: 0.25 }).observe(frame);
+    } else {
+      visible = true;
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) stop(); else start();
+    });
+
+    if ("ResizeObserver" in window) new ResizeObserver(function () { measure(); }).observe(frame);
+    window.addEventListener("resize", measure);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    measure();
+    if (reduceMotion) render(STILL, true);
+    start();
+  })();
 
   /* ------------------------------------------------------------------ */
   /* Theme toggle: explicit choice persists, otherwise follow the system */
