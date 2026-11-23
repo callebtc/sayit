@@ -932,6 +932,7 @@
   }
 
   .p-text-inner {
+    position: relative;   /* the offsetParent its words scroll by */
     padding: 12px 0;
     font-size: 13px;
     line-height: 22px;
@@ -1323,7 +1324,7 @@
             </div>
             <div class="p-text"><div class="p-text-inner" id="pText"></div></div>
             <div class="p-foot">
-              <span class="p-model"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M2.5 5 8 8.2 13.5 5M8 8.2v6"/></svg>Fish Audio · smooth bae<svg viewBox="0 0 16 16" style="width:10px;height:10px"><path d="M4 6l4 4 4-4"/></svg></span>
+              <span class="p-model"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M2.5 5 8 8.2 13.5 5M8 8.2v6"/></svg>Fish Audio<svg viewBox="0 0 16 16" style="width:10px;height:10px"><path d="M4 6l4 4 4-4"/></svg></span>
               <span>Settings…</span>
               <span>Quit</span>
             </div>
@@ -1958,7 +1959,8 @@
         }
         if (now >= 0 && now < words.length && !portrait) {
           var maxScroll = Math.max(0, pText.offsetHeight - pTextBox.clientHeight);
-          var y = clamp(pWords[now].offsetTop - 34, 0, maxScroll);
+          // keep the spoken line second from the top, scrolling a whole line at a time
+          var y = clamp(pWords[now].offsetTop - pWords[0].offsetTop - 22, 0, maxScroll);
           pText.style.transform = "translateY(" + (-y) + "px)";
         } else if (now < 0) {
           pText.style.transform = "";
