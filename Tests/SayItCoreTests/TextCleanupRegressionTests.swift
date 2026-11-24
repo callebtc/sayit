@@ -327,6 +327,100 @@ struct TextCleanupRegressionTests {
         #expect(result.text == #"Title file_name \*literal\* \_literal\_ unmatched`"#)
     }
 
+    @Test("Spaced multiplication asterisks are not stripped as Markdown italics")
+    func preservesSpacedAsterisks() async throws {
+        let plain = "Compute 2 * 3 * 4 and a * b + c * d."
+        let plainResult = try await TextCleaner().ingest(.init(source: .clipboard, plainText: plain))
+        #expect(plainResult.text == plain)
+        #expect(plainResult.cleanupSummary.sourceFormat == "Plain text")
+
+        let mixed = "Use *italic* and **bold** with 2 * 3 * 4."
+        let mixedResult = try await TextCleaner().ingest(.init(source: .clipboard, plainText: mixed))
+        #expect(mixedResult.text == "Use italic and bold with 2 * 3 * 4.")
+        #expect(mixedResult.cleanupSummary.sourceFormat == "Markdown")
+    }
+
+    @Test("Markdown, HTML, and plain-text headings force chunk breaks without splitting wrapped lines")
+    func headingAndUnpunctuatedBlockBoundaries() async throws {
+        let markdown = """
+        Intro sentence.
+
+        ## Release Notes
+
+        First body sentence.
+        """
+        let markdownResult = try await TextCleaner().ingest(.init(source: .selection, plainText: markdown))
+        let markdownChunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: markdownResult.text,
+            listItemStartOffsets: Set(markdownResult.listItemStartOffsets ?? []),
+            paragraphBreakStartOffsets: Set(markdownResult.paragraphBreakStartOffsets ?? [])
+        )
+        #expect(markdownChunks.map(\.text) == ["Intro sentence.", "Release Notes", "First body sentence."])
+        #expect(markdownChunks.allSatisfy { $0.startsParagraph })
+
+        let tightMarkdown = "# Fixed\nFix unnatural pauses."
+        let tightResult = try await TextCleaner().ingest(.init(source: .selection, plainText: tightMarkdown))
+        let tightChunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: tightResult.text,
+            listItemStartOffsets: Set(tightResult.listItemStartOffsets ?? []),
+            paragraphBreakStartOffsets: Set(tightResult.paragraphBreakStartOffsets ?? [])
+        )
+        #expect(tightChunks.map(\.text) == ["Fixed", "Fix unnatural pauses."])
+
+        let html = Data("<h1>Article title</h1><p>First paragraph.</p>".utf8)
+        let htmlResult = try await TextCleaner().ingest(.init(source: .clipboard, html: html))
+        let htmlChunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: htmlResult.text,
+            listItemStartOffsets: Set(htmlResult.listItemStartOffsets ?? []),
+            paragraphBreakStartOffsets: Set(htmlResult.paragraphBreakStartOffsets ?? [])
+        )
+        #expect(htmlChunks.map(\.text) == ["Article title", "First paragraph."])
+        #expect(!htmlResult.text.contains("SAYITBREAK"))
+
+        let browserPlainText = """
+        A wrapped heading
+        across two lines
+
+        First paragraph of the body.
+
+        Second paragraph of the body.
+        """
+        let plainResult = try await TextCleaner().ingest(.init(source: .selection, plainText: browserPlainText))
+        let plainChunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: plainResult.text,
+            listItemStartOffsets: Set(plainResult.listItemStartOffsets ?? []),
+            paragraphBreakStartOffsets: Set(plainResult.paragraphBreakStartOffsets ?? [])
+        )
+        #expect(plainChunks.map(\.text) == [
+            "A wrapped heading\nacross two lines",
+            "First paragraph of the body.\nSecond paragraph of the body."
+        ])
+        for chunk in plainChunks {
+            let slice = plainResult.text
+                .dropFirst(chunk.sourceRange.lowerBound)
+                .prefix(chunk.sourceRange.count)
+            #expect(String(slice) == chunk.text)
+        }
+    }
+
+    @Test("Paragraph break offsets survive serialization and older records still decode")
+    func paragraphBreakOffsetSerialization() async throws {
+        let result = try await TextCleaner().ingest(
+            .init(source: .selection, plainText: "# Fixed\n\nBody sentence.")
+        )
+        #expect(result.paragraphBreakStartOffsets == [6])
+        let data = try JSONEncoder().encode(result)
+        #expect(try JSONDecoder().decode(CleanedText.self, from: data) == result)
+        var legacy = try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        legacy.removeValue(forKey: "paragraphBreakStartOffsets")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacy)
+        let decoded = try JSONDecoder().decode(CleanedText.self, from: legacyData)
+        #expect(decoded.text == result.text)
+        #expect(decoded.paragraphBreakStartOffsets == nil)
+    }
+
     @Test("HTML extraction and importer failure both preserve exact block boundaries", arguments: [true, false])
     func htmlBoundaries(failImporter: Bool) throws {
         let html = Data("<p>First.</p><ul><li>One</li><li>Two</li></ul><table><tr><td>Left</td><td>Right</td></tr></table><p>Last<br>line.</p>".utf8)

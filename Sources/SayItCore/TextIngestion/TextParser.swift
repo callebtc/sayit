@@ -9,13 +9,15 @@ struct TextParser: Sendable {
         sourceFormat: String,
         removedCodeBlocks: Int,
         normalizedWhitespace: Bool,
-        listItemStartOffsets: [Int]
+        listItemStartOffsets: [Int],
+        paragraphBreakStartOffsets: [Int]
     ) {
         guard options.isEnabled else {
             return try rawPassthrough(payload)
         }
 
         let listMarker = "SAYITLIST" + UUID().uuidString
+        let breakMarker = "SAYITBREAK" + UUID().uuidString
         let parsed: (text: String, sourceFormat: String, removedCodeBlocks: Int)
 
         let plainText = payload.plainText.flatMap { text in
@@ -31,10 +33,18 @@ struct TextParser: Sendable {
         if let plainText,
            (payload.html == nil
                || (options.stripHTML && !plainTextMirrorsHTML)) {
-            parsed = cleanPlainText(plainText, listMarker: listMarker)
+            parsed = cleanPlainText(
+                plainText,
+                listMarker: listMarker,
+                breakMarker: breakMarker
+            )
         } else if let html = payload.html {
             if options.stripHTML {
-                let cleaned = try cleanHTML(html, listMarker: listMarker)
+                let cleaned = try cleanHTML(
+                    html,
+                    listMarker: listMarker,
+                    breakMarker: breakMarker
+                )
                 parsed = (cleaned.text, "HTML", cleaned.removedCodeBlocks)
             } else if let raw = decodeHTMLSource(html) {
                 let cleaned = removeHTMLCodeBlocks(from: raw)
@@ -45,37 +55,52 @@ struct TextParser: Sendable {
         } else if let richText = payload.richText {
             parsed = (try cleanRichText(richText), "Rich text", 0)
         } else if let plainText {
-            parsed = cleanPlainText(plainText, listMarker: listMarker)
+            parsed = cleanPlainText(
+                plainText,
+                listMarker: listMarker,
+                breakMarker: breakMarker
+            )
         } else {
             throw TextIngestionError.noReadableText
         }
 
-        // A block inside an HTML list item can put whitespace after its marker.
-        // Move the marker next to its content before computing character offsets.
-        let marked = replacingMatches(
+        let withBlockBreaks = markUnpunctuatedBlankLineBlocks(
             in: parsed.text,
-            pattern: listMarker + #"\s+"#,
-            with: listMarker
+            listMarker: listMarker,
+            breakMarker: breakMarker
         )
-        let normalized = normalize(marked)
-        var text = ""
-        var listItemStartOffsets: [Int] = []
-        let pieces = normalized.components(separatedBy: listMarker)
-        for (index, piece) in pieces.enumerated() {
-            if index > 0 {
-                listItemStartOffsets.append(text.count)
-            }
-            text += piece
-        }
-        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A block inside a list item or after a heading can put whitespace after
+        // its marker. Move markers past whitespace before computing offsets.
+        let marked = shiftMarkersPastWhitespace(
+            in: withBlockBreaks,
+            listMarker: listMarker,
+            breakMarker: breakMarker
+        )
+        let normalized = shiftMarkersPastWhitespace(
+            in: normalize(marked),
+            listMarker: listMarker,
+            breakMarker: breakMarker
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let extracted = extractMarkers(
+            from: normalized,
+            listMarker: listMarker,
+            breakMarker: breakMarker
+        )
+        let text = extracted.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unnormalizedPlain = parsed.text
+            .replacing(listMarker, with: "")
+            .replacing(breakMarker, with: "")
         return (
             text: text,
             sourceFormat: parsed.sourceFormat,
             removedCodeBlocks: parsed.removedCodeBlocks,
-            normalizedWhitespace: text
-                != parsed.text.replacing(listMarker, with: ""),
+            normalizedWhitespace: text != unnormalizedPlain,
             listItemStartOffsets: Array(
-                Set(listItemStartOffsets.filter { $0 < text.count })
+                Set(extracted.listItemStartOffsets.filter { $0 < text.count })
+            ).sorted(),
+            paragraphBreakStartOffsets: Array(
+                Set(extracted.paragraphBreakStartOffsets.filter { $0 > 0 && $0 < text.count })
             ).sorted()
         )
     }
@@ -85,7 +110,8 @@ struct TextParser: Sendable {
         sourceFormat: String,
         removedCodeBlocks: Int,
         normalizedWhitespace: Bool,
-        listItemStartOffsets: [Int]
+        listItemStartOffsets: [Int],
+        paragraphBreakStartOffsets: [Int]
     ) {
         if let plainText = payload.plainText {
             return (
@@ -93,15 +119,16 @@ struct TextParser: Sendable {
                 "Plain text",
                 0,
                 false,
+                [],
                 []
             )
         }
         if let html = payload.html,
            let raw = decodeHTMLSource(html) {
-            return (sanitize(raw), "HTML", 0, false, [])
+            return (sanitize(raw), "HTML", 0, false, [], [])
         }
         if let richText = payload.richText {
-            return (sanitize(try cleanRichText(richText)), "Rich text", 0, false, [])
+            return (sanitize(try cleanRichText(richText)), "Rich text", 0, false, [], [])
         }
         throw TextIngestionError.noReadableText
     }
@@ -113,7 +140,11 @@ struct TextParser: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func cleanPlainText(_ input: String, listMarker: String) -> (
+    private func cleanPlainText(
+        _ input: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> (
         text: String,
         sourceFormat: String,
         removedCodeBlocks: Int
@@ -129,7 +160,11 @@ struct TextParser: Sendable {
         if !hasFences, options.stripHTML,
            looksLikeHTML(detectionInput),
            let data = detectionInput.data(using: .utf8),
-           let html = try? cleanHTML(data, listMarker: listMarker) {
+           let html = try? cleanHTML(
+               data,
+               listMarker: listMarker,
+               breakMarker: breakMarker
+           ) {
             return (html.text, "HTML", html.removedCodeBlocks)
         }
 
@@ -141,7 +176,11 @@ struct TextParser: Sendable {
         if hasFences || looksLikeMarkdown(detectionInput) {
             if options.stripMarkdown {
                 let stripped = stripMarkdownBlocks(from: detectionInput)
-                let parsed = parseMarkdown(stripped.text, listMarker: listMarker)
+                let parsed = parseMarkdown(
+                    stripped.text,
+                    listMarker: listMarker,
+                    breakMarker: breakMarker
+                )
                 return (parsed, "Markdown", stripped.removedCodeBlocks)
             }
             if options.stripCodeBlocks {
@@ -153,7 +192,11 @@ struct TextParser: Sendable {
         return (input, "Plain text", 0)
     }
 
-    private func parseMarkdown(_ input: String, listMarker: String) -> String {
+    private func parseMarkdown(
+        _ input: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> String {
         var fence: String?
         return input.components(separatedBy: "\n").map { line in
             if let open = fence {
@@ -165,11 +208,19 @@ struct TextParser: Sendable {
                 fence = open
                 return line
             }
-            return cleanMarkdownLine(line, listMarker: listMarker)
+            return cleanMarkdownLine(
+                line,
+                listMarker: listMarker,
+                breakMarker: breakMarker
+            )
         }.joined(separator: "\n")
     }
 
-    private func cleanMarkdownLine(_ line: String, listMarker: String) -> String {
+    private func cleanMarkdownLine(
+        _ line: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> String {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return "" }
         if trimmed.range(
@@ -194,9 +245,20 @@ struct TextParser: Sendable {
             prefix = listMarker + String(working[number])
             working.removeSubrange(number)
         }
-        working = replacingMatches(in: working, pattern: #"^#{1,6}\s+"#, with: "")
+        var isHeading = false
+        if let heading = working.range(
+            of: #"^#{1,6}\s+"#,
+            options: .regularExpression
+        ) {
+            isHeading = true
+            working.removeSubrange(heading)
+        }
         working = replacingMatches(in: working, pattern: #"^>\s?"#, with: "")
-        return prefix + cleanMarkdownCodeSpans(working)
+        let cleaned = cleanMarkdownCodeSpans(working)
+        if isHeading, !cleaned.trimmingCharacters(in: .whitespaces).isEmpty {
+            return breakMarker + prefix + cleaned + breakMarker
+        }
+        return prefix + cleaned
     }
 
     private func cleanMarkdownCodeSpans(_ input: String) -> String {
@@ -228,19 +290,31 @@ struct TextParser: Sendable {
             pattern: #"\[([^\]]+)\]\([^)]+\)"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"(?<!\\)\*\*([^*]+)(?<!\\)\*\*"#, with: "$1")
         working = replacingMatches(
             in: working,
-            pattern: #"(?<![\w\\])__([^_]+)(?<!\\)__(?!\w)"#,
+            pattern: #"(?<!\\)\*\*(?!\s)([^\s*\\]|[^\s*][^*]*?[^\s*\\])\*\*"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"(?<!\\)\*([^*]+)(?<!\\)\*"#, with: "$1")
         working = replacingMatches(
             in: working,
-            pattern: #"(?<![\w\\])_([^_]+)(?<!\\)_(?!\w)"#,
+            pattern: #"(?<![\w\\])__(?!\s)([^\s_\\]|[^\s_][^_]*?[^\s_\\])__(?!\w)"#,
             with: "$1"
         )
-        working = replacingMatches(in: working, pattern: #"(?<!\\)~~([^~]+)(?<!\\)~~"#, with: "$1")
+        working = replacingMatches(
+            in: working,
+            pattern: #"(?<!\\)\*(?!\s)([^\s*\\]|[^\s*][^*]*?[^\s*\\])\*"#,
+            with: "$1"
+        )
+        working = replacingMatches(
+            in: working,
+            pattern: #"(?<![\w\\])_(?!\s)([^\s_\\]|[^\s_][^_]*?[^\s_\\])_(?!\w)"#,
+            with: "$1"
+        )
+        working = replacingMatches(
+            in: working,
+            pattern: #"(?<!\\)~~(?!\s)([^\s~\\]|[^\s~][^~]*?[^\s~\\])~~"#,
+            with: "$1"
+        )
         return working
     }
 
@@ -248,6 +322,7 @@ struct TextParser: Sendable {
     func cleanHTML(
         _ data: Data,
         listMarker: String = "",
+        breakMarker: String = "",
         using importer: (Data) throws -> String = TextParser.readHTML
     ) throws -> (text: String, removedCodeBlocks: Int) {
         guard var source = decodeHTMLSource(data) else {
@@ -264,6 +339,11 @@ struct TextParser: Sendable {
         // collision-free text marker and restore it after either extraction path.
         var boundary = "SAYITBOUNDARY" + UUID().uuidString
         while source.contains(boundary) { boundary += "X" }
+        source = markHTMLHeadings(
+            in: source,
+            boundary: boundary,
+            breakMarker: breakMarker
+        )
         source = replacingMatches(
             in: source,
             pattern: #"(?i)</?(p|div|main|section|article|header|footer|nav|aside|h[1-6]|blockquote|pre|address|figure|figcaption|details|summary|fieldset|legend|dl|dt|dd|ul|ol|table|caption|form)\b[^>]*>"#,
@@ -490,9 +570,190 @@ struct TextParser: Sendable {
 
     private func looksLikeMarkdown(_ text: String) -> Bool {
         text.range(
-            of: #"(?m)^([ \t]*(?:[-*+•]|\d+[.)])[\p{Zs}\t]+|#{1,6}\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|\*[^*\n]+\*|(?<!\w)_{1,2}[^_\n]+_{1,2}(?!\w)|~~[^~\n]+~~|`[^`\n]+`"#,
+            of: #"(?m)^([ \t]*(?:[-*+•]|\d+[.)])[\p{Zs}\t]+|#{1,6}\s|>\s|```|~~~)|\[[^\]]+\]\([^)]+\)|(?<!\\)\*\*(?!\s)(?:[^\s*\\\n]|[^\s*\n][^*\n]*?[^\s*\\\n])\*\*|(?<!\\)\*(?!\s)(?:[^\s*\\\n]|[^\s*\n][^*\n]*?[^\s*\\\n])\*|(?<![\w\\])__(?!\s)(?:[^\s_\\\n]|[^\s_\n][^_\n]*?[^\s_\\\n])__(?!\w)|(?<![\w\\])_(?!\s)(?:[^\s_\\\n]|[^\s_\n][^_\n]*?[^\s_\\\n])_(?!\w)|(?<!\\)~~(?!\s)(?:[^\s~\\\n]|[^\s~\n][^~\n]*?[^\s~\\\n])~~|`[^`\n]+`"#,
             options: .regularExpression
         ) != nil
+    }
+
+    private func markHTMLHeadings(
+        in source: String,
+        boundary: String,
+        breakMarker: String
+    ) -> String {
+        guard !breakMarker.isEmpty,
+              let expression = try? NSRegularExpression(
+                  pattern: #"(?is)<h([1-6])\b[^>]*>(.*?)</h\1\s*>"#
+              ) else {
+            return source
+        }
+        let matches = expression.matches(
+            in: source,
+            range: NSRange(source.startIndex..., in: source)
+        )
+        guard !matches.isEmpty else { return source }
+        var output = ""
+        var cursor = source.startIndex
+        for match in matches {
+            guard let fullRange = Range(match.range, in: source),
+                  let innerRange = Range(match.range(at: 2), in: source) else {
+                continue
+            }
+            output += source[cursor..<fullRange.lowerBound]
+            let inner = String(source[innerRange])
+            let plainInner = decodeCommonHTMLEntities(
+                in: replacingMatches(in: inner, pattern: #"(?s)<[^>]+>"#, with: "")
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            if plainInner.isEmpty {
+                output += boundary + boundary
+            } else {
+                output += boundary + boundary + breakMarker + inner + breakMarker + boundary + boundary
+            }
+            cursor = fullRange.upperBound
+        }
+        output += source[cursor...]
+        return output
+    }
+
+    private func markUnpunctuatedBlankLineBlocks(
+        in input: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> String {
+        let canonical = input
+            .replacing("\r\n", with: "\n")
+            .replacing("\r", with: "\n")
+            .replacing("\u{2029}", with: "\n\n")
+            .replacing("\u{000C}", with: "\n\n")
+        guard let separatorRegex = try? NSRegularExpression(
+            pattern: #"(?:\n[ \t]*){2,}"#
+        ) else {
+            return input
+        }
+        let matches = separatorRegex.matches(
+            in: canonical,
+            range: NSRange(canonical.startIndex..., in: canonical)
+        )
+        guard !matches.isEmpty else { return input }
+
+        var blocks: [String] = []
+        var separators: [String] = []
+        var cursor = canonical.startIndex
+        for match in matches {
+            guard let range = Range(match.range, in: canonical) else { continue }
+            blocks.append(String(canonical[cursor..<range.lowerBound]))
+            separators.append(String(canonical[range]))
+            cursor = range.upperBound
+        }
+        blocks.append(String(canonical[cursor...]))
+
+        var breakBefore = Set<Int>()
+        for (index, block) in blocks.enumerated() {
+            let content = block
+                .replacing(listMarker, with: "")
+                .replacing(breakMarker, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !content.isEmpty,
+                  !block.contains(listMarker),
+                  !endsWithTerminalPunctuation(content) else {
+                continue
+            }
+            if index > 0 {
+                breakBefore.insert(index)
+            }
+            if index + 1 < blocks.count {
+                breakBefore.insert(index + 1)
+            }
+        }
+        guard !breakBefore.isEmpty else { return input }
+
+        var output = ""
+        for (index, block) in blocks.enumerated() {
+            if breakBefore.contains(index) {
+                output += breakMarker
+            }
+            output += block
+            if index < separators.count {
+                output += separators[index]
+            }
+        }
+        return output
+    }
+
+    private func endsWithTerminalPunctuation(_ text: String) -> Bool {
+        let closers: Set<Character> = ["\"", "'", "\u{201D}", "\u{2019}", ")", "]", "\u{00BB}"]
+        let terminal: Set<Character> = [".", "!", "?", "\u{2026}", "\u{3002}", "\u{FF01}", "\u{FF1F}"]
+        var end = text.endIndex
+        while end > text.startIndex {
+            let prev = text.index(before: end)
+            let ch = text[prev]
+            if closers.contains(ch) || ch.isWhitespace {
+                end = prev
+            } else {
+                return terminal.contains(ch)
+            }
+        }
+        return false
+    }
+
+    private func shiftMarkersPastWhitespace(
+        in input: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> String {
+        let escapedList = NSRegularExpression.escapedPattern(for: listMarker)
+        let escapedBreak = NSRegularExpression.escapedPattern(for: breakMarker)
+        let pattern = "((?:\(escapedList)|\(escapedBreak))+)(\\s+)"
+        var current = input
+        while true {
+            let next = replacingMatches(in: current, pattern: pattern, with: "$2$1")
+            if next == current {
+                return current
+            }
+            current = next
+        }
+    }
+
+    private func extractMarkers(
+        from input: String,
+        listMarker: String,
+        breakMarker: String
+    ) -> (
+        text: String,
+        listItemStartOffsets: [Int],
+        paragraphBreakStartOffsets: [Int]
+    ) {
+        var text = ""
+        var listItemStartOffsets: [Int] = []
+        var paragraphBreakStartOffsets: [Int] = []
+        var cursor = input.startIndex
+        while cursor < input.endIndex {
+            let listRange = input.range(of: listMarker, range: cursor..<input.endIndex)
+            let breakRange = input.range(of: breakMarker, range: cursor..<input.endIndex)
+            switch (listRange, breakRange) {
+            case (nil, nil):
+                text += input[cursor...]
+                cursor = input.endIndex
+            case (let list?, nil):
+                text += input[cursor..<list.lowerBound]
+                listItemStartOffsets.append(text.count)
+                cursor = list.upperBound
+            case (nil, let brk?):
+                text += input[cursor..<brk.lowerBound]
+                paragraphBreakStartOffsets.append(text.count)
+                cursor = brk.upperBound
+            case (let list?, let brk?):
+                if list.lowerBound <= brk.lowerBound {
+                    text += input[cursor..<list.lowerBound]
+                    listItemStartOffsets.append(text.count)
+                    cursor = list.upperBound
+                } else {
+                    text += input[cursor..<brk.lowerBound]
+                    paragraphBreakStartOffsets.append(text.count)
+                    cursor = brk.upperBound
+                }
+            }
+        }
+        return (text, listItemStartOffsets, paragraphBreakStartOffsets)
     }
 
     private func removingMatches(in input: String, pattern: String) -> String {

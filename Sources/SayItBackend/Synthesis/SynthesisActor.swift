@@ -406,11 +406,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let listItemStartOffsets = Set(
             request.cleanedText.listItemStartOffsets ?? []
         )
+        let paragraphBreakStartOffsets = Set(
+            request.cleanedText.paragraphBreakStartOffsets ?? []
+        )
         let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
             listItemStartOffsets: listItemStartOffsets,
+            paragraphBreakStartOffsets: paragraphBreakStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
         var conditioner = try PCMStreamConditioner(

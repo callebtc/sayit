@@ -2,17 +2,19 @@ import Foundation
 import MLXAudioCore
 import MLXAudioTTS
 
-/// Sentence and clause splitter for Pocket TTS / Gradium Phonon models.
+/// Sentence splitter for Pocket TTS / Gradium Phonon models.
 ///
 /// `mlx-audio-swift`'s `PocketTTSTextUtils.splitIntoBestSentences` calls
 /// `tokenizer.encode(".!...?")` without stripping the leading SentencePiece
 /// metaspace token (`"▁"`), causing every standalone `"▁"` word boundary to
 /// be treated as a sentence ending and splitting sentences mid-phrase at the
-/// 50-token limit. This mirrors Kyutai's `pocket_tts.models.text_chunking`
-/// behavior: drop metaspace/byte-fallback tokens from punctuation sets, skip
-/// inner punctuation and titles, keep closing quotes/brackets attached, and
-/// sub-split oversized sentences on clause punctuation (`,`, `;`, `:`).
+/// 50-token limit. This splits only on true sentence endings (`.`, `!`, `?`,
+/// `…`), drops metaspace/byte-fallback tokens from the punctuation set, skips
+/// inner punctuation and titles, keeps closing quotes/brackets attached, and
+/// packs multiple short sentences up to `defaultMaxTokens` without splitting
+/// individual sentences at commas.
 enum PocketTTSSentenceSplitter {
+    /// Target token budget for packing multiple short sentences into one chunk.
     static let defaultMaxTokens = 50
 
     private static let terminalPunctuation: Set<Character> = [".", "!", "?", "\u{2026}"]
@@ -74,7 +76,11 @@ enum PocketTTSSentenceSplitter {
         tokenizer: PocketTTSSentencePieceTokenizer,
         maxTokens: Int = defaultMaxTokens
     ) throws -> [String] {
-        try split(text, tokenizer: tokenizer.tokenizer, maxTokens: maxTokens)
+        try split(
+            text,
+            tokenizer: tokenizer.tokenizer,
+            maxTokens: maxTokens
+        )
     }
 
     static func split(
@@ -83,7 +89,11 @@ enum PocketTTSSentenceSplitter {
         maxTokens: Int = defaultMaxTokens
     ) throws -> [String] {
         let tokenizer = try SentencePieceTokenizer(tokenizerJSONData: tokenizerJSONData)
-        return try split(text, tokenizer: tokenizer, maxTokens: maxTokens)
+        return try split(
+            text,
+            tokenizer: tokenizer,
+            maxTokens: maxTokens
+        )
     }
 
     static func split(
@@ -92,7 +102,11 @@ enum PocketTTSSentenceSplitter {
         maxTokens: Int = defaultMaxTokens
     ) throws -> [String] {
         let tokenizer = try SentencePieceTokenizer(sentencePieceModelData: sentencePieceModelData)
-        return try split(text, tokenizer: tokenizer, maxTokens: maxTokens)
+        return try split(
+            text,
+            tokenizer: tokenizer,
+            maxTokens: maxTokens
+        )
     }
 
     static func split(
@@ -119,53 +133,18 @@ enum PocketTTSSentenceSplitter {
             tokenizer: tokenizer
         )
 
-        // Sub-split oversized sentences on clause boundaries (, ; :) so long
-        // sentences break at natural pauses rather than exceeding the budget.
-        let clauseTokens = punctuationTokenIDs(for: ",;:", tokenizer: tokenizer)
-        var refined: [(count: Int, text: String)] = []
-        for (count, segmentText) in sentenceSegments {
-            if count <= tokenLimit || clauseTokens.isEmpty {
-                refined.append((count, segmentText))
-                continue
-            }
-            let subTokens = tokenizer.encodeWithByteFallback(
-                segmentText.trimmingCharacters(in: .whitespaces)
-            )
-            let subBoundaries = findBoundaryIndices(
-                in: subTokens,
-                boundaryTokens: clauseTokens,
-                tokenizer: tokenizer
-            )
-            let subSegments = segments(
-                from: subTokens,
-                boundaries: subBoundaries,
-                tokenizer: tokenizer
-            )
-            if subSegments.count > 1 {
-                refined.append(contentsOf: subSegments)
-            } else {
-                refined.append((count, segmentText))
-            }
-        }
+        let chunks = packSegments(sentenceSegments, tokenLimit: tokenLimit).map(\.text)
+        return chunks.isEmpty ? [cleaned] : chunks
+    }
 
-        // Never end a chunk on a decimal number like "$822.95,": converting the
-        // trailing comma to a period would make the model stop before decimals.
-        var glued: [(count: Int, text: String)] = []
-        for segment in refined {
-            if let last = glued.last, endsWithDecimalNumber(last.text) {
-                let merged = last.text.trimmingCharacters(in: .whitespaces)
-                    + " "
-                    + segment.text.trimmingCharacters(in: .whitespaces)
-                glued[glued.count - 1] = (last.count + segment.count, merged)
-            } else {
-                glued.append(segment)
-            }
-        }
-
-        var chunks: [String] = []
+    private static func packSegments(
+        _ segments: [(count: Int, text: String)],
+        tokenLimit: Int
+    ) -> [(count: Int, text: String)] {
+        var chunks: [(count: Int, text: String)] = []
         var current = ""
         var currentCount = 0
-        for (count, segmentText) in glued {
+        for (count, segmentText) in segments {
             let trimmed = segmentText.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { continue }
             if current.isEmpty {
@@ -174,7 +153,7 @@ enum PocketTTSSentenceSplitter {
                 continue
             }
             if currentCount + count > tokenLimit {
-                chunks.append(current)
+                chunks.append((currentCount, current))
                 current = trimmed
                 currentCount = count
             } else {
@@ -183,9 +162,9 @@ enum PocketTTSSentenceSplitter {
             }
         }
         if !current.isEmpty {
-            chunks.append(current)
+            chunks.append((currentCount, current))
         }
-        return chunks.isEmpty ? [cleaned] : chunks
+        return chunks
     }
 
     static func punctuationTokenIDs(
@@ -334,9 +313,5 @@ enum PocketTTSSentenceSplitter {
             return String(core[..<trimmedEnd]) + "." + trailingClosers
         }
         return text + "."
-    }
-
-    private static func endsWithDecimalNumber(_ text: String) -> Bool {
-        text.range(of: #"\d[.,]\d+\W*$"#, options: .regularExpression) != nil
     }
 }
