@@ -74,11 +74,12 @@ struct PocketTTSSentenceSplitterTests {
     @Test("Does not split mid-sentence at standalone metaspace tokens")
     func doesNotSplitMidSentenceOnMetaspace() throws {
         let tokenizerData = makeTokenizerJSONData(words: [
-            "▁Most", "▁token", "▁have", "▁extreme", "▁noise", "▁from",
-            "▁that", "▁train", "▁on", "▁your", "▁data", "▁or", "▁to", "▁be",
-            "▁is", "▁the", "▁largest", "▁understand", "▁AI", "▁because",
-            "▁we", "▁real", "▁usage", "▁an", "▁platform", "▁paying",
-            "▁and", "▁thousands", "▁of", "▁zero"
+            "▁Most", "▁token", "▁aggregators", "▁have", "▁extreme", "▁noise", "▁from",
+            "▁promos", "▁providers", "▁that", "▁train", "▁on", "▁your", "▁data", "▁or",
+            "▁to", "▁be", "▁Vercel", "▁Gateway", "▁is", "▁the", "▁largest", "▁trustworthy",
+            "▁datasource", "▁understand", "▁global", "▁AI", "▁flows", "▁because",
+            "▁we", "▁real", "▁usage", "▁customers", "▁an", "▁scale", "▁platform",
+            "▁paying", "▁and", "▁thousands", "▁of", "▁enterprises", "▁zero", "▁markup"
         ])
         let text = """
         Most token aggregators have extreme noise from ① token promos from/to providers that train on your data or ② providers that *claim* to be ZDR.
@@ -93,20 +94,48 @@ struct PocketTTSSentenceSplitterTests {
         )
 
         #expect(
-            chunks.first
-                == "Most token aggregators have extreme noise from ① token promos from/to providers that train on your data or ② providers that *claim* to be ZDR."
+            chunks == [
+                "Most token aggregators have extreme noise from ① token promos from/to providers that train on your data or ② providers that *claim* to be ZDR.",
+                "Vercel AI Gateway is the largest trustworthy datasource to understand global AI token flows, because we have real usage, from real customers, an at-scale platform (400k+ paying customers and thousands of enterprises), and zero markup."
+            ]
+        )
+    }
+
+    @Test("Keeps technical single sentences intact without splitting at commas")
+    func keepsTechnicalSingleSentenceIntact() throws {
+        let tokenizerData = makeTokenizerJSONData(words: [
+            "▁Say", "▁the", "▁word", "▁and", "▁I", "▁not", "▁this",
+            "▁generate", "▁signed", "▁feed", "▁publish", "▁on"
+        ])
+        let sentence = "Say the word and I'll notarize/staple this DMG (--notarize-existing 0.2.6), generate the signed Sparkle feed, and publish v0.2.6 on GitHub."
+
+        let chunks = try PocketTTSSentenceSplitter.split(
+            sentence,
+            tokenizerJSONData: tokenizerData
         )
 
-        let joinedRemainder = chunks.dropFirst().joined(separator: " ")
-        #expect(joinedRemainder.contains("to understand global AI token flows"))
-        for chunk in chunks {
-            #expect(!chunk.hasSuffix("to understand"))
-            #expect(!chunk.hasSuffix("providers"))
-            #expect(!chunk.hasSuffix("providers that"))
-        }
-        for chunk in chunks.dropFirst().dropLast() {
-            #expect([",", ";", ":", "."].contains(chunk.last))
-        }
+        #expect(chunks == [sentence])
+    }
+
+    @Test("Sub-splits genuinely huge sentences cleanly at commas up to the clause ceiling")
+    func subSplitsHugeSentencesCleanlyAtCommas() throws {
+        let tokenizerData = makeTokenizerJSONData(words: [
+            "▁First", "▁the", "▁pipeline", "▁reads", "▁every", "▁input", "▁block",
+            "▁strips", "▁markup", "▁preserves", "▁list", "▁boundaries",
+            "▁and", "▁streams", "▁audio", "▁without", "▁stalling"
+        ])
+        let clause = "the pipeline reads every input block, strips markup, preserves list boundaries"
+        let sentence = "First, \(clause), \(clause), and streams audio without stalling."
+        let chunks = try PocketTTSSentenceSplitter.split(
+            sentence,
+            tokenizerJSONData: tokenizerData,
+            maxTokens: 12,
+            clauseSplitMaxTokens: 25
+        )
+        try #require(chunks.count == 2)
+        #expect(chunks[0].hasSuffix(","))
+        #expect(chunks[1].hasSuffix("."))
+        #expect(chunks.joined(separator: " ") == sentence)
     }
 
     @Test("Preserves periods inside decimals, URLs, emails, times, and titles")
@@ -149,7 +178,8 @@ struct PocketTTSSentenceSplitterTests {
         let chunks = try PocketTTSSentenceSplitter.split(
             text,
             tokenizerJSONData: tokenizerData,
-            maxTokens: 20
+            maxTokens: 20,
+            clauseSplitMaxTokens: 20
         )
         #expect(chunks.count == 2)
         // Must glue "$822.95," with "which covered..." rather than ending a chunk on "$822.95,"

@@ -12,13 +12,19 @@ public struct CleanedText: Codable, Equatable, Sendable {
     /// Optional so older stored records remain decodable.
     public let listItemStartOffsets: [Int]?
 
+    /// Character offsets where a heading or blank-line-separated unpunctuated
+    /// block begins or resumes after cleanup. Optional so older stored records
+    /// remain decodable.
+    public let paragraphBreakStartOffsets: [Int]?
+
     public init(
         text: String,
         title: String,
         detectedLanguage: String?,
         cleanupSummary: CleanupSummary,
         requiresLongTextConfirmation: Bool,
-        listItemStartOffsets: [Int]? = nil
+        listItemStartOffsets: [Int]? = nil,
+        paragraphBreakStartOffsets: [Int]? = nil
     ) {
         self.text = text
         self.title = title
@@ -27,5 +33,6 @@ public struct CleanedText: Codable, Equatable, Sendable {
         self.cleanupSummary = cleanupSummary
         self.requiresLongTextConfirmation = requiresLongTextConfirmation
         self.listItemStartOffsets = listItemStartOffsets
+        self.paragraphBreakStartOffsets = paragraphBreakStartOffsets
     }
 }

@@ -37,7 +37,10 @@ public actor TextCleaner: TextIngesting {
                 > Self.confirmationThreshold,
             listItemStartOffsets: parsed.listItemStartOffsets.isEmpty
                 ? nil
-                : parsed.listItemStartOffsets
+                : parsed.listItemStartOffsets,
+            paragraphBreakStartOffsets: parsed.paragraphBreakStartOffsets.isEmpty
+                ? nil
+                : parsed.paragraphBreakStartOffsets
         )
     }
 

@@ -17,12 +17,14 @@ public struct TextChunker: Sendable {
     public func chunks(
         for text: String,
         separatesParagraphs: Bool = false,
-        listItemStartOffsets: Set<Int> = []
+        listItemStartOffsets: Set<Int> = [],
+        paragraphBreakStartOffsets: Set<Int> = []
     ) -> [SpeechChunk] {
         chunks(
             for: text,
             separatesParagraphs: separatesParagraphs,
             listItemStartOffsets: listItemStartOffsets,
+            paragraphBreakStartOffsets: paragraphBreakStartOffsets,
             checkingCancellation: {}
         )
     }
@@ -31,6 +33,7 @@ public struct TextChunker: Sendable {
         for text: String,
         separatesParagraphs: Bool = false,
         listItemStartOffsets: Set<Int> = [],
+        paragraphBreakStartOffsets: Set<Int> = [],
         checkingCancellation: () throws -> Void
     ) rethrows -> [SpeechChunk] {
         try checkingCancellation()
@@ -53,7 +56,10 @@ public struct TextChunker: Sendable {
             let isListItem = listItemStartOffsets.contains(
                 paragraph.sourceOffset
             )
-            if isListItem {
+            let startsSeparatedBlock = paragraphBreakStartOffsets.contains(
+                paragraph.sourceOffset
+            )
+            if isListItem || startsSeparatedBlock {
                 flush()
             }
             let sentences = sentences(
