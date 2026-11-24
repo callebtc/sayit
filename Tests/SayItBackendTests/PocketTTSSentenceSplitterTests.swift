@@ -117,8 +117,8 @@ struct PocketTTSSentenceSplitterTests {
         #expect(chunks == [sentence])
     }
 
-    @Test("Sub-splits genuinely huge sentences cleanly at commas up to the clause ceiling")
-    func subSplitsHugeSentencesCleanlyAtCommas() throws {
+    @Test("Keeps long multi-comma sentences intact without sub-splitting at commas")
+    func keepsLongMultiCommaSentencesIntact() throws {
         let tokenizerData = makeTokenizerJSONData(words: [
             "▁First", "▁the", "▁pipeline", "▁reads", "▁every", "▁input", "▁block",
             "▁strips", "▁markup", "▁preserves", "▁list", "▁boundaries",
@@ -129,13 +129,9 @@ struct PocketTTSSentenceSplitterTests {
         let chunks = try PocketTTSSentenceSplitter.split(
             sentence,
             tokenizerJSONData: tokenizerData,
-            maxTokens: 12,
-            clauseSplitMaxTokens: 25
+            maxTokens: 12
         )
-        try #require(chunks.count == 2)
-        #expect(chunks[0].hasSuffix(","))
-        #expect(chunks[1].hasSuffix("."))
-        #expect(chunks.joined(separator: " ") == sentence)
+        #expect(chunks == [sentence])
     }
 
     @Test("Preserves periods inside decimals, URLs, emails, times, and titles")
@@ -168,8 +164,8 @@ struct PocketTTSSentenceSplitterTests {
         }
     }
 
-    @Test("Sub-splits oversized sentences at commas while keeping decimal amounts intact")
-    func subSplitsOversizedSentencesAtCommasAndGluesDecimals() throws {
+    @Test("Keeps comma-heavy sentences with decimal amounts intact")
+    func keepsCommaHeavyDecimalSentencesIntact() throws {
         let tokenizerData = makeTokenizerJSONData(words: [
             "▁The", "▁total", "▁fee", "▁was", "▁which", "▁covered",
             "▁shipping", "▁and", "▁handling", "▁for", "▁all", "▁items"
@@ -178,13 +174,9 @@ struct PocketTTSSentenceSplitterTests {
         let chunks = try PocketTTSSentenceSplitter.split(
             text,
             tokenizerJSONData: tokenizerData,
-            maxTokens: 20,
-            clauseSplitMaxTokens: 20
+            maxTokens: 20
         )
-        #expect(chunks.count == 2)
-        // Must glue "$822.95," with "which covered..." rather than ending a chunk on "$822.95,"
-        #expect(chunks[0] == "The total fee was $822.95, which covered shipping and handling for all items,")
-        #expect(chunks[1] == "including insurance.")
+        #expect(chunks == [text])
     }
 
     @Test("Splits at true sentence boundaries and keeps closing quotes attached")
