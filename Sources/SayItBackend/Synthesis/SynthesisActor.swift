@@ -15,8 +15,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private static let minimumListItemPause: TimeInterval = 0.25
     private static let maxCachedReferenceAudios = 4
     private static let maxCachedQwen3Conditionings = 4
-    private static let fastStartFirstChunkTarget = 160
-    private static let fastStartFirstChunkThreshold = 200
+    private static let fastStartFirstChunkTarget = 60
+    private static let fastStartFirstChunkThreshold = 90
+    private static let dramaFastStartFirstChunkTarget = 60
+    private static let dramaFastStartFirstChunkThreshold = 95
+    private static let qwenFastStartFirstChunkTarget = 60
+    private static let qwenFastStartFirstChunkThreshold = 95
     // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
     // Short inputs let each request reach EOS instead of truncating mid-block.
     static let orpheusChunker = TextChunker(
@@ -171,6 +175,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         )
     }
 
+    func waitForActiveOperation() async {
+        await waitForOperationToFinish(activeOperation)
+    }
+
     func cancelCurrentRequest() async {
         requestArrivalOrder &+= 1
         let previousOperation = invalidateCurrentOperation()
@@ -273,8 +281,41 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     ?? voice.flatMap(KokoroMultilingualProcessor.languageForVoice)
                     ?? "en-us"
                 try? await cachingProcessor.prepare(for: targetLanguage)
+                if let kokoro = loadedModel as? KokoroModel {
+                    let warmVoice = voice ?? model.defaultVoice ?? "af_heart"
+                    _ = try? kokoro.loadVoice(named: warmVoice)
+                    try checkOperation(operationID)
+                    _ = try? await SerializedSpeechModel(kokoro).generateSamples(
+                        text: "Hi.",
+                        voice: warmVoice,
+                        referenceAudio: SerializedMLXArray(nil),
+                        refText: nil,
+                        language: targetLanguage,
+                        generationParameters: kokoro.defaultGenerationParameters
+                    )
+                }
             } else if modelType == "kitten" || modelType == "kitten_tts" {
                 try? await cachingProcessor.prepare()
+            }
+        } else if let drama = loadedModel as? DramaLibraryModel {
+            if let voiceReference,
+               voiceReference.kind == .audio,
+               let transcript = voiceReference.transcript,
+               !transcript.isEmpty,
+               let referenceAudio = try? cachedReferenceAudio(
+                   from: voiceReference.audioURL,
+                   targetSampleRate: Double(loadedModel.sampleRate)
+               ) {
+                retainedReferenceAudio = referenceAudio
+                try? await SerializedSpeechModel(drama).warmDramaVoice(
+                    referenceAudio: SerializedMLXArray(referenceAudio),
+                    refText: transcript
+                )
+            } else {
+                try? await SerializedSpeechModel(drama).warmDramaVoice(
+                    referenceAudio: SerializedMLXArray(nil),
+                    refText: nil
+                )
             }
         } else if let qwen3 = loadedModel as? Qwen3TTSModel,
                   let voiceReference,
@@ -502,50 +543,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             retainedReferenceAudio = referenceAudio
         }
         var referenceText = request.voiceReference?.transcript
-        if request.voiceMode == .automaticStable,
-           request.model.capabilities.supportsRandomVoiceSampling {
-            continuation.yield(.creatingArticleVoice)
-            let anchorText = articleVoiceAnchor(
-                language: request.language,
-                modelType: request.model.modelType
-            )
-            var parameters = loadedModel.defaultGenerationParameters
-            if let tuning = request.voiceTuning {
-                if let value = tuning.parameters["temperature"] {
-                    parameters.temperature = Float(value)
-                }
-                if let value = tuning.parameters["topP"] {
-                    parameters.topP = Float(value)
-                }
-                if let value = tuning.parameters["topK"] {
-                    parameters.topK = Int(value.rounded())
-                }
-                if let value = tuning.parameters["repetitionPenalty"] {
-                    parameters.repetitionPenalty = Float(value)
-                }
-            }
-            let anchorVoice = request.model.capabilities.voiceDescription
-                ? request.voiceDescription
-                : nil
-            let anchorSamples = try await SerializedSpeechModel(loadedModel)
-                .generateSamples(
-                    text: anchorText,
-                    voice: anchorVoice,
-                    referenceAudio: SerializedMLXArray(nil),
-                    refText: nil,
-                    language: request.language,
-                    generationParameters: parameters
-                )
-            try checkOperation(operationID)
-            guard !anchorSamples.isEmpty else {
-                throw SynthesisError.generatedNoAudio
-            }
-            referenceAudio = MLXArray(anchorSamples)
-            retainedReferenceAudio = referenceAudio
-            referenceText = anchorText
-        }
 
-        recordTiming(.voicePreparation, since: voiceStarted)
         let listItemStartOffsets = Set(
             request.cleanedText.listItemStartOffsets ?? []
         )
@@ -561,17 +559,62 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             paragraphBreakStartOffsets: paragraphBreakStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
-        if !chunks.isEmpty,
-           Self.usesFastStartFirstChunk(modelType: modelTypeLower) {
-            let split = chunker.splitFirstChunkForFastStart(
-                chunks[0],
-                targetCharacterCount: Self.fastStartFirstChunkTarget,
-                minimumLengthToSplit: Self.fastStartFirstChunkThreshold
-            )
-            if split.count > 1 {
-                chunks.replaceSubrange(0...0, with: split)
+        if !chunks.isEmpty {
+            if Self.usesFastStartFirstChunk(modelType: modelTypeLower) {
+                let split = chunker.splitFirstChunkForFastStart(
+                    chunks[0],
+                    targetCharacterCount: Self.fastStartFirstChunkTarget,
+                    minimumLengthToSplit: Self.fastStartFirstChunkThreshold
+                )
+                if split.count > 1 {
+                    chunks.replaceSubrange(0...0, with: split)
+                }
+            } else if modelTypeLower == "fish_drama3" {
+                let split = chunker.splitFirstChunkForFastStart(
+                    chunks[0],
+                    targetCharacterCount: Self.dramaFastStartFirstChunkTarget,
+                    minimumLengthToSplit: Self.dramaFastStartFirstChunkThreshold
+                )
+                if split.count > 1 {
+                    chunks.replaceSubrange(0...0, with: split)
+                }
+            } else if modelTypeLower == "qwen3_tts" {
+                let split = chunker.splitFirstChunkForFastStart(
+                    chunks[0],
+                    targetCharacterCount: Self.qwenFastStartFirstChunkTarget,
+                    minimumLengthToSplit: Self.qwenFastStartFirstChunkThreshold
+                )
+                if split.count > 1 {
+                    chunks.replaceSubrange(0...0, with: split)
+                }
             }
         }
+
+        // For `automaticStable` multi-chunk requests, self-anchor on chunk 0
+        // whenever chunk 0 is a natural sentence (>= 24 chars): chunk 0 streams
+        // immediately with zero throwaway anchor synthesis, and chunks 1..N clone
+        // chunk 0's exact voice. Single-chunk requests need no anchor at all.
+        var captureChunk0AsSelfAnchor = false
+        if request.voiceMode == .automaticStable,
+           request.model.capabilities.supportsRandomVoiceSampling,
+           referenceAudio == nil,
+           chunks.count > 1 {
+            if chunks[0].text.count >= 24 {
+                captureChunk0AsSelfAnchor = true
+            } else {
+                let anchor = try await synthesizeArticleVoiceAnchor(
+                    for: request,
+                    model: loadedModel,
+                    operationID: operationID,
+                    continuation: continuation
+                )
+                referenceAudio = MLXArray(anchor.samples)
+                retainedReferenceAudio = referenceAudio
+                referenceText = anchor.text
+            }
+        }
+
+        recordTiming(.voicePreparation, since: voiceStarted)
         var conditioner = try PCMStreamConditioner(
             sampleRate: Double(loadedModel.sampleRate)
         )
@@ -602,6 +645,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
             let start = ContinuousClock.now
             var chunkSamples = 0
+            var selfAnchorSamples: [Float] = []
+            let capturingSelfAnchorThisChunk = captureChunk0AsSelfAnchor && chunkCursor == 0
             var deliveryCount = 0
             var previousDeliverySeconds = 0.0
             var maximumDeliveryGap = 0.0
@@ -635,6 +680,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 func emit(_ samples: [Float]) throws {
                     try Task.checkCancellation()
                     guard !samples.isEmpty else { return }
+                    if capturingSelfAnchorThisChunk {
+                        selfAnchorSamples.append(contentsOf: samples)
+                    }
 
                     let pauseFrameCount = chunk.startsParagraph
                         && generatedSamples > 0
@@ -737,6 +785,19 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     try checkOperation(operationID)
                     try emit(samples)
                 } else if let drama = loadedModel as? DramaLibraryModel {
+                    // Start tight on chunk 0 (10 frames ≈ 0.46 s) and stay tight
+                    // while total buffered audio is still short (< 5 s, e.g. after
+                    // a short 1-sentence opening paragraph) so chunk 1 delivers
+                    // before playback drains, then ramp to 24 frames (≈ 1.11 s),
+                    // safely below DramaTTS's 2.0 s QuietGate dead-air threshold.
+                    let dramaStreamingFrames: Int
+                    if chunkCursor == 0 {
+                        dramaStreamingFrames = 10
+                    } else if generatedSamples < loadedModel.sampleRate * 5 {
+                        dramaStreamingFrames = 12
+                    } else {
+                        dramaStreamingFrames = DramaLibraryModel.maximumStreamingFrames
+                    }
                     let stream = SerializedSpeechModel(drama)
                         .generateDramaSamplesStream(
                             text: chunk.text,
@@ -745,7 +806,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                             ),
                             refText: usesReference ? referenceText : nil,
                             generationParameters: parameters,
-                            streamingFrames: chunkCursor == 0 ? 16 : 24
+                            streamingFrames: dramaStreamingFrames
                         )
                     for try await samples in stream {
                         try checkOperation(operationID)
@@ -777,18 +838,22 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         transcript: referenceText,
                         language: request.language
                     )
+                    let qwenStreamingInterval = chunkCursor == 0 ? 0.32 : 2.0
                     let stream = SerializedSpeechModel(qwen3)
                         .generateQwen3SamplesStream(
                             text: chunk.text,
                             conditioning: conditioning,
                             generationParameters: parameters,
-                            streamingInterval: streamingInterval
+                            streamingInterval: qwenStreamingInterval
                         )
                     for try await samples in stream {
                         try checkOperation(operationID)
                         try emit(samples)
                     }
                 } else {
+                    let effectiveInterval = loadedModel is Qwen3TTSModel
+                        ? (chunkCursor == 0 ? 0.32 : 2.0)
+                        : streamingInterval
                     let stream = SerializedSpeechModel(loadedModel)
                         .generateSamplesStream(
                         text: chunk.text,
@@ -799,7 +864,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         refText: usesReference ? referenceText : nil,
                         language: request.language,
                         generationParameters: parameters,
-                        streamingInterval: streamingInterval
+                        streamingInterval: effectiveInterval
                     )
                     for try await samples in stream {
                         try checkOperation(operationID)
@@ -859,6 +924,31 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     )
                 )
             )
+            if capturingSelfAnchorThisChunk {
+                captureChunk0AsSelfAnchor = false
+                if chunkCursor + 1 < chunks.count {
+                    let minAnchorFrames = Int(Double(loadedModel.sampleRate) * 0.8)
+                    let maxAnchorFrames = Int(Double(loadedModel.sampleRate) * 20.0)
+                    if selfAnchorSamples.count >= minAnchorFrames,
+                       selfAnchorSamples.count <= maxAnchorFrames {
+                        referenceAudio = MLXArray(selfAnchorSamples)
+                        retainedReferenceAudio = referenceAudio
+                        referenceText = chunk.text
+                    } else {
+                        let anchor = try await synthesizeArticleVoiceAnchor(
+                            for: request,
+                            model: loadedModel,
+                            operationID: operationID,
+                            continuation: continuation
+                        )
+                        referenceAudio = MLXArray(anchor.samples)
+                        retainedReferenceAudio = referenceAudio
+                        referenceText = anchor.text
+                    }
+                }
+                selfAnchorSamples.removeAll(keepingCapacity: false)
+            }
+
             chunkCursor += 1
             completedChunkCount += 1
         }
@@ -1002,6 +1092,51 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         loadedTextProcessor = textProcessor
     }
 
+    private func synthesizeArticleVoiceAnchor(
+        for request: SpeechRequest,
+        model: SpeechGenerationModel,
+        operationID: UInt64,
+        continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation
+    ) async throws -> (samples: [Float], text: String) {
+        continuation.yield(.creatingArticleVoice)
+        let anchorText = articleVoiceAnchor(
+            language: request.language,
+            modelType: request.model.modelType
+        )
+        var parameters = model.defaultGenerationParameters
+        if let tuning = request.voiceTuning {
+            if let value = tuning.parameters["temperature"] {
+                parameters.temperature = Float(value)
+            }
+            if let value = tuning.parameters["topP"] {
+                parameters.topP = Float(value)
+            }
+            if let value = tuning.parameters["topK"] {
+                parameters.topK = Int(value.rounded())
+            }
+            if let value = tuning.parameters["repetitionPenalty"] {
+                parameters.repetitionPenalty = Float(value)
+            }
+        }
+        let anchorVoice = request.model.capabilities.voiceDescription
+            ? request.voiceDescription
+            : nil
+        let anchorSamples = try await SerializedSpeechModel(model)
+            .generateSamples(
+                text: anchorText,
+                voice: anchorVoice,
+                referenceAudio: SerializedMLXArray(nil),
+                refText: nil,
+                language: request.language,
+                generationParameters: parameters
+            )
+        try checkOperation(operationID)
+        guard !anchorSamples.isEmpty else {
+            throw SynthesisError.generatedNoAudio
+        }
+        return (anchorSamples, anchorText)
+    }
+
     private func articleVoiceAnchor(
         language: String?,
         modelType: String
@@ -1010,25 +1145,25 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let shortText: String
         switch normalized.split(separator: "-").first {
         case "zh":
-            shortText = "清晨的阳光轻轻落在安静的房间里。"
+            shortText = "清晨的阳光落在安静的房间里。"
         case "ja":
-            shortText = "朝の光が静かな部屋にやさしく差し込みました。"
+            shortText = "朝の光が静かな部屋に差し込みました。"
         case "ko":
-            shortText = "아침 햇살이 조용한 방 안으로 부드럽게 스며들었습니다."
+            shortText = "아침 햇살이 조용한 방에 스며들었습니다."
         case "de":
-            shortText = "Das Morgenlicht fiel sanft in den stillen Raum."
+            shortText = "Klares Morgenlicht füllte den Raum."
         case "fr":
-            shortText = "La lumière du matin entrait doucement dans la pièce."
+            shortText = "La lumière du matin emplit la pièce."
         case "es":
-            shortText = "La luz de la mañana entraba suavemente en la sala."
+            shortText = "La luz de la mañana llenó la sala."
         case "it":
-            shortText = "La luce del mattino entrava dolcemente nella stanza."
+            shortText = "La luce del mattino riempì la stanza."
         case "pt":
-            shortText = "A luz da manhã entrava suavemente na sala tranquila."
+            shortText = "A luz da manhã encheu a sala."
         case "ru":
-            shortText = "Утренний свет мягко наполнял тихую комнату."
+            shortText = "Утренний свет наполнил тихую комнату."
         default:
-            shortText = "Morning light settled softly across the quiet room."
+            shortText = "Clear morning light filled the room."
         }
         if modelType.lowercased() == "fish_speech" {
             return "\(shortText) The day felt unhurried, clear, and full of small possibilities."
@@ -1228,6 +1363,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     }
 
     private func isInputLengthError(_ error: Error) -> Bool {
+        if case .generationLimit = error as? Drama3Error {
+            return true
+        }
         let message: String
         if case .invalidInput(let detail) = error as? AudioGenerationError {
             message = detail
@@ -1551,6 +1689,14 @@ private final class SerializedSpeechModel: @unchecked Sendable {
             generationParameters: generationParameters,
             streamingFrames: streamingFrames
         )
+    }
+
+    func warmDramaVoice(
+        referenceAudio: SerializedMLXArray,
+        refText: String?
+    ) async throws {
+        guard let drama = model as? DramaLibraryModel else { return }
+        try await drama.warmVoice(refAudio: referenceAudio.value, refText: refText)
     }
 
     func generateQwen3SamplesStream(

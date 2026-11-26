@@ -9,11 +9,32 @@ import SpeechSynthesizer
 /// Bridges the pinned native DramaTTS engine to Say It's serialized synthesis pipeline.
 /// The engine reads the existing snapshot and retains its voice/prompt cache in memory.
 final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendable {
+    /// Keep streaming decode windows safely below DramaTTS's 2.0 s QuietGate
+    /// dead-air threshold (`24 * 2048 / 44100 ≈ 1.11 s`) so silence detection
+    /// always observes at least two pieces before rewinding and chunk-boundary
+    /// handoffs stay responsive.
+    static let maximumStreamingFrames = 24
+
     let sampleRate = 44_100
     private let engine: DramaEngine
     private let referenceCacheLock = NSLock()
     private var cachedReferenceKey: (audioID: ObjectIdentifier, transcript: String)?
     private var cachedReferences: [DramaReference]?
+
+    static func clampedStreamingFrames(_ requested: Int) -> Int {
+        min(max(1, requested), maximumStreamingFrames)
+    }
+
+    static func shouldAbortForReport(
+        cappedChunks: Int,
+        silencedChunks: Int,
+        emittedSampleCount: Int
+    ) -> Bool {
+        // DramaPipeline already trims dead air after bounded rewinds and keeps
+        // only finite speech up to the cap. Only fail (so SynthesisActor can
+        // sub-split and retry) when a chunk ended at a limit with no audio.
+        (cappedChunks > 0 || silencedChunks > 0) && emittedSampleCount == 0
+    }
 
     private init(engine: DramaEngine) {
         self.engine = engine
@@ -72,7 +93,7 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         // protection for takes that otherwise continue producing hiss without EOS.
         return (references, DramaSettings(temperature: p.temperature, topK: p.topK, topP: p.topP,
             maxFramesPerChunk: max(1, min(p.maxTokens ?? 1024, 1500)), stopsOnSilence: true,
-            seed: p.seed, streamingFrames: max(1, streamingFrames)))
+            seed: p.seed, streamingFrames: Self.clampedStreamingFrames(streamingFrames)))
     }
 
     // Match the upstream Drama 3 fix: embedded line breaks can end a turn early.
@@ -83,7 +104,7 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
 
     func generate(text: String, voice: String?, refAudio: sending MLXArray?, refText: String?,
                   language: String?, generationParameters: GenerateParameters) async throws -> sending MLXArray {
-        let input = try inputs(refAudio, refText, generationParameters)
+        let input = try inputs(refAudio, refText, generationParameters, streamingFrames: Self.maximumStreamingFrames)
         try Task.checkCancellation()
         let result: (audio: SpokenAudio, report: DramaReport)
         do {
@@ -92,13 +113,28 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
             throw CancellationError()
         }
         try Task.checkCancellation()
-        guard result.report.cappedChunks == 0, result.report.silencedChunks == 0 else {
+        if Self.shouldAbortForReport(
+            cappedChunks: result.report.cappedChunks,
+            silencedChunks: result.report.silencedChunks,
+            emittedSampleCount: result.audio.samples.count
+        ) {
             throw Drama3Error.generationLimit
         }
         guard !result.audio.samples.isEmpty, result.audio.samples.allSatisfy(\.isFinite) else {
             throw Drama3Error.emptyAudio
         }
         return MLXArray(result.audio.samples)
+    }
+
+    /// Pre-encodes the reference clip and warms the 35B backbone/tower prefix
+    /// KV-cache inside `DramaEngine` during background preload.
+    func warmVoice(refAudio: MLXArray?, refText: String?) async throws {
+        let params = GenerateParameters(maxTokens: 1, temperature: 1, topP: 0.9, topK: 30)
+        let input = try inputs(refAudio, refText, params, streamingFrames: 1)
+        try Task.checkCancellation()
+        for try await _ in engine.chunks("Hi.", references: input.references, settings: input.settings) {
+            break
+        }
     }
 
     func generateStream(text: String, voice: String?, refAudio: sending MLXArray?, refText: String?,
@@ -116,13 +152,22 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
+                    var emittedSampleCount = 0
                     for try await piece in engine.chunks(Self.promptText(text), references: input.references, settings: input.settings) {
                         try Task.checkCancellation()
-                        if let report = piece.report, report.cappedChunks > 0 || report.silencedChunks > 0 {
+                        guard piece.samples.allSatisfy(\.isFinite) else { throw Drama3Error.emptyAudio }
+                        if !piece.samples.isEmpty {
+                            emittedSampleCount += piece.samples.count
+                            continuation.yield(.audio(MLXArray(piece.samples)))
+                        }
+                        if let report = piece.report,
+                           Self.shouldAbortForReport(
+                               cappedChunks: report.cappedChunks,
+                               silencedChunks: report.silencedChunks,
+                               emittedSampleCount: emittedSampleCount
+                           ) {
                             throw Drama3Error.generationLimit
                         }
-                        guard piece.samples.allSatisfy(\.isFinite) else { throw Drama3Error.emptyAudio }
-                        if !piece.samples.isEmpty { continuation.yield(.audio(MLXArray(piece.samples))) }
                     }
                     continuation.finish()
                 } catch { continuation.finish(throwing: Task.isCancelled ? CancellationError() : error) }
@@ -146,13 +191,22 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
+                    var emittedSampleCount = 0
                     for try await piece in engine.chunks(Self.promptText(text), references: input.references, settings: input.settings) {
                         try Task.checkCancellation()
-                        if let report = piece.report, report.cappedChunks > 0 || report.silencedChunks > 0 {
+                        guard piece.samples.allSatisfy(\.isFinite) else { throw Drama3Error.emptyAudio }
+                        if !piece.samples.isEmpty {
+                            emittedSampleCount += piece.samples.count
+                            continuation.yield(piece.samples)
+                        }
+                        if let report = piece.report,
+                           Self.shouldAbortForReport(
+                               cappedChunks: report.cappedChunks,
+                               silencedChunks: report.silencedChunks,
+                               emittedSampleCount: emittedSampleCount
+                           ) {
                             throw Drama3Error.generationLimit
                         }
-                        guard piece.samples.allSatisfy(\.isFinite) else { throw Drama3Error.emptyAudio }
-                        if !piece.samples.isEmpty { continuation.yield(piece.samples) }
                     }
                     continuation.finish()
                 } catch { continuation.finish(throwing: Task.isCancelled ? CancellationError() : error) }

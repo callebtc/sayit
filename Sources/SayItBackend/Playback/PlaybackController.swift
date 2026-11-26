@@ -371,7 +371,6 @@ final class PlaybackController: BackendPlaybackControlling {
         estimatedDuration = 0
         scheduleOffset = 0
         synthesisIsComplete = false
-        configuredSampleRate = nil
         state = .idle
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -510,11 +509,11 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func prepareAudioGraph(for format: AVAudioFormat) throws {
-        if let configuredSampleRate {
-            guard sampleRatesMatch(configuredSampleRate, format.sampleRate),
-                  format.channelCount == 1 else {
-                throw PlaybackError.inconsistentSampleRate
-            }
+        guard format.channelCount == 1 else {
+            throw PlaybackError.inconsistentSampleRate
+        }
+        if let configuredSampleRate,
+           sampleRatesMatch(configuredSampleRate, format.sampleRate) {
             try ensureEngineRunning()
             return
         }

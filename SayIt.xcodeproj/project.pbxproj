@@ -70,6 +70,7 @@
 		1AB6750260BF70B395B0F9E5 /* HistorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFDA6836016ADDCDC5ACF3AF /* HistorySettingsView.swift */; };
 		1ACA6FA960940632C8EE1B46 /* SeekCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED5A1F0B187E695CA0512A6 /* SeekCommand.swift */; };
 		1AE36C4DA4C8909EAD163A6A /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93E5EE6D37AD52B74C09BA2 /* GlobalShortcut.swift */; };
+		1B56CA9DF5661C53FE9FAD78 /* PocketTTSStreamRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6627E4F8DD1236602D88A092 /* PocketTTSStreamRunnerTests.swift */; };
 		1B7DE382603E96F6DCFE8250 /* AboutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E05E5EF26C5160EA80CBEC7 /* AboutSettingsView.swift */; };
 		1C1E4B5A59D01BC152EA0440 /* BackendProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C19862FF50A31ADB162AF44 /* BackendProjectionTests.swift */; };
 		1D5288C9C07F6DE54DCD93AF /* SayItProtocol.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9A8BAAEAFC62A33241DF5822 /* SayItProtocol.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -1048,6 +1049,7 @@
 		6262901F90523430DD888CF9 /* HTTPVoiceRouteIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPVoiceRouteIntegrationTests.swift; sourceTree = "<group>"; };
 		6300B807ED37A5454C6FD638 /* PocketTTSSentenceSplitterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketTTSSentenceSplitterTests.swift; sourceTree = "<group>"; };
 		6517CAB9846FFD0FD879B897 /* PlaybackRate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRate.swift; sourceTree = "<group>"; };
+		6627E4F8DD1236602D88A092 /* PocketTTSStreamRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketTTSStreamRunnerTests.swift; sourceTree = "<group>"; };
 		66F395CE405E435EB38E630E /* ServiceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceSettingsView.swift; sourceTree = "<group>"; };
 		697EA1C1EA6477FAFCEF30B8 /* ModelDescriptor+VoiceImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelDescriptor+VoiceImport.swift"; sourceTree = "<group>"; };
 		6A47804F46DFB604995541E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -2388,6 +2390,7 @@
 				D07BCC4B6990BB603ECCEF34 /* PlaybackBufferPolicyTests.swift */,
 				E34A1926523800EBB0B6959D /* PlaybackControllerBoundaryTests.swift */,
 				6300B807ED37A5454C6FD638 /* PocketTTSSentenceSplitterTests.swift */,
+				6627E4F8DD1236602D88A092 /* PocketTTSStreamRunnerTests.swift */,
 				C24BB3FA53E080276A116642 /* ServiceEventHubTests.swift */,
 				EC5F705C24B015E2C6127021 /* SpeechAudioCollectorTests.swift */,
 				C66497ED594E15E3EF2CF5FD /* SpeechQueuePolicyTests.swift */,
@@ -3534,6 +3537,7 @@
 				0F8D81FFA4D5DA431F4127F1 /* PlaybackBufferPolicyTests.swift in Sources */,
 				2AA1EDF6AE8183DA3C9C6B6F /* PlaybackControllerBoundaryTests.swift in Sources */,
 				5A9ED4CEA6A9B4AE6352B3AB /* PocketTTSSentenceSplitterTests.swift in Sources */,
+				1B56CA9DF5661C53FE9FAD78 /* PocketTTSStreamRunnerTests.swift in Sources */,
 				168A63FEEDC7C157E117CB1C /* ServiceEventHubTests.swift in Sources */,
 				70C44C30462D596798F7514C /* SpeechAudioCollectorTests.swift in Sources */,
 				F88A3CF15CA4053F7D587898 /* SpeechQueuePolicyTests.swift in Sources */,
@@ -4015,7 +4019,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -4033,7 +4037,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.3.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
@@ -4415,7 +4419,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = D7AHD3GLH6;
@@ -4438,7 +4442,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.3.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

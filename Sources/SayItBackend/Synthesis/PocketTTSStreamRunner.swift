@@ -10,16 +10,23 @@ import MLXNN
 ///
 /// Optimized execution path:
 /// - Caches voice directory scans and prefilled FlowLM voice KV-cache snapshots
-///   across chunks and consecutive requests.
-/// - Uses `MLXFast.RoPE`, unmasked decode SDPA (`t == 1`), precomputed flow
-///   time embeddings, single-pass `cond_embed`, and compiled `flow_net`.
-/// - Pipelines FlowLM 1 step ahead with `asyncEval` so the GPU never stalls on
-///   per-step EOS checks.
-/// - Batches Mimi `decodeStep` across multiple latent frames per flush instead
-///   of synchronizing and launching the full codec graph per 80 ms frame.
+///   across chunks and consecutive requests in the model's native weight dtype.
+/// - Compiles the entire single-token FlowLM step (input projection, all 6
+///   transformer layers with dynamic-offset `MLXFast.RoPE`, static capacity-bucketed
+///   KV caches + causal SDPA, output norm, EOS check, and all `lsd_decode_steps`
+///   of `flow_net`) into static-shape `MLX.compile(shapeless: false)` graphs for
+///   both 1-step (ultra-low TTFA opening flush) and fused 4-step (steady-state
+///   throughput with 4x fewer graph dispatches and host-GPU EOS syncs).
+/// - Replaces Mimi's dense `eye(512)` depthwise transposed-conv upsample with
+///   exact broadcast-multiply overlap-add (512x fewer FLOPs, zero eye allocation).
+/// - Uses a tight 2-frame opening Mimi flush for instant first audio, then ramps
+///   to 32-frame steady batches overlapped asynchronously (`asyncEval`) with the
+///   next FlowLM batch.
 enum PocketTTSStreamRunner {
     private static let defaultAudioPrompt = "alba"
     private static let maxCachedVoiceStates = 4
+    private static let preallocatedOffsetCount = 1_024
+    private static let quadStepSize = 4
     private static let cacheLock = NSLock()
 
     private struct VoiceStateCacheKey: Hashable {
@@ -29,15 +36,30 @@ enum PocketTTSStreamRunner {
     }
 
     private struct CachedVoiceState {
-        let layerStates: [(keys: MLXArray, values: MLXArray)]
+        let keys: [MLXArray]
+        let values: [MLXArray]
         let promptNumFrames: Int
     }
 
+    private struct DepthwiseUpsampleWeights {
+        let stride: Int
+        let wFirst: MLXArray   // [1, C, 1, stride]
+        let wSecond: MLXArray  // [1, C, 1, stride]
+    }
+
     private struct CompiledModelState {
+        let flowDType: DType
+        let mimiDType: DType
         let conditioningEmbedding: MLXArray?
         let useExactGELU: Bool
         let lsdDecodeSteps: Int
-        let compiledFlowDecode: @Sendable (MLXArray, MLXArray) -> MLXArray
+        let eosThreshold: Float
+        let numLayers: Int
+        let offsetArrays: [MLXArray]
+        let timeConds: [MLXArray]
+        let depthwiseUpsample: DepthwiseUpsampleWeights?
+        var compiledStepsByCapacity: [Int: @Sendable ([MLXArray]) -> [MLXArray]]
+        var compiledQuadStepsByCapacity: [Int: @Sendable ([MLXArray]) -> [MLXArray]]
     }
 
     private final class CacheStore: @unchecked Sendable {
@@ -76,13 +98,87 @@ enum PocketTTSStreamRunner {
         voice: String?,
         referenceAudio: MLXArray?
     ) throws {
-        _ = compiledModelState(for: model)
-        _ = try cachedVoiceState(
+        let compiled = compiledModelState(for: model)
+        let voiceState = try cachedVoiceState(
             model: model,
             modelFolder: modelFolder,
             voice: voice,
             referenceAudio: referenceAudio
         )
+
+        // Pre-trace both primary capacity buckets (320 and 512) for 1-step and
+        // 4-step FlowLM plus the Mimi decoder shaders during background preload
+        // so the very first user utterance pays zero JIT compile latency.
+        let primaryCap = cacheCapacity(forTotalLength: voiceState.promptNumFrames + 1)
+        let buckets = primaryCap == 320 ? [320, 512] : [primaryCap]
+        let bos = model.flow_lm.bos_emb
+            .reshaped([1, 1, model.flow_lm.ldim])
+            .asType(compiled.flowDType)
+        let zeroNoise1 = MLXArray.zeros([1, model.flow_lm.ldim], dtype: compiled.flowDType)
+        let zeroNoise4 = MLXArray.zeros([quadStepSize, 1, model.flow_lm.ldim], dtype: compiled.flowDType)
+
+        var sampleLatent: MLXArray?
+        var sampleEos: MLXArray?
+
+        for capacity in buckets {
+            var paddedKeys = voiceState.keys
+            var paddedValues = voiceState.values
+            padKVCaches(keys: &paddedKeys, values: &paddedValues, toCapacity: capacity, dtype: compiled.flowDType)
+
+            let stepFn = compiledFlowStep(for: model, state: compiled, capacity: capacity)
+            let off0 = offsetScalar(voiceState.promptNumFrames, cached: compiled.offsetArrays)
+            var singleInputs: [MLXArray] = []
+            singleInputs.reserveCapacity(3 + compiled.numLayers * 2)
+            singleInputs.append(bos)
+            singleInputs.append(zeroNoise1)
+            singleInputs.append(off0)
+            for i in 0..<compiled.numLayers {
+                singleInputs.append(paddedKeys[i])
+                singleInputs.append(paddedValues[i])
+            }
+            let singleOut = stepFn(singleInputs)
+            if sampleLatent == nil {
+                sampleLatent = singleOut[0]
+                sampleEos = singleOut[1]
+            }
+
+            if voiceState.promptNumFrames + quadStepSize <= capacity {
+                let quadFn = compiledFlowStep4(for: model, state: compiled, capacity: capacity)
+                var quadInputs: [MLXArray] = []
+                quadInputs.reserveCapacity(2 + quadStepSize + compiled.numLayers * 2)
+                quadInputs.append(bos)
+                quadInputs.append(zeroNoise4)
+                for sub in 0..<quadStepSize {
+                    quadInputs.append(offsetScalar(voiceState.promptNumFrames + sub, cached: compiled.offsetArrays))
+                }
+                for i in 0..<compiled.numLayers {
+                    quadInputs.append(paddedKeys[i])
+                    quadInputs.append(paddedValues[i])
+                }
+                let quadOut = quadFn(quadInputs)
+                eval(singleOut[0], quadOut[0], quadOut[1])
+            } else {
+                eval(singleOut[0], singleOut[1])
+            }
+        }
+
+        if let latent = sampleLatent, let eos = sampleEos {
+            model.mimi.resetState()
+            var upsamplePrev: MLXArray?
+            let pairLatents = concatenated([latent, latent], axis: 1)
+            let embStd = model.flow_lm.emb_std.asType(compiled.mimiDType)
+            let embMean = model.flow_lm.emb_mean.asType(compiled.mimiDType)
+            let audio = decodeMimiChunk(
+                latents: pairLatents,
+                model: model,
+                compiled: compiled,
+                embStd: embStd,
+                embMean: embMean,
+                upsamplePrevInput: &upsamplePrev
+            )
+            eval(audio, eos)
+            model.mimi.resetState()
+        }
     }
 
     static func generateSamples(
@@ -185,29 +281,35 @@ enum PocketTTSStreamRunner {
             tokenizer: model.flow_lm.conditioner.tokenizer
         )
         let frameRate = max(model.mimi.frameRate, 1)
-        let initialBatchFrames = max(
+        let requestedInitial = max(
             1,
             Int((max(0, streamingInterval) * frameRate).rounded(.up))
         )
-        let steadyBatchFrames = max(
-            initialBatchFrames,
-            streamingInterval >= 1.5 ? 24 : 12
-        )
+        // Use a tight 2-frame opening flush (160 ms audio, above the 150 ms
+        // minimum sustainable playback buffer) for instant first audio, then
+        // ramp quickly to 32-frame steady batches overlapped with FlowLM.
+        let firstFlushFrames = streamingInterval >= 1.5
+            ? requestedInitial
+            : min(2, requestedInitial)
+        let secondFlushFrames = streamingInterval >= 1.5
+            ? requestedInitial
+            : max(firstFlushFrames, 8)
+        let steadyBatchFrames = max(secondFlushFrames, 32)
         var emittedFlushes = 0
 
         for chunk in chunks {
             try Task.checkCancellation()
-            var state = makeState(from: voiceState, model: model)
             let (preparedChunk, guess) = try PocketTTSSentenceSplitter.prepareTextPrompt(chunk)
             let framesAfterEos = guess + 2
             try generateShortText(
                 model: model,
                 compiled: compiled,
-                state: &state,
+                voiceState: voiceState,
                 text: preparedChunk,
                 framesAfterEos: framesAfterEos,
                 maxFrames: generationParameters.maxTokens,
-                initialBatchFrames: initialBatchFrames,
+                firstFlushFrames: firstFlushFrames,
+                secondFlushFrames: secondFlushFrames,
                 steadyBatchFrames: steadyBatchFrames,
                 emittedFlushes: &emittedFlushes,
                 onSamples: onSamples
@@ -218,16 +320,18 @@ enum PocketTTSStreamRunner {
     private static func generateShortText(
         model: PocketTTSModel,
         compiled: CompiledModelState,
-        state: inout PocketTTSState,
+        voiceState: CachedVoiceState,
         text: String,
         framesAfterEos: Int,
         maxFrames: Int?,
-        initialBatchFrames: Int,
+        firstFlushFrames: Int,
+        secondFlushFrames: Int,
         steadyBatchFrames: Int,
         emittedFlushes: inout Int,
         onSamples: ([Float]) -> Void
     ) throws {
         model.mimi.resetState()
+        var upsamplePrevInput: MLXArray?
 
         let words = text.split(separator: " ").count
         let genLenSec = Double(words) * 1.0 + 2.0
@@ -235,46 +339,65 @@ enum PocketTTSStreamRunner {
         let maxGenLen = max(0, maxFrames.map { min($0, computedMax) } ?? computedMax)
         guard maxGenLen > 0 else { return }
 
+        var keys = voiceState.keys
+        var values = voiceState.values
+        var kvOffset = voiceState.promptNumFrames
+
         let prepared = model.flow_lm.conditioner.prepare(text)
         if prepared.tokens.shape[1] > 0 {
             let textEmbeddings = model.flow_lm.conditioner(prepared)
-            _ = runTransformer(
+                .asType(compiled.flowDType)
+            _ = runPrefillTransformer(
                 model.flow_lm.transformer,
-                input: textEmbeddings.asType(.float32),
-                cache: state.flowCache,
+                input: textEmbeddings,
+                keys: &keys,
+                values: &values,
+                offset: &kvOffset,
+                computeDType: compiled.flowDType,
                 useExactGELU: compiled.useExactGELU
             )
         }
-        // Match the upstream RNG sequence after prefill.
-        _ = MLXRandom.normal([1, model.flow_lm.ldim])
 
-        let bosInput = model.flow_lm.bos_emb.reshaped([1, 1, model.flow_lm.ldim])
-        let embStd = model.flow_lm.emb_std
-        let embMean = model.flow_lm.emb_mean
+        // Start in the smallest power-of-two bucket that fits the prompt (256
+        // for most chunks, matching `warmVoice`'s pre-traced graph) and expand
+        // mid-chunk only when generation exceeds it.
+        var capacity = cacheCapacity(forTotalLength: kvOffset + 1)
+        padKVCaches(keys: &keys, values: &values, toCapacity: capacity, dtype: compiled.flowDType)
+        var stepFn = compiledFlowStep(for: model, state: compiled, capacity: capacity)
+        var quadStepFn = compiledFlowStep4(for: model, state: compiled, capacity: capacity)
+
+        // Pre-generate all step noise in a single GPU op instead of 3 ops/step.
         let noiseScale = Float(sqrt(model.temp))
-        let noiseClamp = model.noise_clamp
-        let eosThreshold = model.eos_threshold
+        var allNoise = MLXRandom.normal([maxGenLen, 1, model.flow_lm.ldim]) * noiseScale
+        if let noiseClamp = model.noise_clamp {
+            allNoise = MLX.clip(allNoise, min: -noiseClamp, max: noiseClamp)
+        }
+        allNoise = allNoise.asType(compiled.flowDType)
+        asyncEval(allNoise)
+
+        let bosInput = model.flow_lm.bos_emb
+            .reshaped([1, 1, model.flow_lm.ldim])
+            .asType(compiled.flowDType)
+        let embStd = model.flow_lm.emb_std.asType(compiled.mimiDType)
+        let embMean = model.flow_lm.emb_mean.asType(compiled.mimiDType)
+        let numLayers = compiled.numLayers
 
         var pendingLatents: [MLXArray] = []
         pendingLatents.reserveCapacity(steadyBatchFrames)
+        var pendingFrameCount = 0
+        var inFlightMimiAudio: MLXArray?
 
         func targetBatchFrames() -> Int {
-            // Keep the first two deliveries tight for instant playback startup,
-            // then decode larger batches to amortize Mimi Metal launches.
-            emittedFlushes < 2 ? initialBatchFrames : steadyBatchFrames
+            switch emittedFlushes {
+            case 0: firstFlushFrames
+            case 1: secondFlushFrames
+            default: steadyBatchFrames
+            }
         }
 
-        func flushLatents() {
-            guard !pendingLatents.isEmpty else { return }
-            let latents = pendingLatents.count == 1
-                ? pendingLatents[0]
-                : concatenated(pendingLatents, axis: 1)
-            pendingLatents.removeAll(keepingCapacity: true)
-            let decodingInput = latents * embStd + embMean
-            let quantized = model.mimi.quantizer(decodingInput.transposed(0, 2, 1))
-            let audioChunk = model.mimi.decodeStep(quantized)
-            let audio = audioChunk[0, 0].asType(.float32)
-            eval(audio)
+        func drainInFlightMimi() {
+            guard let audio = inFlightMimiAudio else { return }
+            inFlightMimiAudio = nil
             let samples = audio.asArray(Float.self)
             if !samples.isEmpty {
                 emittedFlushes += 1
@@ -282,82 +405,404 @@ enum PocketTTSStreamRunner {
             }
         }
 
-        func enqueueStep(_ input: MLXArray) -> (latent: MLXArray, isEos: MLXArray) {
-            let (out, isEos) = fastFlowStep(
-                model: model,
-                compiled: compiled,
-                sequence: input,
-                cache: state.flowCache,
-                noiseScale: noiseScale,
-                noiseClamp: noiseClamp,
-                eosThreshold: eosThreshold
-            )
-            let nextLatent = out.expandedDimensions(axis: 1)
-            asyncEval(nextLatent, isEos)
-            return (nextLatent, isEos)
+        func appendPending(_ latents: MLXArray, count: Int) {
+            guard count > 0 else { return }
+            pendingLatents.append(latents)
+            pendingFrameCount += count
         }
 
-        var eosStep: Int?
-        var pending = enqueueStep(bosInput)
+        func flushLatents(synchronous: Bool) {
+            guard pendingFrameCount > 0 else {
+                if synchronous { drainInFlightMimi() }
+                return
+            }
+            let latents = pendingLatents.count == 1
+                ? pendingLatents[0]
+                : concatenated(pendingLatents, axis: 1)
+            pendingLatents.removeAll(keepingCapacity: true)
+            pendingFrameCount = 0
 
-        for step in 0..<maxGenLen {
-            try Task.checkCancellation()
-            let current = pending
+            // Deliver any previously overlapped Mimi chunk before launching the next.
+            drainInFlightMimi()
 
-            // Queue the next FlowLM step BEFORE reading `current.isEos` so the
-            // GPU stays busy during host-side EOS inspection. When `eosStep` is
-            // nil, `framesAfterEos >= 3` guarantees step + 1 is always needed.
-            let stopStep = eosStep.map { $0 + framesAfterEos }
-            let shouldPrefetchNext: Bool
-            if let stopStep {
-                shouldPrefetchNext = (step + 1) < min(maxGenLen, stopStep)
+            let audio = decodeMimiChunk(
+                latents: latents,
+                model: model,
+                compiled: compiled,
+                embStd: embStd,
+                embMean: embMean,
+                upsamplePrevInput: &upsamplePrevInput
+            )
+
+            if synchronous {
+                eval(audio)
+                let samples = audio.asArray(Float.self)
+                if !samples.isEmpty {
+                    emittedFlushes += 1
+                    onSamples(samples)
+                }
             } else {
-                shouldPrefetchNext = (step + 1) < maxGenLen
+                asyncEval(audio)
+                inFlightMimiAudio = audio
             }
-            if shouldPrefetchNext {
-                pending = enqueueStep(current.latent)
+        }
+
+        func ensureCapacity(forAdditionalSteps count: Int) {
+            if kvOffset + count > capacity {
+                let nextCapacity = cacheCapacity(forTotalLength: kvOffset + max(128, count))
+                padKVCaches(keys: &keys, values: &values, toCapacity: nextCapacity, dtype: compiled.flowDType)
+                capacity = nextCapacity
+                stepFn = compiledFlowStep(for: model, state: compiled, capacity: nextCapacity)
+                quadStepFn = compiledFlowStep4(for: model, state: compiled, capacity: nextCapacity)
+            }
+        }
+
+        var singleInputs = [MLXArray](repeating: bosInput, count: 3 + numLayers * 2)
+        var quadInputs = [MLXArray](repeating: bosInput, count: 2 + quadStepSize + numLayers * 2)
+        var lastLatent = bosInput
+        var nextStepIndex = 0
+        var eosStep: Int?
+
+        func runSingleStep() -> (step: Int, latent: MLXArray, isEos: MLXArray) {
+            ensureCapacity(forAdditionalSteps: 1)
+            let stepIdx = nextStepIndex
+            nextStepIndex += 1
+            let noise = allNoise[stepIdx]
+            let offsetArray = offsetScalar(kvOffset, cached: compiled.offsetArrays)
+            kvOffset += 1
+
+            singleInputs[0] = lastLatent
+            singleInputs[1] = noise
+            singleInputs[2] = offsetArray
+            for i in 0..<numLayers {
+                singleInputs[3 + i * 2] = keys[i]
+                singleInputs[4 + i * 2] = values[i]
             }
 
-            if eosStep == nil {
-                if current.isEos.item(Bool.self) {
-                    eosStep = step
+            let outputs = stepFn(singleInputs)
+            let latent = outputs[0]
+            let isEos = outputs[1]
+            for i in 0..<numLayers {
+                keys[i] = outputs[2 + i * 2]
+                values[i] = outputs[3 + i * 2]
+            }
+            lastLatent = latent
+            asyncEval(outputs)
+            return (stepIdx, latent, isEos)
+        }
+
+        func runQuadStep() -> (startStep: Int, latents: MLXArray, eosFlags: MLXArray) {
+            ensureCapacity(forAdditionalSteps: quadStepSize)
+            let startIdx = nextStepIndex
+            nextStepIndex += quadStepSize
+            let noise4 = allNoise[startIdx..<(startIdx + quadStepSize)]
+
+            quadInputs[0] = lastLatent
+            quadInputs[1] = noise4
+            for sub in 0..<quadStepSize {
+                quadInputs[2 + sub] = offsetScalar(kvOffset + sub, cached: compiled.offsetArrays)
+            }
+            kvOffset += quadStepSize
+            for i in 0..<numLayers {
+                quadInputs[2 + quadStepSize + i * 2] = keys[i]
+                quadInputs[3 + quadStepSize + i * 2] = values[i]
+            }
+
+            let outputs = quadStepFn(quadInputs)
+            let latents4 = outputs[0]
+            let eos4 = outputs[1]
+            for i in 0..<numLayers {
+                keys[i] = outputs[2 + i * 2]
+                values[i] = outputs[3 + i * 2]
+            }
+            lastLatent = latents4[0..., (quadStepSize - 1)..<quadStepSize, 0...]
+            asyncEval(outputs)
+            return (startIdx, latents4, eos4)
+        }
+
+        // Phase 1: Opening flush using 1-step compiled FlowLM (depth 1) for
+        // minimum TTFA without waiting for extra lookahead frames.
+        if emittedFlushes == 0 {
+            var current = runSingleStep()
+            while true {
+                try Task.checkCancellation()
+                let stopStep = eosStep.map { $0 + framesAfterEos } ?? maxGenLen
+                let limitStep = min(maxGenLen, stopStep)
+
+                var next: (step: Int, latent: MLXArray, isEos: MLXArray)?
+                if pendingFrameCount + 1 < firstFlushFrames && nextStepIndex < limitStep {
+                    next = runSingleStep()
+                }
+
+                if eosStep == nil, current.isEos.item(Bool.self) {
+                    eosStep = current.step
+                }
+                if let eosStep, current.step >= eosStep + framesAfterEos {
+                    break
+                }
+
+                appendPending(current.latent, count: 1)
+                if pendingFrameCount >= firstFlushFrames {
+                    flushLatents(synchronous: true)
+                    if let next {
+                        // Consume the already-queued next frame if any.
+                        if eosStep == nil, next.isEos.item(Bool.self) {
+                            eosStep = next.step
+                        }
+                        if eosStep == nil || next.step < eosStep! + framesAfterEos {
+                            appendPending(next.latent, count: 1)
+                        }
+                    }
+                    break
+                }
+
+                if let queued = next {
+                    current = queued
+                } else {
+                    let updatedLimit = min(maxGenLen, eosStep.map { $0 + framesAfterEos } ?? maxGenLen)
+                    guard nextStepIndex < updatedLimit else { break }
+                    current = runSingleStep()
                 }
             }
-            if let eosStep, step >= eosStep + framesAfterEos {
-                break
-            }
+        }
 
-            pendingLatents.append(current.latent)
-            if pendingLatents.count >= targetBatchFrames() {
-                flushLatents()
+        // Phase 2: Steady-state fused 4-step pipelined FlowLM (when framesAfterEos >= 3
+        // so even an EOS on sub-step 0 produces zero wasted frames).
+        if framesAfterEos >= quadStepSize - 1 && eosStep == nil && nextStepIndex + quadStepSize <= maxGenLen {
+            var currentBlock = runQuadStep()
+            while true {
+                try Task.checkCancellation()
+                let nextBlock: (startStep: Int, latents: MLXArray, eosFlags: MLXArray)? =
+                    nextStepIndex + quadStepSize <= maxGenLen ? runQuadStep() : nil
+
+                let eosBools = currentBlock.eosFlags.asArray(Bool.self)
+                if let firstEosOffset = eosBools.firstIndex(of: true) {
+                    let detectedEos = currentBlock.startStep + firstEosOffset
+                    eosStep = detectedEos
+                    let totalAllowed = min(maxGenLen, detectedEos + framesAfterEos)
+                    let keepInCurrent = max(0, min(quadStepSize, totalAllowed - currentBlock.startStep))
+                    if keepInCurrent == quadStepSize {
+                        appendPending(currentBlock.latents, count: quadStepSize)
+                    } else if keepInCurrent > 0 {
+                        appendPending(currentBlock.latents[0..., 0..<keepInCurrent, 0...], count: keepInCurrent)
+                    }
+
+                    var consumedSteps = currentBlock.startStep + keepInCurrent
+                    if let nextBlock, consumedSteps < totalAllowed {
+                        let keepInNext = max(0, min(quadStepSize, totalAllowed - nextBlock.startStep))
+                        if keepInNext == quadStepSize {
+                            appendPending(nextBlock.latents, count: quadStepSize)
+                        } else if keepInNext > 0 {
+                            appendPending(nextBlock.latents[0..., 0..<keepInNext, 0...], count: keepInNext)
+                        }
+                        consumedSteps = nextBlock.startStep + keepInNext
+                    }
+                    if pendingFrameCount >= targetBatchFrames() {
+                        flushLatents(synchronous: false)
+                    }
+                    // Finish any remaining post-EOS tail frames (only if framesAfterEos > 7).
+                    while consumedSteps < totalAllowed && nextStepIndex < totalAllowed {
+                        try Task.checkCancellation()
+                        let tail = runSingleStep()
+                        appendPending(tail.latent, count: 1)
+                        consumedSteps += 1
+                    }
+                    break
+                }
+
+                appendPending(currentBlock.latents, count: quadStepSize)
+                if pendingFrameCount >= targetBatchFrames() {
+                    flushLatents(synchronous: false)
+                }
+
+                if let nextBlock {
+                    currentBlock = nextBlock
+                } else {
+                    break
+                }
+            }
+        }
+
+        // Phase 3: Finish any remaining tail (< 4 frames before maxGenLen, or
+        // chunks where EOS fired during Phase 1 or framesAfterEos < 3).
+        let finalStop = min(maxGenLen, eosStep.map { $0 + framesAfterEos } ?? maxGenLen)
+        if nextStepIndex < finalStop && (eosStep == nil || nextStepIndex < finalStop) {
+            var current = runSingleStep()
+            while true {
+                try Task.checkCancellation()
+                let stopStep = eosStep.map { $0 + framesAfterEos } ?? maxGenLen
+                let limitStep = min(maxGenLen, stopStep)
+                let next = nextStepIndex < limitStep ? runSingleStep() : nil
+
+                if eosStep == nil, current.isEos.item(Bool.self) {
+                    eosStep = current.step
+                }
+                if let eosStep, current.step >= eosStep + framesAfterEos {
+                    break
+                }
+                appendPending(current.latent, count: 1)
+                if pendingFrameCount >= targetBatchFrames() {
+                    flushLatents(synchronous: false)
+                }
+
+                if let next {
+                    current = next
+                } else {
+                    let updatedLimit = min(maxGenLen, eosStep.map { $0 + framesAfterEos } ?? maxGenLen)
+                    guard nextStepIndex < updatedLimit else { break }
+                    current = runSingleStep()
+                }
             }
         }
 
         try Task.checkCancellation()
-        flushLatents()
+        flushLatents(synchronous: true)
     }
 
-    // MARK: - Fast FlowLM Execution
+    // MARK: - Optimized Mimi Decode & Depthwise Upsample
+
+    private static func decodeMimiChunk(
+        latents: MLXArray,
+        model: PocketTTSModel,
+        compiled: CompiledModelState,
+        embStd: MLXArray,
+        embMean: MLXArray,
+        upsamplePrevInput: inout MLXArray?
+    ) -> MLXArray {
+        let decodingInput = latents.asType(compiled.mimiDType) * embStd + embMean
+        let quantized = model.mimi.quantizer(decodingInput.transposed(0, 2, 1))
+        let upsampled: MLXArray
+        if let dw = compiled.depthwiseUpsample {
+            upsampled = fastDepthwiseUpsampleStep(
+                quantized,
+                weights: dw,
+                prevInput: &upsamplePrevInput
+            )
+        } else if let upsample = model.mimi.upsample {
+            upsampled = upsample.step(quantized)
+        } else {
+            upsampled = quantized
+        }
+        let transformed = model.mimi.decoder_transformer(upsampled, cache: model.mimi.decoderCache)[0]
+        let audioChunk = model.mimi.decoder.step(transformed)
+        return audioChunk[0, 0].asType(.float32)
+    }
+
+    /// Exact streaming replacement for `ConvTrUpsample1d.step` (`groups == C`,
+    /// `ksize == 2 * stride`, `bias == nil`, causal overlap-add). Avoids the
+    /// `[C, ksize, C]` dense `eye(C)` matrix expansion and dense transposed
+    /// convolution in `MimiConvTransposed1d`.
+    static func fastDepthwiseUpsampleStep(
+        _ x: MLXArray,
+        wFirst: MLXArray,
+        wSecond: MLXArray,
+        stride: Int,
+        prevInput: inout MLXArray?
+    ) -> MLXArray {
+        let b = x.shape[0]
+        let c = x.shape[1]
+        let t = x.shape[2]
+        guard t > 0 else { return MLXArray.zeros([b, c, 0], dtype: x.dtype) }
+
+        let head = prevInput ?? MLXArray.zeros([b, c, 1], dtype: x.dtype)
+        let xPrev: MLXArray
+        if t == 1 {
+            xPrev = head
+        } else {
+            xPrev = concatenated([head, x[0..., 0..., 0..<(t - 1)]], axis: 2)
+        }
+        prevInput = x[0..., 0..., (t - 1)...]
+
+        let xCurrExp = x.expandedDimensions(axis: 3)
+        let xPrevExp = xPrev.expandedDimensions(axis: 3)
+        let out = xCurrExp * wFirst + xPrevExp * wSecond
+        return out.reshaped([b, c, t * stride])
+    }
+
+    private static func fastDepthwiseUpsampleStep(
+        _ x: MLXArray,
+        weights: DepthwiseUpsampleWeights,
+        prevInput: inout MLXArray?
+    ) -> MLXArray {
+        fastDepthwiseUpsampleStep(
+            x,
+            wFirst: weights.wFirst,
+            wSecond: weights.wSecond,
+            stride: weights.stride,
+            prevInput: &prevInput
+        )
+    }
+
+    private static func extractDepthwiseUpsampleWeights(
+        from mimi: MimiAdapter,
+        dtype: DType
+    ) -> DepthwiseUpsampleWeights? {
+        guard let upsample = mimi.upsample else { return nil }
+        let convtr = upsample.convtr.convtr.convtr
+        guard convtr.bias == nil, convtr.stride > 0 else { return nil }
+        let s = convtr.stride
+        let ksize = 2 * s
+        let w = convtr.weight
+        guard w.ndim == 3, w.shape[1] == ksize else { return nil }
+
+        let w2D: MLXArray
+        let channels: Int
+        if w.shape[2] == 1 && convtr.groups == w.shape[0] {
+            channels = w.shape[0]
+            w2D = w.squeezed(axis: 2)
+        } else if w.shape[0] == 1 && convtr.groups == w.shape[2] {
+            channels = w.shape[2]
+            w2D = w.squeezed(axis: 0).transposed(1, 0)
+        } else {
+            return nil
+        }
+
+        let wFirst = w2D[0..., 0..<s].asType(dtype).reshaped([1, channels, 1, s])
+        let wSecond = w2D[0..., s..<ksize].asType(dtype).reshaped([1, channels, 1, s])
+        eval(wFirst, wSecond)
+        return DepthwiseUpsampleWeights(stride: s, wFirst: wFirst, wSecond: wSecond)
+    }
+
+    // MARK: - Compiled Full-Step & Quad-Step FlowLM Execution
 
     private static func compiledModelState(
         for model: PocketTTSModel
     ) -> CompiledModelState {
         let modelID = ObjectIdentifier(model)
         let steps = model.lsd_decode_steps
+        let eosThreshold = model.eos_threshold
         if let cached = cacheLock.withLock({ cacheStore.compiledStates[modelID] }),
-           cached.lsdDecodeSteps == steps {
+           cached.lsdDecodeSteps == steps,
+           cached.eosThreshold == eosThreshold {
             return cached
         }
 
-        var conditioningEmbedding = model.flow_lm.num_speakers?(MLXArray([Int32(1)]))
-        if let duration = model.flow_lm.duration_delta?(MLXArray([Float(0)])) {
+        let flowLM = model.flow_lm
+        let flowDType = flowLM.input_linear.weight.dtype
+        // Decoder-only BF16 checkpoints (such as Gradium Phonon) ship FlowLM in
+        // BF16 and Mimi in F32. Converting Mimi's decoder weights to BF16 once
+        // matches Pocket TTS's native BF16 Mimi precision, halving 24 kHz
+        // SeanetDecoder memory bandwidth and GPU footprint.
+        if flowDType == .bfloat16,
+           model.mimi.encoder == nil,
+           model.mimi.quantizer.output_proj.weight.dtype == .float32 {
+            let mimiBF16 = model.mimi.parameters().mapValues { $0.asType(.bfloat16) }
+            model.mimi.update(parameters: mimiBF16)
+            eval(model.mimi.parameters())
+        }
+        let mimiDType = model.mimi.quantizer.output_proj.weight.dtype
+
+        var conditioningEmbedding = flowLM.num_speakers?(MLXArray([Int32(1)]))
+        if let duration = flowLM.duration_delta?(MLXArray([Float(0)])) {
             conditioningEmbedding = conditioningEmbedding.map { $0 + duration } ?? duration
         }
-        if let conditioningEmbedding {
-            eval(conditioningEmbedding)
+        if let emb = conditioningEmbedding {
+            let typed = emb.asType(flowDType)
+            eval(typed)
+            conditioningEmbedding = typed
         }
 
-        let flowNet = model.flow_lm.flow_net
+        let flowNet = flowLM.flow_net
         let numTimeConds = Float(flowNet.num_time_conds)
         var precomputedTimeConds: [MLXArray] = []
         precomputedTimeConds.reserveCapacity(steps)
@@ -371,37 +816,30 @@ enum PocketTTSStreamRunner {
             for (idx, embed) in flowNet.time_embed.enumerated() {
                 tCombined = tCombined + embed(ts[idx])
             }
-            tCombined = tCombined / MLXArray(numTimeConds)
+            tCombined = (tCombined / MLXArray(numTimeConds)).asType(flowDType)
             eval(tCombined)
             precomputedTimeConds.append(tCombined)
         }
 
-        let invSteps = Float(1.0) / Float(steps)
-        let timeConds = precomputedTimeConds
-        let compiledFlowDecode = compile(
-            inputs: [flowNet],
-            outputs: [],
-            shapeless: false
-        ) { (condition: MLXArray, x0: MLXArray) -> MLXArray in
-            let cc = flowNet.cond_embed(condition)
-            var current = x0
-            for tCombined in timeConds {
-                let y = tCombined + cc
-                var xx = flowNet.input_proj(current)
-                for block in flowNet.res_blocks {
-                    xx = block(xx, y)
-                }
-                let flowDir = flowNet.final_layer(xx, y)
-                current = current + flowDir * invSteps
-            }
-            return current
-        }
+        let useExactGELU = model.config.flowLM.transformer.gelu == "erf"
+        let numLayers = flowLM.transformer.layers.count
+        let offsetArrays = (0..<preallocatedOffsetCount).map { MLXArray(Int32($0)) }
+        eval(offsetArrays)
+        let depthwiseUpsample = extractDepthwiseUpsampleWeights(from: model.mimi, dtype: mimiDType)
 
         let state = CompiledModelState(
+            flowDType: flowDType,
+            mimiDType: mimiDType,
             conditioningEmbedding: conditioningEmbedding,
-            useExactGELU: model.config.flowLM.transformer.gelu == "erf",
+            useExactGELU: useExactGELU,
             lsdDecodeSteps: steps,
-            compiledFlowDecode: compiledFlowDecode
+            eosThreshold: eosThreshold,
+            numLayers: numLayers,
+            offsetArrays: offsetArrays,
+            timeConds: precomputedTimeConds,
+            depthwiseUpsample: depthwiseUpsample,
+            compiledStepsByCapacity: [:],
+            compiledQuadStepsByCapacity: [:]
         )
         cacheLock.withLock {
             cacheStore.compiledStates[modelID] = state
@@ -409,97 +847,388 @@ enum PocketTTSStreamRunner {
         return state
     }
 
-    private static func fastFlowStep(
-        model: PocketTTSModel,
-        compiled: CompiledModelState,
-        sequence: MLXArray,
-        cache: [KVCacheSimple],
-        noiseScale: Float,
-        noiseClamp: Float?,
-        eosThreshold: Float
-    ) -> (MLXArray, MLXArray) {
-        var input = model.flow_lm.input_linear(sequence)
-        if let cond = compiled.conditioningEmbedding {
-            input = input + cond
-        }
-        var transformerOut = runTransformer(
-            model.flow_lm.transformer,
-            input: input,
-            cache: cache,
-            useExactGELU: compiled.useExactGELU
-        )
-        transformerOut = model.flow_lm.out_norm(transformerOut).asType(.float32)
-
-        let lastToken = transformerOut[0..., (transformerOut.shape[1] - 1)..., 0...]
-            .squeezed(axis: 1)
-        let eosLogits = model.flow_lm.out_eos(lastToken)
-        let isEos = eosLogits[0, 0] .> eosThreshold
-
-        var noise = MLXRandom.normal([lastToken.shape[0], model.flow_lm.ldim]) * noiseScale
-        if let noiseClamp {
-            noise = MLX.clip(noise, min: -noiseClamp, max: noiseClamp)
-        }
-        let nextLatent = compiled.compiledFlowDecode(lastToken, noise)
-        return (nextLatent, isEos)
+    static func cacheCapacity(forTotalLength total: Int) -> Int {
+        if total <= 320 { return 320 }
+        if total <= 512 { return 512 }
+        if total <= 1024 { return 1024 }
+        return ((total + 255) / 256) * 256
     }
 
-    private static func runTransformer(
-        _ transformer: PocketStreamingTransformer,
-        input: MLXArray,
-        cache: [KVCacheSimple],
-        useExactGELU: Bool
-    ) -> MLXArray {
-        var h = input
-        for (layer, layerCache) in zip(transformer.layers, cache) {
-            let attnOut = fastAttention(layer.self_attn, query: layer.norm1(h), cache: layerCache)
-            if let scale1 = layer.layer_scale_1 {
-                h = h + scale1(attnOut)
-            } else {
-                h = h + attnOut
+    private static func padKVCaches(
+        keys: inout [MLXArray],
+        values: inout [MLXArray],
+        toCapacity capacity: Int,
+        dtype: DType
+    ) {
+        for i in 0..<keys.count {
+            let currentLen = keys[i].shape[2]
+            if currentLen < capacity {
+                let padShape = [keys[i].shape[0], keys[i].shape[1], capacity - currentLen, keys[i].shape[3]]
+                let zeros = MLXArray.zeros(padShape, dtype: dtype)
+                keys[i] = concatenated([keys[i], zeros], axis: 2)
+                values[i] = concatenated([values[i], zeros], axis: 2)
             }
-            let hidden = layer.linear1(layer.norm2(h))
+        }
+    }
+
+    @inline(__always)
+    private static func traceSingleFlowStep(
+        sequence: MLXArray,
+        noise: MLXArray,
+        offsetArray: MLXArray,
+        keys: inout [MLXArray],
+        values: inout [MLXArray],
+        flowLM: FlowLMModel,
+        flowDType: DType,
+        useExactGELU: Bool,
+        eosThreshold: Float,
+        invSteps: MLXArray,
+        timeConds: [MLXArray],
+        condEmb: MLXArray?,
+        posWrite: MLXArray,
+        posMask: MLXArray,
+        zeroMaskVal: MLXArray,
+        negInfMaskVal: MLXArray
+    ) -> (latent: MLXArray, isEos: MLXArray) {
+        let writeMask = posWrite .== offsetArray
+        let attnMask = MLX.where(posMask .<= offsetArray, zeroMaskVal, negInfMaskVal)
+
+        var h = flowLM.input_linear(sequence)
+        if let condEmb {
+            h = h + condEmb
+        }
+
+        for (layerIdx, layer) in flowLM.transformer.layers.enumerated() {
+            let attn = layer.self_attn
+            let norm1Out = layer.norm1(h).asType(flowDType)
+            let projected = attn.in_proj(norm1Out)
+                .reshaped([1, 1, 3, attn.numHeads, attn.headDim])
+            var q = swappedAxes(projected[0..., 0..., 0, 0..., 0...], 1, 2)
+            var k = swappedAxes(projected[0..., 0..., 1, 0..., 0...], 1, 2)
+            let v = swappedAxes(projected[0..., 0..., 2, 0..., 0...], 1, 2)
+
+            let base = Float(attn.rope.maxPeriod)
+            q = MLXFast.RoPE(
+                q,
+                dimensions: attn.headDim,
+                traditional: true,
+                base: base,
+                scale: 1.0,
+                offset: offsetArray
+            )
+            k = MLXFast.RoPE(
+                k,
+                dimensions: attn.headDim,
+                traditional: true,
+                base: base,
+                scale: 1.0,
+                offset: offsetArray
+            )
+
+            let nextK = MLX.where(writeMask, k, keys[layerIdx])
+            let nextV = MLX.where(writeMask, v, values[layerIdx])
+            keys[layerIdx] = nextK
+            values[layerIdx] = nextV
+
+            let attnOut = MLXFast.scaledDotProductAttention(
+                queries: q,
+                keys: nextK,
+                values: nextV,
+                scale: attn.scale,
+                mask: .array(attnMask)
+            )
+            let merged = swappedAxes(attnOut, 1, 2).reshaped([1, 1, attn.embedDim])
+            let projectedOut = attn.out_proj(merged)
+            if let scale1 = layer.layer_scale_1 {
+                h = h + scale1(projectedOut).asType(flowDType)
+            } else {
+                h = h + projectedOut
+            }
+
+            let norm2Out = layer.norm2(h).asType(flowDType)
+            let hidden = layer.linear1(norm2Out)
             let ff = layer.linear2(useExactGELU ? gelu(hidden) : geluApproximate(hidden))
             if let scale2 = layer.layer_scale_2 {
-                h = h + scale2(ff)
+                h = h + scale2(ff).asType(flowDType)
             } else {
                 h = h + ff
             }
         }
-        return h
+
+        let lastToken = flowLM.out_norm(h).squeezed(axis: 1).asType(flowDType)
+        let eosLogits = flowLM.out_eos(lastToken)
+        let isEos = eosLogits[0, 0] .> eosThreshold
+
+        let flowNet = flowLM.flow_net
+        let cc = flowNet.cond_embed(lastToken)
+        var current = noise
+        for tCombined in timeConds {
+            let y = tCombined + cc
+            var xx = flowNet.input_proj(current)
+            for block in flowNet.res_blocks {
+                xx = block(xx, y).asType(flowDType)
+            }
+            let flowDir = flowNet.final_layer(xx, y).asType(flowDType)
+            current = current + flowDir * invSteps
+        }
+
+        return (current.expandedDimensions(axis: 1), isEos)
+    }
+
+    private static func compiledFlowStep(
+        for model: PocketTTSModel,
+        state: CompiledModelState,
+        capacity: Int
+    ) -> @Sendable ([MLXArray]) -> [MLXArray] {
+        let modelID = ObjectIdentifier(model)
+        if let cached = cacheLock.withLock({
+            cacheStore.compiledStates[modelID]?.compiledStepsByCapacity[capacity]
+        }) {
+            return cached
+        }
+
+        let flowLM = model.flow_lm
+        let flowDType = state.flowDType
+        let useExactGELU = state.useExactGELU
+        let eosThreshold = state.eosThreshold
+        let numLayers = state.numLayers
+        let invSteps = MLXArray(Float(1.0) / Float(state.lsdDecodeSteps)).asType(flowDType)
+        let timeConds = state.timeConds
+        let condEmb = state.conditioningEmbedding
+        let posWrite = MLXArray(0..<Int32(capacity)).reshaped([1, 1, capacity, 1])
+        let posMask = MLXArray(0..<Int32(capacity)).reshaped([1, 1, 1, capacity])
+        let zeroMaskVal = MLXArray(Float(0)).asType(flowDType)
+        let negInfMaskVal = MLXArray(Float(-1e9)).asType(flowDType)
+        eval(posWrite, posMask, zeroMaskVal, negInfMaskVal)
+
+        let fn = compile(
+            inputs: [flowLM],
+            outputs: [],
+            shapeless: false
+        ) { (args: [MLXArray]) -> [MLXArray] in
+            var keys: [MLXArray] = []
+            var values: [MLXArray] = []
+            keys.reserveCapacity(numLayers)
+            values.reserveCapacity(numLayers)
+            for i in 0..<numLayers {
+                keys.append(args[3 + i * 2])
+                values.append(args[4 + i * 2])
+            }
+
+            let (nextLatent, isEos) = traceSingleFlowStep(
+                sequence: args[0],
+                noise: args[1],
+                offsetArray: args[2],
+                keys: &keys,
+                values: &values,
+                flowLM: flowLM,
+                flowDType: flowDType,
+                useExactGELU: useExactGELU,
+                eosThreshold: eosThreshold,
+                invSteps: invSteps,
+                timeConds: timeConds,
+                condEmb: condEmb,
+                posWrite: posWrite,
+                posMask: posMask,
+                zeroMaskVal: zeroMaskVal,
+                negInfMaskVal: negInfMaskVal
+            )
+
+            var outputs: [MLXArray] = []
+            outputs.reserveCapacity(2 + numLayers * 2)
+            outputs.append(nextLatent)
+            outputs.append(isEos)
+            for i in 0..<numLayers {
+                outputs.append(keys[i])
+                outputs.append(values[i])
+            }
+            return outputs
+        }
+
+        cacheLock.withLock {
+            cacheStore.compiledStates[modelID]?.compiledStepsByCapacity[capacity] = fn
+        }
+        return fn
+    }
+
+    private static func compiledFlowStep4(
+        for model: PocketTTSModel,
+        state: CompiledModelState,
+        capacity: Int
+    ) -> @Sendable ([MLXArray]) -> [MLXArray] {
+        let modelID = ObjectIdentifier(model)
+        if let cached = cacheLock.withLock({
+            cacheStore.compiledStates[modelID]?.compiledQuadStepsByCapacity[capacity]
+        }) {
+            return cached
+        }
+
+        let flowLM = model.flow_lm
+        let flowDType = state.flowDType
+        let useExactGELU = state.useExactGELU
+        let eosThreshold = state.eosThreshold
+        let numLayers = state.numLayers
+        let invSteps = MLXArray(Float(1.0) / Float(state.lsdDecodeSteps)).asType(flowDType)
+        let timeConds = state.timeConds
+        let condEmb = state.conditioningEmbedding
+        let posWrite = MLXArray(0..<Int32(capacity)).reshaped([1, 1, capacity, 1])
+        let posMask = MLXArray(0..<Int32(capacity)).reshaped([1, 1, 1, capacity])
+        let zeroMaskVal = MLXArray(Float(0)).asType(flowDType)
+        let negInfMaskVal = MLXArray(Float(-1e9)).asType(flowDType)
+        eval(posWrite, posMask, zeroMaskVal, negInfMaskVal)
+
+        let fn = compile(
+            inputs: [flowLM],
+            outputs: [],
+            shapeless: false
+        ) { (args: [MLXArray]) -> [MLXArray] in
+            var sequence = args[0]
+            let noise4 = args[1]
+            var keys: [MLXArray] = []
+            var values: [MLXArray] = []
+            keys.reserveCapacity(numLayers)
+            values.reserveCapacity(numLayers)
+            for i in 0..<numLayers {
+                keys.append(args[2 + quadStepSize + i * 2])
+                values.append(args[3 + quadStepSize + i * 2])
+            }
+
+            var latents: [MLXArray] = []
+            var eosFlags: [MLXArray] = []
+            latents.reserveCapacity(quadStepSize)
+            eosFlags.reserveCapacity(quadStepSize)
+
+            for sub in 0..<quadStepSize {
+                let (nextLatent, isEos) = traceSingleFlowStep(
+                    sequence: sequence,
+                    noise: noise4[sub],
+                    offsetArray: args[2 + sub],
+                    keys: &keys,
+                    values: &values,
+                    flowLM: flowLM,
+                    flowDType: flowDType,
+                    useExactGELU: useExactGELU,
+                    eosThreshold: eosThreshold,
+                    invSteps: invSteps,
+                    timeConds: timeConds,
+                    condEmb: condEmb,
+                    posWrite: posWrite,
+                    posMask: posMask,
+                    zeroMaskVal: zeroMaskVal,
+                    negInfMaskVal: negInfMaskVal
+                )
+                latents.append(nextLatent)
+                eosFlags.append(isEos)
+                sequence = nextLatent
+            }
+
+            var outputs: [MLXArray] = []
+            outputs.reserveCapacity(2 + numLayers * 2)
+            outputs.append(concatenated(latents, axis: 1))
+            outputs.append(stacked(eosFlags, axis: 0))
+            for i in 0..<numLayers {
+                outputs.append(keys[i])
+                outputs.append(values[i])
+            }
+            return outputs
+        }
+
+        cacheLock.withLock {
+            cacheStore.compiledStates[modelID]?.compiledQuadStepsByCapacity[capacity] = fn
+        }
+        return fn
     }
 
     @inline(__always)
-    private static func fastAttention(
-        _ attn: PocketStreamingMultiheadAttention,
-        query: MLXArray,
-        cache: KVCacheSimple
+    private static func offsetScalar(_ offset: Int, cached: [MLXArray]) -> MLXArray {
+        if offset >= 0 && offset < cached.count {
+            return cached[offset]
+        }
+        return MLXArray(Int32(offset))
+    }
+
+    private static func runPrefillTransformer(
+        _ transformer: PocketStreamingTransformer,
+        input: MLXArray,
+        keys: inout [MLXArray],
+        values: inout [MLXArray],
+        offset: inout Int,
+        computeDType: DType,
+        useExactGELU: Bool
     ) -> MLXArray {
-        let b = query.shape[0]
-        let t = query.shape[1]
-        let numHeads = attn.numHeads
-        let headDim = attn.headDim
+        let t = input.shape[1]
+        let currentOffset = offset
+        var h = input.asType(computeDType)
 
-        let projected = attn.in_proj(query).reshaped([b, t, 3, numHeads, headDim])
-        var q = swappedAxes(projected[0..., 0..., 0, 0..., 0...], 1, 2)
-        var k = swappedAxes(projected[0..., 0..., 1, 0..., 0...], 1, 2)
-        let v = swappedAxes(projected[0..., 0..., 2, 0..., 0...], 1, 2)
+        for (layerIdx, layer) in transformer.layers.enumerated() {
+            let attn = layer.self_attn
+            let norm1Out = layer.norm1(h).asType(computeDType)
+            let projected = attn.in_proj(norm1Out)
+                .reshaped([1, t, 3, attn.numHeads, attn.headDim])
+            var q = swappedAxes(projected[0..., 0..., 0, 0..., 0...], 1, 2)
+            var k = swappedAxes(projected[0..., 0..., 1, 0..., 0...], 1, 2)
+            let v = swappedAxes(projected[0..., 0..., 2, 0..., 0...], 1, 2)
 
-        let offset = cache.offset
-        let base = Float(attn.rope.maxPeriod)
-        q = MLXFast.RoPE(q, dimensions: headDim, traditional: true, base: base, scale: 1.0, offset: offset)
-        k = MLXFast.RoPE(k, dimensions: headDim, traditional: true, base: base, scale: 1.0, offset: offset)
+            let base = Float(attn.rope.maxPeriod)
+            q = MLXFast.RoPE(
+                q,
+                dimensions: attn.headDim,
+                traditional: true,
+                base: base,
+                scale: 1.0,
+                offset: currentOffset
+            )
+            k = MLXFast.RoPE(
+                k,
+                dimensions: attn.headDim,
+                traditional: true,
+                base: base,
+                scale: 1.0,
+                offset: currentOffset
+            )
 
-        let (kFull, vFull) = cache.update(keys: k, values: v)
-        let maskMode: MLXFast.ScaledDotProductAttentionMaskMode = t == 1 ? .none : .causal
-        let out = MLXFast.scaledDotProductAttention(
-            queries: q,
-            keys: kFull,
-            values: vFull,
-            scale: attn.scale,
-            mask: maskMode
-        )
-        let merged = swappedAxes(out, 1, 2).reshaped([b, t, attn.embedDim])
-        return attn.out_proj(merged)
+            let kFull: MLXArray
+            let vFull: MLXArray
+            if layerIdx < keys.count {
+                kFull = concatenated([keys[layerIdx], k], axis: 2)
+                vFull = concatenated([values[layerIdx], v], axis: 2)
+                keys[layerIdx] = kFull
+                values[layerIdx] = vFull
+            } else {
+                kFull = k
+                vFull = v
+                keys.append(kFull)
+                values.append(vFull)
+            }
+
+            let maskMode: MLXFast.ScaledDotProductAttentionMaskMode = t == 1 ? .none : .causal
+            let out = MLXFast.scaledDotProductAttention(
+                queries: q,
+                keys: kFull,
+                values: vFull,
+                scale: attn.scale,
+                mask: maskMode
+            )
+            let merged = swappedAxes(out, 1, 2).reshaped([1, t, attn.embedDim])
+            let projectedOut = attn.out_proj(merged)
+            if let scale1 = layer.layer_scale_1 {
+                h = h + scale1(projectedOut).asType(computeDType)
+            } else {
+                h = h + projectedOut
+            }
+
+            let norm2Out = layer.norm2(h).asType(computeDType)
+            let hidden = layer.linear1(norm2Out)
+            let ff = layer.linear2(useExactGELU ? gelu(hidden) : geluApproximate(hidden))
+            if let scale2 = layer.layer_scale_2 {
+                h = h + scale2(ff).asType(computeDType)
+            } else {
+                h = h + ff
+            }
+        }
+
+        offset = currentOffset + t
+        return h
     }
 
     // MARK: - Voice Conditioning & KV-Cache Snapshots
@@ -526,30 +1255,12 @@ enum PocketTTSStreamRunner {
             referenceAudio: referenceAudio
         )
         let compiled = compiledModelState(for: model)
-        let state = try initialState(
+        let snapshot = try initialVoiceState(
             model: model,
             conditioning: conditioning,
-            useExactGELU: compiled.useExactGELU
+            compiled: compiled
         )
-        let promptNumFrames = flowCacheNumFrames(state)
-        var layerStates: [(keys: MLXArray, values: MLXArray)] = []
-        layerStates.reserveCapacity(state.flowCache.count)
-        var arraysToEval: [MLXArray] = []
-        arraysToEval.reserveCapacity(state.flowCache.count * 2)
-        for cache in state.flowCache {
-            let entries = cache.state
-            guard entries.count == 2 else { continue }
-            layerStates.append((entries[0], entries[1]))
-            arraysToEval.append(entries[0])
-            arraysToEval.append(entries[1])
-        }
-        if !arraysToEval.isEmpty {
-            eval(arraysToEval)
-        }
-        let snapshot = CachedVoiceState(
-            layerStates: layerStates,
-            promptNumFrames: promptNumFrames
-        )
+
         cacheLock.withLock {
             if cacheStore.voiceStates[key] == nil {
                 cacheStore.voiceStateOrder.append(key)
@@ -563,16 +1274,55 @@ enum PocketTTSStreamRunner {
         return snapshot
     }
 
-    private static func makeState(
-        from cached: CachedVoiceState,
-        model: PocketTTSModel
-    ) -> PocketTTSState {
-        let state = model.initState()
-        for (cache, saved) in zip(state.flowCache, cached.layerStates) {
-            cache.state = [saved.keys, saved.values]
-            cache.offset = cached.promptNumFrames
+    private static func initialVoiceState(
+        model: PocketTTSModel,
+        conditioning rawConditioning: MLXArray,
+        compiled: CompiledModelState
+    ) throws -> CachedVoiceState {
+        var conditioning = rawConditioning
+        if conditioning.ndim == 2 {
+            conditioning = conditioning.expandedDimensions(axis: 0)
         }
-        return state
+        guard conditioning.ndim == 3,
+              conditioning.shape[0] == 1,
+              conditioning.shape[2] == model.flow_lm.dim else {
+            throw runnerError(
+                "Voice embedding must have shape [1, T, \(model.flow_lm.dim)]"
+            )
+        }
+
+        var keys: [MLXArray] = []
+        var values: [MLXArray] = []
+        keys.reserveCapacity(compiled.numLayers)
+        values.reserveCapacity(compiled.numLayers)
+        var offset = 0
+
+        if conditioning.shape[1] > 0 {
+            _ = runPrefillTransformer(
+                model.flow_lm.transformer,
+                input: conditioning.asType(compiled.flowDType),
+                keys: &keys,
+                values: &values,
+                offset: &offset,
+                computeDType: compiled.flowDType,
+                useExactGELU: compiled.useExactGELU
+            )
+        } else {
+            let numHeads = model.flow_lm.transformer.numHeads
+            let headDim = model.flow_lm.transformer.headDim
+            for _ in 0..<compiled.numLayers {
+                let empty = MLXArray.zeros([1, numHeads, 0, headDim], dtype: compiled.flowDType)
+                keys.append(empty)
+                values.append(empty)
+            }
+        }
+
+        eval(keys + values)
+        return CachedVoiceState(
+            keys: keys,
+            values: values,
+            promptNumFrames: offset
+        )
     }
 
     private static func validateSampling(_ model: PocketTTSModel) throws {
@@ -713,60 +1463,6 @@ enum PocketTTSStreamRunner {
             return mono.expandedDimensions(axis: 0)
         }
         return audio
-    }
-
-    private static func initialState(
-        model: PocketTTSModel,
-        conditioning rawConditioning: MLXArray,
-        useExactGELU: Bool
-    ) throws -> PocketTTSState {
-        var state = model.initState()
-        var conditioning = rawConditioning
-        if conditioning.ndim == 2 {
-            conditioning = conditioning.expandedDimensions(axis: 0)
-        }
-        guard conditioning.ndim == 3,
-              conditioning.shape[0] == 1,
-              conditioning.shape[2] == model.flow_lm.dim else {
-            throw runnerError(
-                "Voice embedding must have shape [1, T, \(model.flow_lm.dim)]"
-            )
-        }
-        if conditioning.shape[1] > 0 {
-            _ = runTransformer(
-                model.flow_lm.transformer,
-                input: conditioning.asType(.float32),
-                cache: state.flowCache,
-                useExactGELU: useExactGELU
-            )
-            _ = MLXRandom.normal([1, model.flow_lm.ldim])
-        }
-        sliceFlowCache(&state, to: conditioning.shape[1])
-        return state
-    }
-
-    private static func sliceFlowCache(_ state: inout PocketTTSState, to length: Int) {
-        let targetLength = max(length, 0)
-        for cache in state.flowCache {
-            let entries = cache.state
-            guard entries.count == 2 else { continue }
-            let keys = entries[0]
-            let values = entries[1]
-            let end = min(targetLength, keys.shape[2])
-            let slicedKeys = keys[.ellipsis, ..<end, 0...]
-            let slicedValues = values[.ellipsis, ..<end, 0...]
-            cache.state = [slicedKeys, slicedValues]
-            cache.offset = min(cache.offset, end)
-        }
-    }
-
-    private static func flowCacheNumFrames(_ state: PocketTTSState) -> Int {
-        for cache in state.flowCache {
-            let entries = cache.state
-            guard entries.count == 2 else { continue }
-            return min(cache.offset, entries[0].shape[2])
-        }
-        return 0
     }
 
     private static func runnerError(_ message: String) -> NSError {

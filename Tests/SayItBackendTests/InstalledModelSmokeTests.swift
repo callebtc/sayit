@@ -335,11 +335,32 @@ struct InstalledModelSmokeTests {
             in: environment
         )
 
+        let repeats = max(
+            1,
+            auditValue("SAYIT_MODEL_AUDIT_REPEATS", in: environment).flatMap(Int.init) ?? 1
+        )
+        let shouldPreload = environment["SAYIT_MODEL_AUDIT_PRELOAD"] == "1"
+
         for voice in voices {
             let voiceName = voice ?? "none"
             let language = auditLanguage
                 ?? model.inferredLanguage(forPresetVoice: voice)
                 ?? model.defaultLanguage
+            if shouldPreload {
+                let preloadStart = ContinuousClock.now
+                await synthesizer.preloadModel(
+                    model,
+                    voice: voice,
+                    voiceReference: voiceReference,
+                    language: language
+                )
+                await synthesizer.waitForActiveOperation()
+                let preloadElapsed = preloadStart.duration(to: .now)
+                let preloadSeconds = Double(preloadElapsed.components.seconds)
+                    + Double(preloadElapsed.components.attoseconds) / 1e18
+                print("MODEL_AUDIT_PRELOAD id=\(model.id.rawValue) voice=\(voiceName) seconds=\(preloadSeconds)")
+            }
+            for iteration in 1...repeats {
             let request = SpeechRequest(
                 cleanedText: CleanedText(
                     text: auditText ?? sampleText(for: model, language: language),
@@ -464,6 +485,7 @@ struct InstalledModelSmokeTests {
             print(
                 "MODEL_AUDIT_RESULT id=\(model.id.rawValue) "
                     + "voice=\(voiceName) "
+                    + "run=\(iteration) "
                     + "samples=\(samples.count) rate=\(sampleRate) "
                     + "duration=\(audioDuration) peak=\(peak) rms=\(rms) "
                     + "elapsed=\(seconds) firstAudio=\(firstAudioSeconds ?? -1) "
@@ -511,6 +533,7 @@ struct InstalledModelSmokeTests {
                     encoding: .utf8
                 )
                 print("MODEL_AUDIT_OUTPUT path=\(outputURL.path)")
+            }
             }
         }
         await synthesizer.unloadModel()
