@@ -1,3 +1,4 @@
+import Accelerate
 @preconcurrency import AVFoundation
 import Foundation
 
@@ -12,6 +13,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
     private static let kokoroTokenBudget = 500
     private static let minimumListItemPause: TimeInterval = 0.25
+    private static let maxCachedReferenceAudios = 4
+    private static let maxCachedQwen3Conditionings = 4
+    private static let fastStartFirstChunkTarget = 160
+    private static let fastStartFirstChunkThreshold = 200
     // MLX Audio caps Orpheus at 1,200 audio tokens, roughly 15 seconds.
     // Short inputs let each request reach EOS instead of truncating mid-block.
     static let orpheusChunker = TextChunker(
@@ -26,6 +31,21 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let id: UInt64
         let cancel: @Sendable () -> Void
         let completion: Task<Void, Never>
+        let preloadingModelID: ModelID?
+    }
+
+    private struct ReferenceAudioCacheKey: Hashable {
+        let path: String
+        let sampleRate: Int
+        let fileSize: Int64
+        let modifiedTimeInterval: TimeInterval
+    }
+
+    private struct Qwen3ConditioningCacheKey: Hashable {
+        let modelID: ObjectIdentifier
+        let audioID: ObjectIdentifier
+        let transcript: String
+        let language: String
     }
 
     private let modelURLProvider: ModelURLProvider
@@ -38,7 +58,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private var loadedModelURL: URL?
     private var loadedTextProcessor: (any TextProcessor)?
     private var retainedReferenceAudio: MLXArray?
+    private var referenceAudioCache: [ReferenceAudioCacheKey: MLXArray] = [:]
+    private var referenceAudioCacheOrder: [ReferenceAudioCacheKey] = []
+    private var qwen3ConditioningCache: [Qwen3ConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning] = [:]
+    private var qwen3ConditioningCacheOrder: [Qwen3ConditioningCacheKey] = []
     private var operationGeneration: UInt64 = 0
+    private var requestArrivalOrder: UInt64 = 0
     private var activeOperation: ActiveOperation?
     private var idleUnloadTask: Task<Void, Never>?
 
@@ -63,6 +88,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
+        requestArrivalOrder &+= 1
+        let arrivalOrder = requestArrivalOrder
+        if let active = activeOperation, active.preloadingModelID == request.model.id {
+            await waitForOperationToFinish(active)
+            guard arrivalOrder == requestArrivalOrder else {
+                return cancelledStream()
+            }
+        }
+
         let (operationID, previousOperation) = reserveOperation()
         await waitForOperationToFinish(previousOperation)
         guard operationID == operationGeneration else {
@@ -95,7 +129,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         activeOperation = ActiveOperation(
             id: operationID,
             cancel: { task.cancel() },
-            completion: task
+            completion: task,
+            preloadingModelID: nil
         )
         continuation.onTermination = { @Sendable _ in
             task.cancel()
@@ -103,12 +138,47 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         return stream
     }
 
+    func preloadModel(
+        _ model: ModelDescriptor,
+        voice: String?,
+        voiceReference: VoiceReference?,
+        language: String?
+    ) async {
+        guard activeOperation == nil else { return }
+        let (operationID, _) = reserveOperation()
+        let task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Self.operationGate.perform {
+                    try await self.performPreload(
+                        model,
+                        voice: voice,
+                        voiceReference: voiceReference,
+                        language: language,
+                        operationID: operationID
+                    )
+                }
+            } catch {
+                // Preloading is opportunistic; real synthesis surfaces errors.
+            }
+            await self.operationDidFinish(operationID)
+        }
+        activeOperation = ActiveOperation(
+            id: operationID,
+            cancel: { task.cancel() },
+            completion: task,
+            preloadingModelID: model.id
+        )
+    }
+
     func cancelCurrentRequest() async {
+        requestArrivalOrder &+= 1
         let previousOperation = invalidateCurrentOperation()
         await waitForOperationToFinish(previousOperation)
     }
 
     func unloadModel() async {
+        requestArrivalOrder &+= 1
         let (operationID, previousOperation) = reserveOperation()
         await waitForOperationToFinish(previousOperation)
         do {
@@ -164,6 +234,69 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         }
     }
 
+    private func performPreload(
+        _ model: ModelDescriptor,
+        voice: String?,
+        voiceReference: VoiceReference?,
+        language: String?,
+        operationID: UInt64
+    ) async throws {
+        try await ensureModelLoaded(model, operationID: operationID)
+        try checkOperation(operationID)
+        guard let loadedModel else { return }
+
+        if let pocketTTS = loadedModel as? PocketTTSModel,
+           let modelURL = loadedModelURL {
+            let embeddingVoice = try? phononEmbeddingVoice(voiceReference, model: model)
+            let referenceAudio: MLXArray?
+            if let voiceReference, voiceReference.kind == .audio {
+                referenceAudio = try? cachedReferenceAudio(
+                    from: voiceReference.audioURL,
+                    targetSampleRate: Double(loadedModel.sampleRate)
+                )
+            } else {
+                referenceAudio = nil
+            }
+            if let referenceAudio {
+                retainedReferenceAudio = referenceAudio
+            }
+            try? PocketTTSStreamRunner.warmVoice(
+                model: pocketTTS,
+                modelFolder: modelURL,
+                voice: embeddingVoice ?? (referenceAudio == nil ? voice : nil),
+                referenceAudio: referenceAudio
+            )
+        } else if let cachingProcessor = loadedTextProcessor as? CachingTextProcessor {
+            let modelType = model.modelType.lowercased()
+            if modelType == "kokoro" || modelType == "kokoro_tts" {
+                let targetLanguage = language
+                    ?? voice.flatMap(KokoroMultilingualProcessor.languageForVoice)
+                    ?? "en-us"
+                try? await cachingProcessor.prepare(for: targetLanguage)
+            } else if modelType == "kitten" || modelType == "kitten_tts" {
+                try? await cachingProcessor.prepare()
+            }
+        } else if let qwen3 = loadedModel as? Qwen3TTSModel,
+                  let voiceReference,
+                  voiceReference.kind == .audio,
+                  let transcript = voiceReference.transcript,
+                  !transcript.isEmpty,
+                  let referenceAudio = try? cachedReferenceAudio(
+                      from: voiceReference.audioURL,
+                      targetSampleRate: Double(loadedModel.sampleRate)
+                  ) {
+            retainedReferenceAudio = referenceAudio
+            _ = try? cachedQwen3Conditioning(
+                for: qwen3,
+                referenceAudio: referenceAudio,
+                transcript: transcript,
+                language: language
+            )
+        }
+        try checkOperation(operationID)
+        synchronizeMLXAfterSuccess()
+    }
+
     func generateVoiceSample(
         model: ModelDescriptor,
         text: String,
@@ -172,6 +305,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         seed: UInt64,
         reference: VoiceReference? = nil
     ) async throws -> GeneratedVoiceSample {
+        requestArrivalOrder &+= 1
+        let arrivalOrder = requestArrivalOrder
+        if let active = activeOperation, active.preloadingModelID == model.id {
+            await waitForOperationToFinish(active)
+            guard arrivalOrder == requestArrivalOrder else {
+                throw CancellationError()
+            }
+        }
+
         let (operationID, previousOperation) = reserveOperation()
         await waitForOperationToFinish(previousOperation)
         guard operationID == operationGeneration else {
@@ -207,7 +349,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         activeOperation = ActiveOperation(
             id: operationID,
             cancel: { resultTask.cancel() },
-            completion: completion
+            completion: completion,
+            preloadingModelID: nil
         )
 
         return try await withTaskCancellationHandler {
@@ -238,7 +381,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         var referenceAudio: MLXArray?
         let embeddingVoice = try phononEmbeddingVoice(reference, model: model)
         if let reference, reference.kind == .audio {
-            let audio = try loadReferenceAudio(
+            let audio = try cachedReferenceAudio(
                 from: reference.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
             )
@@ -350,7 +493,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let embeddingVoice = try phononEmbeddingVoice(request.voiceReference, model: request.model)
         var referenceAudio = try request.voiceReference.flatMap { reference -> MLXArray? in
             guard reference.kind == .audio else { return nil }
-            return try loadReferenceAudio(
+            return try cachedReferenceAudio(
                 from: reference.audioURL,
                 targetSampleRate: Double(loadedModel.sampleRate)
             )
@@ -409,7 +552,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let paragraphBreakStartOffsets = Set(
             request.cleanedText.paragraphBreakStartOffsets ?? []
         )
-        let usesShortChunks = ["orpheus", "orpheus_tts"].contains(request.model.modelType.lowercased())
+        let modelTypeLower = request.model.modelType.lowercased()
+        let usesShortChunks = ["orpheus", "orpheus_tts"].contains(modelTypeLower)
         var chunks = try (usesShortChunks ? Self.orpheusChunker : chunker).chunks(
             for: request.cleanedText.text,
             separatesParagraphs: usesShortChunks || request.voiceMode == .randomPerParagraph,
@@ -417,9 +561,23 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             paragraphBreakStartOffsets: paragraphBreakStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
+        if !chunks.isEmpty,
+           Self.usesFastStartFirstChunk(modelType: modelTypeLower) {
+            let split = chunker.splitFirstChunkForFastStart(
+                chunks[0],
+                targetCharacterCount: Self.fastStartFirstChunkTarget,
+                minimumLengthToSplit: Self.fastStartFirstChunkThreshold
+            )
+            if split.count > 1 {
+                chunks.replaceSubrange(0...0, with: split)
+            }
+        }
         var conditioner = try PCMStreamConditioner(
             sampleRate: Double(loadedModel.sampleRate)
         )
+        let streamingInterval: Double = request.model.playbackMode == .progressive ? 0.32 : 0.8
+        let emitsAdaptiveProgress = loadedModel is DramaLibraryModel
+            || request.model.playbackMode == .adaptive
         var chunkCursor = 0
         var completedChunkCount = 0
         var generatedSamples = 0
@@ -517,7 +675,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     continuation.yield(.audio(audio))
                     chunkSamples += conditioned.count
                     generatedSamples += conditioned.count
-                    if loadedModel is DramaLibraryModel {
+                    if emitsAdaptiveProgress {
                         // Observe existing output only; sampling and PCM stay unchanged.
                         let elapsed = start.duration(to: .now)
                         let seconds = Double(elapsed.components.seconds)
@@ -578,6 +736,21 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         )
                     try checkOperation(operationID)
                     try emit(samples)
+                } else if let drama = loadedModel as? DramaLibraryModel {
+                    let stream = SerializedSpeechModel(drama)
+                        .generateDramaSamplesStream(
+                            text: chunk.text,
+                            referenceAudio: SerializedMLXArray(
+                                usesReference ? referenceAudio : nil
+                            ),
+                            refText: usesReference ? referenceText : nil,
+                            generationParameters: parameters,
+                            streamingFrames: chunkCursor == 0 ? 16 : 24
+                        )
+                    for try await samples in stream {
+                        try checkOperation(operationID)
+                        try emit(samples)
+                    }
                 } else if let pocketTTS = loadedModel as? PocketTTSModel,
                           let modelURL = loadedModelURL {
                     let stream = PocketTTSStreamRunner.generateSamplesStream(
@@ -587,9 +760,30 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         voice: voiceArgument,
                         referenceAudio: usesReference ? referenceAudio : nil,
                         generationParameters: parameters,
-                        streamingInterval: request.model.playbackMode
-                            == .progressive ? 0.32 : 2
+                        streamingInterval: streamingInterval
                     )
+                    for try await samples in stream {
+                        try checkOperation(operationID)
+                        try emit(samples)
+                    }
+                } else if let qwen3 = loadedModel as? Qwen3TTSModel,
+                          usesReference,
+                          let referenceAudio,
+                          let referenceText,
+                          !referenceText.isEmpty {
+                    let conditioning = try cachedQwen3Conditioning(
+                        for: qwen3,
+                        referenceAudio: referenceAudio,
+                        transcript: referenceText,
+                        language: request.language
+                    )
+                    let stream = SerializedSpeechModel(qwen3)
+                        .generateQwen3SamplesStream(
+                            text: chunk.text,
+                            conditioning: conditioning,
+                            generationParameters: parameters,
+                            streamingInterval: streamingInterval
+                        )
                     for try await samples in stream {
                         try checkOperation(operationID)
                         try emit(samples)
@@ -605,8 +799,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         refText: usesReference ? referenceText : nil,
                         language: request.language,
                         generationParameters: parameters,
-                        streamingInterval: request.model.playbackMode
-                            == .progressive ? 0.32 : 2
+                        streamingInterval: streamingInterval
                     )
                     for try await samples in stream {
                         try checkOperation(operationID)
@@ -677,6 +870,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         continuation.finish()
     }
 
+    private static func usesFastStartFirstChunk(modelType: String) -> Bool {
+        switch modelType {
+        case "kokoro", "kokoro_tts", "kitten", "kitten_tts", "omnivoice", "soprano", "soprano_tts":
+            true
+        default:
+            false
+        }
+    }
+
     private func applyModelSpecificTuning(
         _ tuning: VoiceSynthesisTuning?,
         to model: SpeechGenerationModel
@@ -710,9 +912,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     ) -> (any TextProcessor)? {
         switch model.modelType.lowercased() {
         case "kokoro", "kokoro_tts":
-            KokoroMultilingualProcessor()
+            CachingTextProcessor(KokoroMultilingualProcessor())
         case "kitten", "kitten_tts":
-            MisakiTextProcessor()
+            CachingTextProcessor(MisakiTextProcessor())
         default:
             nil
         }
@@ -807,30 +1009,97 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let shortText: String
         switch normalized.split(separator: "-").first {
         case "zh":
-            shortText = "清晨的阳光轻轻落在安静的房间里，远处传来鸟儿清脆的歌声。"
+            shortText = "清晨的阳光轻轻落在安静的房间里。"
         case "ja":
-            shortText = "朝の光が静かな部屋にやさしく差し込み、遠くで鳥の声が聞こえました。"
+            shortText = "朝の光が静かな部屋にやさしく差し込みました。"
         case "ko":
-            shortText = "아침 햇살이 조용한 방 안으로 부드럽게 스며들고 멀리서 새소리가 들렸습니다."
+            shortText = "아침 햇살이 조용한 방 안으로 부드럽게 스며들었습니다."
         case "de":
-            shortText = "Das Morgenlicht fiel sanft in den stillen Raum, während draußen die ersten Vögel sangen."
+            shortText = "Das Morgenlicht fiel sanft in den stillen Raum."
         case "fr":
-            shortText = "La lumière du matin entrait doucement dans la pièce calme, tandis que les oiseaux chantaient au loin."
+            shortText = "La lumière du matin entrait doucement dans la pièce."
         case "es":
-            shortText = "La luz de la mañana entraba suavemente en la habitación tranquila mientras cantaban los pájaros."
+            shortText = "La luz de la mañana entraba suavemente en la sala."
         case "it":
-            shortText = "La luce del mattino entrava dolcemente nella stanza tranquilla mentre gli uccelli cantavano."
+            shortText = "La luce del mattino entrava dolcemente nella stanza."
         case "pt":
-            shortText = "A luz da manhã entrava suavemente na sala tranquila enquanto os pássaros cantavam ao longe."
+            shortText = "A luz da manhã entrava suavemente na sala tranquila."
         case "ru":
-            shortText = "Утренний свет мягко наполнял тихую комнату, а вдали уже пели первые птицы."
+            shortText = "Утренний свет мягко наполнял тихую комнату."
         default:
-            shortText = "Morning light settled softly across the quiet room while the first birds began to sing outside."
+            shortText = "Morning light settled softly across the quiet room."
         }
         if modelType.lowercased() == "fish_speech" {
             return "\(shortText) The day felt unhurried, clear, and full of small possibilities."
         }
         return shortText
+    }
+
+    private func cachedReferenceAudio(
+        from url: URL,
+        targetSampleRate: Double
+    ) throws -> MLXArray {
+        let standardized = url.standardizedFileURL
+        let resourceValues = try? standardized.resourceValues(
+            forKeys: [.fileSizeKey, .contentModificationDateKey]
+        )
+        let cacheKey = ReferenceAudioCacheKey(
+            path: standardized.path,
+            sampleRate: Int(targetSampleRate.rounded()),
+            fileSize: Int64(resourceValues?.fileSize ?? -1),
+            modifiedTimeInterval: resourceValues?.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0
+        )
+        if let cached = referenceAudioCache[cacheKey] {
+            if let existingIndex = referenceAudioCacheOrder.firstIndex(of: cacheKey) {
+                referenceAudioCacheOrder.remove(at: existingIndex)
+            }
+            referenceAudioCacheOrder.append(cacheKey)
+            return cached
+        }
+        let loaded = try loadReferenceAudio(
+            from: standardized,
+            targetSampleRate: targetSampleRate
+        )
+        referenceAudioCache[cacheKey] = loaded
+        referenceAudioCacheOrder.append(cacheKey)
+        if referenceAudioCacheOrder.count > Self.maxCachedReferenceAudios {
+            let evicted = referenceAudioCacheOrder.removeFirst()
+            referenceAudioCache.removeValue(forKey: evicted)
+        }
+        return loaded
+    }
+
+    private func cachedQwen3Conditioning(
+        for model: Qwen3TTSModel,
+        referenceAudio: MLXArray,
+        transcript: String,
+        language: String?
+    ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
+        let key = Qwen3ConditioningCacheKey(
+            modelID: ObjectIdentifier(model),
+            audioID: ObjectIdentifier(referenceAudio),
+            transcript: transcript,
+            language: language ?? "auto"
+        )
+        if let cached = qwen3ConditioningCache[key] {
+            if let existingIndex = qwen3ConditioningCacheOrder.firstIndex(of: key) {
+                qwen3ConditioningCacheOrder.remove(at: existingIndex)
+            }
+            qwen3ConditioningCacheOrder.append(key)
+            return cached
+        }
+        let prepared = try model.prepareReferenceConditioning(
+            refAudio: referenceAudio,
+            refText: transcript,
+            language: language
+        )
+        qwen3ConditioningCache[key] = prepared
+        qwen3ConditioningCacheOrder.append(key)
+        if qwen3ConditioningCacheOrder.count > Self.maxCachedQwen3Conditionings {
+            let evicted = qwen3ConditioningCacheOrder.removeFirst()
+            qwen3ConditioningCache.removeValue(forKey: evicted)
+        }
+        return prepared
     }
 
     private func loadReferenceAudio(
@@ -851,12 +1120,32 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             throw SynthesisError.invalidReferenceAudio
         }
         let count = Int(buffer.frameLength)
+        guard count > 0 else {
+            throw SynthesisError.invalidReferenceAudio
+        }
         let channelCount = Int(buffer.format.channelCount)
         var mono = [Float](repeating: 0, count: count)
-        for channelIndex in 0..<channelCount {
-            for sampleIndex in 0..<count {
-                mono[sampleIndex] += channels[channelIndex][sampleIndex]
-                    / Float(channelCount)
+        if channelCount == 1 {
+            mono.withUnsafeMutableBufferPointer { dst in
+                dst.baseAddress?.update(from: channels[0], count: count)
+            }
+        } else {
+            var scale = 1.0 / Float(channelCount)
+            mono.withUnsafeMutableBufferPointer { dst in
+                guard let dstBase = dst.baseAddress else { return }
+                vDSP_vsmul(channels[0], 1, &scale, dstBase, 1, vDSP_Length(count))
+                for channelIndex in 1..<channelCount {
+                    vDSP_vsma(
+                        channels[channelIndex],
+                        1,
+                        &scale,
+                        dstBase,
+                        1,
+                        dstBase,
+                        1,
+                        vDSP_Length(count)
+                    )
+                }
             }
         }
         let sourceRate = buffer.format.sampleRate
@@ -868,15 +1157,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             1
         )
         var resampled = [Float](repeating: 0, count: outputCount)
-        for outputIndex in 0..<outputCount {
-            let sourcePosition = Double(outputIndex) * sourceRate
-                / targetSampleRate
-            let lower = min(Int(sourcePosition), mono.count - 1)
-            let upper = min(lower + 1, mono.count - 1)
-            let fraction = Float(sourcePosition - Double(lower))
-            resampled[outputIndex] =
-                mono[lower] * (1 - fraction) + mono[upper] * fraction
-        }
+        let step = Float(sourceRate / targetSampleRate)
+        let maxIndex = Float(mono.count - 1)
+        var positions = [Float](repeating: 0, count: outputCount)
+        var start: Float = 0
+        var increment = step
+        vDSP_vramp(&start, &increment, &positions, 1, vDSP_Length(outputCount))
+        var minVal: Float = 0
+        var maxVal = maxIndex
+        vDSP_vclip(positions, 1, &minVal, &maxVal, &positions, 1, vDSP_Length(outputCount))
+        vDSP_vlint(mono, positions, 1, &resampled, 1, vDSP_Length(outputCount), vDSP_Length(mono.count))
         return MLXArray(resampled)
     }
 
@@ -902,7 +1192,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     KokoroMultilingualProcessor.languageForVoice
                 )
                 ?? "en-us"
-            if let processor =
+            if let caching = loadedTextProcessor as? CachingTextProcessor {
+                try await caching.prepare(for: language)
+            } else if let processor =
                 loadedTextProcessor as? KokoroMultilingualProcessor {
                 try await processor.prepare(for: language)
             }
@@ -1033,9 +1325,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 operationID: operationID,
                 continuation: continuation
             )
-            synchronizeMLXIfLoaded()
+            synchronizeMLXAfterSuccess()
         } catch {
-            synchronizeMLXIfLoaded()
+            synchronizeAndClearMLXCache()
             throw error
         }
     }
@@ -1073,10 +1365,10 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 reference: reference,
                 operationID: operationID
             )
-            synchronizeMLXIfLoaded()
+            synchronizeMLXAfterSuccess()
             return result
         } catch {
-            synchronizeMLXIfLoaded()
+            synchronizeAndClearMLXCache()
             throw error
         }
     }
@@ -1087,6 +1379,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     }
 
     private func releaseLoadedModel() {
+        if let pocketTTS = loadedModel as? PocketTTSModel {
+            PocketTTSStreamRunner.clearCaches(for: pocketTTS)
+        }
+        if let caching = loadedTextProcessor as? CachingTextProcessor {
+            caching.clearCache()
+        }
+        qwen3ConditioningCache.removeAll(keepingCapacity: false)
+        qwen3ConditioningCacheOrder.removeAll(keepingCapacity: false)
+        referenceAudioCache.removeAll(keepingCapacity: false)
+        referenceAudioCacheOrder.removeAll(keepingCapacity: false)
         guard loadedModel != nil || retainedReferenceAudio != nil else {
             loadedModelID = nil
             loadedModelURL = nil
@@ -1102,7 +1404,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         Memory.clearCache()
     }
 
-    private func synchronizeMLXIfLoaded() {
+    private func synchronizeMLXAfterSuccess() {
+        guard loadedModel != nil || retainedReferenceAudio != nil else { return }
+        Stream.gpu.synchronize()
+    }
+
+    private func synchronizeAndClearMLXCache() {
         guard loadedModel != nil || retainedReferenceAudio != nil else { return }
         Stream.gpu.synchronize()
         Memory.clearCache()
@@ -1224,6 +1531,64 @@ private final class SerializedSpeechModel: @unchecked Sendable {
         let samples = audio.asType(.float32).asArray(Float.self)
         try Task.checkCancellation()
         return samples
+    }
+
+    func generateDramaSamplesStream(
+        text: String,
+        referenceAudio: SerializedMLXArray,
+        refText: String?,
+        generationParameters: GenerateParameters,
+        streamingFrames: Int
+    ) -> AsyncThrowingStream<[Float], Error> {
+        guard let drama = model as? DramaLibraryModel else {
+            return AsyncThrowingStream { $0.finish(throwing: SynthesisError.generatedNoAudio) }
+        }
+        return drama.generateDirectSamplesStream(
+            text: text,
+            refAudio: referenceAudio.value,
+            refText: refText,
+            generationParameters: generationParameters,
+            streamingFrames: streamingFrames
+        )
+    }
+
+    func generateQwen3SamplesStream(
+        text: String,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double
+    ) -> AsyncThrowingStream<[Float], Error> {
+        guard model is Qwen3TTSModel else {
+            return AsyncThrowingStream { $0.finish(throwing: SynthesisError.generatedNoAudio) }
+        }
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    guard let qwen3 = self.model as? Qwen3TTSModel else {
+                        throw SynthesisError.generatedNoAudio
+                    }
+                    let source = qwen3.generateStream(
+                        text: text,
+                        conditioning: conditioning,
+                        generationParameters: generationParameters,
+                        streamingInterval: streamingInterval
+                    )
+                    for try await event in source {
+                        try Task.checkCancellation()
+                        if case .audio(let array) = event {
+                            let samples = array.asType(.float32).asArray(Float.self)
+                            if !samples.isEmpty {
+                                continuation.yield(samples)
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: Task.isCancelled ? CancellationError() : error)
+                }
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
     }
 
     func generateSamplesStream(

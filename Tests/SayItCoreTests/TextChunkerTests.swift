@@ -279,6 +279,39 @@ struct TextChunkerTests {
         )
     }
 
+    @Test("Fast-start splitting breaks a large opening chunk at a sentence boundary")
+    func fastStartSplitsLargeOpeningChunk() throws {
+        let text = "Apple Silicon unifies CPU and GPU memory so neural speech models can run locally without remote servers. When you select text, the app cleans markup, splits it into natural spoken chunks, and streams audio directly to your speakers.\nLatency matters as much as raw throughput."
+        let chunker = TextChunker(targetCharacterCount: 650, hardCharacterLimit: 1_000)
+        let chunks = chunker.chunks(for: text)
+        let first = try #require(chunks.first)
+        let pieces = chunker.splitFirstChunkForFastStart(first)
+
+        #expect(pieces.count == 2)
+        #expect(pieces[0].text == "Apple Silicon unifies CPU and GPU memory so neural speech models can run locally without remote servers.")
+        #expect(pieces[0].startsParagraph == first.startsParagraph)
+        #expect(!pieces[1].startsParagraph)
+        #expect(pieces[0].sourceRange.lowerBound == 0)
+        #expect(pieces[1].sourceRange.upperBound == text.count)
+        #expect(sourceText(in: pieces[0].sourceRange, from: text) == pieces[0].text[...])
+        #expect(sourceText(in: pieces[1].sourceRange, from: text) == pieces[1].text[...])
+    }
+
+    @Test("Fast-start splitting preserves paragraph breaks and leaves short chunks intact")
+    func fastStartPreservesParagraphBreakAndShortChunks() throws {
+        let shortText = "Short opening sentence. Second brief sentence."
+        let chunker = TextChunker()
+        let shortChunk = try #require(chunker.chunks(for: shortText).first)
+        #expect(chunker.splitFirstChunkForFastStart(shortChunk) == [shortChunk])
+
+        let twoParagraphText = "Apple Silicon unifies CPU and GPU memory so neural speech models run locally without uploading private documents.\nWaiting several seconds for the first word makes an interactive reading tool feel sluggish even when throughput is high."
+        let combined = try #require(chunker.chunks(for: twoParagraphText).first)
+        let split = chunker.splitFirstChunkForFastStart(combined)
+        #expect(split.count == 2)
+        #expect(split[0].startsParagraph)
+        #expect(split[1].startsParagraph)
+    }
+
     private func sourceText(
         in range: Range<Int>,
         from text: String

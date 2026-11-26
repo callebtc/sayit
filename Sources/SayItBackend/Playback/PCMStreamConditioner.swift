@@ -41,15 +41,40 @@ struct PCMStreamConditioner: Sendable {
         paragraphPauseFrameCount: Int
     ) throws -> [Float] {
         guard !samples.isEmpty else { return [] }
-        guard samples.allSatisfy(\.isFinite) else {
+
+        let count = samples.count
+        var prevIn = previousInput
+        var prevOut = previousOutput
+        let pole = Self.dcFilterPole
+        var hasInvalidSample = false
+
+        let processed = [Float](unsafeUninitializedCapacity: count) { dst, initializedCount in
+            samples.withUnsafeBufferPointer { src in
+                guard let srcBase = src.baseAddress, let dstBase = dst.baseAddress else {
+                    initializedCount = 0
+                    return
+                }
+                for index in 0..<count {
+                    let sample = srcBase[index]
+                    if !sample.isFinite {
+                        hasInvalidSample = true
+                        initializedCount = index
+                        return
+                    }
+                    let filtered = sample - prevIn + pole * prevOut
+                    prevIn = sample
+                    prevOut = filtered
+                    dstBase[index] = PCMTransitionRamp.safetyLimited(filtered)
+                }
+                initializedCount = count
+            }
+        }
+        if hasInvalidSample {
             throw PlaybackError.invalidSamples
         }
+        previousInput = prevIn
+        previousOutput = prevOut
 
-        var processed: [Float] = []
-        processed.reserveCapacity(samples.count)
-        for sample in samples {
-            processed.append(process(sample))
-        }
         guard let currentLogicalChunkIndex else {
             self.currentLogicalChunkIndex = logicalChunkIndex
             return holdTail(
@@ -60,7 +85,7 @@ struct PCMStreamConditioner: Sendable {
             )
         }
         if currentLogicalChunkIndex == logicalChunkIndex {
-            return holdTail(from: pendingTail + processed)
+            return appendContinuingChunk(processed)
         }
 
         self.currentLogicalChunkIndex = logicalChunkIndex
@@ -78,12 +103,52 @@ struct PCMStreamConditioner: Sendable {
         return PCMTransitionRamp.fadeOut(pendingTail)
     }
 
-    private mutating func process(_ sample: Float) -> Float {
-        let filtered = sample - previousInput
-            + Self.dcFilterPole * previousOutput
-        previousInput = sample
-        previousOutput = filtered
-        return PCMTransitionRamp.safetyLimited(filtered)
+    private mutating func appendContinuingChunk(_ processed: [Float]) -> [Float] {
+        let tailCount = pendingTail.count
+        let incomingCount = processed.count
+        let totalCount = tailCount + incomingCount
+        guard totalCount > boundaryFrameCount else {
+            pendingTail.append(contentsOf: processed)
+            return []
+        }
+
+        let emitCount = totalCount - boundaryFrameCount
+        let output = [Float](unsafeUninitializedCapacity: emitCount) { dst, initializedCount in
+            guard let dstBase = dst.baseAddress else {
+                initializedCount = 0
+                return
+            }
+            let fromTail = min(emitCount, tailCount)
+            if fromTail > 0 {
+                pendingTail.withUnsafeBufferPointer { src in
+                    if let srcBase = src.baseAddress {
+                        dstBase.initialize(from: srcBase, count: fromTail)
+                    }
+                }
+            }
+            let fromIncoming = emitCount - fromTail
+            if fromIncoming > 0 {
+                processed.withUnsafeBufferPointer { src in
+                    if let srcBase = src.baseAddress {
+                        dstBase.advanced(by: fromTail).initialize(from: srcBase, count: fromIncoming)
+                    }
+                }
+            }
+            initializedCount = emitCount
+        }
+
+        if incomingCount >= boundaryFrameCount {
+            let splitIndex = incomingCount - boundaryFrameCount
+            pendingTail = Array(processed[splitIndex...])
+        } else {
+            let keepFromTail = boundaryFrameCount - incomingCount
+            var nextTail: [Float] = []
+            nextTail.reserveCapacity(boundaryFrameCount)
+            nextTail.append(contentsOf: pendingTail[(tailCount - keepFromTail)...])
+            nextTail.append(contentsOf: processed)
+            pendingTail = nextTail
+        }
+        return output
     }
 
     private mutating func holdTail(from samples: [Float]) -> [Float] {

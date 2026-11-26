@@ -6,6 +6,7 @@ import Foundation
 public final class TimeStretchStream {
     public static let engineName = "Sonic"
     private let handle: UnsafeMutableRawPointer
+    private let isIdentityRate: Bool
     private var isFinished = false
 
     public enum Failure: Error {
@@ -20,6 +21,7 @@ public final class TimeStretchStream {
             throw Failure.invalidConfiguration
         }
         self.handle = handle
+        self.isIdentityRate = rate == 1
     }
 
     deinit { sayit_stretch_destroy(handle) }
@@ -28,8 +30,21 @@ public final class TimeStretchStream {
     /// At 1×, samples pass through unchanged.
     public func process(_ samples: [Float], final: Bool = false) throws -> [Float] {
         guard !isFinished else { throw Failure.alreadyFinished }
-        guard samples.count <= Int(Int32.max), samples.allSatisfy(\.isFinite) else {
+        guard samples.count <= Int(Int32.max) else {
             throw Failure.invalidSamples
+        }
+        let allFinite = samples.withUnsafeBufferPointer { buffer in
+            for sample in buffer where !sample.isFinite {
+                return false
+            }
+            return true
+        }
+        guard allFinite else {
+            throw Failure.invalidSamples
+        }
+        if isIdentityRate {
+            isFinished = final
+            return samples
         }
         var count: Int32 = 0
         let result = samples.withUnsafeBufferPointer {
@@ -39,7 +54,13 @@ public final class TimeStretchStream {
         isFinished = final
         guard count > 0, let result else { return [] }
         let output = Array(UnsafeBufferPointer(start: result, count: Int(count)))
-        guard output.allSatisfy(\.isFinite) else { throw Failure.processingFailed }
+        let outputFinite = output.withUnsafeBufferPointer { buffer in
+            for sample in buffer where !sample.isFinite {
+                return false
+            }
+            return true
+        }
+        guard outputFinite else { throw Failure.processingFailed }
         return output
     }
 }

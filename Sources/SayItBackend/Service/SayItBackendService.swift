@@ -267,6 +267,7 @@ public final class SayItBackendService: SayItService {
         )
         diagnosticsRevision &+= 1
         startNextJobIfNeeded()
+        scheduleActiveModelPreload()
     }
 
     public func shutdown() async {
@@ -2571,6 +2572,54 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
+    private func scheduleActiveModelPreload() {
+        guard !isShuttingDown,
+              activeJobID == nil,
+              activeRequest == nil,
+              queuedJobIDs.isEmpty,
+              !isModelTransitionInProgress else {
+            return
+        }
+        let settings = settingsStore.value
+        let activeID = ModelID(settings.activeModelID)
+        guard installedModelIDs.contains(activeID),
+              let model = models.first(where: { $0.id == activeID }) else {
+            return
+        }
+        let selection = settings.voiceSelections[model.id.rawValue]
+            ?? fallbackSelection(settings: settings, model: model)
+        var voice: String?
+        var reference: VoiceReference?
+        switch selection {
+        case .preset(let preset):
+            voice = preset
+        case .profile(let id):
+            if let record = voiceProfiles.record(id: id),
+               record.modelID == model.id.rawValue,
+               let url = try? voiceProfiles.referenceURL(for: record) {
+                reference = record.origin == .importedFile
+                    ? VoiceReference(phononEmbeddingURL: url)
+                    : VoiceReference(audioURL: url, transcript: record.transcript)
+            }
+        case .automaticStable:
+            voice = model.defaultVoice
+        case .randomPerParagraph:
+            break
+        }
+        let language = settings.activeLanguage.isEmpty
+            ? model.defaultLanguage
+            : settings.activeLanguage
+        let synthesizer = self.synthesizer
+        Task {
+            await synthesizer.preloadModel(
+                model,
+                voice: voice,
+                voiceReference: reference,
+                language: language
+            )
+        }
+    }
+
     private func selectModel(_ id: ModelID) async throws {
         guard let model = models.first(where: { $0.id == id }) else {
             throw ServiceFailure(
@@ -2724,6 +2773,7 @@ public final class SayItBackendService: SayItService {
                 )
             )
             diagnosticsRevision &+= 1
+            scheduleActiveModelPreload()
         } catch is CancellationError {
             isModelTransitionInProgress = false
             if !isShuttingDown {

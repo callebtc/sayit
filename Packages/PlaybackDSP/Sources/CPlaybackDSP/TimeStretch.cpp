@@ -8,22 +8,27 @@
 
 namespace {
 struct Stream {
-    sonicStream sonic;
+    sonicStream sonic = nullptr;
     double rate, sampleRate;
     int64_t inputFrames = 0, deliveredFrames = 0;
     bool finished = false;
-    std::vector<float> pending, output;
+    std::vector<float> bounded, pending, output;
+    size_t pendingOffset = 0;
 
     Stream(double sampleRate, double rate) : rate(rate), sampleRate(sampleRate) {
-        sonic = sonicCreateStream(int(sampleRate), 1);
-        if (!sonic) throw std::bad_alloc();
-        sonicSetSpeed(sonic, float(rate));
-        sonicSetPitch(sonic, 1);
-        sonicSetRate(sonic, 1);
-        sonicSetVolume(sonic, 1);
-        sonicSetQuality(sonic, 1);
+        if (rate != 1) {
+            sonic = sonicCreateStream(int(sampleRate), 1);
+            if (!sonic) throw std::bad_alloc();
+            sonicSetSpeed(sonic, float(rate));
+            sonicSetPitch(sonic, 1);
+            sonicSetRate(sonic, 1);
+            sonicSetVolume(sonic, 1);
+            sonicSetQuality(sonic, 1);
+        }
     }
-    ~Stream() { sonicDestroyStream(sonic); }
+    ~Stream() {
+        if (sonic) sonicDestroyStream(sonic);
+    }
 
     void process(const float *input, int count, bool final) {
         if (finished) throw std::runtime_error("Stream already finalized");
@@ -36,7 +41,7 @@ struct Stream {
         } else {
             // Sonic's upstream Float API converts internally to signed 16-bit.
             // Clamp before that conversion to prevent overflow for hot PCM.
-            std::vector<float> bounded(count);
+            bounded.resize(count);
             for (int i = 0; i < count; ++i) bounded[i] = std::clamp(input[i], -1.0f, 1.0f);
             if (!sonicWriteFloatToStream(sonic, bounded.data(), count)) throw std::bad_alloc();
             if (final) {
@@ -47,14 +52,31 @@ struct Stream {
                     || !sonicFlushStream(sonic)) throw std::bad_alloc();
             }
             int available = sonicSamplesAvailable(sonic);
-            auto offset = pending.size();
-            pending.resize(offset + available);
-            if (available && sonicReadFloatFromStream(sonic, pending.data() + offset, available) != available)
-                throw std::runtime_error("Incomplete read");
-            auto keep = std::min<int64_t>(pending.size(), expected - deliveredFrames);
-            output.assign(pending.begin(), pending.begin() + keep);
-            pending.erase(pending.begin(), pending.begin() + keep);
-            deliveredFrames += keep;
+            if (available > 0) {
+                if (pendingOffset > 0 && pendingOffset == pending.size()) {
+                    pending.clear();
+                    pendingOffset = 0;
+                }
+                auto offset = pending.size();
+                pending.resize(offset + available);
+                if (sonicReadFloatFromStream(sonic, pending.data() + offset, available) != available)
+                    throw std::runtime_error("Incomplete read");
+            }
+            auto livePending = int64_t(pending.size() - pendingOffset);
+            auto keep = std::min<int64_t>(livePending, expected - deliveredFrames);
+            if (keep > 0) {
+                auto begin = pending.begin() + ptrdiff_t(pendingOffset);
+                output.assign(begin, begin + ptrdiff_t(keep));
+                pendingOffset += size_t(keep);
+                if (pendingOffset == pending.size()) {
+                    pending.clear();
+                    pendingOffset = 0;
+                } else if (pendingOffset >= 16384 && pendingOffset * 2 >= pending.size()) {
+                    pending.erase(pending.begin(), pending.begin() + ptrdiff_t(pendingOffset));
+                    pendingOffset = 0;
+                }
+                deliveredFrames += keep;
+            }
             if (final && deliveredFrames != expected) throw std::runtime_error("Incomplete tail");
         }
         finished = final;

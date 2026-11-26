@@ -39,6 +39,7 @@ public struct TextChunker: Sendable {
         try checkingCancellation()
         var output: [SpeechChunk] = []
         var buffer: SpeechChunk?
+        let sentenceTokenizer = NLTokenizer(unit: .sentence)
 
         func flush() {
             guard let chunk = buffer else { return }
@@ -65,13 +66,14 @@ public struct TextChunker: Sendable {
             let sentences = sentences(
                 in: text,
                 within: paragraph.range,
-                sourceOffset: paragraph.sourceOffset
+                sourceOffset: paragraph.sourceOffset,
+                using: sentenceTokenizer
             )
             var isFirstSentence = true
 
             for sentence in sentences {
                 try checkingCancellation()
-                if sentence.text.count > hardCharacterLimit {
+                if sentence.characterCount > hardCharacterLimit {
                     flush()
                     for piece in try splitOversized(sentence, checkingCancellation: checkingCancellation) {
                         output.append(
@@ -87,7 +89,7 @@ public struct TextChunker: Sendable {
 
                 let separator = isFirstSentence ? "\n" : " "
                 if let buffer,
-                   buffer.text.count + separator.count + sentence.text.count
+                   buffer.characterCount + 1 + sentence.characterCount
                     > targetCharacterCount {
                     flush()
                 }
@@ -210,13 +212,92 @@ public struct TextChunker: Sendable {
         return output
     }
 
+    /// Splits a large initial chunk at a sentence boundary near
+    /// `targetCharacterCount` so whole-chunk models emit first audio faster.
+    public func splitFirstChunkForFastStart(
+        _ chunk: SpeechChunk,
+        targetCharacterCount: Int = 160,
+        minimumLengthToSplit: Int = 200
+    ) -> [SpeechChunk] {
+        let totalLength = chunk.characterCount
+        guard totalLength >= max(minimumLengthToSplit, 80) else {
+            return [chunk]
+        }
+
+        let minimumFirstLength = max(40, targetCharacterCount / 2)
+        let minimumRemainderLength = 40
+        let maxSplitOffset = min(
+            totalLength - minimumRemainderLength,
+            targetCharacterCount + 80
+        )
+        guard maxSplitOffset >= minimumFirstLength else {
+            return [chunk]
+        }
+
+        let text = chunk.text
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+        var cursor = text.startIndex
+        var offset = 0
+        var bestSplit: (index: String.Index, offset: Int, distance: Int)?
+
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            offset += text.distance(from: cursor, to: range.upperBound)
+            cursor = range.upperBound
+            guard offset <= maxSplitOffset else {
+                // Allow a single opening sentence slightly past the soft target
+                // if no earlier sentence boundary was found.
+                if bestSplit == nil,
+                   offset <= min(totalLength - minimumRemainderLength, targetCharacterCount + 120),
+                   offset >= minimumFirstLength {
+                    bestSplit = (range.upperBound, offset, abs(offset - targetCharacterCount))
+                }
+                return false
+            }
+            if offset >= minimumFirstLength {
+                let distance = abs(offset - targetCharacterCount)
+                if bestSplit == nil || distance < bestSplit!.distance {
+                    bestSplit = (range.upperBound, offset, distance)
+                }
+            }
+            return true
+        }
+
+        guard let split = bestSplit,
+              let leftRange = trimmedRange(in: text, within: text.startIndex..<split.index),
+              let rightRange = trimmedRange(in: text, within: split.index..<text.endIndex) else {
+            return [chunk]
+        }
+
+        let leftLower = text.distance(from: text.startIndex, to: leftRange.lowerBound)
+        let leftUpper = leftLower + text.distance(from: leftRange.lowerBound, to: leftRange.upperBound)
+        let rightLower = split.offset + text.distance(from: split.index, to: rightRange.lowerBound)
+        let rightUpper = rightLower + text.distance(from: rightRange.lowerBound, to: rightRange.upperBound)
+        let gapContainsNewline = text[leftRange.upperBound..<rightRange.lowerBound].contains("\n")
+
+        return [
+            chunk.slice(
+                id: chunk.id,
+                textRange: leftRange,
+                characterRange: leftLower..<leftUpper,
+                startsParagraph: chunk.startsParagraph
+            ),
+            chunk.slice(
+                id: chunk.id + 1,
+                textRange: rightRange,
+                characterRange: rightLower..<rightUpper,
+                startsParagraph: gapContainsNewline
+            )
+        ]
+    }
+
     private func sentences(
         in source: String,
         within sourceRange: Range<String.Index>,
-        sourceOffset: Int
+        sourceOffset: Int,
+        using tokenizer: NLTokenizer
     ) -> [SpeechChunk] {
         let text = String(source[sourceRange])
-        let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
         var output: [SpeechChunk] = []
         var indexCursor = text.startIndex

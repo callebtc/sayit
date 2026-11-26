@@ -1,3 +1,4 @@
+import Accelerate
 @preconcurrency import AVFoundation
 
 import Foundation
@@ -39,6 +40,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
+    private var cachedMonoFormat: AVAudioFormat?
     private var scheduleGeneration = 0
     private var scheduledBufferCount = 0
     private var shouldFadeInNextScheduledBuffer = false
@@ -195,10 +197,11 @@ final class PlaybackController: BackendPlaybackControlling {
         appendAmplitudeSamples(chunk.samples)
         try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
         try scheduleAvailableAudio()
+        let stateChanged = state == .preparing
         if state == .preparing || state == .buffering {
             state = .buffering
         }
-        updateNowPlaying()
+        updateNowPlaying(throttleTimeline: !stateChanged)
     }
 
     func setSpokenText(_ text: String) {
@@ -572,16 +575,17 @@ final class PlaybackController: BackendPlaybackControlling {
         guard samples.count <= Int(UInt32.max) else {
             throw PlaybackError.audioTooLarge
         }
-        guard samples.allSatisfy(\.isFinite) else {
+        let allFinite = samples.withUnsafeBufferPointer { buffer in
+            for sample in buffer where !sample.isFinite {
+                return false
+            }
+            return true
+        }
+        guard allFinite else {
             throw PlaybackError.invalidSamples
         }
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: sampleRate,
-            channels: 1,
-            interleaved: false
-        ),
-        let buffer = AVAudioPCMBuffer(
+        let format = try monoFormat(sampleRate: sampleRate)
+        guard let buffer = AVAudioPCMBuffer(
             pcmFormat: format,
             frameCapacity: AVAudioFrameCount(samples.count)
         ),
@@ -614,10 +618,21 @@ final class PlaybackController: BackendPlaybackControlling {
         }
 
         var samples = [Float](repeating: 0, count: frameCount)
-        for channelIndex in 0..<channelCount {
-            let channel = channels[channelIndex]
-            for frameIndex in 0..<frameCount {
-                samples[frameIndex] += channel[frameIndex] / Float(channelCount)
+        var scale = 1.0 / Float(channelCount)
+        samples.withUnsafeMutableBufferPointer { dst in
+            guard let dstBase = dst.baseAddress else { return }
+            vDSP_vsmul(channels[0], 1, &scale, dstBase, 1, vDSP_Length(frameCount))
+            for channelIndex in 1..<channelCount {
+                vDSP_vsma(
+                    channels[channelIndex],
+                    1,
+                    &scale,
+                    dstBase,
+                    1,
+                    dstBase,
+                    1,
+                    vDSP_Length(frameCount)
+                )
             }
         }
         return samples
@@ -973,6 +988,9 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func monoFormat(sampleRate: Double) throws -> AVAudioFormat {
+        if let cachedMonoFormat, cachedMonoFormat.sampleRate == sampleRate {
+            return cachedMonoFormat
+        }
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: sampleRate,
@@ -981,6 +999,7 @@ final class PlaybackController: BackendPlaybackControlling {
         ) else {
             throw PlaybackError.audioFormatMismatch
         }
+        cachedMonoFormat = format
         return format
     }
 
@@ -1052,24 +1071,39 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func appendAmplitudeSamples(_ samples: [Float]) {
-        for sample in samples {
-            amplitudePendingEnergy += Double(sample * sample)
-            amplitudePendingSampleCount += 1
-            if amplitudePendingSampleCount >= amplitudeWindowFrameCount {
-                amplitudeWindows.append(
-                    Float(
-                        sqrt(
-                            amplitudePendingEnergy
-                                / Double(amplitudePendingSampleCount)
+        guard !samples.isEmpty else { return }
+        var windowsAdded = 0
+        samples.withUnsafeBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            var offset = 0
+            let total = buffer.count
+            while offset < total {
+                let needed = amplitudeWindowFrameCount - amplitudePendingSampleCount
+                let take = min(needed, total - offset)
+                var sumOfSquares: Float = 0
+                vDSP_svesq(base.advanced(by: offset), 1, &sumOfSquares, vDSP_Length(take))
+                amplitudePendingEnergy += Double(sumOfSquares)
+                amplitudePendingSampleCount += take
+                offset += take
+                if amplitudePendingSampleCount >= amplitudeWindowFrameCount {
+                    amplitudeWindows.append(
+                        Float(
+                            sqrt(
+                                amplitudePendingEnergy
+                                    / Double(amplitudePendingSampleCount)
+                            )
                         )
                     )
-                )
-                amplitudePendingEnergy = 0
-                amplitudePendingSampleCount = 0
-                compactAmplitudeWindowsIfNeeded()
+                    amplitudePendingEnergy = 0
+                    amplitudePendingSampleCount = 0
+                    windowsAdded += 1
+                    compactAmplitudeWindowsIfNeeded()
+                }
             }
         }
-        amplitudes = displayAmplitudeBuckets(count: 96)
+        if windowsAdded > 0 {
+            amplitudes = displayAmplitudeBuckets(count: 96)
+        }
     }
 
     private func compactAmplitudeWindowsIfNeeded() {
@@ -1097,24 +1131,24 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func displayAmplitudeBuckets(count: Int) -> [Float] {
         guard !amplitudeWindows.isEmpty, count > 0 else { return [] }
+        let total = amplitudeWindows.count
         let windowSize = max(
-            Int(ceil(Double(amplitudeWindows.count) / Double(count))),
+            Int(ceil(Double(total) / Double(count))),
             1
         )
-        return Swift.stride(
-            from: 0,
-            to: amplitudeWindows.count,
-            by: windowSize
-        )
-        .prefix(count)
-        .map { start in
-            let end = min(start + windowSize, amplitudeWindows.count)
-            let window = amplitudeWindows[start..<end]
-            let energy = window.reduce(Double.zero) {
-                $0 + Double($1 * $1)
+        let bucketCount = min((total + windowSize - 1) / windowSize, count)
+        var result = [Float](repeating: 0, count: bucketCount)
+        amplitudeWindows.withUnsafeBufferPointer { buffer in
+            guard let base = buffer.baseAddress else { return }
+            for bucketIndex in 0..<bucketCount {
+                let start = bucketIndex * windowSize
+                let length = min(windowSize, total - start)
+                var energy: Float = 0
+                vDSP_svesq(base.advanced(by: start), 1, &energy, vDSP_Length(length))
+                result[bucketIndex] = sqrt(energy / Float(length))
             }
-            return Float(sqrt(energy / Double(window.count)))
         }
+        return result
     }
 
     private func configureRemoteCommands() {

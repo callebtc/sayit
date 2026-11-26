@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct PCMStoreSnapshot: Sendable {
@@ -13,30 +14,36 @@ struct PCMStoreSnapshot: Sendable {
             throw CocoaError(.fileReadCorruptFile)
         }
         let availableFrameCount = max(frameCount - startFrame, 0)
-        let frameCount = min(
+        let readCount = min(
             Int64(requestedFrameCount),
             availableFrameCount
         )
-        guard frameCount > 0 else { return [] }
-        guard frameCount <= Int64(Int.max / MemoryLayout<Float>.stride) else {
+        guard readCount > 0 else { return [] }
+        guard readCount <= Int64(Int.max / MemoryLayout<Float>.stride) else {
             throw CocoaError(.fileReadTooLarge)
         }
 
-        let byteOffset = UInt64(startFrame)
-            * UInt64(MemoryLayout<Float>.stride)
-        let byteCount = Int(frameCount) * MemoryLayout<Float>.stride
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        try handle.seek(toOffset: byteOffset)
-        let data = try handle.read(upToCount: byteCount) ?? Data()
-        guard data.count == byteCount else {
-            throw CocoaError(.fileReadCorruptFile)
+        let fd = Darwin.open(url.path, O_RDONLY)
+        guard fd >= 0 else {
+            throw CocoaError(.fileReadNoSuchFile)
         }
+        defer { _ = Darwin.close(fd) }
 
-        var samples = [Float](repeating: 0, count: Int(frameCount))
-        _ = samples.withUnsafeMutableBytes { destination in
-            data.copyBytes(to: destination)
+        return try PCMStore.preadFrames(
+            from: fd,
+            startingAt: startFrame,
+            count: Int(readCount)
+        )
+    }
+
+    func withOpenFileDescriptor<Result>(
+        _ body: (Int32) throws -> Result
+    ) throws -> Result {
+        let fd = Darwin.open(url.path, O_RDONLY)
+        guard fd >= 0 else {
+            throw CocoaError(.fileReadNoSuchFile)
         }
-        return samples
+        defer { _ = Darwin.close(fd) }
+        return try body(fd)
     }
 }

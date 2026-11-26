@@ -8,6 +8,8 @@ import SwiftData
 @MainActor
 @Observable
 final class HistoryStore {
+    private static let maxLoadedItems = 500
+
     let container: ModelContainer
     private let context: ModelContext
     private let directories: AppDirectories
@@ -31,9 +33,13 @@ final class HistoryStore {
     }
 
     func begin(_ request: SpeechRequest) throws {
+        let title = normalizedTitle(
+            title: request.cleanedText.title,
+            cleanedText: request.cleanedText.text
+        )
         let item = SpeechItem(
             id: request.id,
-            title: request.cleanedText.title,
+            title: title,
             cleanedText: request.cleanedText.text,
             createdAt: request.createdAt,
             triggerSourceRawValue: request.source.rawValue,
@@ -48,7 +54,17 @@ final class HistoryStore {
         )
         context.insert(item)
         try context.save()
-        try reload()
+        let snapshot = makeSnapshot(from: item, title: title)
+        if items.first.map({ snapshot.createdAt >= $0.createdAt }) ?? true {
+            items.insert(snapshot, at: 0)
+        } else {
+            let insertionIndex = items.firstIndex { $0.createdAt < snapshot.createdAt }
+                ?? items.endIndex
+            items.insert(snapshot, at: insertionIndex)
+        }
+        if items.count > Self.maxLoadedItems {
+            items.removeLast(items.count - Self.maxLoadedItems)
+        }
     }
 
     func complete(
@@ -66,7 +82,7 @@ final class HistoryStore {
         item.stateRawValue = SpeechItemState.completed.rawValue
         item.updatedAt = .now
         try context.save()
-        try reload()
+        updateCachedItem(item)
     }
 
     func playbackTiming(id: UUID) throws -> [PlaybackTextChunk] {
@@ -104,7 +120,7 @@ final class HistoryStore {
         item.failureCode = code
         item.updatedAt = .now
         try context.save()
-        try reload()
+        updateCachedItem(item)
     }
 
     func togglePinned(id: UUID) throws {
@@ -112,7 +128,7 @@ final class HistoryStore {
         item.isPinned.toggle()
         item.updatedAt = .now
         try context.save()
-        try reload()
+        updateCachedItem(item)
     }
 
     func remove(id: UUID) throws {
@@ -124,7 +140,11 @@ final class HistoryStore {
         }
         context.delete(item)
         try context.save()
-        try reload()
+        if items.count < Self.maxLoadedItems {
+            items.removeAll { $0.id == id }
+        } else {
+            try reload()
+        }
     }
 
     func removeAll() throws {
@@ -138,7 +158,7 @@ final class HistoryStore {
             context.delete(item)
         }
         try context.save()
-        try reload()
+        items = []
     }
 
     func enforceRetention(period: RetentionPeriod, quotaBytes: Int64) throws {
@@ -152,13 +172,27 @@ final class HistoryStore {
                 isPinned: $0.isPinned
             )
         }
-        let identifiers = RetentionPlanner().identifiersToRemove(
-            from: candidates,
-            period: period,
-            quotaBytes: quotaBytes
+        let identifiers = Set(
+            RetentionPlanner().identifiersToRemove(
+                from: candidates,
+                period: period,
+                quotaBytes: quotaBytes
+            )
         )
-        for id in identifiers {
-            try remove(id: id)
+        guard !identifiers.isEmpty else { return }
+        for item in stored where identifiers.contains(item.id) {
+            if let relativePath = item.audioRelativePath {
+                try? FileManager.default.removeItem(
+                    at: directories.historyAudio.appending(path: relativePath)
+                )
+            }
+            context.delete(item)
+        }
+        try context.save()
+        if items.count < Self.maxLoadedItems {
+            items.removeAll { identifiers.contains($0.id) }
+        } else {
+            try reload()
         }
     }
 
@@ -182,39 +216,55 @@ final class HistoryStore {
         return try context.fetch(descriptor).first
     }
 
+    private func normalizedTitle(title: String, cleanedText: String) -> String {
+        let storedTitle = titleGenerator.title(from: title)
+        return storedTitle == SpeechTitleGenerator.fallbackTitle
+            ? titleGenerator.title(from: cleanedText)
+            : storedTitle
+    }
+
+    private func makeSnapshot(from item: SpeechItem, title: String) -> HistoryItemSnapshot {
+        HistoryItemSnapshot(
+            id: item.id,
+            title: title,
+            cleanedText: item.cleanedText,
+            createdAt: item.createdAt,
+            modelID: ModelID(item.modelIDRawValue),
+            voice: item.voice,
+            voiceMode: VoiceSynthesisMode(
+                rawValue: item.voiceModeRawValue ?? ""
+            ) ?? .standard,
+            voiceProfileID: item.voiceProfileID,
+            voiceProfileName: item.voiceProfileName,
+            language: item.language,
+            duration: item.duration,
+            audioRelativePath: item.audioRelativePath,
+            state: SpeechItemState(rawValue: item.stateRawValue) ?? .failed,
+            isPinned: item.isPinned
+        )
+    }
+
+    private func updateCachedItem(_ item: SpeechItem) {
+        let title = normalizedTitle(title: item.title, cleanedText: item.cleanedText)
+        let snapshot = makeSnapshot(from: item, title: title)
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index] = snapshot
+        }
+    }
+
     private func reload() throws {
         var descriptor = FetchDescriptor<SpeechItem>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 500
+        descriptor.fetchLimit = Self.maxLoadedItems
         var repairedTitle = false
         items = try context.fetch(descriptor).map {
-            let storedTitle = titleGenerator.title(from: $0.title)
-            let title = storedTitle == SpeechTitleGenerator.fallbackTitle
-                ? titleGenerator.title(from: $0.cleanedText)
-                : storedTitle
+            let title = normalizedTitle(title: $0.title, cleanedText: $0.cleanedText)
             if $0.title != title {
                 $0.title = title
                 repairedTitle = true
             }
-            return HistoryItemSnapshot(
-                id: $0.id,
-                title: title,
-                cleanedText: $0.cleanedText,
-                createdAt: $0.createdAt,
-                modelID: ModelID($0.modelIDRawValue),
-                voice: $0.voice,
-                voiceMode: VoiceSynthesisMode(
-                    rawValue: $0.voiceModeRawValue ?? ""
-                ) ?? .standard,
-                voiceProfileID: $0.voiceProfileID,
-                voiceProfileName: $0.voiceProfileName,
-                language: $0.language,
-                duration: $0.duration,
-                audioRelativePath: $0.audioRelativePath,
-                state: SpeechItemState(rawValue: $0.stateRawValue) ?? .failed,
-                isPinned: $0.isPinned
-            )
+            return makeSnapshot(from: $0, title: title)
         }
         if repairedTitle {
             try context.save()
