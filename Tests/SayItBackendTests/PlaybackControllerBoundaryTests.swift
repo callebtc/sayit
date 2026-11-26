@@ -142,6 +142,97 @@ struct PlaybackControllerBoundaryTests {
         playback.stop()
     }
 
+    @Test("Rate change during route-change debounce rebuilds graph immediately and cancels stale recovery")
+    @MainActor
+    func rateChangeCancelsPendingRouteRecovery() async throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "RateRoute", estimatedDuration: 2.0, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 48_000),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        playback.play()
+        try await Task.sleep(for: .milliseconds(120))
+        let configBefore = playback.audioGraphConfigurationCount
+
+        playback.handleAudioConfigurationChangeForTesting()
+        try await Task.sleep(for: .milliseconds(25))
+        playback.rate = 1.5
+        let configRightAfterRate = playback.audioGraphConfigurationCount
+        let elapsedRightAfterRate = playback.elapsed
+
+        // Graph must have reconfigured immediately on rate change.
+        #expect(configRightAfterRate == configBefore + 1)
+        #expect(elapsedRightAfterRate >= 0)
+
+        // Waiting past the route debounce must not trigger a second stale recovery
+        // or snap elapsed back to the pre-change anchor.
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(playback.audioGraphConfigurationCount == configRightAfterRate)
+        #expect(playback.elapsed >= elapsedRightAfterRate)
+        #expect(playback.state == .playing)
+    }
+
+    @Test("Immediate rate change after play never exposes negative elapsed time")
+    @MainActor
+    func elapsedNeverNegativeAfterPlay() throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "ClampElapsed", estimatedDuration: 1.0, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 24_000),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        playback.play()
+        playback.rate = 1.25
+        #expect(playback.elapsed >= 0)
+    }
+
+    @Test("Controls during smooth stop fade-out cannot resurrect playback")
+    @MainActor
+    func smoothStopIgnoresConcurrentControls() async throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "SmoothStop", estimatedDuration: 2.0, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 48_000),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        playback.play()
+        #expect(playback.state == .playing)
+
+        let stopTask = Task { @MainActor in
+            await playback.stopForModelSwitch()
+        }
+        await Task.yield()
+        playback.play()
+        playback.seek(to: 0.5)
+        playback.rate = 1.5
+        #expect(playback.state != .playing)
+
+        await stopTask.value
+        #expect(playback.state == .idle)
+    }
+
     @Test("Playback buffer duration grows only above normal speed")
     @MainActor
     func preferredBufferDuration() {

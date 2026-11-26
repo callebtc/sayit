@@ -101,4 +101,40 @@ struct TimeStretchTests {
         #expect(Double(outputFrames) <= expected.rounded() + 1)
         #expect(Double(outputFrames) >= expected * 0.99)
     }
+
+    @Test("Long slow-rate recordings preserve trailing audio without clipping")
+    func longClipSlowRatePreservesTail() throws {
+        let sampleRate = 24_000.0
+        let rate = 0.5
+        let pitches = [127.0, 149.0, 173.0, 197.0, 223.0]
+        let tiles: [[Float]] = pitches.map { freq in
+            (0..<Int(sampleRate)).map { frame in
+                let t = Double(frame) / sampleRate
+                return Float(0.2 * sin(2 * .pi * freq * t))
+            }
+        }
+        let stream = try TimeStretchStream(sampleRate: sampleRate, rate: rate)
+        let totalSeconds = 180
+        for second in 0..<(totalSeconds - 2) {
+            let chunk = try stream.process(tiles[second % tiles.count])
+            #expect(chunk.allSatisfy { $0.isFinite })
+        }
+        // Append 1.75 s of silence followed by a loud 0.25 s 1 kHz beacon at the very end.
+        var trailingWindow: [Float] = []
+        trailingWindow += try stream.process([Float](repeating: 0, count: Int(sampleRate)))
+        var finalSecond = [Float](repeating: 0, count: Int(sampleRate))
+        let beaconStart = Int(sampleRate * 0.75)
+        for index in beaconStart..<Int(sampleRate) {
+            let t = Double(index) / sampleRate
+            finalSecond[index] = Float(0.9 * sin(2 * .pi * 1000 * t))
+        }
+        trailingWindow += try stream.process(finalSecond)
+        trailingWindow += try stream.process([], final: true)
+
+        let loudTailSamples = trailingWindow.filter { abs($0) > 0.3 }.count
+        let maxTailAmplitude = trailingWindow.suffix(Int(sampleRate * 0.5)).map { abs($0) }.max() ?? 0
+        #expect(trailingWindow.allSatisfy { $0.isFinite })
+        #expect(loudTailSamples > Int(sampleRate * 0.25))
+        #expect(maxTailAmplitude > 0.5)
+    }
 }

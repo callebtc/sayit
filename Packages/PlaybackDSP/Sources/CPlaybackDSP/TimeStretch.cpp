@@ -12,8 +12,7 @@ struct Stream {
     double rate, sampleRate;
     int64_t inputFrames = 0, deliveredFrames = 0;
     bool finished = false;
-    std::vector<float> bounded, pending, output;
-    size_t pendingOffset = 0;
+    std::vector<float> bounded, output;
 
     Stream(double sampleRate, double rate) : rate(rate), sampleRate(sampleRate) {
         if (rate != 1) {
@@ -43,45 +42,54 @@ struct Stream {
             // Clamp before that conversion to prevent overflow for hot PCM.
             bounded.resize(count);
             for (int i = 0; i < count; ++i) bounded[i] = std::clamp(input[i], -1.0f, 1.0f);
-            if (!sonicWriteFloatToStream(sonic, bounded.data(), count)) throw std::bad_alloc();
-            if (final) {
-                // Supply lookahead before flushing and crop to the cumulative
-                // target, avoiding per-chunk rounding and a clipped final phoneme.
-                std::vector<float> padding(int(std::ceil(sampleRate * 0.2)), 0);
-                if (!sonicWriteFloatToStream(sonic, padding.data(), int(padding.size()))
-                    || !sonicFlushStream(sonic)) throw std::bad_alloc();
+            if (count > 0 && !sonicWriteFloatToStream(sonic, bounded.data(), count)) {
+                throw std::bad_alloc();
             }
-            int available = sonicSamplesAvailable(sonic);
-            if (available > 0) {
-                if (pendingOffset > 0 && pendingOffset == pending.size()) {
-                    pending.clear();
-                    pendingOffset = 0;
-                }
-                auto offset = pending.size();
-                pending.resize(offset + available);
-                if (sonicReadFloatFromStream(sonic, pending.data() + offset, available) != available)
+            // Always drain all real stretched samples Sonic has produced so
+            // slow speeds where Sonic drifts slightly long (e.g. 0.5x over
+            // multi-minute clips) never accumulate a backlog that truncates
+            // the end of the recording.
+            int preFlushAvailable = sonicSamplesAvailable(sonic);
+            if (preFlushAvailable > 0) {
+                output.resize(preFlushAvailable);
+                if (sonicReadFloatFromStream(sonic, output.data(), preFlushAvailable) != preFlushAvailable) {
                     throw std::runtime_error("Incomplete read");
-            }
-            auto livePending = int64_t(pending.size() - pendingOffset);
-            auto keep = std::min<int64_t>(livePending, expected - deliveredFrames);
-            if (keep > 0) {
-                auto begin = pending.begin() + ptrdiff_t(pendingOffset);
-                output.assign(begin, begin + ptrdiff_t(keep));
-                pendingOffset += size_t(keep);
-                if (pendingOffset == pending.size()) {
-                    pending.clear();
-                    pendingOffset = 0;
-                } else if (pendingOffset >= 16384 && pendingOffset * 2 >= pending.size()) {
-                    pending.erase(pending.begin(), pending.begin() + ptrdiff_t(pendingOffset));
-                    pendingOffset = 0;
                 }
-                deliveredFrames += keep;
+                deliveredFrames += preFlushAvailable;
             }
-            // Above 2.0x, Sonic's skipPitchPeriod truncates period / (speed - 1)
-            // downward (~0.2-0.35% cumulative shortfall on multi-minute clips).
-            // Once the lookahead padding has been flushed, accept Sonic's
-            // drained output rather than aborting near the end of long clips;
-            // only fail if non-empty input produced no audio at all.
+            if (final) {
+                // Supply lookahead silence before flushing so Sonic drains its
+                // final pitch-period lookahead without clipping the last phoneme,
+                // then trim only the synthetic silence padding.
+                int padFrames = int(std::ceil(sampleRate * 0.2));
+                std::vector<float> padding(padFrames, 0);
+                if (!sonicWriteFloatToStream(sonic, padding.data(), padFrames)
+                    || !sonicFlushStream(sonic)) {
+                    throw std::bad_alloc();
+                }
+                int flushedAvailable = sonicSamplesAvailable(sonic);
+                if (flushedAvailable > 0) {
+                    std::vector<float> flushed(flushedAvailable);
+                    if (sonicReadFloatFromStream(sonic, flushed.data(), flushedAvailable) != flushedAvailable) {
+                        throw std::runtime_error("Incomplete read");
+                    }
+                    int64_t keep;
+                    if (expected > deliveredFrames) {
+                        keep = std::min<int64_t>(flushedAvailable, expected - deliveredFrames);
+                    } else {
+                        // Sonic has already emitted >= expected frames (cumulative
+                        // positive drift on long slow-rate clips). Strip only the
+                        // stretched lookahead padding so the real final lookahead
+                        // tail is preserved.
+                        auto padOutput = std::llround(double(padFrames) / rate);
+                        keep = std::max<int64_t>(0, int64_t(flushedAvailable) - padOutput);
+                    }
+                    if (keep > 0) {
+                        output.insert(output.end(), flushed.begin(), flushed.begin() + ptrdiff_t(keep));
+                        deliveredFrames += keep;
+                    }
+                }
+            }
             if (final && expected > 0 && deliveredFrames == 0) {
                 throw std::runtime_error("Incomplete tail");
             }

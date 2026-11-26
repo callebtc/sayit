@@ -77,6 +77,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private var requestArrivalOrder: UInt64 = 0
     private var activeOperation: ActiveOperation?
     private var idleUnloadTask: Task<Void, Never>?
+    private var cancelPreloadWarmupRequested = false
 
     init(
         modelURLProvider: @escaping ModelURLProvider,
@@ -102,9 +103,14 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         requestArrivalOrder &+= 1
         let arrivalOrder = requestArrivalOrder
         if let active = activeOperation, active.preloadingModelID == request.model.id {
-            await waitForOperationToFinish(active)
-            guard arrivalOrder == requestArrivalOrder else {
-                return cancelledStream()
+            cancelPreloadWarmupRequested = true
+            if loadedModelID != request.model.id || loadedModel == nil {
+                // Weights are still loading from disk: let weight loading finish
+                // instead of discarding partial work, while skipping opportunistic warmup.
+                await waitForOperationToFinish(active)
+                guard arrivalOrder == requestArrivalOrder else {
+                    return cancelledStream()
+                }
             }
         }
 
@@ -156,12 +162,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         language: String?
     ) async {
         guard activeOperation == nil else { return }
+        cancelPreloadWarmupRequested = false
         let (operationID, _) = reserveOperation()
         let task = Task { [weak self] in
             guard let self else { return }
             do {
                 try await Self.operationGate.perform {
-                    try await self.performPreload(
+                    try await self.performPreloadAndQuiesce(
                         model,
                         voice: voice,
                         voiceReference: voiceReference,
@@ -249,6 +256,28 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         }
     }
 
+    private func performPreloadAndQuiesce(
+        _ model: ModelDescriptor,
+        voice: String?,
+        voiceReference: VoiceReference?,
+        language: String?,
+        operationID: UInt64
+    ) async throws {
+        do {
+            try await performPreload(
+                model,
+                voice: voice,
+                voiceReference: voiceReference,
+                language: language,
+                operationID: operationID
+            )
+            synchronizeMLXAfterSuccess()
+        } catch {
+            synchronizeAndClearMLXCache()
+            throw error
+        }
+    }
+
     private func performPreload(
         _ model: ModelDescriptor,
         voice: String?,
@@ -258,7 +287,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     ) async throws {
         try await ensureModelLoaded(model, operationID: operationID)
         try checkOperation(operationID)
-        guard let loadedModel else { return }
+        guard !cancelPreloadWarmupRequested, let loadedModel else { return }
 
         if let pocketTTS = loadedModel as? PocketTTSModel,
            let modelURL = loadedModelURL {
@@ -356,9 +385,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         requestArrivalOrder &+= 1
         let arrivalOrder = requestArrivalOrder
         if let active = activeOperation, active.preloadingModelID == model.id {
-            await waitForOperationToFinish(active)
-            guard arrivalOrder == requestArrivalOrder else {
-                throw CancellationError()
+            cancelPreloadWarmupRequested = true
+            if loadedModelID != model.id || loadedModel == nil {
+                await waitForOperationToFinish(active)
+                guard arrivalOrder == requestArrivalOrder else {
+                    throw CancellationError()
+                }
             }
         }
 
@@ -796,8 +828,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     } else {
                         dramaStreamingFrames = DramaLibraryModel.maximumStreamingFrames
                     }
-                    let stream = SerializedSpeechModel(drama)
-                        .generateDramaSamplesStream(
+                    let managed = SerializedSpeechModel(drama)
+                        .makeManagedDramaSamplesStream(
                             text: chunk.text,
                             referenceAudio: SerializedMLXArray(
                                 usesReference ? referenceAudio : nil
@@ -806,13 +838,19 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                             generationParameters: parameters,
                             streamingFrames: dramaStreamingFrames
                         )
-                    for try await samples in stream {
-                        try checkOperation(operationID)
-                        try emit(samples)
+                    do {
+                        for try await samples in managed.stream {
+                            try checkOperation(operationID)
+                            try emit(samples)
+                        }
+                        await managed.waitForCompletion()
+                    } catch {
+                        await managed.cancelAndWait()
+                        throw error
                     }
                 } else if let pocketTTS = loadedModel as? PocketTTSModel,
                           let modelURL = loadedModelURL {
-                    let stream = PocketTTSStreamRunner.generateSamplesStream(
+                    let managed = PocketTTSStreamRunner.makeManagedSamplesStream(
                         model: pocketTTS,
                         modelFolder: modelURL,
                         text: chunk.text,
@@ -821,9 +859,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         generationParameters: parameters,
                         streamingInterval: streamingInterval
                     )
-                    for try await samples in stream {
-                        try checkOperation(operationID)
-                        try emit(samples)
+                    do {
+                        for try await samples in managed.stream {
+                            try checkOperation(operationID)
+                            try emit(samples)
+                        }
+                        await managed.waitForCompletion()
+                    } catch {
+                        await managed.cancelAndWait()
+                        throw error
                     }
                 } else if let qwen3 = loadedModel as? Qwen3TTSModel,
                           usesReference,
@@ -837,16 +881,22 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                         language: request.language
                     )
                     let qwenStreamingInterval = chunkCursor == 0 ? 0.32 : 2.0
-                    let stream = SerializedSpeechModel(qwen3)
-                        .generateQwen3SamplesStream(
+                    let managed = SerializedSpeechModel(qwen3)
+                        .makeManagedQwen3SamplesStream(
                             text: chunk.text,
                             conditioning: conditioning,
                             generationParameters: parameters,
                             streamingInterval: qwenStreamingInterval
                         )
-                    for try await samples in stream {
-                        try checkOperation(operationID)
-                        try emit(samples)
+                    do {
+                        for try await samples in managed.stream {
+                            try checkOperation(operationID)
+                            try emit(samples)
+                        }
+                        await managed.waitForCompletion()
+                    } catch {
+                        await managed.cancelAndWait()
+                        throw error
                     }
                 } else {
                     let effectiveInterval = loadedModel is Qwen3TTSModel
@@ -1780,17 +1830,19 @@ private final class SerializedSpeechModel: @unchecked Sendable {
         return samples
     }
 
-    func generateDramaSamplesStream(
+    func makeManagedDramaSamplesStream(
         text: String,
         referenceAudio: SerializedMLXArray,
         refText: String?,
         generationParameters: GenerateParameters,
         streamingFrames: Int
-    ) -> AsyncThrowingStream<[Float], Error> {
+    ) -> ManagedSampleStream {
         guard let drama = model as? DramaLibraryModel else {
-            return AsyncThrowingStream { $0.finish(throwing: SynthesisError.generatedNoAudio) }
+            let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+            continuation.finish(throwing: SynthesisError.generatedNoAudio)
+            return ManagedSampleStream(stream: stream, producer: Task {})
         }
-        return drama.generateDirectSamplesStream(
+        return drama.makeManagedDirectSamplesStream(
             text: text,
             refAudio: referenceAudio.value,
             refText: refText,
@@ -1807,43 +1859,45 @@ private final class SerializedSpeechModel: @unchecked Sendable {
         try await drama.warmVoice(refAudio: referenceAudio.value, refText: refText)
     }
 
-    func generateQwen3SamplesStream(
+    func makeManagedQwen3SamplesStream(
         text: String,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         generationParameters: GenerateParameters,
         streamingInterval: Double
-    ) -> AsyncThrowingStream<[Float], Error> {
+    ) -> ManagedSampleStream {
         guard model is Qwen3TTSModel else {
-            return AsyncThrowingStream { $0.finish(throwing: SynthesisError.generatedNoAudio) }
+            let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+            continuation.finish(throwing: SynthesisError.generatedNoAudio)
+            return ManagedSampleStream(stream: stream, producer: Task {})
         }
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    guard let qwen3 = self.model as? Qwen3TTSModel else {
-                        throw SynthesisError.generatedNoAudio
-                    }
-                    let source = qwen3.generateStream(
-                        text: text,
-                        conditioning: conditioning,
-                        generationParameters: generationParameters,
-                        streamingInterval: streamingInterval
-                    )
-                    for try await event in source {
-                        try Task.checkCancellation()
-                        if case .audio(let array) = event {
-                            let samples = array.asType(.float32).asArray(Float.self)
-                            if !samples.isEmpty {
-                                continuation.yield(samples)
-                            }
+        let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+        let task = Task {
+            do {
+                guard let qwen3 = self.model as? Qwen3TTSModel else {
+                    throw SynthesisError.generatedNoAudio
+                }
+                let source = qwen3.generateStream(
+                    text: text,
+                    conditioning: conditioning,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval
+                )
+                for try await event in source {
+                    try Task.checkCancellation()
+                    if case .audio(let array) = event {
+                        let samples = array.asType(.float32).asArray(Float.self)
+                        if !samples.isEmpty {
+                            continuation.yield(samples)
                         }
                     }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: Task.isCancelled ? CancellationError() : error)
                 }
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: Task.isCancelled ? CancellationError() : error)
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
+        continuation.onTermination = { @Sendable _ in task.cancel() }
+        return ManagedSampleStream(stream: stream, producer: task)
     }
 
     func generateSamplesStream(
@@ -1864,6 +1918,45 @@ private final class SerializedSpeechModel: @unchecked Sendable {
             generationParameters: generationParameters,
             streamingInterval: streamingInterval
         )
+    }
+}
+
+/// Pairs an `AsyncThrowingStream` with its producer `Task` so cancellation or
+/// early exit always awaits producer completion before `SynthesisOperationGate`
+/// releases the non-Sendable MLX model to the next operation.
+struct ManagedSampleStream: Sendable {
+    let stream: AsyncThrowingStream<[Float], Error>
+    private let producer: Task<Void, Never>
+
+    init(
+        stream: AsyncThrowingStream<[Float], Error>,
+        producer: Task<Void, Never>
+    ) {
+        self.stream = stream
+        self.producer = producer
+    }
+
+    func waitForCompletion() async {
+        await producer.value
+    }
+
+    func cancelAndWait() async {
+        producer.cancel()
+        await producer.value
+    }
+
+    func drain(
+        _ consume: ([Float]) throws -> Void
+    ) async throws {
+        do {
+            for try await samples in stream {
+                try consume(samples)
+            }
+            await waitForCompletion()
+        } catch {
+            await cancelAndWait()
+            throw error
+        }
     }
 }
 

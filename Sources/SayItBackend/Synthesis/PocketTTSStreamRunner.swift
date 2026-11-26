@@ -134,6 +134,7 @@ enum PocketTTSStreamRunner {
         var sampleEos: MLXArray?
 
         for capacity in buckets {
+            try Task.checkCancellation()
             var paddedKeys = voiceState.keys
             var paddedValues = voiceState.values
             padKVCaches(keys: &paddedKeys, values: &paddedValues, toCapacity: capacity, dtype: compiled.flowDType)
@@ -156,6 +157,7 @@ enum PocketTTSStreamRunner {
             }
 
             if voiceState.promptNumFrames + quadStepSize <= capacity {
+                try Task.checkCancellation()
                 let quadFn = compiledFlowStep4(for: model, state: compiled, capacity: capacity)
                 var quadInputs: [MLXArray] = []
                 quadInputs.reserveCapacity(2 + quadStepSize + compiled.numLayers * 2)
@@ -175,6 +177,7 @@ enum PocketTTSStreamRunner {
             }
         }
 
+        try Task.checkCancellation()
         if let latent = sampleLatent, let eos = sampleEos {
             model.mimi.resetState()
             var upsamplePrev: MLXArray?
@@ -226,6 +229,26 @@ enum PocketTTSStreamRunner {
         generationParameters: GenerateParameters,
         streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
+        makeManagedSamplesStream(
+            model: model,
+            modelFolder: modelFolder,
+            text: text,
+            voice: voice,
+            referenceAudio: referenceAudio,
+            generationParameters: generationParameters,
+            streamingInterval: streamingInterval
+        ).stream
+    }
+
+    static func makeManagedSamplesStream(
+        model: PocketTTSModel,
+        modelFolder: URL,
+        text: String,
+        voice: String?,
+        referenceAudio: MLXArray?,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double
+    ) -> ManagedSampleStream {
         let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
         let box = RunnerInputs(
             model: model,
@@ -257,7 +280,7 @@ enum PocketTTSStreamRunner {
         continuation.onTermination = { @Sendable _ in
             task.cancel()
         }
-        return stream
+        return ManagedSampleStream(stream: stream, producer: task)
     }
 
     private static func run(

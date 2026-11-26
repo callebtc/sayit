@@ -118,6 +118,39 @@ struct PCMStoreTests {
         #expect(!names.contains { $0.contains(".partial.") })
     }
 
+    @Test("Snapshot remains readable and archivable after PCMStore deallocates and unlinks its path")
+    func snapshotSurvivesStoreDeinit() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "PCMStoreTests")
+        defer { fixture.remove() }
+        var store: PCMStore? = try PCMStore(
+            sampleRate: 24_000,
+            directory: fixture.root
+        )
+        let samples = (0..<24_000).map { frame in
+            Float(sin(Double(frame) / 20) * 0.1)
+        }
+        try store?.append(samples)
+        let url = try #require(store?.url)
+        let snapshot = try #require(try store?.snapshot())
+
+        // Release store so its deinit unlinks the temporary path before reading/archiving.
+        store = nil
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+
+        let head = try snapshot.readFrames(startingAt: 0, count: 16)
+        #expect(head == Array(samples.prefix(16)))
+
+        let archive = AudioArchive(directory: fixture.root)
+        let result = try await archive.writeM4A(
+            source: snapshot,
+            requestID: UUID()
+        )
+        let file = try AVAudioFile(
+            forReading: fixture.root.appending(path: result.relativePath)
+        )
+        #expect(file.length == AVAudioFramePosition(samples.count))
+    }
+
     @Test("Reads span both the in-memory tail cache and disk fallback seamlessly")
     func tailCacheAndDiskFallback() throws {
         let fixture = try TemporaryBackendFixture(prefix: "PCMStoreTests")
