@@ -162,10 +162,7 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
             [[Float]],
             ScriptedGenerationFailure
         )
-        case gated(
-            batchesBeforeGate: [[Float]],
-            batchesAfterGate: [[Float]]
-        )
+        case gated(batchesBeforeGate: [[Float]])
     }
 
     private struct State {
@@ -177,7 +174,6 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
         var oneShotScripts: [OneShotScript] = []
         var streamScripts: [StreamScript] = []
         var fittingCharacterLimit: Int?
-        var gateIsOpen = false
         var isWaitingAtGate = false
     }
 
@@ -248,25 +244,15 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
         }
     }
 
-    /// The next streamed call yields `batchesBeforeGate`, then parks until
-    /// `openGate()` or cancellation, then yields `batchesAfterGate`.
-    func enqueueGatedStream(
-        batchesBeforeGate: [[Float]],
-        batchesAfterGate: [[Float]] = []
-    ) {
+    /// The next streamed call yields `batchesBeforeGate`, then parks
+    /// until its task is cancelled. This is how tests hold an operation
+    /// active while they supersede or unload it.
+    func enqueueGatedStream(batchesBeforeGate: [[Float]]) {
         state.withLock {
-            $0.gateIsOpen = false
             $0.streamScripts.append(
-                .gated(
-                    batchesBeforeGate: batchesBeforeGate,
-                    batchesAfterGate: batchesAfterGate
-                )
+                .gated(batchesBeforeGate: batchesBeforeGate)
             )
         }
-    }
-
-    func openGate() {
-        state.withLock { $0.gateIsOpen = true }
     }
 
     /// Split chunks with the caller's chunker so no piece sent to
@@ -352,8 +338,8 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
             return Self.stream(yielding: [], thenThrowing: failure)
         case .batchesThenFailure(let batches, let failure):
             return Self.stream(yielding: batches, thenThrowing: failure)
-        case .gated(let before, let after):
-            return gatedStream(before: before, after: after)
+        case .gated(let before):
+            return gatedStream(before: before)
         case nil:
             return Self.stream(yielding: [defaultBatch])
         }
@@ -404,8 +390,7 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
     }
 
     private func gatedStream(
-        before: [[Float]],
-        after: [[Float]]
+        before: [[Float]]
     ) -> AsyncThrowingStream<[Float], Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -414,15 +399,10 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
                         continuation.yield(batch)
                     }
                     self.state.withLock { $0.isWaitingAtGate = true }
-                    while !self.state.withLock({ $0.gateIsOpen }) {
+                    while true {
                         try Task.checkCancellation()
                         await Task.yield()
                     }
-                    self.state.withLock { $0.isWaitingAtGate = false }
-                    for batch in after {
-                        continuation.yield(batch)
-                    }
-                    continuation.finish()
                 } catch {
                     self.state.withLock { $0.isWaitingAtGate = false }
                     continuation.finish(throwing: error)

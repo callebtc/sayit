@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import SayItCore
 import Testing
@@ -707,6 +706,7 @@ struct SynthesisEngineTests {
             loader: loader,
             clock: ControllableSynthesisClock()
         )
+        await configure(synthesizer)
         let model = try catalogModel(id: "kokoro-bf16")
 
         let result = try await synthesizer.generateVoiceSample(
@@ -748,6 +748,7 @@ struct SynthesisEngineTests {
             loader: ScriptedSpeechModelLoader(session: session),
             clock: ControllableSynthesisClock()
         )
+        await configure(synthesizer)
         let model = try catalogModel(id: "kokoro-bf16")
 
         do {
@@ -769,6 +770,32 @@ struct SynthesisEngineTests {
             )
         } catch {
             Issue.record("Unexpected error: \(error)")
+        }
+        #expect(session.oneShotCalls.count == 1)
+    }
+
+    @Test("Voice samples surface generic one-shot generation failures")
+    func voiceSampleGenericFailureSurfaces() async throws {
+        let session = ScriptedSpeechModelSession(sampleRate: 8_000)
+        session.enqueueOneShotFailure(.generic)
+        let synthesizer = makeSynthesizer(
+            loader: ScriptedSpeechModelLoader(session: session),
+            clock: ControllableSynthesisClock()
+        )
+        await configure(synthesizer)
+        let model = try catalogModel(id: "kokoro-bf16")
+
+        await #expect(throws: ScriptedSpeechModelError.self) {
+            _ = try await synthesizer.generateVoiceSample(
+                model: model,
+                text: "Sample words.",
+                language: model.defaultLanguage,
+                tuning: VoiceSynthesisTuning(
+                    preset: "natural",
+                    parameters: [:]
+                ),
+                seed: 3
+            )
         }
         #expect(session.oneShotCalls.count == 1)
     }
@@ -953,12 +980,10 @@ struct SynthesisEngineTests {
         sourceSampleRate: Double,
         in fixture: TemporaryBackendFixture
     ) async throws -> URL {
+        // Sawtooth between -0.2 and 0.2 so decoded samples are finite
+        // and audibly non-silent without any math-library dependency.
         let samples = (0..<sampleCount).map { frame in
-            Float(
-                sin(
-                    2 * .pi * 220 * Double(frame) / sourceSampleRate
-                ) * 0.2
-            )
+            Float(frame % 100) / 100 * 0.4 - 0.2
         }
         let url = fixture.root.appending(path: "reference.wav")
         try await AudioArchive(directory: fixture.root).writeWAV(
