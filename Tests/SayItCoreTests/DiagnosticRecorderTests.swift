@@ -84,4 +84,25 @@ struct DiagnosticRecorderTests {
         let oversizedContents = try String(contentsOf: oversizedURL, encoding: .utf8)
         #expect(oversizedContents.contains("rotated.event"))
     }
+
+    @Test("Recorder recovers when the log file is deleted externally")
+    func recoversFromExternalDeletion() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "DiagnosticExternalDelete-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "events.jsonl")
+
+        let recorder = DiagnosticRecorder(fileURL: fileURL)
+        await recorder.record(DiagnosticEvent(severity: .info, category: .lifecycle, code: "before.delete"))
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+
+        try FileManager.default.removeItem(at: fileURL)
+        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+
+        await recorder.record(DiagnosticEvent(severity: .error, category: .playback, code: "after.delete"))
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+        let contents = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(contents.contains("after.delete"))
+        #expect(!contents.contains("before.delete"))
+    }
 }

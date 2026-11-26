@@ -31,9 +31,14 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduledOutputFrames: Int64 = 0
     private var renderRate: Double = 1
     private let timeline = TimelineDriver()
-    private var audioConfigurationTask: Task<Void, Never>?
-    private var audioConfigurationRecoveryTask: Task<Void, Never>?
-    private var completionWatchdogTask: Task<Void, Never>?
+    @ObservationIgnored
+    private nonisolated(unsafe) var audioConfigurationTask: Task<Void, Never>?
+    @ObservationIgnored
+    private nonisolated(unsafe) var audioConfigurationRecoveryTask: Task<Void, Never>?
+    @ObservationIgnored
+    private nonisolated(unsafe) var completionWatchdogTask: Task<Void, Never>?
+    @ObservationIgnored
+    private nonisolated(unsafe) var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
     private var pcmStore: PCMStore?
     private var frameScheduler: PCMFrameScheduler?
     private var sampleRate: Double = 24_000
@@ -48,6 +53,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private var shouldFadeInNextScheduledBuffer = false
     private var synthesisIsComplete = false
     private var isReconfiguringAudioGraph = false
+    private var isStoppingSmoothly = false
     private var amplitudeWindows: [Float] = []
     private var amplitudePendingEnergy = Double.zero
     private var amplitudePendingSampleCount = 0
@@ -113,10 +119,18 @@ final class PlaybackController: BackendPlaybackControlling {
     var rate: Double = 1 {
         didSet {
             guard rate != oldValue else { return }
+            guard !isStoppingSmoothly else { return }
             let wasPlaying = state == .playing
             let anchor = currentPlaybackTime()
             do {
-                if hasStoredAudio {
+                if hasStoredAudio, state != .failed, state != .idle {
+                    cancelAudioConfigurationRecovery()
+                    if audioGraphNeedsReconfiguration {
+                        invalidateScheduledAudio()
+                        configuredSampleRate = nil
+                        let format = try monoFormat(sampleRate: sampleRate)
+                        try configureAudioGraph(for: format)
+                    }
                     try rescheduleAudio(from: anchor)
                     elapsed = anchor
                     lastStablePlaybackTime = anchor
@@ -155,6 +169,15 @@ final class PlaybackController: BackendPlaybackControlling {
         engine.attach(player)
         configureRemoteCommands()
         monitorAudioConfiguration()
+    }
+
+    deinit {
+        audioConfigurationTask?.cancel()
+        audioConfigurationRecoveryTask?.cancel()
+        completionWatchdogTask?.cancel()
+        for (command, target) in remoteCommandTargets {
+            command.removeTarget(target)
+        }
     }
 
     func prepare(
@@ -241,6 +264,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func play() {
+        guard !isStoppingSmoothly else { return }
         cancelAudioConfigurationRecovery()
         do {
             if audioGraphNeedsReconfiguration, hasStoredAudio {
@@ -257,7 +281,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     func pause() {
-        guard state == .playing else { return }
+        guard !isStoppingSmoothly, state == .playing else { return }
         elapsed = AudioRouteRecoveryPolicy.stableAnchor(
             lastRendered: lastStablePlaybackTime,
             fallback: currentPlaybackTime(),
@@ -290,11 +314,12 @@ final class PlaybackController: BackendPlaybackControlling {
         let generation = stopTransitionGeneration
         requestID = nil
 
-        guard player.isPlaying, hasStoredAudio else {
+        guard player.isPlaying, hasStoredAudio, !audioGraphNeedsReconfiguration else {
             finishStopping()
             return
         }
 
+        isStoppingSmoothly = true
         do {
             let actualDuration = try scheduleFadeOut(
                 from: currentPlaybackTime(),
@@ -359,6 +384,7 @@ final class PlaybackController: BackendPlaybackControlling {
     }
 
     private func finishStopping() {
+        isStoppingSmoothly = false
         cancelAudioConfigurationRecovery()
         if audioGraphNeedsReconfiguration {
             configuredSampleRate = nil
@@ -391,23 +417,27 @@ final class PlaybackController: BackendPlaybackControlling {
     func finishBuffering() {
         synthesisIsComplete = true
         estimatedDuration = generatedDuration
+        if state == .buffering {
+            play()
+            return
+        }
+        guard !audioGraphNeedsReconfiguration else {
+            updateNowPlaying()
+            return
+        }
         do {
             try scheduleAvailableAudio()
         } catch {
             reportFailure(error)
             return
         }
-        if state == .buffering {
-            play()
-        } else {
-            finishPlaybackIfReady()
-            scheduleCompletionWatchdog()
-        }
+        finishPlaybackIfReady()
+        scheduleCompletionWatchdog()
         updateNowPlaying()
     }
 
     func seek(to seconds: TimeInterval) {
-        guard hasStoredAudio else { return }
+        guard !isStoppingSmoothly, hasStoredAudio else { return }
         cancelAudioConfigurationRecovery()
         let target = min(max(seconds, 0), generatedDuration)
         let wasPlaying = state == .playing
@@ -782,12 +812,15 @@ final class PlaybackController: BackendPlaybackControlling {
               let nodeTime = player.lastRenderTime,
               let playerTime = player.playerTime(forNodeTime: nodeTime),
               playerTime.sampleRate > 0 else {
-            return elapsed
+            return max(elapsed, 0)
         }
+        let renderedFrames = max(min(playerTime.sampleTime, scheduledOutputFrames), 0)
         return min(
-            scheduleOffset
-                + Double(min(playerTime.sampleTime, scheduledOutputFrames))
-                    / playerTime.sampleRate * renderRate,
+            max(
+                scheduleOffset
+                    + Double(renderedFrames) / playerTime.sampleRate * renderRate,
+                0
+            ),
             generatedDuration
         )
     }
@@ -898,9 +931,10 @@ final class PlaybackController: BackendPlaybackControlling {
         elapsed = currentPlaybackTime()
         lastStablePlaybackTime = elapsed
         invalidateScheduledAudio()
-        let frame = Int64((elapsed * sampleRate).rounded(.down))
+        let frame = max(Int64((elapsed * sampleRate).rounded(.down)), 0)
         frameScheduler?.reset(startingAt: frame)
         scheduleOffset = Double(frame) / sampleRate
+        shouldFadeInNextScheduledBuffer = true
         state = .buffering
         updateNowPlaying()
     }
@@ -1208,7 +1242,14 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func configureRemoteCommands() {
         let commands = MPRemoteCommandCenter.shared()
-        commands.playCommand.addTarget { [weak self] _ in
+        func register(
+            _ command: MPRemoteCommand,
+            handler: @escaping (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
+        ) {
+            let target = command.addTarget(handler: handler)
+            remoteCommandTargets.append((command, target))
+        }
+        register(commands.playCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.play()
@@ -1216,7 +1257,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.pauseCommand.addTarget { [weak self] _ in
+        register(commands.pauseCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.pause()
@@ -1224,7 +1265,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.togglePlayPauseCommand.addTarget { [weak self] _ in
+        register(commands.togglePlayPauseCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 if self.state == .playing {
@@ -1236,7 +1277,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.stopCommand.addTarget { [weak self] _ in
+        register(commands.stopCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.stop()
@@ -1244,7 +1285,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.nextTrackCommand.addTarget { [weak self] _ in
+        register(commands.nextTrackCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
@@ -1252,7 +1293,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.previousTrackCommand.addTarget { [weak self] _ in
+        register(commands.previousTrackCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
@@ -1263,7 +1304,7 @@ final class PlaybackController: BackendPlaybackControlling {
         commands.skipBackwardCommand.preferredIntervals = [
             NSNumber(value: backwardSkipInterval)
         ]
-        commands.skipBackwardCommand.addTarget { [weak self] _ in
+        register(commands.skipBackwardCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: -self.backwardSkipInterval)
@@ -1274,7 +1315,7 @@ final class PlaybackController: BackendPlaybackControlling {
         commands.skipForwardCommand.preferredIntervals = [
             NSNumber(value: forwardSkipInterval)
         ]
-        commands.skipForwardCommand.addTarget { [weak self] _ in
+        register(commands.skipForwardCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.skip(by: self.forwardSkipInterval)
@@ -1282,7 +1323,7 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             return .success
         }
-        commands.changePlaybackPositionCommand.addTarget { [weak self] event in
+        register(commands.changePlaybackPositionCommand) { [weak self] event in
             guard let position = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
@@ -1295,7 +1336,7 @@ final class PlaybackController: BackendPlaybackControlling {
         }
         commands.changePlaybackRateCommand.supportedPlaybackRates =
             PlaybackRate.presets.map { NSNumber(value: $0) }
-        commands.changePlaybackRateCommand.addTarget { [weak self] event in
+        register(commands.changePlaybackRateCommand) { [weak self] event in
             guard let rateEvent = event as? MPChangePlaybackRateCommandEvent,
                   PlaybackRate.isSupported(
                     Double(rateEvent.playbackRate)

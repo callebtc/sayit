@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public actor DiagnosticRecorder {
@@ -7,6 +8,7 @@ public actor DiagnosticRecorder {
     private let fileURL: URL
     private var recentEvents: [DiagnosticEvent] = []
     private var writeHandle: FileHandle?
+    private var openFileInode: UInt64?
     private var currentByteCount: Int64 = 0
     private var lastModifiedAt: Date?
     private var parentDirectoryCreated = false
@@ -50,7 +52,7 @@ public actor DiagnosticRecorder {
             }
             var data = try JSONEncoder.sayIt.encode(event)
             data.append(0x0A)
-            if let handle = writeHandle {
+            if let handle = writeHandle, isCachedHandleValid() {
                 do {
                     try handle.write(contentsOf: data)
                     currentByteCount += Int64(data.count)
@@ -59,20 +61,21 @@ public actor DiagnosticRecorder {
                 } catch {
                     closeHandle()
                 }
+            } else if writeHandle != nil {
+                closeHandle()
+                currentByteCount = 0
+                lastModifiedAt = nil
             }
-            if !FileManager.default.fileExists(atPath: fileURL.path) {
-                try data.write(to: fileURL, options: .atomic)
-                currentByteCount = Int64(data.count)
-                lastModifiedAt = .now
-                openAppendHandle()
+            let handle = try openAppendHandle()
+            try handle.write(contentsOf: data)
+            var fileStat = stat()
+            if Darwin.fstat(handle.fileDescriptor, &fileStat) == 0 {
+                currentByteCount = Int64(fileStat.st_size)
+                openFileInode = fileStat.st_ino
             } else {
-                let handle = try FileHandle(forWritingTo: fileURL)
-                let endOffset = try handle.seekToEnd()
-                try handle.write(contentsOf: data)
-                writeHandle = handle
-                currentByteCount = Int64(endOffset) + Int64(data.count)
-                lastModifiedAt = .now
+                currentByteCount += Int64(data.count)
             }
+            lastModifiedAt = .now
         } catch {
             closeHandle()
             // Diagnostics must never disrupt the user-facing operation.
@@ -104,15 +107,39 @@ public actor DiagnosticRecorder {
         }
     }
 
-    private func openAppendHandle() {
-        guard let handle = try? FileHandle(forWritingTo: fileURL) else { return }
-        _ = try? handle.seekToEnd()
+    private func isCachedHandleValid() -> Bool {
+        guard let openFileInode else { return false }
+        var pathStat = Darwin.stat()
+        guard Darwin.fstatat(AT_FDCWD, fileURL.path, &pathStat, 0) == 0 else {
+            return false
+        }
+        return pathStat.st_ino == openFileInode
+    }
+
+    private func openAppendHandle() throws -> FileHandle {
+        let fd = Darwin.open(
+            fileURL.path,
+            O_WRONLY | O_CREAT | O_APPEND,
+            S_IRUSR | S_IWUSR
+        )
+        guard fd >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         writeHandle = handle
+        var fileStat = stat()
+        if Darwin.fstat(fd, &fileStat) == 0 {
+            openFileInode = fileStat.st_ino
+        } else {
+            openFileInode = nil
+        }
+        return handle
     }
 
     private func closeHandle() {
         try? writeHandle?.close()
         writeHandle = nil
+        openFileInode = nil
     }
 
     private func rotateIfNeeded() throws {

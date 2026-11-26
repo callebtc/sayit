@@ -122,10 +122,15 @@ final class PCMStore {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
         }
+        let duplicated = Darwin.dup(fileDescriptor)
+        guard duplicated >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
         return PCMStoreSnapshot(
             url: url,
             sampleRate: sampleRate,
-            frameCount: frameCount
+            frameCount: frameCount,
+            duplicatedDescriptor: duplicated
         )
     }
 

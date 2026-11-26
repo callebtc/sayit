@@ -62,9 +62,7 @@ final class HistoryStore {
                 ?? items.endIndex
             items.insert(snapshot, at: insertionIndex)
         }
-        if items.count > Self.maxLoadedItems {
-            items.removeLast(items.count - Self.maxLoadedItems)
-        }
+        trimUnpinnedItemsToLimit()
     }
 
     func complete(
@@ -140,7 +138,7 @@ final class HistoryStore {
         }
         context.delete(item)
         try context.save()
-        if items.count < Self.maxLoadedItems {
+        if unpinnedLoadedCount < Self.maxLoadedItems {
             items.removeAll { $0.id == id }
         } else {
             try reload()
@@ -189,7 +187,7 @@ final class HistoryStore {
             context.delete(item)
         }
         try context.save()
-        if items.count < Self.maxLoadedItems {
+        if unpinnedLoadedCount < Self.maxLoadedItems {
             items.removeAll { identifiers.contains($0.id) }
         } else {
             try reload()
@@ -202,9 +200,28 @@ final class HistoryStore {
 
     func search(_ text: String) -> [HistoryItemSnapshot] {
         guard !text.isEmpty else { return items }
-        return items.filter {
-            $0.title.localizedStandardContains(text)
-                || $0.cleanedText.localizedStandardContains(text)
+        if unpinnedLoadedCount < Self.maxLoadedItems {
+            return items.filter {
+                $0.title.localizedStandardContains(text)
+                    || $0.cleanedText.localizedStandardContains(text)
+            }
+        }
+        let descriptor = FetchDescriptor<SpeechItem>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        guard let stored = try? context.fetch(descriptor) else {
+            return items.filter {
+                $0.title.localizedStandardContains(text)
+                    || $0.cleanedText.localizedStandardContains(text)
+            }
+        }
+        return stored.compactMap { item in
+            let title = normalizedTitle(title: item.title, cleanedText: item.cleanedText)
+            guard title.localizedStandardContains(text)
+                || item.cleanedText.localizedStandardContains(text) else {
+                return nil
+            }
+            return makeSnapshot(from: item, title: title)
         }
     }
 
@@ -252,20 +269,51 @@ final class HistoryStore {
         }
     }
 
+    private var unpinnedLoadedCount: Int {
+        items.reduce(into: 0) { count, item in
+            if !item.isPinned {
+                count += 1
+            }
+        }
+    }
+
+    private func trimUnpinnedItemsToLimit() {
+        var unpinnedCount = unpinnedLoadedCount
+        guard unpinnedCount > Self.maxLoadedItems else { return }
+        var index = items.endIndex
+        while unpinnedCount > Self.maxLoadedItems && index > items.startIndex {
+            index = items.index(before: index)
+            if !items[index].isPinned {
+                items.remove(at: index)
+                unpinnedCount -= 1
+            }
+        }
+    }
+
     private func reload() throws {
-        var descriptor = FetchDescriptor<SpeechItem>(
+        var recentDescriptor = FetchDescriptor<SpeechItem>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        descriptor.fetchLimit = Self.maxLoadedItems
+        recentDescriptor.fetchLimit = Self.maxLoadedItems
+        let pinnedDescriptor = FetchDescriptor<SpeechItem>(
+            predicate: #Predicate { $0.isPinned },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
         var repairedTitle = false
-        items = try context.fetch(descriptor).map {
-            let title = normalizedTitle(title: $0.title, cleanedText: $0.cleanedText)
-            if $0.title != title {
-                $0.title = title
-                repairedTitle = true
+        var loadedByID = Set<UUID>()
+        var loaded: [HistoryItemSnapshot] = []
+        for source in [try context.fetch(recentDescriptor), try context.fetch(pinnedDescriptor)] {
+            for item in source where loadedByID.insert(item.id).inserted {
+                let title = normalizedTitle(title: item.title, cleanedText: item.cleanedText)
+                if item.title != title {
+                    item.title = title
+                    repairedTitle = true
+                }
+                loaded.append(makeSnapshot(from: item, title: title))
             }
-            return makeSnapshot(from: $0, title: title)
         }
+        loaded.sort { $0.createdAt > $1.createdAt }
+        items = loaded
         if repairedTitle {
             try context.save()
         }

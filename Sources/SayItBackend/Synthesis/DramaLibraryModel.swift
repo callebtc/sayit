@@ -307,31 +307,51 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         generationParameters: GenerateParameters,
         streamingFrames: Int = 16
     ) -> sending AsyncThrowingStream<[Float], Error> {
+        makeManagedDirectSamplesStream(
+            text: text,
+            refAudio: refAudio,
+            refText: refText,
+            generationParameters: generationParameters,
+            streamingFrames: streamingFrames
+        ).stream
+    }
+
+    func makeManagedDirectSamplesStream(
+        text: String,
+        refAudio: sending MLXArray?,
+        refText: String?,
+        generationParameters: GenerateParameters,
+        streamingFrames: Int = 16
+    ) -> ManagedSampleStream {
         let input: (references: [DramaReference], settings: DramaSettings)
         do { input = try inputs(refAudio, refText, generationParameters, streamingFrames: streamingFrames) }
-        catch { return AsyncThrowingStream { $0.finish(throwing: error) } }
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    var gate = StreamVoicingGate()
-                    for try await piece in engine.chunks(Self.promptText(text), references: input.references, settings: input.settings) {
-                        try Task.checkCancellation()
-                        let ready = try gate.receive(
-                            samples: piece.samples,
-                            cappedChunks: piece.report?.cappedChunks ?? 0,
-                            silencedChunks: piece.report?.silencedChunks ?? 0
-                        )
-                        for samples in ready {
-                            continuation.yield(samples)
-                        }
-                    }
-                    for samples in gate.finish() {
+        catch {
+            let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+            continuation.finish(throwing: error)
+            return ManagedSampleStream(stream: stream, producer: Task {})
+        }
+        let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+        let task = Task {
+            do {
+                var gate = StreamVoicingGate()
+                for try await piece in engine.chunks(Self.promptText(text), references: input.references, settings: input.settings) {
+                    try Task.checkCancellation()
+                    let ready = try gate.receive(
+                        samples: piece.samples,
+                        cappedChunks: piece.report?.cappedChunks ?? 0,
+                        silencedChunks: piece.report?.silencedChunks ?? 0
+                    )
+                    for samples in ready {
                         continuation.yield(samples)
                     }
-                    continuation.finish()
-                } catch { continuation.finish(throwing: Task.isCancelled ? CancellationError() : error) }
-            }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+                }
+                for samples in gate.finish() {
+                    continuation.yield(samples)
+                }
+                continuation.finish()
+            } catch { continuation.finish(throwing: Task.isCancelled ? CancellationError() : error) }
         }
+        continuation.onTermination = { @Sendable _ in task.cancel() }
+        return ManagedSampleStream(stream: stream, producer: task)
     }
 }

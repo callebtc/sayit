@@ -201,4 +201,35 @@ struct PlaybackSnapshotApplicationTests {
         #expect(controller.volume == 0.6)
         #expect(commands.count == 1)
     }
+
+    @Test("Diagnostics revision state retains pending revision on failure and advances on success")
+    func diagnosticsRevisionStateTransitions() {
+        let failed = AppState.nextDiagnosticsRevisionState(
+            loadedRevision: 5,
+            lastLoaded: 3,
+            pending: 5,
+            succeeded: false
+        )
+        #expect(failed.lastLoaded == 3)
+        #expect(failed.pending == 5)
+
+        let succeeded = AppState.nextDiagnosticsRevisionState(
+            loadedRevision: 5,
+            lastLoaded: 3,
+            pending: 5,
+            succeeded: true
+        )
+        #expect(succeeded.lastLoaded == 5)
+        #expect(succeeded.pending == nil)
+
+        // Newer pending revision arriving during an in-flight load stays pending.
+        let withNewerPending = AppState.nextDiagnosticsRevisionState(
+            loadedRevision: 5,
+            lastLoaded: 3,
+            pending: 7,
+            succeeded: true
+        )
+        #expect(withNewerPending.lastLoaded == 5)
+        #expect(withNewerPending.pending == 7)
+    }
 }

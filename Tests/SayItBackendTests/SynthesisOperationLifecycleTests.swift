@@ -92,6 +92,78 @@ struct SynthesisOperationLifecycleTests {
         }
         #expect(await provider.observedCancellation)
     }
+
+    @Test("ManagedSampleStream awaits producer completion on cancellation before returning")
+    func managedSampleStreamAwaitsProducerOnCancel() async throws {
+        let probe = ManagedStreamCancellationProbe()
+        let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
+        let producer = Task.detached {
+            continuation.yield([0.1, 0.2])
+            await probe.markYielded()
+            await probe.waitUntilReleased()
+            await probe.markProducerFinished()
+            continuation.finish()
+        }
+        continuation.onTermination = { @Sendable _ in
+            producer.cancel()
+        }
+        let managed = ManagedSampleStream(stream: stream, producer: producer)
+
+        let consumer = Task {
+            try await managed.drain { _ in
+                throw CancellationError()
+            }
+        }
+
+        await probe.waitUntilYielded()
+        try await Task.sleep(for: .milliseconds(30))
+        // Drain must still be suspended awaiting producer completion while producer is running.
+        #expect(!(await probe.producerFinished))
+
+        await probe.release()
+        do {
+            try await consumer.value
+            Issue.record("Expected drain to propagate cancellation")
+        } catch is CancellationError {
+            // Expected.
+        }
+        // Once drain returns, producer is guaranteed to have exited.
+        #expect(await probe.producerFinished)
+    }
+}
+
+private actor ManagedStreamCancellationProbe {
+    private var yielded = false
+    private var released = false
+    private(set) var producerFinished = false
+    private var yieldWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func markYielded() {
+        yielded = true
+        for waiter in yieldWaiters { waiter.resume() }
+        yieldWaiters.removeAll()
+    }
+
+    func waitUntilYielded() async {
+        if yielded { return }
+        await withCheckedContinuation { yieldWaiters.append($0) }
+    }
+
+    func waitUntilReleased() async {
+        if released { return }
+        await withCheckedContinuation { releaseWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        for waiter in releaseWaiters { waiter.resume() }
+        releaseWaiters.removeAll()
+    }
+
+    func markProducerFinished() {
+        producerFinished = true
+    }
 }
 
 private actor OperationOverlapProbe {

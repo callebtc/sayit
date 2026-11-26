@@ -124,6 +124,7 @@ public final class SayItBackendService: SayItService {
     private(set) var eventSnapshotBuildCount = 0
     private var isModelTransitionInProgress = false
     private var isShuttingDown = false
+    private var preloadTask: Task<Void, Never>?
     private let serviceVersion: String
 
     public convenience init(
@@ -280,8 +281,11 @@ public final class SayItBackendService: SayItService {
 
         let transitionTask = modelTransitionTask
         let installTask = downloadTask
+        let activePreloadTask = preloadTask
         transitionTask?.cancel()
         installTask?.cancel()
+        activePreloadTask?.cancel()
+        preloadTask = nil
         if let modelID = downloadProgress?.modelID {
             await modelManager.cancelInstall(modelID)
         }
@@ -294,6 +298,7 @@ public final class SayItBackendService: SayItService {
         await cancelVoiceStudio()
         await installTask?.value
         _ = await transitionTask?.result
+        await activePreloadTask?.value
         await synthesizer.unloadModel()
         playback.stop()
 
@@ -2667,7 +2672,8 @@ public final class SayItBackendService: SayItService {
             ? model.defaultLanguage
             : settings.activeLanguage
         let synthesizer = self.synthesizer
-        Task {
+        preloadTask?.cancel()
+        preloadTask = Task {
             await synthesizer.preloadModel(
                 model,
                 voice: voice,

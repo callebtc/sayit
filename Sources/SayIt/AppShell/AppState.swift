@@ -42,6 +42,7 @@ final class AppState {
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
     private var pendingDiagnosticsRevision: UInt64?
+    private var inFlightDiagnosticsRevision: UInt64?
     private var lastVoicesRevision: UInt64?
     private var lastServiceRevision: UInt64?
     @ObservationIgnored
@@ -371,10 +372,10 @@ final class AppState {
         if isPresented {
             if NSApp.isActive { updates.userDidInteract() }
             if let pending = pendingDiagnosticsRevision,
-               pending != lastDiagnosticsRevision {
-                lastDiagnosticsRevision = pending
-                pendingDiagnosticsRevision = nil
-                Task { await loadDiagnostics() }
+               pending != lastDiagnosticsRevision,
+               pending != inFlightDiagnosticsRevision {
+                inFlightDiagnosticsRevision = pending
+                Task { await loadDiagnostics(forRevision: pending) }
             }
         }
     }
@@ -1476,12 +1477,12 @@ final class AppState {
             Task { await refreshHistory() }
         }
         if lastDiagnosticsRevision != snapshot.diagnosticsRevision {
-            if isAppWindowPresented {
-                lastDiagnosticsRevision = snapshot.diagnosticsRevision
-                pendingDiagnosticsRevision = nil
-                Task { await loadDiagnostics() }
-            } else {
-                pendingDiagnosticsRevision = snapshot.diagnosticsRevision
+            pendingDiagnosticsRevision = snapshot.diagnosticsRevision
+            if isAppWindowPresented,
+               inFlightDiagnosticsRevision != snapshot.diagnosticsRevision {
+                let targetRevision = snapshot.diagnosticsRevision
+                inFlightDiagnosticsRevision = targetRevision
+                Task { await loadDiagnostics(forRevision: targetRevision) }
             }
         }
         if voiceStudio != snapshot.voiceStudio {
@@ -1556,7 +1557,39 @@ final class AppState {
         }
     }
 
-    private func loadDiagnostics() async {
+    static func nextDiagnosticsRevisionState(
+        loadedRevision: UInt64?,
+        lastLoaded: UInt64?,
+        pending: UInt64?,
+        succeeded: Bool
+    ) -> (lastLoaded: UInt64?, pending: UInt64?) {
+        guard succeeded else {
+            let retainedPending: UInt64? = switch (pending, loadedRevision) {
+            case let (current?, failed?):
+                max(current, failed)
+            case let (current?, nil):
+                current
+            case let (nil, failed?):
+                failed
+            case (nil, nil):
+                nil
+            }
+            return (lastLoaded, retainedPending)
+        }
+        guard let loadedRevision else {
+            return (lastLoaded, pending)
+        }
+        let nextLast = lastLoaded.map { max($0, loadedRevision) } ?? loadedRevision
+        let nextPending = pending.flatMap { $0 > nextLast ? $0 : nil }
+        return (nextLast, nextPending)
+    }
+
+    private func loadDiagnostics(forRevision targetRevision: UInt64? = nil) async {
+        defer {
+            if let targetRevision, inFlightDiagnosticsRevision == targetRevision {
+                inFlightDiagnosticsRevision = nil
+            }
+        }
         do {
             let response = try await send(.diagnostics)
             guard case .diagnostics(let snapshots) = response else {
@@ -1564,7 +1597,23 @@ final class AppState {
                 return
             }
             diagnosticEvents = snapshots.map(\.event)
+            let updated = Self.nextDiagnosticsRevisionState(
+                loadedRevision: targetRevision,
+                lastLoaded: lastDiagnosticsRevision,
+                pending: pendingDiagnosticsRevision,
+                succeeded: true
+            )
+            lastDiagnosticsRevision = updated.lastLoaded
+            pendingDiagnosticsRevision = updated.pending
         } catch {
+            let updated = Self.nextDiagnosticsRevisionState(
+                loadedRevision: targetRevision,
+                lastLoaded: lastDiagnosticsRevision,
+                pending: pendingDiagnosticsRevision,
+                succeeded: false
+            )
+            lastDiagnosticsRevision = updated.lastLoaded
+            pendingDiagnosticsRevision = updated.pending
             presentError(error.localizedDescription)
         }
     }

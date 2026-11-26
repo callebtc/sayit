@@ -176,6 +176,47 @@ struct HistoryStoreTests {
         #expect(store.items.map(\.id) == [pinned.id])
     }
 
+    @Test("Pinned items and search remain accessible beyond the 500-item loaded window")
+    func pinnedAndSearchBeyondLoadedLimit() throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItHistoryCapTests")
+        defer { fixture.remove() }
+        let store = try HistoryStore(directories: fixture.directories)
+        let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let pinned = try makeRequest(
+            text: "PinnedArchiveNeedle body text",
+            title: "Pinned Vintage Entry",
+            createdAt: baseDate
+        )
+        let oldUnpinned = try makeRequest(
+            text: "OlderUnpinnedSearchNeedle body text",
+            title: "Older Unpinned Entry",
+            createdAt: baseDate.addingTimeInterval(1)
+        )
+        try store.begin(pinned)
+        try store.togglePinned(id: pinned.id)
+        try store.begin(oldUnpinned)
+
+        for index in 2...505 {
+            try store.begin(
+                try makeRequest(
+                    text: "Recent body \(index)",
+                    title: "Recent \(index)",
+                    createdAt: baseDate.addingTimeInterval(Double(index))
+                )
+            )
+        }
+
+        #expect(store.items.contains { $0.id == pinned.id })
+        #expect(store.search("PinnedArchiveNeedle").map(\.id) == [pinned.id])
+        #expect(store.search("OlderUnpinnedSearchNeedle").map(\.id) == [oldUnpinned.id])
+
+        let reloaded = try HistoryStore(directories: fixture.directories)
+        #expect(reloaded.items.contains { $0.id == pinned.id })
+        #expect(reloaded.search("PinnedArchiveNeedle").map(\.id) == [pinned.id])
+        #expect(reloaded.search("OlderUnpinnedSearchNeedle").map(\.id) == [oldUnpinned.id])
+    }
+
     private func makeRequest(
         text: String,
         title: String,
