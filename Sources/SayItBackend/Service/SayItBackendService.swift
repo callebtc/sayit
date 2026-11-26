@@ -267,6 +267,7 @@ public final class SayItBackendService: SayItService {
         )
         diagnosticsRevision &+= 1
         startNextJobIfNeeded()
+        scheduleActiveModelPreload()
     }
 
     public func shutdown() async {
@@ -1839,6 +1840,7 @@ public final class SayItBackendService: SayItService {
         }
 
         stopSynthesisWatchdog(for: id)
+        try Task.checkCancellation()
         let terminalState = await waitForPlaybackCompletion(jobID: id)
         try Task.checkCancellation()
         switch terminalState {
@@ -2078,6 +2080,7 @@ public final class SayItBackendService: SayItService {
         statusText = "Ready to speak"
         persistJobJournal()
         await synthesizer.cancelCurrentRequest()
+        resumePlaybackCompletion(for: id, with: .idle)
         await task?.value
         if startNext, !isShuttingDown, !modelSwitchIsPending {
             startNextJobIfNeeded()
@@ -2317,10 +2320,12 @@ public final class SayItBackendService: SayItService {
             break
         }
         revision &+= 1
-        if state == .finished || state == .failed {
+        if state == .finished || state == .failed || state == .idle {
             if let id = activeJobID {
                 resumePlaybackCompletion(for: id, with: state)
-            } else {
+            } else if let waitingID = playbackCompletionJobID {
+                resumePlaybackCompletion(for: waitingID, with: state)
+            } else if state == .finished || state == .failed {
                 startNextJobIfNeeded()
             }
         }
@@ -2329,14 +2334,38 @@ public final class SayItBackendService: SayItService {
     private func waitForPlaybackCompletion(
         jobID: UUID
     ) async -> PlaybackState {
+        if Task.isCancelled || activeJobID != jobID {
+            return .idle
+        }
         if playback.state == .finished
             || playback.state == .failed
             || playback.state == .idle {
             return playback.state
         }
-        return await withCheckedContinuation { continuation in
-            playbackCompletionJobID = jobID
-            playbackCompletionContinuation = continuation
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled || activeJobID != jobID {
+                    continuation.resume(returning: .idle)
+                    return
+                }
+                if playback.state == .finished
+                    || playback.state == .failed
+                    || playback.state == .idle {
+                    continuation.resume(returning: playback.state)
+                    return
+                }
+                if let previous = playbackCompletionContinuation {
+                    playbackCompletionJobID = nil
+                    playbackCompletionContinuation = nil
+                    previous.resume(returning: .idle)
+                }
+                playbackCompletionJobID = jobID
+                playbackCompletionContinuation = continuation
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.resumePlaybackCompletion(for: jobID, with: .idle)
+            }
         }
     }
 
@@ -2571,6 +2600,54 @@ public final class SayItBackendService: SayItService {
         revision &+= 1
     }
 
+    private func scheduleActiveModelPreload() {
+        guard !isShuttingDown,
+              activeJobID == nil,
+              activeRequest == nil,
+              queuedJobIDs.isEmpty,
+              !isModelTransitionInProgress else {
+            return
+        }
+        let settings = settingsStore.value
+        let activeID = ModelID(settings.activeModelID)
+        guard installedModelIDs.contains(activeID),
+              let model = models.first(where: { $0.id == activeID }) else {
+            return
+        }
+        let selection = settings.voiceSelections[model.id.rawValue]
+            ?? fallbackSelection(settings: settings, model: model)
+        var voice: String?
+        var reference: VoiceReference?
+        switch selection {
+        case .preset(let preset):
+            voice = preset
+        case .profile(let id):
+            if let record = voiceProfiles.record(id: id),
+               record.modelID == model.id.rawValue,
+               let url = try? voiceProfiles.referenceURL(for: record) {
+                reference = record.origin == .importedFile
+                    ? VoiceReference(phononEmbeddingURL: url)
+                    : VoiceReference(audioURL: url, transcript: record.transcript)
+            }
+        case .automaticStable:
+            voice = model.defaultVoice
+        case .randomPerParagraph:
+            break
+        }
+        let language = settings.activeLanguage.isEmpty
+            ? model.defaultLanguage
+            : settings.activeLanguage
+        let synthesizer = self.synthesizer
+        Task {
+            await synthesizer.preloadModel(
+                model,
+                voice: voice,
+                voiceReference: reference,
+                language: language
+            )
+        }
+    }
+
     private func selectModel(_ id: ModelID) async throws {
         guard let model = models.first(where: { $0.id == id }) else {
             throw ServiceFailure(
@@ -2724,6 +2801,7 @@ public final class SayItBackendService: SayItService {
                 )
             )
             diagnosticsRevision &+= 1
+            scheduleActiveModelPreload()
         } catch is CancellationError {
             isModelTransitionInProgress = false
             if !isShuttingDown {

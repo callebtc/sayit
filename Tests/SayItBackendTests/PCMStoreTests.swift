@@ -117,6 +117,40 @@ struct PCMStoreTests {
         )
         #expect(!names.contains { $0.contains(".partial.") })
     }
+
+    @Test("Reads span both the in-memory tail cache and disk fallback seamlessly")
+    func tailCacheAndDiskFallback() throws {
+        let fixture = try TemporaryBackendFixture(prefix: "PCMStoreTests")
+        defer { fixture.remove() }
+        // At 1_000 Hz, maxTailFrames clamps to 65_536; writing 100_000 frames
+        // exercises both disk fallback (< 34_464) and in-memory tail reads.
+        let store = try PCMStore(
+            sampleRate: 1_000,
+            directory: fixture.root
+        )
+        let batchSize = 10_000
+        for batch in 0..<10 {
+            let start = batch * batchSize
+            let samples = (0..<batchSize).map { Float(start + $0) * 0.00001 }
+            try store.append(samples)
+        }
+        #expect(store.frameCount == 100_000)
+
+        let early = try store.readFrames(startingAt: 123, count: 50)
+        #expect(early.count == 50)
+        #expect(early.first == Float(123) * 0.00001)
+        #expect(early.last == Float(172) * 0.00001)
+
+        let boundary = try store.readFrames(startingAt: 34_400, count: 200)
+        #expect(boundary.count == 200)
+        #expect(boundary.first == Float(34_400) * 0.00001)
+        #expect(boundary.last == Float(34_599) * 0.00001)
+
+        let tail = try store.readFrames(startingAt: 99_900, count: 100)
+        #expect(tail.count == 100)
+        #expect(tail.first == Float(99_900) * 0.00001)
+        #expect(tail.last == Float(99_999) * 0.00001)
+    }
 }
 
 @Suite("Bounded PCM frame scheduler")

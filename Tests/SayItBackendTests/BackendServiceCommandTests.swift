@@ -1137,6 +1137,89 @@ struct BackendServiceCommandTests {
         _ = await fixture.service.handle(.init(command: .clear))
     }
 
+    @Test("Interrupting active playback during ongoing synthesis starts replacement speech", .timeLimit(.minutes(1)))
+    func interruptingActivePlaybackDuringSynthesisStartsReplacement() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+        fixture.playback.smoothStopFadeDuration = .milliseconds(25)
+
+        let longText = String(
+            repeating: "Streaming speech that is still synthesizing while playing. ",
+            count: 60
+        )
+        let first = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: longText,
+                            source: .selection,
+                            queuePolicy: .interruptCurrent
+                        )
+                    )
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == first.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+
+        let second = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: longText + "Replacement one.",
+                            source: .clipboard,
+                            queuePolicy: .interruptCurrent
+                        )
+                    )
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == second.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+
+        let third = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: "Final replacement speech.",
+                            source: .clipboard,
+                            queuePolicy: .interruptCurrent
+                        )
+                    )
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == third.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+
+        let jobs = try jobList(
+            await fixture.service.handle(.init(command: .jobs))
+        )
+        #expect(jobs.first(where: { $0.id == first.id })?.state == .canceled)
+        #expect(jobs.first(where: { $0.id == second.id })?.state == .canceled)
+        fixture.playback.finishForTesting()
+        try await waitForJobState(.completed, id: third.id, service: fixture.service)
+        for _ in 0..<4 {
+            await gate.releaseNext()
+        }
+    }
+
     @Test("Paused playback reports its blocker and interrupt starts new speech")
     func pausedPlaybackCanBeInterruptedWithoutStrandingTheQueue() async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
@@ -3082,6 +3165,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var playedFileTitle: String?
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
+    var smoothStopFadeDuration: Duration?
     var showTitleInNowPlaying = false
     var rate: Double = 1
     var volume: Double = 1
@@ -3143,6 +3227,14 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         estimatedDuration = 0
         currentTitle = ""
         currentModelID = nil
+    }
+
+    func stopSmoothly() async {
+        if let smoothStopFadeDuration, state == .playing {
+            state = .paused
+            try? await Task.sleep(for: smoothStopFadeDuration)
+        }
+        stop()
     }
 
     func stopForModelSwitch() async {

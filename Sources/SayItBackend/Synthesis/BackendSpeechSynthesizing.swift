@@ -18,4 +18,22 @@ protocol BackendSpeechSynthesizing: SpeechSynthesizing {
         seed: UInt64,
         reference: VoiceReference?
     ) async throws -> GeneratedVoiceSample
+
+    func preloadModel(
+        _ model: ModelDescriptor,
+        voice: String?,
+        voiceReference: VoiceReference?,
+        language: String?
+    ) async
+}
+
+extension BackendSpeechSynthesizing {
+    func preloadModel(
+        _ model: ModelDescriptor,
+        voice: String?,
+        voiceReference: VoiceReference?,
+        language: String?
+    ) async {
+        _ = (model, voice, voiceReference, language)
+    }
 }

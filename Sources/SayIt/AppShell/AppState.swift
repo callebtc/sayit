@@ -41,6 +41,7 @@ final class AppState {
     private var lastModelsRevision: UInt64?
     private var lastHistoryRevision: UInt64?
     private var lastDiagnosticsRevision: UInt64?
+    private var pendingDiagnosticsRevision: UInt64?
     private var lastVoicesRevision: UInt64?
     private var lastServiceRevision: UInt64?
     @ObservationIgnored
@@ -367,7 +368,15 @@ final class AppState {
     func setAppWindowPresented(_ isPresented: Bool) {
         guard isAppWindowPresented != isPresented else { return }
         isAppWindowPresented = isPresented
-        if isPresented && NSApp.isActive { updates.userDidInteract() }
+        if isPresented {
+            if NSApp.isActive { updates.userDidInteract() }
+            if let pending = pendingDiagnosticsRevision,
+               pending != lastDiagnosticsRevision {
+                lastDiagnosticsRevision = pending
+                pendingDiagnosticsRevision = nil
+                Task { await loadDiagnostics() }
+            }
+        }
     }
 
     func cancelCurrentRequest(preserveHistory: Bool = true) {
@@ -1467,8 +1476,13 @@ final class AppState {
             Task { await refreshHistory() }
         }
         if lastDiagnosticsRevision != snapshot.diagnosticsRevision {
-            lastDiagnosticsRevision = snapshot.diagnosticsRevision
-            Task { await loadDiagnostics() }
+            if isAppWindowPresented {
+                lastDiagnosticsRevision = snapshot.diagnosticsRevision
+                pendingDiagnosticsRevision = nil
+                Task { await loadDiagnostics() }
+            } else {
+                pendingDiagnosticsRevision = snapshot.diagnosticsRevision
+            }
         }
         if voiceStudio != snapshot.voiceStudio {
             voiceStudio = snapshot.voiceStudio
@@ -1699,6 +1713,7 @@ final class AppState {
         lastModelsRevision = nil
         lastHistoryRevision = nil
         lastDiagnosticsRevision = nil
+        pendingDiagnosticsRevision = nil
         lastVoicesRevision = nil
     }
 

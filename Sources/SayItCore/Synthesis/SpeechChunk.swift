@@ -10,6 +10,11 @@ public struct SpeechChunk: Identifiable, Equatable, Sendable {
         return lowerBound..<upperBound
     }
 
+    /// O(1) character count derived from `sourceBoundaryOffsets`.
+    public var characterCount: Int {
+        sourceBoundaryOffsets.count - 1
+    }
+
     let sourceBoundaryOffsets: [Int]
 
     public init(

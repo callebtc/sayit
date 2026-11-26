@@ -6,6 +6,10 @@ public actor DiagnosticRecorder {
 
     private let fileURL: URL
     private var recentEvents: [DiagnosticEvent] = []
+    private var writeHandle: FileHandle?
+    private var currentByteCount: Int64 = 0
+    private var lastModifiedAt: Date?
+    private var parentDirectoryCreated = false
 
     public init(fileURL: URL) {
         self.fileURL = fileURL
@@ -23,6 +27,10 @@ public actor DiagnosticRecorder {
         }
     }
 
+    deinit {
+        try? writeHandle?.close()
+    }
+
     public func record(_ event: DiagnosticEvent) async {
         guard Self.isSafeCode(event.code) else { return }
         recentEvents.append(event)
@@ -32,22 +40,41 @@ public actor DiagnosticRecorder {
 
         do {
             try rotateIfNeeded()
-            let parent = fileURL.deletingLastPathComponent()
-            try FileManager.default.createDirectory(
-                at: parent,
-                withIntermediateDirectories: true
-            )
+            if !parentDirectoryCreated {
+                let parent = fileURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(
+                    at: parent,
+                    withIntermediateDirectories: true
+                )
+                parentDirectoryCreated = true
+            }
             var data = try JSONEncoder.sayIt.encode(event)
             data.append(0x0A)
+            if let handle = writeHandle {
+                do {
+                    try handle.write(contentsOf: data)
+                    currentByteCount += Int64(data.count)
+                    lastModifiedAt = .now
+                    return
+                } catch {
+                    closeHandle()
+                }
+            }
             if !FileManager.default.fileExists(atPath: fileURL.path) {
                 try data.write(to: fileURL, options: .atomic)
+                currentByteCount = Int64(data.count)
+                lastModifiedAt = .now
+                openAppendHandle()
             } else {
                 let handle = try FileHandle(forWritingTo: fileURL)
-                try handle.seekToEnd()
+                let endOffset = try handle.seekToEnd()
                 try handle.write(contentsOf: data)
-                try handle.close()
+                writeHandle = handle
+                currentByteCount = Int64(endOffset) + Int64(data.count)
+                lastModifiedAt = .now
             }
         } catch {
+            closeHandle()
             // Diagnostics must never disrupt the user-facing operation.
         }
     }
@@ -58,6 +85,9 @@ public actor DiagnosticRecorder {
 
     public func clear() throws {
         recentEvents.removeAll(keepingCapacity: false)
+        closeHandle()
+        currentByteCount = 0
+        lastModifiedAt = nil
         if FileManager.default.fileExists(atPath: fileURL.path) {
             try FileManager.default.removeItem(at: fileURL)
         }
@@ -74,17 +104,48 @@ public actor DiagnosticRecorder {
         }
     }
 
+    private func openAppendHandle() {
+        guard let handle = try? FileHandle(forWritingTo: fileURL) else { return }
+        _ = try? handle.seekToEnd()
+        writeHandle = handle
+    }
+
+    private func closeHandle() {
+        try? writeHandle?.close()
+        writeHandle = nil
+    }
+
     private func rotateIfNeeded() throws {
+        if writeHandle != nil {
+            let isOversized = currentByteCount >= Self.maximumByteCount
+            let isExpired = lastModifiedAt.map {
+                Date.now.timeIntervalSince($0) >= Self.maximumAge
+            } ?? false
+            if isOversized || isExpired {
+                closeHandle()
+                currentByteCount = 0
+                lastModifiedAt = nil
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+            return
+        }
         let values = try? fileURL.resourceValues(forKeys: [
             .fileSizeKey,
             .contentModificationDateKey
         ])
-        let isOversized = Int64(values?.fileSize ?? 0) >= Self.maximumByteCount
-        let isExpired = values?.contentModificationDate.map {
+        let size = Int64(values?.fileSize ?? 0)
+        let modified = values?.contentModificationDate
+        let isOversized = size >= Self.maximumByteCount
+        let isExpired = modified.map {
             Date.now.timeIntervalSince($0) >= Self.maximumAge
         } ?? false
         if isOversized || isExpired {
             try? FileManager.default.removeItem(at: fileURL)
+            currentByteCount = 0
+            lastModifiedAt = nil
+        } else if values != nil {
+            currentByteCount = size
+            lastModifiedAt = modified
         }
     }
 }

@@ -1,5 +1,5 @@
 import AVFoundation
-
+import Darwin
 import Foundation
 import PlaybackDSP
 import SayItCore
@@ -217,22 +217,50 @@ actor AudioArchive {
     ) throws {
         guard source.frameCount > 0,
               source.sampleRate.isFinite,
-              source.sampleRate > 0 else {
+              source.sampleRate > 0,
+              let buffer = AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: AVAudioFrameCount(Self.writeChunkFrameCount)
+              ),
+              let channel = buffer.floatChannelData?[0] else {
             throw CocoaError(.fileWriteUnknown)
         }
 
-        var offset: Int64 = 0
-        while offset < source.frameCount {
-            let frameCount = min(
-                Self.writeChunkFrameCount,
-                Int(source.frameCount - offset)
-            )
-            let samples = try source.readFrames(
-                startingAt: offset,
-                count: frameCount
-            )
-            try write(samples: samples, format: format, to: file)
-            offset += Int64(samples.count)
+        try source.withOpenFileDescriptor { fd in
+            var offset: Int64 = 0
+            while offset < source.frameCount {
+                let frameCount = min(
+                    Self.writeChunkFrameCount,
+                    Int(source.frameCount - offset)
+                )
+                let byteOffset = off_t(offset) * off_t(MemoryLayout<Float>.stride)
+                let byteCount = frameCount * MemoryLayout<Float>.stride
+                let rawDst = UnsafeMutableRawPointer(channel)
+                var bytesRead = 0
+                while bytesRead < byteCount {
+                    let result = Darwin.pread(
+                        fd,
+                        rawDst.advanced(by: bytesRead),
+                        byteCount - bytesRead,
+                        byteOffset + off_t(bytesRead)
+                    )
+                    if result > 0 {
+                        bytesRead += result
+                    } else if result == -1 && errno == EINTR {
+                        continue
+                    } else if result == 0 {
+                        throw CocoaError(.fileReadCorruptFile)
+                    } else {
+                        throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                    }
+                }
+                for index in 0..<frameCount where !channel[index].isFinite {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                buffer.frameLength = AVAudioFrameCount(frameCount)
+                try file.write(from: buffer)
+                offset += Int64(frameCount)
+            }
         }
     }
 

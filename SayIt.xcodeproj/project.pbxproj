@@ -220,6 +220,7 @@
 		655F0772A2C3FA320720CA2A /* SayItBackend.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7E8C6A20E706CC206C44FC28 /* SayItBackend.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		65660AA297D0C8DC90D9D553 /* SayItHTTPServer+Upload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5C8FD44D6CA11CEA0B6212 /* SayItHTTPServer+Upload.swift */; };
 		656AACB1A3C56D27819DB755 /* HistoryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56631767F22E065003A55DA8 /* HistoryRowView.swift */; };
+		659AC07775F97B9D91DD51BB /* CachingTextProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B900A934C8B52DFA1B9E969 /* CachingTextProcessor.swift */; };
 		65ADE144FE13DEA0644A01A8 /* ServiceConnectionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4C0B12021D874A9797E94AA /* ServiceConnectionState.swift */; };
 		660B9287719F72B11783D3C1 /* ResumeCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C159E47E305909312F3675A5 /* ResumeCommand.swift */; };
 		662931D02D9303078BB8AE62 /* VoiceTuningSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61809FAC6AB3B4223A714878 /* VoiceTuningSpace.swift */; };
@@ -504,6 +505,7 @@
 		F3533C07DC9FF71C2FC05E10 /* MLXCachePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1B942725B7DC902DCDE1DC /* MLXCachePolicy.swift */; };
 		F37DE5C0F712CCB35E6CDC9D /* SpeechReaderLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1ED9A5191200B4C3B2F306A /* SpeechReaderLayout.swift */; };
 		F3C0BE22B46B4C9096F9D3AE /* CleanedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE5F90F8700618CBFF89611 /* CleanedText.swift */; };
+		F45BC4D9CCA02776068BF46A /* CachingTextProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438BA572A88C71E87DF97B86 /* CachingTextProcessorTests.swift */; };
 		F4DEB3192F7FFA8A44F37867 /* OnboardingStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798F5FF5F67AAD0DB93DC48F /* OnboardingStep.swift */; };
 		F584C1627A6C318C06C8A4E5 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = A39050CFC31E1CAFAD4CAFB6 /* Hummingbird */; };
 		F589786607987C69B5420B5A /* SayItCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E5B162BA286FB4707D990A4 /* SayItCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -895,6 +897,7 @@
 		09C022565E5F0A887C7D6A12 /* PhononVoiceImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhononVoiceImportSheet.swift; sourceTree = "<group>"; };
 		0A0CE028617B738D71D87065 /* VoiceTuningSpaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTuningSpaceTests.swift; sourceTree = "<group>"; };
 		0B1F7F464B9E202A91B06177 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
+		0B900A934C8B52DFA1B9E969 /* CachingTextProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachingTextProcessor.swift; sourceTree = "<group>"; };
 		0BE5C34234C6C62438D71E5A /* SpeechJobSource+TriggerSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpeechJobSource+TriggerSource.swift"; sourceTree = "<group>"; };
 		0C7947A1B766A97606F2097C /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		0C8EBE5B271FE3440BCFC059 /* SpeechAudioCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechAudioCollector.swift; sourceTree = "<group>"; };
@@ -988,6 +991,7 @@
 		42BFC2964BF2ABF447564986 /* VoiceRecordingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecordingError.swift; sourceTree = "<group>"; };
 		431BE087EDC0779B11802FCC /* SayItXPCClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItXPCClient.swift; sourceTree = "<group>"; };
 		435BC42F39716B2AF01C14DE /* SayItAgentMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SayItAgentMain.swift; sourceTree = "<group>"; };
+		438BA572A88C71E87DF97B86 /* CachingTextProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachingTextProcessorTests.swift; sourceTree = "<group>"; };
 		44DFE3716739E1A9D985FA10 /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
 		4527699AF5875AD4FC468DF5 /* PauseCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseCommand.swift; sourceTree = "<group>"; };
 		456A6147E5C1F299C5F70B42 /* AccessibilityAncestorSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityAncestorSearch.swift; sourceTree = "<group>"; };
@@ -1703,6 +1707,7 @@
 			isa = PBXGroup;
 			children = (
 				DA3519C44D00FEEA77E4A7E1 /* BackendSpeechSynthesizing.swift */,
+				0B900A934C8B52DFA1B9E969 /* CachingTextProcessor.swift */,
 				59C0229430B164D8FBA5DD59 /* Drama3Error.swift */,
 				1EDA5F9F1746A54AFE89FD61 /* DramaLibraryModel.swift */,
 				8C462F1A523FD96FFB614980 /* KittenVoiceArchiveConverter.swift */,
@@ -2366,6 +2371,7 @@
 				1C19862FF50A31ADB162AF44 /* BackendProjectionTests.swift */,
 				E35626CDDF11816B4A32DE6A /* BackendServiceCommandTests.swift */,
 				9921FBAE1C609BFD9AB4942F /* BackendSettingsStoreTests.swift */,
+				438BA572A88C71E87DF97B86 /* CachingTextProcessorTests.swift */,
 				214BC446DB61B3C9A7569932 /* CommunityModelResolverTests.swift */,
 				BEFF27897B469CFCC79D7DB6 /* DramaLibraryTests.swift */,
 				0B1F7F464B9E202A91B06177 /* HistoryStoreTests.swift */,
@@ -3041,6 +3047,7 @@
 				7856CCAA37B79FD97834762B /* BackendPlaybackControlling.swift in Sources */,
 				4C7C91395A2A7B358CB8BA6C /* BackendSettingsStore.swift in Sources */,
 				862EDDD16F402EC12212F7BE /* BackendSpeechSynthesizing.swift in Sources */,
+				659AC07775F97B9D91DD51BB /* CachingTextProcessor.swift in Sources */,
 				9A468EF5A94031E08CFEE119 /* CommunityModelResolver.swift in Sources */,
 				945A39481BECA04AEDA50C1F /* DiagnosticEvent+Snapshot.swift in Sources */,
 				DD991807F8FDB76C60A91E10 /* Drama3Error.swift in Sources */,
@@ -3510,6 +3517,7 @@
 				1C1E4B5A59D01BC152EA0440 /* BackendProjectionTests.swift in Sources */,
 				22DC722BCC81C0369F7F13CE /* BackendServiceCommandTests.swift in Sources */,
 				DA190540830AC28ABFB83F57 /* BackendSettingsStoreTests.swift in Sources */,
+				F45BC4D9CCA02776068BF46A /* CachingTextProcessorTests.swift in Sources */,
 				0EDC044954B21072C027314C /* CommunityModelResolverTests.swift in Sources */,
 				4581863BEFB457A209F9D54A /* DramaLibraryTests.swift in Sources */,
 				85B64EACE8D0A7F7159E7498 /* HistoryStoreTests.swift in Sources */,
@@ -4007,7 +4015,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
@@ -4025,7 +4033,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.7;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_SWIFT_FLAGS = "$(inherited) $(SAYIT_LOCAL_SWIFT_FLAG)";
@@ -4407,7 +4415,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = D7AHD3GLH6;
@@ -4430,7 +4438,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.7;
+				MARKETING_VERSION = 0.3.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
