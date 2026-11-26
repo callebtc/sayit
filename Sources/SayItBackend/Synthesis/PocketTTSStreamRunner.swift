@@ -19,9 +19,10 @@ import MLXNN
 ///   throughput with 4x fewer graph dispatches and host-GPU EOS syncs).
 /// - Replaces Mimi's dense `eye(512)` depthwise transposed-conv upsample with
 ///   exact broadcast-multiply overlap-add (512x fewer FLOPs, zero eye allocation).
-/// - Uses a tight 2-frame opening Mimi flush for instant first audio, then ramps
-///   to 32-frame steady batches overlapped asynchronously (`asyncEval`) with the
-///   next FlowLM batch.
+/// - Uses a tight 2-frame opening Mimi flush for instant first audio, a
+///   synchronous 16-frame second flush so cold playback crosses the 1.2 s
+///   start buffer by frame 18 (1.44 s), then 32-frame steady batches overlapped
+///   asynchronously (`asyncEval`) with the next FlowLM batch.
 enum PocketTTSStreamRunner {
     private static let defaultAudioPrompt = "alba"
     private static let maxCachedVoiceStates = 4
@@ -39,6 +40,17 @@ enum PocketTTSStreamRunner {
         let keys: [MLXArray]
         let values: [MLXArray]
         let promptNumFrames: Int
+        /// Retain the reference audio tensor so its `ObjectIdentifier` cache key
+        /// cannot be recycled while this entry remains cached.
+        let referenceAudio: MLXArray?
+    }
+
+    private struct FlowStepConstants {
+        let invSteps: MLXArray
+        let posWrite: MLXArray
+        let posMask: MLXArray
+        let zeroMaskVal: MLXArray
+        let negInfMaskVal: MLXArray
     }
 
     private struct DepthwiseUpsampleWeights {
@@ -76,6 +88,7 @@ enum PocketTTSStreamRunner {
             if let model {
                 let modelID = ObjectIdentifier(model)
                 cacheStore.compiledStates.removeValue(forKey: modelID)
+                cacheStore.voiceFilesByFolder.removeAll(keepingCapacity: false)
                 cacheStore.voiceStateOrder.removeAll { key in
                     if key.modelID == modelID {
                         cacheStore.voiceStates.removeValue(forKey: key)
@@ -286,14 +299,17 @@ enum PocketTTSStreamRunner {
             Int((max(0, streamingInterval) * frameRate).rounded(.up))
         )
         // Use a tight 2-frame opening flush (160 ms audio, above the 150 ms
-        // minimum sustainable playback buffer) for instant first audio, then
-        // ramp quickly to 32-frame steady batches overlapped with FlowLM.
+        // minimum sustainable playback buffer) for instant warm first audio,
+        // a synchronous 16-frame second flush (aligned to quadStepSize = 4)
+        // so cold playback crosses its 1.2 s start threshold by frame 18
+        // (1.44 s), then 32-frame steady batches overlapped asynchronously
+        // with FlowLM.
         let firstFlushFrames = streamingInterval >= 1.5
             ? requestedInitial
             : min(2, requestedInitial)
         let secondFlushFrames = streamingInterval >= 1.5
             ? requestedInitial
-            : max(firstFlushFrames, 8)
+            : max(firstFlushFrames, 16)
         let steadyBatchFrames = max(secondFlushFrames, 32)
         var emittedFlushes = 0
 
@@ -576,32 +592,39 @@ enum PocketTTSStreamRunner {
                     nextStepIndex + quadStepSize <= maxGenLen ? runQuadStep() : nil
 
                 let eosBools = currentBlock.eosFlags.asArray(Bool.self)
-                if let firstEosOffset = eosBools.firstIndex(of: true) {
-                    let detectedEos = currentBlock.startStep + firstEosOffset
-                    eosStep = detectedEos
-                    let totalAllowed = min(maxGenLen, detectedEos + framesAfterEos)
-                    let keepInCurrent = max(0, min(quadStepSize, totalAllowed - currentBlock.startStep))
-                    if keepInCurrent == quadStepSize {
+                if let slice = eosBlockKeepCounts(
+                    startStep: currentBlock.startStep,
+                    eosFlags: eosBools,
+                    framesAfterEos: framesAfterEos,
+                    maxGenLen: maxGenLen
+                ) {
+                    eosStep = slice.eosStep
+                    if slice.keepInCurrent == quadStepSize {
                         appendPending(currentBlock.latents, count: quadStepSize)
-                    } else if keepInCurrent > 0 {
-                        appendPending(currentBlock.latents[0..., 0..<keepInCurrent, 0...], count: keepInCurrent)
+                    } else if slice.keepInCurrent > 0 {
+                        appendPending(
+                            currentBlock.latents[0..., 0..<slice.keepInCurrent, 0...],
+                            count: slice.keepInCurrent
+                        )
                     }
 
-                    var consumedSteps = currentBlock.startStep + keepInCurrent
-                    if let nextBlock, consumedSteps < totalAllowed {
-                        let keepInNext = max(0, min(quadStepSize, totalAllowed - nextBlock.startStep))
-                        if keepInNext == quadStepSize {
+                    var consumedSteps = currentBlock.startStep + slice.keepInCurrent
+                    if let nextBlock, slice.keepInNext > 0 {
+                        if slice.keepInNext == quadStepSize {
                             appendPending(nextBlock.latents, count: quadStepSize)
-                        } else if keepInNext > 0 {
-                            appendPending(nextBlock.latents[0..., 0..<keepInNext, 0...], count: keepInNext)
+                        } else {
+                            appendPending(
+                                nextBlock.latents[0..., 0..<slice.keepInNext, 0...],
+                                count: slice.keepInNext
+                            )
                         }
-                        consumedSteps = nextBlock.startStep + keepInNext
+                        consumedSteps = nextBlock.startStep + slice.keepInNext
                     }
                     if pendingFrameCount >= targetBatchFrames() {
-                        flushLatents(synchronous: false)
+                        flushLatents(synchronous: emittedFlushes <= 1)
                     }
                     // Finish any remaining post-EOS tail frames (only if framesAfterEos > 7).
-                    while consumedSteps < totalAllowed && nextStepIndex < totalAllowed {
+                    while consumedSteps < slice.totalAllowed && nextStepIndex < slice.totalAllowed {
                         try Task.checkCancellation()
                         let tail = runSingleStep()
                         appendPending(tail.latent, count: 1)
@@ -612,7 +635,7 @@ enum PocketTTSStreamRunner {
 
                 appendPending(currentBlock.latents, count: quadStepSize)
                 if pendingFrameCount >= targetBatchFrames() {
-                    flushLatents(synchronous: false)
+                    flushLatents(synchronous: emittedFlushes <= 1)
                 }
 
                 if let nextBlock {
@@ -642,7 +665,7 @@ enum PocketTTSStreamRunner {
                 }
                 appendPending(current.latent, count: 1)
                 if pendingFrameCount >= targetBatchFrames() {
-                    flushLatents(synchronous: false)
+                    flushLatents(synchronous: emittedFlushes <= 1)
                 }
 
                 if let next {
@@ -686,6 +709,68 @@ enum PocketTTSStreamRunner {
         let transformed = model.mimi.decoder_transformer(upsampled, cache: model.mimi.decoderCache)[0]
         let audioChunk = model.mimi.decoder.step(transformed)
         return audioChunk[0, 0].asType(.float32)
+    }
+
+    /// Computes how many frames to keep from the current fused block and the
+    /// prefetched next block when EOS triggers inside a multi-step FlowLM block.
+    static func eosBlockKeepCounts(
+        startStep: Int,
+        eosFlags: [Bool],
+        framesAfterEos: Int,
+        maxGenLen: Int,
+        blockSize: Int = quadStepSize
+    ) -> (eosStep: Int, keepInCurrent: Int, keepInNext: Int, totalAllowed: Int)? {
+        guard let firstEosOffset = eosFlags.firstIndex(of: true) else {
+            return nil
+        }
+        let detectedEos = startStep + firstEosOffset
+        let totalAllowed = min(maxGenLen, detectedEos + framesAfterEos)
+        let keepInCurrent = max(0, min(blockSize, totalAllowed - startStep))
+        let nextStartStep = startStep + blockSize
+        let keepInNext = max(0, min(blockSize, totalAllowed - nextStartStep))
+        return (detectedEos, keepInCurrent, keepInNext, totalAllowed)
+    }
+
+    /// Pure-Swift reference implementation of the causal overlap-add formula
+    /// used by `fastDepthwiseUpsampleStep` so unit tests can verify exact
+    /// numerical equivalence with transposed convolution without requiring
+    /// Metal shader loading.
+    ///
+    /// - Parameters:
+    ///   - input: `[channels][timeSteps]`
+    ///   - wFirst: `[channels][stride]` first-half kernel weights `w[c, 0..<stride]`
+    ///   - wSecond: `[channels][stride]` second-half kernel weights `w[c, stride..<(2*stride)]`
+    ///   - prevInput: previous trailing frame `[channels]` carried across streaming chunks
+    /// - Returns: `[channels][timeSteps * stride]`
+    static func depthwiseUpsampleStepReference(
+        input: [[Float]],
+        wFirst: [[Float]],
+        wSecond: [[Float]],
+        prevInput: inout [Float]?
+    ) -> [[Float]] {
+        let channels = input.count
+        guard channels > 0,
+              let timeSteps = input.first?.count,
+              let stride = wFirst.first?.count,
+              timeSteps > 0,
+              stride > 0 else {
+            return input.map { _ in [] }
+        }
+        let head = prevInput ?? [Float](repeating: 0, count: channels)
+        var output = Array(repeating: [Float](repeating: 0, count: timeSteps * stride), count: channels)
+        var nextPrev = [Float](repeating: 0, count: channels)
+        for c in 0..<channels {
+            for t in 0..<timeSteps {
+                let curr = input[c][t]
+                let prev = t == 0 ? head[c] : input[c][t - 1]
+                for s in 0..<stride {
+                    output[c][t * stride + s] = curr * wFirst[c][s] + prev * wSecond[c][s]
+                }
+            }
+            nextPrev[c] = input[c][timeSteps - 1]
+        }
+        prevInput = nextPrev
+        return output
     }
 
     /// Exact streaming replacement for `ConvTrUpsample1d.step` (`groups == C`,
@@ -882,16 +967,16 @@ enum PocketTTSStreamRunner {
         flowDType: DType,
         useExactGELU: Bool,
         eosThreshold: Float,
-        invSteps: MLXArray,
         timeConds: [MLXArray],
         condEmb: MLXArray?,
-        posWrite: MLXArray,
-        posMask: MLXArray,
-        zeroMaskVal: MLXArray,
-        negInfMaskVal: MLXArray
+        constants: FlowStepConstants
     ) -> (latent: MLXArray, isEos: MLXArray) {
-        let writeMask = posWrite .== offsetArray
-        let attnMask = MLX.where(posMask .<= offsetArray, zeroMaskVal, negInfMaskVal)
+        let writeMask = constants.posWrite .== offsetArray
+        let attnMask = MLX.where(
+            constants.posMask .<= offsetArray,
+            constants.zeroMaskVal,
+            constants.negInfMaskVal
+        )
 
         var h = flowLM.input_linear(sequence)
         if let condEmb {
@@ -969,10 +1054,30 @@ enum PocketTTSStreamRunner {
                 xx = block(xx, y).asType(flowDType)
             }
             let flowDir = flowNet.final_layer(xx, y).asType(flowDType)
-            current = current + flowDir * invSteps
+            current = current + flowDir * constants.invSteps
         }
 
         return (current.expandedDimensions(axis: 1), isEos)
+    }
+
+    private static func makeFlowStepConstants(
+        state: CompiledModelState,
+        capacity: Int
+    ) -> FlowStepConstants {
+        let flowDType = state.flowDType
+        let invSteps = MLXArray(Float(1.0) / Float(state.lsdDecodeSteps)).asType(flowDType)
+        let posWrite = MLXArray(0..<Int32(capacity)).reshaped([1, 1, capacity, 1])
+        let posMask = MLXArray(0..<Int32(capacity)).reshaped([1, 1, 1, capacity])
+        let zeroMaskVal = MLXArray(Float(0)).asType(flowDType)
+        let negInfMaskVal = MLXArray(Float(-1e9)).asType(flowDType)
+        eval(invSteps, posWrite, posMask, zeroMaskVal, negInfMaskVal)
+        return FlowStepConstants(
+            invSteps: invSteps,
+            posWrite: posWrite,
+            posMask: posMask,
+            zeroMaskVal: zeroMaskVal,
+            negInfMaskVal: negInfMaskVal
+        )
     }
 
     private static func compiledFlowStep(
@@ -992,14 +1097,9 @@ enum PocketTTSStreamRunner {
         let useExactGELU = state.useExactGELU
         let eosThreshold = state.eosThreshold
         let numLayers = state.numLayers
-        let invSteps = MLXArray(Float(1.0) / Float(state.lsdDecodeSteps)).asType(flowDType)
         let timeConds = state.timeConds
         let condEmb = state.conditioningEmbedding
-        let posWrite = MLXArray(0..<Int32(capacity)).reshaped([1, 1, capacity, 1])
-        let posMask = MLXArray(0..<Int32(capacity)).reshaped([1, 1, 1, capacity])
-        let zeroMaskVal = MLXArray(Float(0)).asType(flowDType)
-        let negInfMaskVal = MLXArray(Float(-1e9)).asType(flowDType)
-        eval(posWrite, posMask, zeroMaskVal, negInfMaskVal)
+        let constants = makeFlowStepConstants(state: state, capacity: capacity)
 
         let fn = compile(
             inputs: [flowLM],
@@ -1025,13 +1125,9 @@ enum PocketTTSStreamRunner {
                 flowDType: flowDType,
                 useExactGELU: useExactGELU,
                 eosThreshold: eosThreshold,
-                invSteps: invSteps,
                 timeConds: timeConds,
                 condEmb: condEmb,
-                posWrite: posWrite,
-                posMask: posMask,
-                zeroMaskVal: zeroMaskVal,
-                negInfMaskVal: negInfMaskVal
+                constants: constants
             )
 
             var outputs: [MLXArray] = []
@@ -1068,14 +1164,9 @@ enum PocketTTSStreamRunner {
         let useExactGELU = state.useExactGELU
         let eosThreshold = state.eosThreshold
         let numLayers = state.numLayers
-        let invSteps = MLXArray(Float(1.0) / Float(state.lsdDecodeSteps)).asType(flowDType)
         let timeConds = state.timeConds
         let condEmb = state.conditioningEmbedding
-        let posWrite = MLXArray(0..<Int32(capacity)).reshaped([1, 1, capacity, 1])
-        let posMask = MLXArray(0..<Int32(capacity)).reshaped([1, 1, 1, capacity])
-        let zeroMaskVal = MLXArray(Float(0)).asType(flowDType)
-        let negInfMaskVal = MLXArray(Float(-1e9)).asType(flowDType)
-        eval(posWrite, posMask, zeroMaskVal, negInfMaskVal)
+        let constants = makeFlowStepConstants(state: state, capacity: capacity)
 
         let fn = compile(
             inputs: [flowLM],
@@ -1109,13 +1200,9 @@ enum PocketTTSStreamRunner {
                     flowDType: flowDType,
                     useExactGELU: useExactGELU,
                     eosThreshold: eosThreshold,
-                    invSteps: invSteps,
                     timeConds: timeConds,
                     condEmb: condEmb,
-                    posWrite: posWrite,
-                    posMask: posMask,
-                    zeroMaskVal: zeroMaskVal,
-                    negInfMaskVal: negInfMaskVal
+                    constants: constants
                 )
                 latents.append(nextLatent)
                 eosFlags.append(isEos)
@@ -1244,7 +1331,14 @@ enum PocketTTSStreamRunner {
             voiceKey: referenceAudio == nil ? (voice ?? "").lowercased() : "",
             referenceAudioID: referenceAudio.map(ObjectIdentifier.init)
         )
-        if let cached = cacheLock.withLock({ cacheStore.voiceStates[key] }) {
+        if let cached = cacheLock.withLock({ () -> CachedVoiceState? in
+            guard let state = cacheStore.voiceStates[key] else { return nil }
+            if let existingIndex = cacheStore.voiceStateOrder.firstIndex(of: key) {
+                cacheStore.voiceStateOrder.remove(at: existingIndex)
+                cacheStore.voiceStateOrder.append(key)
+            }
+            return state
+        }) {
             return cached
         }
 
@@ -1258,7 +1352,8 @@ enum PocketTTSStreamRunner {
         let snapshot = try initialVoiceState(
             model: model,
             conditioning: conditioning,
-            compiled: compiled
+            compiled: compiled,
+            referenceAudio: referenceAudio
         )
 
         cacheLock.withLock {
@@ -1277,7 +1372,8 @@ enum PocketTTSStreamRunner {
     private static func initialVoiceState(
         model: PocketTTSModel,
         conditioning rawConditioning: MLXArray,
-        compiled: CompiledModelState
+        compiled: CompiledModelState,
+        referenceAudio: MLXArray?
     ) throws -> CachedVoiceState {
         var conditioning = rawConditioning
         if conditioning.ndim == 2 {
@@ -1321,7 +1417,8 @@ enum PocketTTSStreamRunner {
         return CachedVoiceState(
             keys: keys,
             values: values,
-            promptNumFrames: offset
+            promptNumFrames: offset,
+            referenceAudio: referenceAudio
         )
     }
 
@@ -1386,21 +1483,45 @@ enum PocketTTSStreamRunner {
             }
         }
 
-        let voices = voiceFiles(in: modelFolder)
-        let defaultVoice = ["default", defaultAudioPrompt].first { voices[$0] != nil }
-        let selected = voice?.lowercased()
-            ?? defaultVoice
-            ?? voices.keys.sorted().first
-            ?? defaultAudioPrompt
-        guard let file = voices[selected] else {
-            let available = voices.keys.sorted().joined(separator: ", ")
-            throw runnerError("Unknown voice '\(selected)'. Available voices: \(available)")
+        let resolved = resolveVoiceFile(in: modelFolder, voice: voice)
+        guard let file = resolved.file else {
+            let available = resolved.available.joined(separator: ", ")
+            throw runnerError("Unknown voice '\(resolved.selected)'. Available voices: \(available)")
         }
         return try voiceConditioning(MLX.loadArrays(url: file), model: model)
     }
 
-    private static func voiceFiles(in modelFolder: URL) -> [String: URL] {
-        if let cached = cacheLock.withLock({ cacheStore.voiceFilesByFolder[modelFolder] }) {
+    static func resolveVoiceFile(
+        in modelFolder: URL,
+        voice: String?
+    ) -> (selected: String, file: URL?, available: [String]) {
+        func lookup(in voices: [String: URL]) -> (selected: String, file: URL?) {
+            let defaultVoice = ["default", defaultAudioPrompt].first { voices[$0] != nil }
+            let selected = voice?.lowercased()
+                ?? defaultVoice
+                ?? voices.keys.sorted().first
+                ?? defaultAudioPrompt
+            return (selected, voices[selected])
+        }
+
+        var voices = voiceFiles(in: modelFolder, forceRefresh: false)
+        var match = lookup(in: voices)
+        if match.file == nil {
+            // Re-scan disk on a cache miss so voices installed after the
+            // initial directory scan (e.g. "Update Voices" in the same process)
+            // resolve immediately without restarting the agent.
+            voices = voiceFiles(in: modelFolder, forceRefresh: true)
+            match = lookup(in: voices)
+        }
+        return (match.selected, match.file, voices.keys.sorted())
+    }
+
+    private static func voiceFiles(
+        in modelFolder: URL,
+        forceRefresh: Bool
+    ) -> [String: URL] {
+        if !forceRefresh,
+           let cached = cacheLock.withLock({ cacheStore.voiceFilesByFolder[modelFolder] }) {
             return cached
         }
         var voices: [String: URL] = [:]

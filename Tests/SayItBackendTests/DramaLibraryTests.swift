@@ -21,13 +21,82 @@ struct DramaLibraryTests {
         #expect(DramaLibraryModel.clampedStreamingFrames(128) == 24)
     }
 
-    @Test("Drama generation limit only aborts when a chunk emitted zero audio")
-    func generationLimitOnlyAbortsEmptyChunk() {
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 0, emittedSampleCount: 0))
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 44_100))
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 44_100))
-        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 0))
-        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 0))
+    @Test("Drama generation limit aborts when no voiced speech was emitted")
+    func generationLimitOnlyAbortsWithoutVoicedSpeech() {
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 0, emittedVoicedAudio: false))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedVoicedAudio: true))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedVoicedAudio: true))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedVoicedAudio: false))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedVoicedAudio: false))
+
+        // QuietGate can emit a 0.5 s dead-air tail at -50 dBFS or flat -40 dBFS
+        // hiss before aborting on silence; neither may masquerade as voiced speech.
+        let deadAirTail = [Float](repeating: 0.003, count: 22_050)
+        let flatHiss40dBFS = [Float](repeating: 0.01, count: 22_050)
+        // Quiet speech at ~-44 dBFS with syllable dynamics (alternating bursts
+        // and pauses across 50 ms sub-windows) must still count as voiced.
+        let subWindow = 2_205
+        var quietWhisper: [Float] = []
+        quietWhisper.reserveCapacity(subWindow * 10)
+        for index in 0..<10 {
+            let amp: Float = index.isMultiple(of: 2) ? 0.009 : 0.0005
+            quietWhisper.append(contentsOf: [Float](repeating: amp, count: subWindow))
+        }
+        let voicedPiece = [Float](repeating: 0.05, count: 22_050)
+        // Composite QuietGate payload: 1.49 s of held silence followed by a
+        // 0.37 s dynamic whisper must still detect the voiced window.
+        let heldSilencePlusWhisper = [Float](repeating: 0, count: Int(1.49 * 44_100))
+            + Array(quietWhisper.prefix(Int(0.37 * 44_100)))
+        #expect(!DramaLibraryModel.pieceContainsVoicedAudio([]))
+        #expect(!DramaLibraryModel.pieceContainsVoicedAudio(deadAirTail))
+        #expect(!DramaLibraryModel.pieceContainsVoicedAudio(flatHiss40dBFS))
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(quietWhisper))
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(heldSilencePlusWhisper))
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(voicedPiece))
+        #expect(
+            DramaLibraryModel.shouldAbortForReport(
+                cappedChunks: 0,
+                silencedChunks: 1,
+                emittedVoicedAudio: DramaLibraryModel.pieceContainsVoicedAudio(flatHiss40dBFS)
+            )
+        )
+    }
+
+    @Test("Drama voicing gate holds back dead air so silent limit failures emit zero samples for retry")
+    func voicingGateHoldsBackDeadAirBeforeRetry() throws {
+        let deadAirTail = [Float](repeating: 0.003, count: 22_050)
+        let flatHiss40dBFS = [Float](repeating: 0.01, count: 22_050)
+        let voicedPiece = [Float](repeating: 0.05, count: 22_050)
+
+        // Quiet dead-air piece (including flat -40 dBFS hiss) followed by a
+        // silenced report must emit zero samples before throwing generationLimit
+        // so SynthesisActor sees chunkSamples == 0 and retries.
+        for tail in [deadAirTail, flatHiss40dBFS] {
+            var silentGate = DramaLibraryModel.StreamVoicingGate()
+            let first = try silentGate.receive(samples: tail, cappedChunks: 0, silencedChunks: 0)
+            #expect(first.isEmpty)
+            do {
+                _ = try silentGate.receive(samples: [], cappedChunks: 0, silencedChunks: 1)
+                Issue.record("Expected Drama3Error.generationLimit")
+            } catch Drama3Error.generationLimit {}
+            #expect(silentGate.finish().isEmpty)
+        }
+
+        // Quiet lead followed by voiced speech flushes both and tolerates trailing silence report.
+        var voicedGate = DramaLibraryModel.StreamVoicingGate()
+        #expect(try voicedGate.receive(samples: deadAirTail, cappedChunks: 0, silencedChunks: 0).isEmpty)
+        let flushed = try voicedGate.receive(samples: voicedPiece, cappedChunks: 0, silencedChunks: 1)
+        #expect(flushed.count == 2)
+        #expect(flushed[0].count == deadAirTail.count)
+        #expect(flushed[1].count == voicedPiece.count)
+        #expect(voicedGate.emittedVoicedAudio)
+
+        // Intentional soft audio completing without any limit report flushes cleanly on finish().
+        var whisperGate = DramaLibraryModel.StreamVoicingGate()
+        #expect(try whisperGate.receive(samples: deadAirTail, cappedChunks: 0, silencedChunks: 0).isEmpty)
+        let remaining = whisperGate.finish()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].count == deadAirTail.count)
     }
 
     @Test("Installed Q4 streams finite speech and recovers after cancellation")

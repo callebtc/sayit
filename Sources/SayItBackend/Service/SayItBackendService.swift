@@ -42,8 +42,10 @@ public final class SayItBackendService: SayItService {
     private var pendingJobs: [UUID: PendingSpeechJob] = [:]
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
+    private var jobTransitionGeneration: UInt64 = 0
     private var activeRequest: SpeechRequest?
     private struct RequestTiming {
+        let requestID: UUID
         let modelID: ModelID
         let started: ContinuousClock.Instant
         var firstAudio: ContinuousClock.Instant?
@@ -1551,6 +1553,7 @@ public final class SayItBackendService: SayItService {
         }
         queuedJobIDs.removeFirst()
         activeJobID = id
+        jobTransitionGeneration &+= 1
         persistJobJournal()
         jobTask = Task { [weak self] in
             await self?.processJob(id)
@@ -1803,8 +1806,12 @@ public final class SayItBackendService: SayItService {
             return
         }
 
-        requestTiming = RequestTiming(modelID: request.model.id, started: .now)
-        defer { requestTiming = nil }
+        requestTiming = RequestTiming(requestID: request.id, modelID: request.model.id, started: .now)
+        defer {
+            if requestTiming?.requestID == request.id {
+                requestTiming = nil
+            }
+        }
         playback.rate = validatedPlaybackRate(
             submission.playbackRate ?? settings.playbackRate
         )
@@ -1987,7 +1994,9 @@ public final class SayItBackendService: SayItService {
             if request.source != .preview {
                 try await archiveCompletedRequest(request)
             }
-            activeRequest = nil
+            if activeRequest?.id == request.id {
+                activeRequest = nil
+            }
         case .cancelled:
             throw CancellationError()
         }
@@ -1997,6 +2006,10 @@ public final class SayItBackendService: SayItService {
         let spokenChunks = playback.spokenChunks
         do {
             let archive = try await playback.archive(using: audioArchive)
+            if Task.isCancelled || jobsByID[request.id]?.state == .canceled {
+                await audioArchive.remove(relativePath: archive.relativePath)
+                throw CancellationError()
+            }
             do {
                 try history.complete(
                     id: request.id,
@@ -2010,7 +2023,12 @@ public final class SayItBackendService: SayItService {
                 await audioArchive.remove(relativePath: archive.relativePath)
                 throw error
             }
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            if jobsByID[request.id]?.state == .canceled {
+                throw CancellationError()
+            }
             try? history.markIncomplete(
                 id: request.id,
                 state: .failed,
@@ -2060,6 +2078,7 @@ public final class SayItBackendService: SayItService {
         }
         let task = jobTask
         let request = activeRequest
+        let interruptGeneration = jobTransitionGeneration
         task?.cancel()
         resumePlaybackCompletion(for: id, with: .idle)
         stopSynthesisWatchdog(for: id)
@@ -2077,12 +2096,22 @@ public final class SayItBackendService: SayItService {
             historyRevision &+= 1
         }
         finishQueuedJob(id, state: .canceled)
-        statusText = "Ready to speak"
         persistJobJournal()
-        await synthesizer.cancelCurrentRequest()
+        // If a newer job started while we were suspended in stopSmoothly /
+        // stopForModelSwitch (even if it already transitioned to awaiting
+        // confirmation and cleared activeJobID), do not clobber its status or
+        // cancel its synthesis.
+        if activeJobID == nil, interruptGeneration == jobTransitionGeneration {
+            statusText = "Ready to speak"
+            await synthesizer.cancelCurrentRequest()
+        }
         resumePlaybackCompletion(for: id, with: .idle)
         await task?.value
-        if startNext, !isShuttingDown, !modelSwitchIsPending {
+        if activeJobID == nil,
+           interruptGeneration == jobTransitionGeneration,
+           startNext,
+           !isShuttingDown,
+           !modelSwitchIsPending {
             startNextJobIfNeeded()
         }
     }

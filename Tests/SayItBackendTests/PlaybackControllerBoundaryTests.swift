@@ -29,34 +29,117 @@ struct PlaybackControllerBoundaryTests {
         #expect(!playback.shouldStartWhenBuffered)
     }
 
-    @Test("Audio graph reuses matching sample rate across stops and reconfigures on sample-rate change")
+    @Test("Audio graph reuses matching sample rate across stops and reconfigures on sample-rate or route change")
     @MainActor
     func audioGraphReusesAndSwitchesSampleRate() throws {
         let playback = PlaybackController()
         defer { playback.stop() }
         playback.volume = 0
 
-        for sampleRate in [24_000.0, 24_000.0, 44_100.0, 24_000.0] {
+        let steps: [(sampleRate: Double, expectedConfigCount: Int)] = [
+            (24_000.0, 1),
+            (24_000.0, 1),
+            (44_100.0, 2),
+            (24_000.0, 3)
+        ]
+
+        for step in steps {
             let requestID = UUID()
             playback.prepare(
                 requestID: requestID,
-                title: "Rate \(Int(sampleRate))",
+                title: "Rate \(Int(step.sampleRate))",
                 estimatedDuration: 0.5,
                 modelID: "rate-test"
             )
-            let samples = [Float](repeating: 0.01, count: Int(sampleRate * 0.1))
+            let samples = [Float](repeating: 0.01, count: Int(step.sampleRate * 0.1))
             try playback.enqueue(AudioChunk(
                 requestID: requestID,
                 index: 0,
                 samples: samples,
-                sampleRate: sampleRate,
+                sampleRate: step.sampleRate,
                 startsParagraph: false
             ))
+            #expect(playback.audioGraphConfigurationCount == step.expectedConfigCount)
             #expect(playback.state == .buffering)
             #expect(abs(playback.generatedDuration - 0.1) < 0.001)
             playback.stop()
             #expect(playback.state == .idle)
         }
+
+        // An output-route change while idle must invalidate the cached sample
+        // rate so the next utterance reconfigures the graph for the new device.
+        playback.handleAudioConfigurationChangeForTesting()
+        let postRouteID = UUID()
+        playback.prepare(
+            requestID: postRouteID,
+            title: "Post-route change",
+            estimatedDuration: 0.5,
+            modelID: "rate-test"
+        )
+        try playback.enqueue(AudioChunk(
+            requestID: postRouteID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(playback.audioGraphConfigurationCount == 4)
+
+        // A route change while audio is buffered must not stop the player on a
+        // subsequent progressive enqueue during the debounce window, and must
+        // still rebuild the graph if stop() cancels the debounced recovery task.
+        playback.handleAudioConfigurationChangeForTesting()
+        try playback.enqueue(AudioChunk(
+            requestID: postRouteID,
+            index: 1,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        // Graph stays untouched during debounce so already-scheduled buffers are preserved.
+        #expect(playback.audioGraphConfigurationCount == 4)
+        #expect(abs(playback.generatedDuration - 0.2) < 0.001)
+        playback.stop()
+
+        let postBufferedRouteID = UUID()
+        playback.prepare(
+            requestID: postBufferedRouteID,
+            title: "Post-buffered-route change",
+            estimatedDuration: 0.5,
+            modelID: "rate-test"
+        )
+        try playback.enqueue(AudioChunk(
+            requestID: postBufferedRouteID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(playback.audioGraphConfigurationCount == 5)
+
+        // Calling play() during a pending route-change debounce must rebuild
+        // the graph and reschedule cleanly rather than discarding queued frames.
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.play()
+        #expect(playback.audioGraphConfigurationCount == 6)
+        #expect(playback.state == .playing)
+
+        // Calling seek() during a pending route-change debounce must rebuild
+        // the graph and preserve the requested seek position.
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.seek(to: 0.05)
+        #expect(playback.audioGraphConfigurationCount == 7)
+        #expect(abs(playback.elapsed - 0.05) < 0.01)
+
+        // Finishing playback during a pending route-change debounce must cancel
+        // recovery so the finished clip does not replay.
+        playback.pause()
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.finishBuffering()
+        playback.seek(to: playback.generatedDuration)
+        #expect(playback.state == .finished)
+        #expect(playback.audioGraphConfigurationCount == 8)
+        playback.stop()
     }
 
     @Test("Playback buffer duration grows only above normal speed")

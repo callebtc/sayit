@@ -70,4 +70,35 @@ struct TimeStretchTests {
         let silence = try second.process([Float](repeating: 0, count: 24_000), final: true)
         #expect(silence.allSatisfy { abs($0) < 0.0001 })
     }
+
+    @Test("Long recordings above 2x drain cleanly without tail failure", arguments: [2.1, 2.75, 3.0])
+    func longClipAboveTwoX(rate: Double) throws {
+        let sampleRate = 24_000.0
+        // Vary pitch across 1-second tiles so Sonic encounters non-divisible
+        // pitch periods over a 180-second stream (~4.32M frames).
+        let pitches = [127.0, 149.0, 173.0, 197.0, 223.0]
+        let tiles: [[Float]] = pitches.map { freq in
+            (0..<Int(sampleRate)).map { frame in
+                let t = Double(frame) / sampleRate
+                return Float(0.2 * sin(2 * .pi * freq * t) + 0.08 * sin(2 * .pi * freq * 2 * t))
+            }
+        }
+        let stream = try TimeStretchStream(sampleRate: sampleRate, rate: rate)
+        let totalInputFrames = 180 * Int(sampleRate)
+        var outputFrames = 0
+        for second in 0..<180 {
+            let chunk = tiles[second % tiles.count]
+            let stretched = try stream.process(chunk)
+            #expect(stretched.allSatisfy { $0.isFinite })
+            outputFrames += stretched.count
+        }
+        let tail = try stream.process([], final: true)
+        #expect(tail.allSatisfy { $0.isFinite })
+        outputFrames += tail.count
+
+        let expected = Double(totalInputFrames) / rate
+        #expect(outputFrames > 0)
+        #expect(Double(outputFrames) <= expected.rounded() + 1)
+        #expect(Double(outputFrames) >= expected * 0.99)
+    }
 }

@@ -129,12 +129,11 @@ public actor DiagnosticRecorder {
             }
             return
         }
-        let values = try? fileURL.resourceValues(forKeys: [
-            .fileSizeKey,
-            .contentModificationDateKey
-        ])
-        let size = Int64(values?.fileSize ?? 0)
-        let modified = values?.contentModificationDate
+        let attributes = try? FileManager.default.attributesOfItem(
+            atPath: fileURL.path
+        )
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = attributes?[.modificationDate] as? Date
         let isOversized = size >= Self.maximumByteCount
         let isExpired = modified.map {
             Date.now.timeIntervalSince($0) >= Self.maximumAge
@@ -143,7 +142,7 @@ public actor DiagnosticRecorder {
             try? FileManager.default.removeItem(at: fileURL)
             currentByteCount = 0
             lastModifiedAt = nil
-        } else if values != nil {
+        } else if attributes != nil {
             currentByteCount = size
             lastModifiedAt = modified
         }

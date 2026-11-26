@@ -18,10 +18,9 @@ The app's small `DramaLibraryModel` bridge connects upstream generation to the
 existing PCM conditioning and adaptive playback pipeline. Temperature 1.0,
 top-p 0.9, top-k 30, paragraph handling, and the 1024-frame cap remain in use.
 Reference recordings require a transcript and may be at most 30 seconds long.
-The library caches voice preparation and emits approximately 0.74-second pieces.
+The library caches voice preparation and emits bounded streaming pieces (up to 24 frames, ~1.11 s, below DramaTTS's 2.0 s `QuietGate` window).
 Say It starts playback once delivered-audio measurements provide sufficient lead.
-A capped or unrecoverably silenced response is an error rather than a successful
-truncated reading. Cancellation stops the producer and permits a later request.
+When a chunk emits voiced speech and `DramaPipeline` trims trailing dead air or hits its frame cap, Say It keeps the emitted speech and continues reading subsequent chunks; a chunk that hits a limit without producing voiced audio raises `Drama3Error.generationLimit` so `SynthesisActor` can sub-split and retry. Cancellation stops the producer and permits a later request.
 
 ## Dependencies and packaging
 

@@ -40,6 +40,8 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
+    private var audioGraphNeedsReconfiguration = false
+    private(set) var audioGraphConfigurationCount = 0
     private var cachedMonoFormat: AVAudioFormat?
     private var scheduleGeneration = 0
     private var scheduledBufferCount = 0
@@ -241,7 +243,14 @@ final class PlaybackController: BackendPlaybackControlling {
     func play() {
         cancelAudioConfigurationRecovery()
         do {
-            try startPlayback()
+            if audioGraphNeedsReconfiguration, hasStoredAudio {
+                try recoverAudioConfiguration(
+                    from: elapsed,
+                    previousState: .playing
+                )
+            } else {
+                try startPlayback()
+            }
         } catch {
             reportFailure(error)
         }
@@ -351,6 +360,10 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func finishStopping() {
         cancelAudioConfigurationRecovery()
+        if audioGraphNeedsReconfiguration {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
+        }
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
@@ -400,6 +413,12 @@ final class PlaybackController: BackendPlaybackControlling {
         let wasPlaying = state == .playing
 
         do {
+            if audioGraphNeedsReconfiguration {
+                invalidateScheduledAudio()
+                configuredSampleRate = nil
+                let format = try monoFormat(sampleRate: sampleRate)
+                try configureAudioGraph(for: format)
+            }
             try rescheduleAudio(from: target)
             elapsed = target
             lastStablePlaybackTime = target
@@ -534,6 +553,8 @@ final class PlaybackController: BackendPlaybackControlling {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.prepare()
         configuredSampleRate = format.sampleRate
+        audioGraphNeedsReconfiguration = false
+        audioGraphConfigurationCount += 1
         try ensureEngineRunning()
     }
 
@@ -773,6 +794,11 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func completePlayback() {
         guard state != .finished else { return }
+        cancelAudioConfigurationRecovery()
+        if audioGraphNeedsReconfiguration {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
+        }
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
@@ -845,12 +871,25 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             self.elapsed = self.currentPlaybackTime()
             let frameTolerance = 1 / max(self.sampleRate, 1)
-            if self.elapsed >= self.generatedDuration - frameTolerance {
+            if self.elapsed >= self.generatedDuration - frameTolerance
+                || (self.processingIsComplete && self.hasRenderedAllScheduledOutput()) {
                 self.completePlayback()
             } else {
                 self.scheduleCompletionWatchdog()
             }
         }
+    }
+
+    private func hasRenderedAllScheduledOutput() -> Bool {
+        guard scheduledOutputFrames > 0 else {
+            return scheduledBufferCount == 0
+        }
+        guard let nodeTime = player.lastRenderTime,
+              let playerTime = player.playerTime(forNodeTime: nodeTime),
+              playerTime.sampleRate > 0 else {
+            return scheduledBufferCount == 0
+        }
+        return playerTime.sampleTime >= scheduledOutputFrames
     }
 
     private func enterBufferingState() {
@@ -892,14 +931,29 @@ final class PlaybackController: BackendPlaybackControlling {
         }
     }
 
+    func handleAudioConfigurationChangeForTesting() {
+        scheduleAudioConfigurationRecovery()
+    }
+
     private func scheduleAudioConfigurationRecovery() {
-        guard !isReconfiguringAudioGraph,
-              configuredSampleRate != nil,
+        guard !isReconfiguringAudioGraph else {
+            return
+        }
+        // When idle or finished, drop the cached graph sample rate immediately
+        // so the next utterance reconfigures AVAudioEngine for the new device.
+        // When audio is currently buffered or playing, defer reconfiguration to
+        // `recoverAudioConfiguration` (or `finishStopping` / `play` if recovery
+        // is canceled early) so progressive `enqueue()` calls during the
+        // debounce window never call `player.stop()` and drop scheduled frames.
+        guard configuredSampleRate != nil,
               hasStoredAudio,
               state != .idle,
               state != .finished else {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
             return
         }
+        audioGraphNeedsReconfiguration = true
         let previousState = state
         let resumeTime = AudioRouteRecoveryPolicy.stableAnchor(
             lastRendered: lastStablePlaybackTime,
@@ -922,7 +976,9 @@ final class PlaybackController: BackendPlaybackControlling {
                     guard let self,
                           generation
                             == self.audioConfigurationRecoveryGeneration,
-                          self.hasStoredAudio else {
+                          self.hasStoredAudio,
+                          self.state != .idle,
+                          self.state != .finished else {
                         return
                     }
                     do {

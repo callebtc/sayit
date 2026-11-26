@@ -52,6 +52,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         let language: String
     }
 
+    private struct Qwen3ConditioningCacheEntry {
+        /// Retains the backing MLXArray so its `ObjectIdentifier` cannot be
+        /// recycled while the entry remains in the LRU cache.
+        let referenceAudio: MLXArray
+        let conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning
+    }
+
     private let modelURLProvider: ModelURLProvider
     private var chunker: TextChunker
     private var chunkDelay: Double = 0
@@ -64,7 +71,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     private var retainedReferenceAudio: MLXArray?
     private var referenceAudioCache: [ReferenceAudioCacheKey: MLXArray] = [:]
     private var referenceAudioCacheOrder: [ReferenceAudioCacheKey] = []
-    private var qwen3ConditioningCache: [Qwen3ConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning] = [:]
+    private var qwen3ConditioningCache: [Qwen3ConditioningCacheKey: Qwen3ConditioningCacheEntry] = [:]
     private var qwen3ConditioningCacheOrder: [Qwen3ConditioningCacheKey] = []
     private var operationGeneration: UInt64 = 0
     private var requestArrivalOrder: UInt64 = 0
@@ -559,60 +566,48 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             paragraphBreakStartOffsets: paragraphBreakStartOffsets,
             checkingCancellation: Task.checkCancellation
         )
-        if !chunks.isEmpty {
-            if Self.usesFastStartFirstChunk(modelType: modelTypeLower) {
-                let split = chunker.splitFirstChunkForFastStart(
-                    chunks[0],
-                    targetCharacterCount: Self.fastStartFirstChunkTarget,
-                    minimumLengthToSplit: Self.fastStartFirstChunkThreshold
-                )
-                if split.count > 1 {
-                    chunks.replaceSubrange(0...0, with: split)
-                }
-            } else if modelTypeLower == "fish_drama3" {
-                let split = chunker.splitFirstChunkForFastStart(
-                    chunks[0],
-                    targetCharacterCount: Self.dramaFastStartFirstChunkTarget,
-                    minimumLengthToSplit: Self.dramaFastStartFirstChunkThreshold
-                )
-                if split.count > 1 {
-                    chunks.replaceSubrange(0...0, with: split)
-                }
-            } else if modelTypeLower == "qwen3_tts" {
-                let split = chunker.splitFirstChunkForFastStart(
-                    chunks[0],
-                    targetCharacterCount: Self.qwenFastStartFirstChunkTarget,
-                    minimumLengthToSplit: Self.qwenFastStartFirstChunkThreshold
-                )
-                if split.count > 1 {
-                    chunks.replaceSubrange(0...0, with: split)
-                }
+        if !chunks.isEmpty,
+           let thresholds = Self.fastStartThresholds(forModelType: modelTypeLower) {
+            let split = chunker.splitFirstChunkForFastStart(
+                chunks[0],
+                targetCharacterCount: thresholds.target,
+                minimumLengthToSplit: thresholds.minimumLength
+            )
+            if split.count > 1 {
+                chunks.replaceSubrange(0...0, with: split)
             }
         }
 
+        // Fit chunk 0 before deciding whether automaticStable has multiple
+        // model calls: a single >300-byte Drama sentence can split into multiple
+        // fitted pieces that must all share the same voice.
+        var prefittedFirstChunk = false
+        if !chunks.isEmpty,
+           request.voiceMode == .automaticStable,
+           request.model.capabilities.supportsRandomVoiceSampling,
+           referenceAudio == nil {
+            let fittedFirst = try await fittingPieces(
+                for: chunks[0],
+                request: request,
+                model: loadedModel
+            )
+            chunks.replaceSubrange(0...0, with: fittedFirst)
+            prefittedFirstChunk = true
+        }
+
         // For `automaticStable` multi-chunk requests, self-anchor on chunk 0
-        // whenever chunk 0 is a natural sentence (>= 24 chars): chunk 0 streams
+        // whenever chunk 0 is a natural sentence (>= 36 chars): chunk 0 streams
         // immediately with zero throwaway anchor synthesis, and chunks 1..N clone
         // chunk 0's exact voice. Single-chunk requests need no anchor at all.
-        var captureChunk0AsSelfAnchor = false
-        if request.voiceMode == .automaticStable,
-           request.model.capabilities.supportsRandomVoiceSampling,
-           referenceAudio == nil,
-           chunks.count > 1 {
-            if chunks[0].text.count >= 24 {
-                captureChunk0AsSelfAnchor = true
-            } else {
-                let anchor = try await synthesizeArticleVoiceAnchor(
-                    for: request,
-                    model: loadedModel,
-                    operationID: operationID,
-                    continuation: continuation
-                )
-                referenceAudio = MLXArray(anchor.samples)
-                retainedReferenceAudio = referenceAudio
-                referenceText = anchor.text
-            }
-        }
+        var captureChunk0AsSelfAnchor = try await configureAutomaticVoiceAnchor(
+            for: request,
+            chunks: chunks,
+            model: loadedModel,
+            operationID: operationID,
+            continuation: continuation,
+            referenceAudio: &referenceAudio,
+            referenceText: &referenceText
+        )
 
         recordTiming(.voicePreparation, since: voiceStarted)
         var conditioner = try PCMStreamConditioner(
@@ -631,10 +626,13 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             }
             // Fit only the next logical chunk. Phonemizing a whole article here
             // would delay first audio even though the model consumes one chunk.
-            let pieces = try await fittingPieces(
-                for: chunks[chunkCursor], request: request, model: loadedModel
-            )
-            chunks.replaceSubrange(chunkCursor...chunkCursor, with: pieces)
+            if !(prefittedFirstChunk && chunkCursor == 0) {
+                let pieces = try await fittingPieces(
+                    for: chunks[chunkCursor], request: request, model: loadedModel
+                )
+                chunks.replaceSubrange(chunkCursor...chunkCursor, with: pieces)
+            }
+            prefittedFirstChunk = false
             let chunk = chunks[chunkCursor]
             continuation.yield(
                 .chunkStarted(
@@ -883,6 +881,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     chunkCursor...chunkCursor,
                     with: replacements
                 )
+                // If an initially single-chunk automaticStable request split
+                // into multiple pieces on retry, re-enable voice anchoring so
+                // replacement pieces share one consistent voice.
+                if chunkCursor == 0 {
+                    captureChunk0AsSelfAnchor = try await configureAutomaticVoiceAnchor(
+                        for: request,
+                        chunks: chunks,
+                        model: loadedModel,
+                        operationID: operationID,
+                        continuation: continuation,
+                        referenceAudio: &referenceAudio,
+                        referenceText: &referenceText
+                    )
+                }
                 continue
             }
 
@@ -927,8 +939,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             if capturingSelfAnchorThisChunk {
                 captureChunk0AsSelfAnchor = false
                 if chunkCursor + 1 < chunks.count {
-                    let minAnchorFrames = Int(Double(loadedModel.sampleRate) * 0.8)
-                    let maxAnchorFrames = Int(Double(loadedModel.sampleRate) * 20.0)
+                    let minAnchorFrames = Int(Double(loadedModel.sampleRate) * 0.25)
+                    let maxAnchorFrames = Int(Double(loadedModel.sampleRate) * 25.0)
                     if selfAnchorSamples.count >= minAnchorFrames,
                        selfAnchorSamples.count <= maxAnchorFrames {
                         referenceAudio = MLXArray(selfAnchorSamples)
@@ -961,12 +973,79 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         continuation.finish()
     }
 
-    private static func usesFastStartFirstChunk(modelType: String) -> Bool {
+    enum AutomaticStableAnchorAction: Equatable {
+        case none
+        case selfAnchorFirstChunk
+        case synthesizeAnchorUpfront
+    }
+
+    static let selfAnchorMinimumCharacterCount = 36
+
+    static func automaticStableAnchorAction(
+        voiceMode: VoiceSynthesisMode,
+        supportsRandomVoiceSampling: Bool,
+        hasReferenceAudio: Bool,
+        chunkCount: Int,
+        firstChunkLength: Int
+    ) -> AutomaticStableAnchorAction {
+        guard voiceMode == .automaticStable,
+              supportsRandomVoiceSampling,
+              !hasReferenceAudio,
+              chunkCount > 1 else {
+            return .none
+        }
+        return firstChunkLength >= selfAnchorMinimumCharacterCount
+            ? .selfAnchorFirstChunk
+            : .synthesizeAnchorUpfront
+    }
+
+    private func configureAutomaticVoiceAnchor(
+        for request: SpeechRequest,
+        chunks: [SpeechChunk],
+        model: SpeechGenerationModel,
+        operationID: UInt64,
+        continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation,
+        referenceAudio: inout MLXArray?,
+        referenceText: inout String?
+    ) async throws -> Bool {
+        let action = Self.automaticStableAnchorAction(
+            voiceMode: request.voiceMode,
+            supportsRandomVoiceSampling: request.model.capabilities.supportsRandomVoiceSampling,
+            hasReferenceAudio: referenceAudio != nil,
+            chunkCount: chunks.count,
+            firstChunkLength: chunks.first?.text.count ?? 0
+        )
+        switch action {
+        case .none:
+            return false
+        case .selfAnchorFirstChunk:
+            return true
+        case .synthesizeAnchorUpfront:
+            let anchor = try await synthesizeArticleVoiceAnchor(
+                for: request,
+                model: model,
+                operationID: operationID,
+                continuation: continuation
+            )
+            referenceAudio = MLXArray(anchor.samples)
+            retainedReferenceAudio = referenceAudio
+            referenceText = anchor.text
+            return false
+        }
+    }
+
+    private static func fastStartThresholds(
+        forModelType modelType: String
+    ) -> (target: Int, minimumLength: Int)? {
         switch modelType {
         case "kokoro", "kokoro_tts", "kitten", "kitten_tts", "omnivoice", "soprano", "soprano_tts":
-            true
+            (fastStartFirstChunkTarget, fastStartFirstChunkThreshold)
+        case "fish_drama3":
+            (dramaFastStartFirstChunkTarget, dramaFastStartFirstChunkThreshold)
+        case "qwen3_tts":
+            (qwenFastStartFirstChunkTarget, qwenFastStartFirstChunkThreshold)
         default:
-            false
+            nil
         }
     }
 
@@ -1222,14 +1301,17 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 qwen3ConditioningCacheOrder.remove(at: existingIndex)
             }
             qwen3ConditioningCacheOrder.append(key)
-            return cached
+            return cached.conditioning
         }
         let prepared = try model.prepareReferenceConditioning(
             refAudio: referenceAudio,
             refText: transcript,
             language: language
         )
-        qwen3ConditioningCache[key] = prepared
+        qwen3ConditioningCache[key] = Qwen3ConditioningCacheEntry(
+            referenceAudio: referenceAudio,
+            conditioning: prepared
+        )
         qwen3ConditioningCacheOrder.append(key)
         if qwen3ConditioningCacheOrder.count > Self.maxCachedQwen3Conditionings {
             let evicted = qwen3ConditioningCacheOrder.removeFirst()
@@ -1288,10 +1370,36 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         if abs(sourceRate - targetSampleRate) < 1 {
             return MLXArray(mono)
         }
+        return MLXArray(
+            Self.resampleMono(
+                mono,
+                from: sourceRate,
+                to: targetSampleRate
+            )
+        )
+    }
+
+    /// Linearly resamples mono PCM using `vDSP_vlint` with a trailing duplicate
+    /// sentinel sample so `vDSP_vlint`'s documented `A[floor(b) + 1]` access is
+    /// always strictly in bounds even when `b == mono.count - 1`.
+    static func resampleMono(
+        _ mono: [Float],
+        from sourceRate: Double,
+        to targetSampleRate: Double
+    ) -> [Float] {
+        guard !mono.isEmpty else { return [] }
+        if abs(sourceRate - targetSampleRate) < 1 {
+            return mono
+        }
         let outputCount = max(
             Int(Double(mono.count) * targetSampleRate / sourceRate),
             1
         )
+        if mono.count == 1 {
+            return [Float](repeating: mono[0], count: outputCount)
+        }
+        var padded = mono
+        padded.append(mono[mono.count - 1])
         var resampled = [Float](repeating: 0, count: outputCount)
         let step = Float(sourceRate / targetSampleRate)
         let maxIndex = Float(mono.count - 1)
@@ -1302,8 +1410,8 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         var minVal: Float = 0
         var maxVal = maxIndex
         vDSP_vclip(positions, 1, &minVal, &maxVal, &positions, 1, vDSP_Length(outputCount))
-        vDSP_vlint(mono, positions, 1, &resampled, 1, vDSP_Length(outputCount), vDSP_Length(mono.count))
-        return MLXArray(resampled)
+        vDSP_vlint(padded, positions, 1, &resampled, 1, vDSP_Length(outputCount), vDSP_Length(padded.count))
+        return resampled
     }
 
     private func fittingPieces(

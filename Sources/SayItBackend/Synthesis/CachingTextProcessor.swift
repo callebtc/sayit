@@ -24,17 +24,25 @@ final class CachingTextProcessor: TextProcessor, @unchecked Sendable {
 
     func process(text: String, language: String?) throws -> String {
         let key = Key(language: language ?? "", text: text)
-        if let cached = lock.withLock({ values[key] }) {
+        if let cached = lock.withLock({ () -> String? in
+            guard let value = values[key] else { return nil }
+            if let existingIndex = order.firstIndex(of: key) {
+                order.remove(at: existingIndex)
+                order.append(key)
+            }
+            return value
+        }) {
             return cached
         }
         let processed = try base.process(text: text, language: language)
         lock.withLock {
-            if values[key] == nil {
-                order.append(key)
-                if order.count > capacity {
-                    let evicted = order.removeFirst()
-                    values.removeValue(forKey: evicted)
-                }
+            if let existingIndex = order.firstIndex(of: key) {
+                order.remove(at: existingIndex)
+            }
+            order.append(key)
+            if order.count > capacity {
+                let evicted = order.removeFirst()
+                values.removeValue(forKey: evicted)
             }
             values[key] = processed
         }

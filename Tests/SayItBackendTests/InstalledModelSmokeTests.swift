@@ -361,179 +361,199 @@ struct InstalledModelSmokeTests {
                 print("MODEL_AUDIT_PRELOAD id=\(model.id.rawValue) voice=\(voiceName) seconds=\(preloadSeconds)")
             }
             for iteration in 1...repeats {
-            let request = SpeechRequest(
-                cleanedText: CleanedText(
-                    text: auditText ?? sampleText(for: model, language: language),
-                    title: "Model audit",
-                    detectedLanguage: language ?? "en",
-                    cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
-                    requiresLongTextConfirmation: false
-                ),
-                model: model,
-                voice: voice,
-                language: language,
-                voiceDescription: model.capabilities.voiceDescription
-                    ? auditVoiceDescription
-                        ?? "A calm, clear adult voice with natural pacing."
-                    : nil,
-                voiceMode: voiceReference == nil
-                    ? model.capabilities.supportsRandomVoiceSampling
-                        ? .automaticStable
-                        : .standard
-                    : .savedProfile,
-                voiceReference: voiceReference,
-                source: .preview
-            )
+                let request = SpeechRequest(
+                    cleanedText: CleanedText(
+                        text: auditText ?? sampleText(for: model, language: language),
+                        title: "Model audit",
+                        detectedLanguage: language ?? "en",
+                        cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
+                        requiresLongTextConfirmation: false
+                    ),
+                    model: model,
+                    voice: voice,
+                    language: language,
+                    voiceDescription: model.capabilities.voiceDescription
+                        ? auditVoiceDescription
+                            ?? "A calm, clear adult voice with natural pacing."
+                        : nil,
+                    voiceMode: voiceReference == nil
+                        ? model.capabilities.supportsRandomVoiceSampling
+                            ? .automaticStable
+                            : .standard
+                        : .savedProfile,
+                    voiceReference: voiceReference,
+                    source: .preview
+                )
 
-            let startedAt = ContinuousClock.now
-            let playback = environment["SAYIT_MODEL_AUDIT_PLAYBACK"] == "1" ? PlaybackController() : nil
-            var firstPlaybackSeconds: Double?
-            var rebufferCount = 0
-            var previousState = PlaybackState.idle
-            func elapsedSeconds() -> Double {
+                let startedAt = ContinuousClock.now
+                let playback = environment["SAYIT_MODEL_AUDIT_PLAYBACK"] == "1" ? PlaybackController() : nil
+                var firstPlaybackSeconds: Double?
+                var rebufferCount = 0
+                var previousState = PlaybackState.idle
+                func elapsedSeconds() -> Double {
+                    let elapsed = startedAt.duration(to: .now)
+                    return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+                }
+                playback?.onStateChange = { state in
+                    if state == .playing, firstPlaybackSeconds == nil { firstPlaybackSeconds = elapsedSeconds() }
+                    if state == .buffering, previousState == .playing { rebufferCount += 1 }
+                    previousState = state
+                }
+                playback?.volume = 0
+                if let rate = auditValue("SAYIT_MODEL_AUDIT_PLAYBACK_RATE", in: environment).flatMap(Double.init) {
+                    playback?.rate = rate
+                }
+                playback?.setPlaybackMode(model.playbackMode)
+                playback?.prepare(
+                    requestID: request.id,
+                    title: "Timing audit",
+                    estimatedDuration: Double(request.cleanedText.text.count) / 14,
+                    modelID: model.id.rawValue
+                )
+                playback?.setSpokenText(request.cleanedText.text)
+                defer { playback?.stop() }
+                let stream = await synthesizer.synthesize(request)
+                var samples: [Float] = []
+                var firstAudioSeconds: Double?
+                var audioEventCount = 0
+                var sampleRate = 0.0
+                var synthesizedChunks: [SpeechChunk] = []
+                var chunkDurations: [Double] = []
+                for try await event in stream {
+                    switch event {
+                    case .chunkStarted(_, let chunk):
+                        synthesizedChunks.append(chunk)
+                        playback?.appendSpokenChunk(PlaybackTextChunk(
+                            textStart: chunk.sourceRange.lowerBound,
+                            textEnd: chunk.sourceRange.upperBound,
+                            audioStart: playback?.generatedDuration ?? 0
+                        ))
+                    case .audio(let chunk):
+                        if firstAudioSeconds == nil {
+                            let elapsed = startedAt.duration(to: .now)
+                            firstAudioSeconds = Double(elapsed.components.seconds)
+                                + Double(elapsed.components.attoseconds) / 1e18
+                        }
+                        audioEventCount += 1
+                        samples.append(contentsOf: chunk.samples)
+                        sampleRate = chunk.sampleRate
+                        try playback?.enqueue(chunk)
+                        if playback?.shouldStartWhenBuffered == true { playback?.play() }
+                    case .progress(let progress):
+                        playback?.observeSynthesisProgress(progress)
+                        if playback?.shouldStartWhenBuffered == true { playback?.play() }
+                    case .metrics(let metrics):
+                        chunkDurations.append(metrics.audioDuration)
+                        if let playback, let chunk = playback.spokenChunks.last {
+                            playback.appendSpokenChunk(PlaybackTextChunk(
+                                textStart: chunk.textStart,
+                                textEnd: chunk.textEnd,
+                                audioStart: chunk.audioStart,
+                                audioEnd: playback.generatedDuration + metrics.trailingAudioDuration
+                            ))
+                            playback.observeSynthesisMetrics(metrics)
+                            if playback.shouldStartWhenBuffered { playback.play() }
+                        }
+                        print("MODEL_AUDIT_CHUNK index=\(metrics.chunkIndex) generation=\(metrics.generationDuration) audio=\(metrics.audioDuration) rtf=\(metrics.realTimeFactor)")
+                    case .timing(let timing):
+                        #expect(timing.duration.isFinite && timing.duration >= 0)
+                        print("MODEL_AUDIT_TIMING phase=\(timing.phase.rawValue) seconds=\(timing.duration)")
+                    case .completed:
+                        playback?.finishBuffering()
+                    default:
+                        break
+                    }
+                }
+
                 let elapsed = startedAt.duration(to: .now)
-                return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-            }
-            playback?.onStateChange = { state in
-                if state == .playing, firstPlaybackSeconds == nil { firstPlaybackSeconds = elapsedSeconds() }
-                if state == .buffering, previousState == .playing { rebufferCount += 1 }
-                previousState = state
-            }
-            playback?.volume = 0
-            if let rate = auditValue("SAYIT_MODEL_AUDIT_PLAYBACK_RATE", in: environment).flatMap(Double.init) {
-                playback?.rate = rate
-            }
-            playback?.setPlaybackMode(model.playbackMode)
-            playback?.prepare(requestID: request.id, title: "Timing audit",
-                estimatedDuration: Double(request.cleanedText.text.count) / 14, modelID: model.id.rawValue)
-            playback?.setSpokenText(request.cleanedText.text)
-            defer { playback?.stop() }
-            let stream = await synthesizer.synthesize(request)
-            var samples: [Float] = []
-            var firstAudioSeconds: Double?
-            var audioEventCount = 0
-            var sampleRate = 0.0
-            var synthesizedChunks: [SpeechChunk] = []
-            var chunkDurations: [Double] = []
-            for try await event in stream {
-                switch event {
-                case .chunkStarted(_, let chunk):
-                    synthesizedChunks.append(chunk)
-                    playback?.appendSpokenChunk(PlaybackTextChunk(
-                        textStart: chunk.sourceRange.lowerBound, textEnd: chunk.sourceRange.upperBound,
-                        audioStart: playback?.generatedDuration ?? 0))
-                case .audio(let chunk):
-                    if firstAudioSeconds == nil {
-                        let elapsed = startedAt.duration(to: .now)
-                        firstAudioSeconds = Double(elapsed.components.seconds)
-                            + Double(elapsed.components.attoseconds) / 1e18
+                let seconds = Double(elapsed.components.seconds)
+                    + Double(elapsed.components.attoseconds) / 1e18
+                if let playback {
+                    let deadline = ContinuousClock.now.advanced(by: .seconds(playback.generatedDuration + 10))
+                    while playback.state == .playing || playback.state == .buffering {
+                        if ContinuousClock.now >= deadline { break }
+                        try await Task.sleep(for: .milliseconds(100))
                     }
-                    audioEventCount += 1
-                    samples.append(contentsOf: chunk.samples)
-                    sampleRate = chunk.sampleRate
-                    try playback?.enqueue(chunk)
-                    if playback?.shouldStartWhenBuffered == true { playback?.play() }
-                case .progress(let progress):
-                    playback?.observeSynthesisProgress(progress)
-                    if playback?.shouldStartWhenBuffered == true { playback?.play() }
-                case .metrics(let metrics):
-                    chunkDurations.append(metrics.audioDuration)
-                    if let playback, let chunk = playback.spokenChunks.last {
-                        playback.appendSpokenChunk(PlaybackTextChunk(textStart: chunk.textStart,
-                            textEnd: chunk.textEnd, audioStart: chunk.audioStart,
-                            audioEnd: playback.generatedDuration + metrics.trailingAudioDuration))
-                        playback.observeSynthesisMetrics(metrics)
-                        if playback.shouldStartWhenBuffered { playback.play() }
+                    #expect(playback.state == .finished)
+                    #expect(rebufferCount == 0, "Adaptive playback ran out of audio")
+                    #expect(firstPlaybackSeconds != nil)
+                    print("MODEL_AUDIT_PLAYBACK firstStart=\(firstPlaybackSeconds ?? -1) synthesisComplete=\(seconds) rebuffers=\(rebufferCount)")
+                }
+                let finiteSamples = samples.filter(\.isFinite)
+                let peak = finiteSamples.map { abs($0) }.max() ?? 0
+                let rms = finiteSamples.isEmpty
+                    ? 0
+                    : sqrt(
+                        finiteSamples.reduce(0.0) { sum, sample in
+                            sum + Double(sample * sample)
+                        } / Double(finiteSamples.count)
+                    )
+                let audioDuration = sampleRate > 0
+                    ? Double(samples.count) / sampleRate
+                    : 0
+                print(
+                    "MODEL_AUDIT_RESULT id=\(model.id.rawValue) "
+                        + "voice=\(voiceName) "
+                        + "run=\(iteration) "
+                        + "samples=\(samples.count) rate=\(sampleRate) "
+                        + "duration=\(audioDuration) peak=\(peak) rms=\(rms) "
+                        + "elapsed=\(seconds) firstAudio=\(firstAudioSeconds ?? -1) "
+                        + "audioEvents=\(audioEventCount) "
+                        + "rtf=\(audioDuration > 0 ? seconds / audioDuration : -1) "
+                        + "peakFootprintBytes=\(peakPhysicalFootprint() ?? 0)"
+                )
+
+                #expect(samples.count > 1_000, "No audio for voice \(voiceName)")
+                #expect(
+                    finiteSamples.count == samples.count,
+                    "Non-finite audio for voice \(voiceName)"
+                )
+                #expect(sampleRate >= 8_000, "Invalid rate for voice \(voiceName)")
+                #expect(peak > 0.001, "Silent audio for voice \(voiceName)")
+                #expect(rms > 0.0001, "Silent audio for voice \(voiceName)")
+
+                if let outputPath = auditValue(
+                    "SAYIT_MODEL_AUDIT_OUTPUT",
+                    in: environment
+                ),
+                   voices.count == 1 {
+                    let baseURL = URL(filePath: outputPath)
+                    let outputURL: URL
+                    if repeats > 1 {
+                        let stem = baseURL.deletingPathExtension().lastPathComponent
+                        let ext = baseURL.pathExtension
+                        let runName = ext.isEmpty
+                            ? "\(stem)-run\(iteration)"
+                            : "\(stem)-run\(iteration).\(ext)"
+                        outputURL = baseURL.deletingLastPathComponent().appending(path: runName)
+                    } else {
+                        outputURL = baseURL
                     }
-                    print("MODEL_AUDIT_CHUNK index=\(metrics.chunkIndex) generation=\(metrics.generationDuration) audio=\(metrics.audioDuration) rtf=\(metrics.realTimeFactor)")
-                case .timing(let timing):
-                    #expect(timing.duration.isFinite && timing.duration >= 0)
-                    print("MODEL_AUDIT_TIMING phase=\(timing.phase.rawValue) seconds=\(timing.duration)")
-                case .completed:
-                    playback?.finishBuffering()
-                default:
-                    break
+                    let outputDirectory = outputURL.deletingLastPathComponent()
+                    try FileManager.default.createDirectory(
+                        at: outputDirectory,
+                        withIntermediateDirectories: true
+                    )
+                    let archive = AudioArchive(directory: outputDirectory)
+                    try await archive.writeWAV(
+                        samples: samples,
+                        sampleRate: sampleRate,
+                        destination: outputURL
+                    )
+                    let diagnostics = synthesizedChunks.enumerated().map {
+                        index, chunk in
+                        let duration = chunkDurations.indices.contains(index)
+                            ? chunkDurations[index]
+                            : 0
+                        return "\(chunk.id)\t\(chunk.text.count)\t\(duration)\t\(chunk.text)"
+                    }.joined(separator: "\n")
+                    try diagnostics.write(
+                        to: outputURL.appendingPathExtension("chunks.txt"),
+                        atomically: true,
+                        encoding: .utf8
+                    )
+                    print("MODEL_AUDIT_OUTPUT path=\(outputURL.path)")
                 }
-            }
-
-            let elapsed = startedAt.duration(to: .now)
-            let seconds = Double(elapsed.components.seconds)
-                + Double(elapsed.components.attoseconds) / 1e18
-            if let playback {
-                let deadline = ContinuousClock.now.advanced(by: .seconds(playback.generatedDuration + 10))
-                while playback.state == .playing || playback.state == .buffering {
-                    if ContinuousClock.now >= deadline { break }
-                    try await Task.sleep(for: .milliseconds(100))
-                }
-                #expect(playback.state == .finished)
-                #expect(rebufferCount == 0, "Adaptive playback ran out of audio")
-                #expect(firstPlaybackSeconds != nil)
-                print("MODEL_AUDIT_PLAYBACK firstStart=\(firstPlaybackSeconds ?? -1) synthesisComplete=\(seconds) rebuffers=\(rebufferCount)")
-            }
-            let finiteSamples = samples.filter(\.isFinite)
-            let peak = finiteSamples.map { abs($0) }.max() ?? 0
-            let rms = finiteSamples.isEmpty
-                ? 0
-                : sqrt(
-                    finiteSamples.reduce(0.0) { sum, sample in
-                        sum + Double(sample * sample)
-                    } / Double(finiteSamples.count)
-                )
-            let audioDuration = sampleRate > 0
-                ? Double(samples.count) / sampleRate
-                : 0
-            print(
-                "MODEL_AUDIT_RESULT id=\(model.id.rawValue) "
-                    + "voice=\(voiceName) "
-                    + "run=\(iteration) "
-                    + "samples=\(samples.count) rate=\(sampleRate) "
-                    + "duration=\(audioDuration) peak=\(peak) rms=\(rms) "
-                    + "elapsed=\(seconds) firstAudio=\(firstAudioSeconds ?? -1) "
-                    + "audioEvents=\(audioEventCount) "
-                    + "rtf=\(audioDuration > 0 ? seconds / audioDuration : -1) "
-                    + "peakFootprintBytes=\(peakPhysicalFootprint() ?? 0)"
-            )
-
-            #expect(samples.count > 1_000, "No audio for voice \(voiceName)")
-            #expect(
-                finiteSamples.count == samples.count,
-                "Non-finite audio for voice \(voiceName)"
-            )
-            #expect(sampleRate >= 8_000, "Invalid rate for voice \(voiceName)")
-            #expect(peak > 0.001, "Silent audio for voice \(voiceName)")
-            #expect(rms > 0.0001, "Silent audio for voice \(voiceName)")
-
-            if let outputPath = auditValue(
-                "SAYIT_MODEL_AUDIT_OUTPUT",
-                in: environment
-            ),
-               voices.count == 1 {
-                let outputURL = URL(filePath: outputPath)
-                let outputDirectory = outputURL.deletingLastPathComponent()
-                try FileManager.default.createDirectory(
-                    at: outputDirectory,
-                    withIntermediateDirectories: true
-                )
-                let archive = AudioArchive(directory: outputDirectory)
-                try await archive.writeWAV(
-                    samples: samples,
-                    sampleRate: sampleRate,
-                    destination: outputURL
-                )
-                let diagnostics = synthesizedChunks.enumerated().map {
-                    index, chunk in
-                    let duration = chunkDurations.indices.contains(index)
-                        ? chunkDurations[index]
-                        : 0
-                    return "\(chunk.id)\t\(chunk.text.count)\t\(duration)\t\(chunk.text)"
-                }.joined(separator: "\n")
-                try diagnostics.write(
-                    to: outputURL.appendingPathExtension("chunks.txt"),
-                    atomically: true,
-                    encoding: .utf8
-                )
-                print("MODEL_AUDIT_OUTPUT path=\(outputURL.path)")
-            }
             }
         }
         await synthesizer.unloadModel()

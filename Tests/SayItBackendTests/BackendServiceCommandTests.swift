@@ -128,6 +128,108 @@ struct BackendServiceCommandTests {
         #expect(!item.hasAudio)
     }
 
+    @Test("Overlapping interruption during fade-out does not cancel a newly started job")
+    func overlappingInterruptionPreservesNewJob() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fadeEntered = BackendSynthesisEventGate()
+        let fadeRelease = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+        fixture.playback.smoothStopEnteredGate = fadeEntered
+        fixture.playback.smoothStopReleaseGate = fadeRelease
+
+        let first = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "First spoken passage for overlap testing. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+
+        let stopTask = Task { @MainActor in
+            await fixture.service.handle(.init(command: .cancelJob(first.id)))
+        }
+        await fadeEntered.wait()
+        let cancelsBeforeSecond = await fixture.synthesizer.cancelCount
+
+        let second = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "Second spoken passage started during fade-out. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        await fadeRelease.releaseNext()
+        _ = await stopTask.value
+
+        try await waitForJobState(.playing, id: second.id, service: fixture.service)
+        let cancelsAfterStopFinished = await fixture.synthesizer.cancelCount
+        #expect(cancelsAfterStopFinished == cancelsBeforeSecond)
+        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(current.statusText != "Ready to speak")
+
+        // Release permits for both the canceled first stream and the active second stream,
+        // waiting explicitly for the replacement job's second audio enqueue before finishing.
+        for _ in 0..<4 {
+            await gate.releaseNext()
+        }
+        for _ in 0..<200 where (fixture.playback.enqueuedChunksByRequestID[second.id] ?? 0) < 2 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect((fixture.playback.enqueuedChunksByRequestID[second.id] ?? 0) >= 2)
+        fixture.playback.finishForTesting()
+        try await waitForJobState(.completed, id: second.id, service: fixture.service)
+    }
+
+    @Test("Older fade-out completion does not overwrite long-text confirmation status")
+    func overlappingInterruptionPreservesConfirmationStatus() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fadeEntered = BackendSynthesisEventGate()
+        let fadeRelease = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+        fixture.playback.smoothStopEnteredGate = fadeEntered
+        fixture.playback.smoothStopReleaseGate = fadeRelease
+
+        let first = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "First spoken passage for confirmation overlap test. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+
+        let stopTask = Task { @MainActor in
+            await fixture.service.handle(.init(command: .cancelJob(first.id)))
+        }
+        await fadeEntered.wait()
+
+        // Submit a long text that enters .awaitingConfirmation (which clears activeJobID).
+        let longText = String(repeating: "Confirm this long speech. ", count: 5_000)
+        let second = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: longText,
+                source: .selection,
+                permitsLongText: false
+            )
+        ))))
+        try await waitForJobState(.awaitingConfirmation, id: second.id, service: fixture.service)
+
+        await fadeRelease.releaseNext()
+        _ = await stopTask.value
+
+        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(current.statusText == "Long text needs confirmation")
+        for _ in 0..<4 {
+            await gate.releaseNext()
+        }
+    }
+
     @Test("Phonon voice imports validate, persist, and route embeddings for previews")
     func phononVoiceImportLifecycle() async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
@@ -3013,6 +3115,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var referenceKinds: [VoiceReferenceKind] = []
+    private(set) var cancelCount = 0
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
     private let eventGate: BackendSynthesisEventGate?
@@ -3100,7 +3203,9 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         }
     }
 
-    func cancelCurrentRequest() async {}
+    func cancelCurrentRequest() async {
+        cancelCount += 1
+    }
 
     func unloadModel() async {
         unloadCount += 1
@@ -3163,9 +3268,13 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var pauseCount = 0
     private(set) var stopCount = 0
     private(set) var playedFileTitle: String?
+    private(set) var enqueuedChunksByRequestID: [UUID: Int] = [:]
+    private var stopTransitionGeneration: UInt64 = 0
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
     var smoothStopFadeDuration: Duration?
+    var smoothStopEnteredGate: BackendSynthesisEventGate?
+    var smoothStopReleaseGate: BackendSynthesisEventGate?
     var showTitleInNowPlaying = false
     var rate: Double = 1
     var volume: Double = 1
@@ -3178,6 +3287,8 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         estimatedDuration: TimeInterval,
         modelID: String?
     ) {
+        stopTransitionGeneration &+= 1
+        generatedDuration = 0
         currentTitle = title
         currentModelID = modelID
         self.estimatedDuration = estimatedDuration
@@ -3192,6 +3303,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         if let enqueueError {
             throw enqueueError
         }
+        enqueuedChunksByRequestID[chunk.requestID, default: 0] += 1
         generatedDuration += chunk.duration
         state = .buffering
     }
@@ -3230,10 +3342,17 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func stopSmoothly() async {
-        if let smoothStopFadeDuration, state == .playing {
+        stopTransitionGeneration &+= 1
+        let generation = stopTransitionGeneration
+        if let smoothStopEnteredGate, let smoothStopReleaseGate, state == .playing {
+            state = .paused
+            await smoothStopEnteredGate.releaseNext()
+            await smoothStopReleaseGate.wait()
+        } else if let smoothStopFadeDuration, state == .playing {
             state = .paused
             try? await Task.sleep(for: smoothStopFadeDuration)
         }
+        guard generation == stopTransitionGeneration else { return }
         stop()
     }
 
@@ -3250,7 +3369,9 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func finishBuffering() {
-        state = .playing
+        if state != .finished {
+            state = .playing
+        }
     }
 
     func finishForTesting() {
