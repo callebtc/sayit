@@ -821,6 +821,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 continue
             }
 
+            try checkOperation(operationID)
             if chunkCursor == chunks.count - 1 {
                 let tail = conditioner.finish()
                 if !tail.isEmpty {
