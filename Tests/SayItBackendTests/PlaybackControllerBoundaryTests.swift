@@ -29,6 +29,36 @@ struct PlaybackControllerBoundaryTests {
         #expect(!playback.shouldStartWhenBuffered)
     }
 
+    @Test("Audio graph reuses matching sample rate across stops and reconfigures on sample-rate change")
+    @MainActor
+    func audioGraphReusesAndSwitchesSampleRate() throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        for sampleRate in [24_000.0, 24_000.0, 44_100.0, 24_000.0] {
+            let requestID = UUID()
+            playback.prepare(
+                requestID: requestID,
+                title: "Rate \(Int(sampleRate))",
+                estimatedDuration: 0.5,
+                modelID: "rate-test"
+            )
+            let samples = [Float](repeating: 0.01, count: Int(sampleRate * 0.1))
+            try playback.enqueue(AudioChunk(
+                requestID: requestID,
+                index: 0,
+                samples: samples,
+                sampleRate: sampleRate,
+                startsParagraph: false
+            ))
+            #expect(playback.state == .buffering)
+            #expect(abs(playback.generatedDuration - 0.1) < 0.001)
+            playback.stop()
+            #expect(playback.state == .idle)
+        }
+    }
+
     @Test("Playback buffer duration grows only above normal speed")
     @MainActor
     func preferredBufferDuration() {

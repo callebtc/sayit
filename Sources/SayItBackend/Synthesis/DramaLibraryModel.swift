@@ -83,7 +83,9 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
 
     func generate(text: String, voice: String?, refAudio: sending MLXArray?, refText: String?,
                   language: String?, generationParameters: GenerateParameters) async throws -> sending MLXArray {
-        let input = try inputs(refAudio, refText, generationParameters)
+        // Non-streaming requests (anchors, voice studio samples) do not need
+        // frequent intermediate KV-cache checkpoints or incremental DAC decodes.
+        let input = try inputs(refAudio, refText, generationParameters, streamingFrames: 128)
         try Task.checkCancellation()
         let result: (audio: SpokenAudio, report: DramaReport)
         do {
@@ -99,6 +101,17 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
             throw Drama3Error.emptyAudio
         }
         return MLXArray(result.audio.samples)
+    }
+
+    /// Pre-encodes the reference clip and warms the 35B backbone/tower prefix
+    /// KV-cache inside `DramaEngine` during background preload.
+    func warmVoice(refAudio: MLXArray?, refText: String?) async throws {
+        let params = GenerateParameters(maxTokens: 1, temperature: 1, topP: 0.9, topK: 30)
+        let input = try inputs(refAudio, refText, params, streamingFrames: 1)
+        try Task.checkCancellation()
+        for try await _ in engine.chunks("Hi.", references: input.references, settings: input.settings) {
+            break
+        }
     }
 
     func generateStream(text: String, voice: String?, refAudio: sending MLXArray?, refText: String?,
