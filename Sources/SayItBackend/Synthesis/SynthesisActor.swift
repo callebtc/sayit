@@ -384,7 +384,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     reference: usesReference ? generationReference : nil,
                     language: request.language,
                     tuning: request.voiceTuning,
-                    seed: nil
+                    seed: nil,
+                    streamingInterval: request.model.playbackMode
+                        == .progressive ? 0.32 : 2
                 )
                 for try await samples in stream {
                     try checkOperation(operationID)

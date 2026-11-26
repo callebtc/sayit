@@ -50,6 +50,8 @@ struct RecordedGenerationCall: Equatable, Sendable {
     let seed: UInt64?
     /// Only set for one-shot calls; streams have no such argument.
     let allowTuningSelectedGeneration: Bool?
+    /// Only set for streamed calls; one-shot calls have no interval.
+    let streamingInterval: Double?
 
     var hasReference: Bool {
         referenceSamples != nil
@@ -63,7 +65,8 @@ struct RecordedGenerationCall: Equatable, Sendable {
         language: String?,
         tuning: VoiceSynthesisTuning?,
         seed: UInt64?,
-        allowTuningSelectedGeneration: Bool?
+        allowTuningSelectedGeneration: Bool?,
+        streamingInterval: Double?
     ) {
         self.kind = kind
         self.text = text
@@ -76,14 +79,14 @@ struct RecordedGenerationCall: Equatable, Sendable {
         self.seed = seed
         self.allowTuningSelectedGeneration =
             allowTuningSelectedGeneration
+        self.streamingInterval = streamingInterval
     }
 }
 
 /// Scripted `SpeechModelLoading` adapter: returns its scripted session for
 /// every load, records loads and dependency preparations, and can be told
 /// to fail them.
-final class ScriptedSpeechModelLoader: SpeechModelLoading,
-    @unchecked Sendable {
+final class ScriptedSpeechModelLoader: SpeechModelLoading, Sendable {
     private struct State {
         var loadedModelIDs: [ModelID] = []
         var loadedDirectories: [URL] = []
@@ -146,8 +149,7 @@ final class ScriptedSpeechModelLoader: SpeechModelLoading,
 /// Scripted `SpeechModelSession` adapter. Calls are recorded in order;
 /// one-shot and streamed results come from per-call queues, falling back
 /// to a default batch of samples when a queue is empty.
-final class ScriptedSpeechModelSession: SpeechModelSession,
-    @unchecked Sendable {
+final class ScriptedSpeechModelSession: SpeechModelSession, Sendable {
     let sampleRate: Double
 
     private enum OneShotScript {
@@ -289,7 +291,8 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
                     tuning: tuning,
                     seed: seed,
                     allowTuningSelectedGeneration:
-                        allowTuningSelectedGeneration
+                        allowTuningSelectedGeneration,
+                    streamingInterval: nil
                 )
             )
             return state.oneShotScripts.isEmpty
@@ -312,7 +315,8 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
         reference: SpeechModelReference?,
         language: String?,
         tuning: VoiceSynthesisTuning?,
-        seed: UInt64?
+        seed: UInt64?,
+        streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
         let script = state.withLock { state -> StreamScript? in
             state.generationCalls.append(
@@ -324,7 +328,8 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
                     language: language,
                     tuning: tuning,
                     seed: seed,
-                    allowTuningSelectedGeneration: nil
+                    allowTuningSelectedGeneration: nil,
+                    streamingInterval: streamingInterval
                 )
             )
             return state.streamScripts.isEmpty
@@ -420,8 +425,7 @@ final class ScriptedSpeechModelSession: SpeechModelSession,
 /// In manual mode a sleep records its duration and then parks until the
 /// test advances `now` past its deadline with `advance(by:)`, which is
 /// how idle-unload timing is driven on demand without real-time waits.
-final class ControllableSynthesisClock: SynthesisClock,
-    @unchecked Sendable {
+final class ControllableSynthesisClock: SynthesisClock, Sendable {
     private struct State {
         var instant: ContinuousClock.Instant
         var sleeps: [Duration] = []

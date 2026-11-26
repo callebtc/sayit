@@ -906,6 +906,108 @@ struct SynthesisEngineTests {
         #expect(session.fittingCallTexts.isEmpty)
     }
 
+    @Test("Streaming interval follows the request model's playback mode")
+    func streamingIntervalByPlaybackMode() async throws {
+        let progressiveSession =
+            ScriptedSpeechModelSession(sampleRate: 8_000)
+        let progressiveSynthesizer = makeSynthesizer(
+            loader: ScriptedSpeechModelLoader(
+                session: progressiveSession
+            ),
+            clock: ControllableSynthesisClock()
+        )
+        await configure(progressiveSynthesizer)
+        let progressive = try catalogModel(id: "kokoro-bf16")
+
+        let progressiveRun = await collectAll(
+            await progressiveSynthesizer.synthesize(
+                makeRequest(
+                    model: progressive,
+                    text: "Alpha bravo charlie."
+                )
+            )
+        )
+
+        let bufferedSession =
+            ScriptedSpeechModelSession(sampleRate: 8_000)
+        let bufferedSynthesizer = makeSynthesizer(
+            loader: ScriptedSpeechModelLoader(
+                session: bufferedSession
+            ),
+            clock: ControllableSynthesisClock()
+        )
+        await configure(bufferedSynthesizer)
+        let buffered = try catalogModel(id: "qwen3-06b-base-8bit")
+
+        let bufferedRun = await collectAll(
+            await bufferedSynthesizer.synthesize(
+                makeRequest(
+                    model: buffered,
+                    text: "Alpha bravo charlie."
+                )
+            )
+        )
+
+        #expect(progressiveRun.error == nil)
+        #expect(bufferedRun.error == nil)
+        #expect(
+            progressiveSession.streamCalls.first?.streamingInterval
+                == 0.32
+        )
+        #expect(
+            bufferedSession.streamCalls.first?.streamingInterval == 2
+        )
+    }
+
+    @Test("Voice samples decode the reference to the session sample rate")
+    func voiceSampleReferenceDecodedToSessionSampleRate()
+        async throws {
+        let fixture = try TemporaryBackendFixture(
+            prefix: "SayItSynthesisEngineTests"
+        )
+        defer { fixture.remove() }
+        let referenceURL = try await writeReferenceFixture(
+            sampleCount: 1_200,
+            sourceSampleRate: 12_000,
+            in: fixture
+        )
+        let session = ScriptedSpeechModelSession(sampleRate: 8_000)
+        session.enqueueOneShotSamples([0.25, -0.5, 0.75])
+        let synthesizer = makeSynthesizer(
+            loader: ScriptedSpeechModelLoader(session: session),
+            clock: ControllableSynthesisClock()
+        )
+        await configure(synthesizer)
+        let model = try catalogModel(id: "kokoro-bf16")
+
+        let result = try await synthesizer.generateVoiceSample(
+            model: model,
+            text: "Sample words.",
+            language: "en-GB",
+            tuning: VoiceSynthesisTuning(
+                preset: "expressive",
+                parameters: ["temperature": 0.7]
+            ),
+            seed: 42,
+            reference: VoiceReference(
+                audioURL: referenceURL,
+                transcript: "Reference words."
+            )
+        )
+
+        #expect(result.samples == [0.25, -0.5, 0.75])
+        #expect(result.sampleRate == 8_000)
+        let call = try #require(session.oneShotCalls.first)
+        #expect(session.oneShotCalls.count == 1)
+        #expect(call.voice == nil)
+        #expect(call.referenceTranscript == "Reference words.")
+        let decoded = try #require(call.referenceSamples)
+        #expect(decoded.count == 800)
+        #expect(decoded.allSatisfy(\.isFinite))
+        #expect((decoded.map { abs($0) }.max() ?? 0) > 0.1)
+        #expect(call.allowTuningSelectedGeneration == true)
+    }
+
     // MARK: - Harness
 
     private func makeSynthesizer(

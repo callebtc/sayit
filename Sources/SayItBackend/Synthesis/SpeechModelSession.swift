@@ -25,7 +25,8 @@ protocol SpeechModelSession: Sendable {
         reference: SpeechModelReference?,
         language: String?,
         tuning: VoiceSynthesisTuning?,
-        seed: UInt64?
+        seed: UInt64?,
+        streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error>
 
     /// Split one chunk to the model's processed-text budget, using the

@@ -86,7 +86,8 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         reference: SpeechModelReference?,
         language: String?,
         tuning: VoiceSynthesisTuning?,
-        seed: UInt64?
+        seed: UInt64?,
+        streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
         guard let model else {
             return Self.failedStream(SynthesisError.generatedNoAudio)
@@ -129,8 +130,7 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
                     tuning: tuning,
                     seed: seed
                 ),
-                streamingInterval: descriptor.playbackMode
-                    == .progressive ? 0.32 : 2
+                streamingInterval: streamingInterval
             )
         return Self.bridgedStream { continuation in
             do {
