@@ -45,6 +45,7 @@ public final class SayItBackendService: SayItService {
     private var jobTransitionGeneration: UInt64 = 0
     private var activeRequest: SpeechRequest?
     private struct RequestTiming {
+        let requestID: UUID
         let modelID: ModelID
         let started: ContinuousClock.Instant
         var firstAudio: ContinuousClock.Instant?
@@ -1805,8 +1806,12 @@ public final class SayItBackendService: SayItService {
             return
         }
 
-        requestTiming = RequestTiming(modelID: request.model.id, started: .now)
-        defer { requestTiming = nil }
+        requestTiming = RequestTiming(requestID: request.id, modelID: request.model.id, started: .now)
+        defer {
+            if requestTiming?.requestID == request.id {
+                requestTiming = nil
+            }
+        }
         playback.rate = validatedPlaybackRate(
             submission.playbackRate ?? settings.playbackRate
         )
@@ -2001,6 +2006,10 @@ public final class SayItBackendService: SayItService {
         let spokenChunks = playback.spokenChunks
         do {
             let archive = try await playback.archive(using: audioArchive)
+            if Task.isCancelled || jobsByID[request.id]?.state == .canceled {
+                await audioArchive.remove(relativePath: archive.relativePath)
+                throw CancellationError()
+            }
             do {
                 try history.complete(
                     id: request.id,
@@ -2014,7 +2023,12 @@ public final class SayItBackendService: SayItService {
                 await audioArchive.remove(relativePath: archive.relativePath)
                 throw error
             }
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            if jobsByID[request.id]?.state == .canceled {
+                throw CancellationError()
+            }
             try? history.markIncomplete(
                 id: request.id,
                 state: .failed,

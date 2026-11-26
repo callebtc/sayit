@@ -413,6 +413,12 @@ final class PlaybackController: BackendPlaybackControlling {
         let wasPlaying = state == .playing
 
         do {
+            if audioGraphNeedsReconfiguration {
+                invalidateScheduledAudio()
+                configuredSampleRate = nil
+                let format = try monoFormat(sampleRate: sampleRate)
+                try configureAudioGraph(for: format)
+            }
             try rescheduleAudio(from: target)
             elapsed = target
             lastStablePlaybackTime = target
@@ -788,6 +794,11 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func completePlayback() {
         guard state != .finished else { return }
+        cancelAudioConfigurationRecovery()
+        if audioGraphNeedsReconfiguration {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
+        }
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
@@ -965,7 +976,9 @@ final class PlaybackController: BackendPlaybackControlling {
                     guard let self,
                           generation
                             == self.audioConfigurationRecoveryGeneration,
-                          self.hasStoredAudio else {
+                          self.hasStoredAudio,
+                          self.state != .idle,
+                          self.state != .finished else {
                         return
                     }
                     do {

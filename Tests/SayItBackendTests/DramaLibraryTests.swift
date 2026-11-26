@@ -43,10 +43,15 @@ struct DramaLibraryTests {
             quietWhisper.append(contentsOf: [Float](repeating: amp, count: subWindow))
         }
         let voicedPiece = [Float](repeating: 0.05, count: 22_050)
+        // Composite QuietGate payload: 1.49 s of held silence followed by a
+        // 0.37 s dynamic whisper must still detect the voiced window.
+        let heldSilencePlusWhisper = [Float](repeating: 0, count: Int(1.49 * 44_100))
+            + Array(quietWhisper.prefix(Int(0.37 * 44_100)))
         #expect(!DramaLibraryModel.pieceContainsVoicedAudio([]))
         #expect(!DramaLibraryModel.pieceContainsVoicedAudio(deadAirTail))
         #expect(!DramaLibraryModel.pieceContainsVoicedAudio(flatHiss40dBFS))
         #expect(DramaLibraryModel.pieceContainsVoicedAudio(quietWhisper))
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(heldSilencePlusWhisper))
         #expect(DramaLibraryModel.pieceContainsVoicedAudio(voicedPiece))
         #expect(
             DramaLibraryModel.shouldAbortForReport(

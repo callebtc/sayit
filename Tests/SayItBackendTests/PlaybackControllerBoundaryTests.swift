@@ -123,6 +123,22 @@ struct PlaybackControllerBoundaryTests {
         playback.play()
         #expect(playback.audioGraphConfigurationCount == 6)
         #expect(playback.state == .playing)
+
+        // Calling seek() during a pending route-change debounce must rebuild
+        // the graph and preserve the requested seek position.
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.seek(to: 0.05)
+        #expect(playback.audioGraphConfigurationCount == 7)
+        #expect(abs(playback.elapsed - 0.05) < 0.01)
+
+        // Finishing playback during a pending route-change debounce must cancel
+        // recovery so the finished clip does not replay.
+        playback.pause()
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.finishBuffering()
+        playback.seek(to: playback.generatedDuration)
+        #expect(playback.state == .finished)
+        #expect(playback.audioGraphConfigurationCount == 8)
         playback.stop()
     }
 

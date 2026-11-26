@@ -45,12 +45,15 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         return power > 0 ? Float(10.0 * log10(power)) : -200
     }
 
-    private static func subWindowSpreadDB(_ samples: [Float], window: Int) -> Float {
+    private static func subWindowSpreadDB<C: RandomAccessCollection>(
+        _ samples: C,
+        window: Int
+    ) -> Float where C.Element == Float, C.Index == Int {
         guard window > 0, samples.count >= 2 * window else { return .infinity }
         var levels: [Float] = []
         levels.reserveCapacity(samples.count / window)
-        var start = 0
-        while start + window <= samples.count {
+        var start = samples.startIndex
+        while start + window <= samples.endIndex {
             levels.append(max(rmsLevelDB(samples[start..<(start + window)]), -120))
             start += window
         }
@@ -59,22 +62,42 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         return variance.squareRoot()
     }
 
+    private static func windowContainsVoicedAudio<C: RandomAccessCollection>(
+        _ windowSamples: C,
+        subWindow: Int
+    ) -> Bool where C.Element == Float, C.Index == Int {
+        let loudness = rmsLevelDB(windowSamples)
+        if loudness < silenceLevelDB {
+            return false
+        }
+        if loudness < quietLevelDB,
+           subWindowSpreadDB(windowSamples, window: subWindow) < flatSpreadDB {
+            return false
+        }
+        return true
+    }
+
     static func pieceContainsVoicedAudio(
         _ samples: [Float],
         sampleRate: Double = 44_100
     ) -> Bool {
         guard !samples.isEmpty else { return false }
-        let loudness = rmsLevelDB(samples)
-        if loudness < silenceLevelDB {
-            return false
+        let subWindow = max(Int(spreadSubWindowSeconds * sampleRate), 1)
+        // Evaluate in <= 0.5 s windows so leading held silence prepended by
+        // QuietGate cannot dilute a genuine quiet whisper below -45 dBFS.
+        let analysisWindow = max(Int(0.5 * sampleRate), subWindow * 2)
+        if samples.count <= analysisWindow {
+            return windowContainsVoicedAudio(samples[...], subWindow: subWindow)
         }
-        if loudness < quietLevelDB {
-            let window = Int(spreadSubWindowSeconds * sampleRate)
-            if subWindowSpreadDB(samples, window: window) < flatSpreadDB {
-                return false
+        var offset = 0
+        while offset < samples.count {
+            let end = min(offset + analysisWindow, samples.count)
+            if windowContainsVoicedAudio(samples[offset..<end], subWindow: subWindow) {
+                return true
             }
+            offset = end
         }
-        return true
+        return false
     }
 
     static func shouldAbortForReport(
@@ -217,7 +240,7 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
             throw CancellationError()
         }
         try Task.checkCancellation()
-        guard !result.audio.samples.isEmpty, result.audio.samples.allSatisfy(\.isFinite) else {
+        guard result.audio.samples.allSatisfy(\.isFinite) else {
             throw Drama3Error.emptyAudio
         }
         if Self.shouldAbortForReport(
@@ -226,6 +249,9 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
             emittedVoicedAudio: Self.pieceContainsVoicedAudio(result.audio.samples)
         ) {
             throw Drama3Error.generationLimit
+        }
+        guard !result.audio.samples.isEmpty else {
+            throw Drama3Error.emptyAudio
         }
         return MLXArray(result.audio.samples)
     }
