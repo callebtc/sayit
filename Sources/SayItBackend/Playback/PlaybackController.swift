@@ -847,12 +847,25 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             self.elapsed = self.currentPlaybackTime()
             let frameTolerance = 1 / max(self.sampleRate, 1)
-            if self.elapsed >= self.generatedDuration - frameTolerance {
+            if self.elapsed >= self.generatedDuration - frameTolerance
+                || (self.processingIsComplete && self.hasRenderedAllScheduledOutput()) {
                 self.completePlayback()
             } else {
                 self.scheduleCompletionWatchdog()
             }
         }
+    }
+
+    private func hasRenderedAllScheduledOutput() -> Bool {
+        guard scheduledOutputFrames > 0 else {
+            return scheduledBufferCount == 0
+        }
+        guard let nodeTime = player.lastRenderTime,
+              let playerTime = player.playerTime(forNodeTime: nodeTime),
+              playerTime.sampleRate > 0 else {
+            return scheduledBufferCount == 0
+        }
+        return playerTime.sampleTime >= scheduledOutputFrames
     }
 
     private func enterBufferingState() {
