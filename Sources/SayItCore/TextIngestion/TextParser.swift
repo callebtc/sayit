@@ -294,7 +294,7 @@ struct TextParser: Sendable {
             // Keep the list boundary as metadata, never as a spoken symbol.
             prefix = listMarker
             working.removeSubrange(bullet)
-        } else if working.first?.isASCII == true && working.first?.isNumber == true,
+        } else if working.unicodeScalars.first?.properties.numericType == .decimal,
                   let number = firstMatchRange(Regex.numberedList, in: working) {
             prefix = listMarker + String(working[number])
             working.removeSubrange(number)

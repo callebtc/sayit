@@ -151,6 +151,17 @@ struct PCMStoreTests {
         #expect(tail.first == Float(99_900) * 0.00001)
         #expect(tail.last == Float(99_999) * 0.00001)
     }
+
+    @Test("Store rejects invalid or absurdly large sample rates without trapping")
+    func invalidSampleRates() throws {
+        let fixture = try TemporaryBackendFixture(prefix: "PCMStoreTests")
+        defer { fixture.remove() }
+        for rate in [0.0, -24_000.0, .nan, .infinity, 1e18] {
+            #expect(throws: PlaybackError.invalidSampleRate) {
+                _ = try PCMStore(sampleRate: rate, directory: fixture.root)
+            }
+        }
+    }
 }
 
 @Suite("Bounded PCM frame scheduler")

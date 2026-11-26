@@ -2077,12 +2077,17 @@ public final class SayItBackendService: SayItService {
             historyRevision &+= 1
         }
         finishQueuedJob(id, state: .canceled)
-        statusText = "Ready to speak"
         persistJobJournal()
-        await synthesizer.cancelCurrentRequest()
+        // If a newer job started while we were suspended in stopSmoothly /
+        // stopForModelSwitch, do not clobber its status or cancel its synthesis
+        // (SynthesisActor.synthesize already superseded the old operation).
+        if activeJobID == nil {
+            statusText = "Ready to speak"
+            await synthesizer.cancelCurrentRequest()
+        }
         resumePlaybackCompletion(for: id, with: .idle)
         await task?.value
-        if startNext, !isShuttingDown, !modelSwitchIsPending {
+        if activeJobID == nil, startNext, !isShuttingDown, !modelSwitchIsPending {
             startNextJobIfNeeded()
         }
     }

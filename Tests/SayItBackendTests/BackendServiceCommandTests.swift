@@ -128,6 +128,55 @@ struct BackendServiceCommandTests {
         #expect(!item.hasAudio)
     }
 
+    @Test("Overlapping interruption during fade-out does not cancel a newly started job")
+    func overlappingInterruptionPreservesNewJob() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+        fixture.playback.smoothStopFadeDuration = .milliseconds(80)
+
+        let first = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "First spoken passage for overlap testing. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+
+        let stopTask = Task { @MainActor in
+            await fixture.service.handle(.init(command: .cancelJob(first.id)))
+        }
+        try await Task.sleep(for: .milliseconds(15))
+        let cancelsBeforeSecond = await fixture.synthesizer.cancelCount
+
+        let second = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "Second spoken passage started during fade-out. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        _ = await stopTask.value
+
+        try await waitForJobState(.playing, id: second.id, service: fixture.service)
+        let cancelsAfterStopFinished = await fixture.synthesizer.cancelCount
+        #expect(cancelsAfterStopFinished == cancelsBeforeSecond)
+        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(current.statusText != "Ready to speak")
+
+        // Release permits for both the canceled first stream and the active second stream.
+        for _ in 0..<4 {
+            await gate.releaseNext()
+        }
+        for _ in 0..<100 where fixture.playback.generatedDuration < 2 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        fixture.playback.finishForTesting()
+        try await waitForJobState(.completed, id: second.id, service: fixture.service)
+    }
+
     @Test("Phonon voice imports validate, persist, and route embeddings for previews")
     func phononVoiceImportLifecycle() async throws {
         let fixture = try ServiceFixture(synthesizesAudio: true)
@@ -3013,6 +3062,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var referenceKinds: [VoiceReferenceKind] = []
+    private(set) var cancelCount = 0
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
     private let eventGate: BackendSynthesisEventGate?
@@ -3100,7 +3150,9 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         }
     }
 
-    func cancelCurrentRequest() async {}
+    func cancelCurrentRequest() async {
+        cancelCount += 1
+    }
 
     func unloadModel() async {
         unloadCount += 1
@@ -3163,6 +3215,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var pauseCount = 0
     private(set) var stopCount = 0
     private(set) var playedFileTitle: String?
+    private var stopTransitionGeneration: UInt64 = 0
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
     var smoothStopFadeDuration: Duration?
@@ -3178,6 +3231,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         estimatedDuration: TimeInterval,
         modelID: String?
     ) {
+        stopTransitionGeneration &+= 1
         currentTitle = title
         currentModelID = modelID
         self.estimatedDuration = estimatedDuration
@@ -3230,10 +3284,13 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func stopSmoothly() async {
+        stopTransitionGeneration &+= 1
+        let generation = stopTransitionGeneration
         if let smoothStopFadeDuration, state == .playing {
             state = .paused
             try? await Task.sleep(for: smoothStopFadeDuration)
         }
+        guard generation == stopTransitionGeneration else { return }
         stop()
     }
 
@@ -3250,7 +3307,9 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func finishBuffering() {
-        state = .playing
+        if state != .finished {
+            state = .playing
+        }
     }
 
     func finishForTesting() {

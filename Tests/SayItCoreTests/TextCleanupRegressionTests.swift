@@ -139,6 +139,22 @@ struct TextCleanupRegressionTests {
         )
     }
 
+    @Test("Unicode decimal numbered lists preserve item pause boundaries")
+    func unicodeNumberedListOffsets() async throws {
+        let input = "١. First item\n٢. Second item"
+        let result = try await TextCleaner().ingest(
+            .init(source: .selection, plainText: input)
+        )
+        let chunks = TextChunker(targetCharacterCount: 2_000).chunks(
+            for: result.text,
+            listItemStartOffsets: Set(result.listItemStartOffsets ?? [])
+        )
+        #expect(chunks.map(\.text) == ["١. First item", "٢. Second item"])
+        #expect(
+            chunks.map(\.sourceRange.lowerBound) == result.listItemStartOffsets
+        )
+    }
+
     @Test("HTML lists retain pause boundaries through block tags and whitespace", arguments: [true, false])
     func htmlListOffsets(normalizeWhitespace: Bool) async throws {
         let html = Data(

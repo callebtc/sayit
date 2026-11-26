@@ -18,7 +18,9 @@ final class PCMStore {
         sampleRate: Double,
         directory: URL = FileManager.default.temporaryDirectory
     ) throws {
-        guard sampleRate.isFinite, sampleRate > 0 else {
+        guard sampleRate.isFinite,
+              sampleRate > 0,
+              sampleRate <= 1_000_000 else {
             throw PlaybackError.invalidSampleRate
         }
         self.sampleRate = sampleRate

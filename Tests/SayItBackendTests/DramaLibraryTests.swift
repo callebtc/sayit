@@ -21,13 +21,28 @@ struct DramaLibraryTests {
         #expect(DramaLibraryModel.clampedStreamingFrames(128) == 24)
     }
 
-    @Test("Drama generation limit only aborts when a chunk emitted zero audio")
-    func generationLimitOnlyAbortsEmptyChunk() {
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 0, emittedSampleCount: 0))
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 44_100))
-        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 44_100))
-        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 0))
-        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 0))
+    @Test("Drama generation limit aborts when no voiced speech was emitted")
+    func generationLimitOnlyAbortsWithoutVoicedSpeech() {
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 0, emittedVoicedAudio: false))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedVoicedAudio: true))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedVoicedAudio: true))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedVoicedAudio: false))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedVoicedAudio: false))
+
+        // QuietGate can emit a 0.5 s dead-air tail at ~-50 dBFS before aborting
+        // on silence; that tail must not masquerade as voiced speech.
+        let deadAirTail = [Float](repeating: 0.003, count: 22_050)
+        let voicedPiece = [Float](repeating: 0.05, count: 22_050)
+        #expect(!DramaLibraryModel.pieceContainsVoicedAudio([]))
+        #expect(!DramaLibraryModel.pieceContainsVoicedAudio(deadAirTail))
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(voicedPiece))
+        #expect(
+            DramaLibraryModel.shouldAbortForReport(
+                cappedChunks: 0,
+                silencedChunks: 1,
+                emittedVoicedAudio: DramaLibraryModel.pieceContainsVoicedAudio(deadAirTail)
+            )
+        )
     }
 
     @Test("Installed Q4 streams finite speech and recovers after cancellation")

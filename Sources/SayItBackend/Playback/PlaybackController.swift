@@ -40,6 +40,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
+    private(set) var audioGraphConfigurationCount = 0
     private var cachedMonoFormat: AVAudioFormat?
     private var scheduleGeneration = 0
     private var scheduledBufferCount = 0
@@ -534,6 +535,7 @@ final class PlaybackController: BackendPlaybackControlling {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.prepare()
         configuredSampleRate = format.sampleRate
+        audioGraphConfigurationCount += 1
         try ensureEngineRunning()
     }
 
@@ -892,12 +894,22 @@ final class PlaybackController: BackendPlaybackControlling {
         }
     }
 
+    func handleAudioConfigurationChangeForTesting() {
+        scheduleAudioConfigurationRecovery()
+    }
+
     private func scheduleAudioConfigurationRecovery() {
-        guard !isReconfiguringAudioGraph,
-              configuredSampleRate != nil,
+        guard !isReconfiguringAudioGraph else {
+            return
+        }
+        // If the hardware route changes while idle or finished, drop the cached
+        // graph sample rate so the next utterance reconfigures AVAudioEngine for
+        // the new output device instead of reusing a stale graph.
+        guard configuredSampleRate != nil,
               hasStoredAudio,
               state != .idle,
               state != .finished else {
+            configuredSampleRate = nil
             return
         }
         let previousState = state

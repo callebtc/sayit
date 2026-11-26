@@ -107,6 +107,38 @@ struct SynthesisActorTests {
                 == text.split(whereSeparator: \.isWhitespace)
         )
     }
+
+    @Test("Mono reference resampling matches scalar linear interpolation including the final sample")
+    func resampleMonoEndpointParity() {
+        let input: [Float] = (0..<17).map { index in
+            sin(Float(index) * 0.37) + Float(index) * 0.05
+        }
+        for (sourceRate, targetRate) in [(16_000.0, 24_000.0), (44_100.0, 24_000.0), (24_000.0, 44_100.0)] {
+            let resampled = SynthesisActor.resampleMono(
+                input,
+                from: sourceRate,
+                to: targetRate
+            )
+            let expectedCount = max(Int(Double(input.count) * targetRate / sourceRate), 1)
+            #expect(resampled.count == expectedCount)
+            let step = Float(sourceRate / targetRate)
+            for outIndex in 0..<expectedCount {
+                let rawPos = Float(outIndex) * step
+                let clamped = min(max(rawPos, 0), Float(input.count - 1))
+                let lo = Int(floor(clamped))
+                let hi = min(lo + 1, input.count - 1)
+                let frac = clamped - Float(lo)
+                let expected = input[lo] + (input[hi] - input[lo]) * frac
+                #expect(abs(resampled[outIndex] - expected) < 1e-5)
+            }
+            #expect(resampled.allSatisfy { $0.isFinite })
+        }
+
+        // Single-sample and matching-rate edge cases.
+        #expect(SynthesisActor.resampleMono([0.42], from: 16_000, to: 24_000) == [0.42])
+        #expect(SynthesisActor.resampleMono(input, from: 24_000, to: 24_000) == input)
+        #expect(SynthesisActor.resampleMono([], from: 16_000, to: 24_000).isEmpty)
+    }
 }
 
 private actor ModelIDRecorder {

@@ -29,34 +29,62 @@ struct PlaybackControllerBoundaryTests {
         #expect(!playback.shouldStartWhenBuffered)
     }
 
-    @Test("Audio graph reuses matching sample rate across stops and reconfigures on sample-rate change")
+    @Test("Audio graph reuses matching sample rate across stops and reconfigures on sample-rate or route change")
     @MainActor
     func audioGraphReusesAndSwitchesSampleRate() throws {
         let playback = PlaybackController()
         defer { playback.stop() }
         playback.volume = 0
 
-        for sampleRate in [24_000.0, 24_000.0, 44_100.0, 24_000.0] {
+        let steps: [(sampleRate: Double, expectedConfigCount: Int)] = [
+            (24_000.0, 1),
+            (24_000.0, 1),
+            (44_100.0, 2),
+            (24_000.0, 3)
+        ]
+
+        for step in steps {
             let requestID = UUID()
             playback.prepare(
                 requestID: requestID,
-                title: "Rate \(Int(sampleRate))",
+                title: "Rate \(Int(step.sampleRate))",
                 estimatedDuration: 0.5,
                 modelID: "rate-test"
             )
-            let samples = [Float](repeating: 0.01, count: Int(sampleRate * 0.1))
+            let samples = [Float](repeating: 0.01, count: Int(step.sampleRate * 0.1))
             try playback.enqueue(AudioChunk(
                 requestID: requestID,
                 index: 0,
                 samples: samples,
-                sampleRate: sampleRate,
+                sampleRate: step.sampleRate,
                 startsParagraph: false
             ))
+            #expect(playback.audioGraphConfigurationCount == step.expectedConfigCount)
             #expect(playback.state == .buffering)
             #expect(abs(playback.generatedDuration - 0.1) < 0.001)
             playback.stop()
             #expect(playback.state == .idle)
         }
+
+        // An output-route change while idle must invalidate the cached sample
+        // rate so the next utterance reconfigures the graph for the new device.
+        playback.handleAudioConfigurationChangeForTesting()
+        let postRouteID = UUID()
+        playback.prepare(
+            requestID: postRouteID,
+            title: "Post-route change",
+            estimatedDuration: 0.5,
+            modelID: "rate-test"
+        )
+        try playback.enqueue(AudioChunk(
+            requestID: postRouteID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(playback.audioGraphConfigurationCount == 4)
+        playback.stop()
     }
 
     @Test("Playback buffer duration grows only above normal speed")
