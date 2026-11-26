@@ -23,3 +23,17 @@ media integration without owning transcript text or timing alignment.
 **Playback output port**: the ordered `Output` callback stream emitting state
 changes, playback failures, and external control notifications from the playback
 controller to the backend coordinator.
+
+# Backend synthesis
+
+Language for the backend's speech synthesis engine and model boundary.
+
+## Language
+
+**Synthesis engine**: the concrete backend module that turns a speech request
+into streamed audio events (chunking, article-voice anchoring, conditioning,
+retry, and idle unload).
+
+**Speech-model port**: the seam at which a loaded speech-model session
+generates samples, fits text, and quiesces (live MLX adapter in production,
+scripted adapter in tests).
