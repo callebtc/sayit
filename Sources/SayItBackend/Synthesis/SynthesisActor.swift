@@ -599,25 +599,15 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         // whenever chunk 0 is a natural sentence (>= 36 chars): chunk 0 streams
         // immediately with zero throwaway anchor synthesis, and chunks 1..N clone
         // chunk 0's exact voice. Single-chunk requests need no anchor at all.
-        var captureChunk0AsSelfAnchor = false
-        if request.voiceMode == .automaticStable,
-           request.model.capabilities.supportsRandomVoiceSampling,
-           referenceAudio == nil,
-           chunks.count > 1 {
-            if chunks[0].text.count >= 36 {
-                captureChunk0AsSelfAnchor = true
-            } else {
-                let anchor = try await synthesizeArticleVoiceAnchor(
-                    for: request,
-                    model: loadedModel,
-                    operationID: operationID,
-                    continuation: continuation
-                )
-                referenceAudio = MLXArray(anchor.samples)
-                retainedReferenceAudio = referenceAudio
-                referenceText = anchor.text
-            }
-        }
+        var captureChunk0AsSelfAnchor = try await configureAutomaticVoiceAnchor(
+            for: request,
+            chunks: chunks,
+            model: loadedModel,
+            operationID: operationID,
+            continuation: continuation,
+            referenceAudio: &referenceAudio,
+            referenceText: &referenceText
+        )
 
         recordTiming(.voicePreparation, since: voiceStarted)
         var conditioner = try PCMStreamConditioner(
@@ -894,25 +884,16 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 // If an initially single-chunk automaticStable request split
                 // into multiple pieces on retry, re-enable voice anchoring so
                 // replacement pieces share one consistent voice.
-                if chunkCursor == 0,
-                   referenceAudio == nil,
-                   chunks.count > 1,
-                   request.voiceMode == .automaticStable,
-                   request.model.capabilities.supportsRandomVoiceSampling {
-                    if chunks[0].text.count >= 36 {
-                        captureChunk0AsSelfAnchor = true
-                    } else {
-                        let anchor = try await synthesizeArticleVoiceAnchor(
-                            for: request,
-                            model: loadedModel,
-                            operationID: operationID,
-                            continuation: continuation
-                        )
-                        referenceAudio = MLXArray(anchor.samples)
-                        retainedReferenceAudio = referenceAudio
-                        referenceText = anchor.text
-                        captureChunk0AsSelfAnchor = false
-                    }
+                if chunkCursor == 0 {
+                    captureChunk0AsSelfAnchor = try await configureAutomaticVoiceAnchor(
+                        for: request,
+                        chunks: chunks,
+                        model: loadedModel,
+                        operationID: operationID,
+                        continuation: continuation,
+                        referenceAudio: &referenceAudio,
+                        referenceText: &referenceText
+                    )
                 }
                 continue
             }
@@ -990,6 +971,67 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         recordTiming(.synthesisTotal, since: requestStarted)
         continuation.yield(.completed)
         continuation.finish()
+    }
+
+    enum AutomaticStableAnchorAction: Equatable {
+        case none
+        case selfAnchorFirstChunk
+        case synthesizeAnchorUpfront
+    }
+
+    static let selfAnchorMinimumCharacterCount = 36
+
+    static func automaticStableAnchorAction(
+        voiceMode: VoiceSynthesisMode,
+        supportsRandomVoiceSampling: Bool,
+        hasReferenceAudio: Bool,
+        chunkCount: Int,
+        firstChunkLength: Int
+    ) -> AutomaticStableAnchorAction {
+        guard voiceMode == .automaticStable,
+              supportsRandomVoiceSampling,
+              !hasReferenceAudio,
+              chunkCount > 1 else {
+            return .none
+        }
+        return firstChunkLength >= selfAnchorMinimumCharacterCount
+            ? .selfAnchorFirstChunk
+            : .synthesizeAnchorUpfront
+    }
+
+    private func configureAutomaticVoiceAnchor(
+        for request: SpeechRequest,
+        chunks: [SpeechChunk],
+        model: SpeechGenerationModel,
+        operationID: UInt64,
+        continuation: AsyncThrowingStream<SynthesisEvent, Error>.Continuation,
+        referenceAudio: inout MLXArray?,
+        referenceText: inout String?
+    ) async throws -> Bool {
+        let action = Self.automaticStableAnchorAction(
+            voiceMode: request.voiceMode,
+            supportsRandomVoiceSampling: request.model.capabilities.supportsRandomVoiceSampling,
+            hasReferenceAudio: referenceAudio != nil,
+            chunkCount: chunks.count,
+            firstChunkLength: chunks.first?.text.count ?? 0
+        )
+        switch action {
+        case .none:
+            return false
+        case .selfAnchorFirstChunk:
+            return true
+        case .synthesizeAnchorUpfront:
+            let anchor = try await synthesizeArticleVoiceAnchor(
+                for: request,
+                model: model,
+                operationID: operationID,
+                continuation: continuation
+            )
+            referenceAudio = MLXArray(anchor.samples)
+            retainedReferenceAudio = referenceAudio
+            referenceText = anchor.text
+            return false
+        }
     }
 
     private static func fastStartThresholds(

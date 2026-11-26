@@ -15,9 +15,13 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
     /// handoffs stay responsive.
     static let maximumStreamingFrames = 24
 
-    /// Minimum mean-square energy for a piece to count as voiced speech rather
-    /// than dead-air hiss (-42 dBFS, above DramaTTS's -45 dBFS silence floor).
-    private static let minimumVoicedPower: Double = 6.31e-5
+    /// Matches DramaTTS's `SilenceRule` thresholds: a piece is dead air when
+    /// quieter than -45 dBFS, or quieter than -30 dBFS with flat (< 2.5 dB)
+    /// 50 ms sub-window spread (steady hiss).
+    private static let silenceLevelDB: Float = -45
+    private static let quietLevelDB: Float = -30
+    private static let flatSpreadDB: Float = 2.5
+    private static let spreadSubWindowSeconds: Double = 0.05
 
     let sampleRate = 44_100
     private let engine: DramaEngine
@@ -30,14 +34,47 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         min(max(1, requested), maximumStreamingFrames)
     }
 
-    static func pieceContainsVoicedAudio(_ samples: [Float]) -> Bool {
-        guard !samples.isEmpty else { return false }
+    private static func rmsLevelDB<C: Collection>(_ samples: C) -> Float where C.Element == Float {
+        guard !samples.isEmpty else { return -200 }
         var sumSquares = 0.0
         for sample in samples {
             let value = Double(sample)
             sumSquares += value * value
         }
-        return (sumSquares / Double(samples.count)) > minimumVoicedPower
+        let power = sumSquares / Double(samples.count)
+        return power > 0 ? Float(10.0 * log10(power)) : -200
+    }
+
+    private static func subWindowSpreadDB(_ samples: [Float], window: Int) -> Float {
+        guard window > 0, samples.count >= 2 * window else { return .infinity }
+        var levels: [Float] = []
+        levels.reserveCapacity(samples.count / window)
+        var start = 0
+        while start + window <= samples.count {
+            levels.append(max(rmsLevelDB(samples[start..<(start + window)]), -120))
+            start += window
+        }
+        let mean = levels.reduce(Float(0), +) / Float(levels.count)
+        let variance = levels.reduce(Float(0)) { $0 + ($1 - mean) * ($1 - mean) } / Float(levels.count)
+        return variance.squareRoot()
+    }
+
+    static func pieceContainsVoicedAudio(
+        _ samples: [Float],
+        sampleRate: Double = 44_100
+    ) -> Bool {
+        guard !samples.isEmpty else { return false }
+        let loudness = rmsLevelDB(samples)
+        if loudness < silenceLevelDB {
+            return false
+        }
+        if loudness < quietLevelDB {
+            let window = Int(spreadSubWindowSeconds * sampleRate)
+            if subWindowSpreadDB(samples, window: window) < flatSpreadDB {
+                return false
+            }
+        }
+        return true
     }
 
     static func shouldAbortForReport(

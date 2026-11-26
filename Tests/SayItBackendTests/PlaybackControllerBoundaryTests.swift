@@ -85,10 +85,22 @@ struct PlaybackControllerBoundaryTests {
         ))
         #expect(playback.audioGraphConfigurationCount == 4)
 
-        // A route change while audio is buffered must also invalidate the cached
-        // sample rate even if stop() cancels the debounced recovery task.
+        // A route change while audio is buffered must not stop the player on a
+        // subsequent progressive enqueue during the debounce window, and must
+        // still rebuild the graph if stop() cancels the debounced recovery task.
         playback.handleAudioConfigurationChangeForTesting()
+        try playback.enqueue(AudioChunk(
+            requestID: postRouteID,
+            index: 1,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        // Graph stays untouched during debounce so already-scheduled buffers are preserved.
+        #expect(playback.audioGraphConfigurationCount == 4)
+        #expect(abs(playback.generatedDuration - 0.2) < 0.001)
         playback.stop()
+
         let postBufferedRouteID = UUID()
         playback.prepare(
             requestID: postBufferedRouteID,
@@ -104,6 +116,13 @@ struct PlaybackControllerBoundaryTests {
             startsParagraph: false
         ))
         #expect(playback.audioGraphConfigurationCount == 5)
+
+        // Calling play() during a pending route-change debounce must rebuild
+        // the graph and reschedule cleanly rather than discarding queued frames.
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.play()
+        #expect(playback.audioGraphConfigurationCount == 6)
+        #expect(playback.state == .playing)
         playback.stop()
     }
 

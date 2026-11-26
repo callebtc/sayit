@@ -42,6 +42,7 @@ public final class SayItBackendService: SayItService {
     private var pendingJobs: [UUID: PendingSpeechJob] = [:]
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
+    private var jobTransitionGeneration: UInt64 = 0
     private var activeRequest: SpeechRequest?
     private struct RequestTiming {
         let modelID: ModelID
@@ -1551,6 +1552,7 @@ public final class SayItBackendService: SayItService {
         }
         queuedJobIDs.removeFirst()
         activeJobID = id
+        jobTransitionGeneration &+= 1
         persistJobJournal()
         jobTask = Task { [weak self] in
             await self?.processJob(id)
@@ -1987,7 +1989,9 @@ public final class SayItBackendService: SayItService {
             if request.source != .preview {
                 try await archiveCompletedRequest(request)
             }
-            activeRequest = nil
+            if activeRequest?.id == request.id {
+                activeRequest = nil
+            }
         case .cancelled:
             throw CancellationError()
         }
@@ -2060,6 +2064,7 @@ public final class SayItBackendService: SayItService {
         }
         let task = jobTask
         let request = activeRequest
+        let interruptGeneration = jobTransitionGeneration
         task?.cancel()
         resumePlaybackCompletion(for: id, with: .idle)
         stopSynthesisWatchdog(for: id)
@@ -2079,15 +2084,20 @@ public final class SayItBackendService: SayItService {
         finishQueuedJob(id, state: .canceled)
         persistJobJournal()
         // If a newer job started while we were suspended in stopSmoothly /
-        // stopForModelSwitch, do not clobber its status or cancel its synthesis
-        // (SynthesisActor.synthesize already superseded the old operation).
-        if activeJobID == nil {
+        // stopForModelSwitch (even if it already transitioned to awaiting
+        // confirmation and cleared activeJobID), do not clobber its status or
+        // cancel its synthesis.
+        if activeJobID == nil, interruptGeneration == jobTransitionGeneration {
             statusText = "Ready to speak"
             await synthesizer.cancelCurrentRequest()
         }
         resumePlaybackCompletion(for: id, with: .idle)
         await task?.value
-        if activeJobID == nil, startNext, !isShuttingDown, !modelSwitchIsPending {
+        if activeJobID == nil,
+           interruptGeneration == jobTransitionGeneration,
+           startNext,
+           !isShuttingDown,
+           !modelSwitchIsPending {
             startNextJobIfNeeded()
         }
     }

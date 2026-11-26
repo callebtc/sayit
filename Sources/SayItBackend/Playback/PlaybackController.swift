@@ -40,6 +40,7 @@ final class PlaybackController: BackendPlaybackControlling {
     private var scheduleOffset: TimeInterval = 0
     private var requestID: UUID?
     private var configuredSampleRate: Double?
+    private var audioGraphNeedsReconfiguration = false
     private(set) var audioGraphConfigurationCount = 0
     private var cachedMonoFormat: AVAudioFormat?
     private var scheduleGeneration = 0
@@ -242,7 +243,14 @@ final class PlaybackController: BackendPlaybackControlling {
     func play() {
         cancelAudioConfigurationRecovery()
         do {
-            try startPlayback()
+            if audioGraphNeedsReconfiguration, hasStoredAudio {
+                try recoverAudioConfiguration(
+                    from: elapsed,
+                    previousState: .playing
+                )
+            } else {
+                try startPlayback()
+            }
         } catch {
             reportFailure(error)
         }
@@ -352,6 +360,10 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func finishStopping() {
         cancelAudioConfigurationRecovery()
+        if audioGraphNeedsReconfiguration {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
+        }
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
@@ -535,6 +547,7 @@ final class PlaybackController: BackendPlaybackControlling {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.prepare()
         configuredSampleRate = format.sampleRate
+        audioGraphNeedsReconfiguration = false
         audioGraphConfigurationCount += 1
         try ensureEngineRunning()
     }
@@ -915,19 +928,21 @@ final class PlaybackController: BackendPlaybackControlling {
         guard !isReconfiguringAudioGraph else {
             return
         }
-        // Always invalidate the cached graph sample rate immediately on a
-        // hardware/route change, even if audio is currently buffered or playing:
-        // if the user stops or starts a replacement before the debounced
-        // recovery task runs, the next utterance must rebuild the graph for
-        // the new output device rather than reusing a stale cached rate.
-        let hadConfiguredGraph = configuredSampleRate != nil
-        configuredSampleRate = nil
-        guard hadConfiguredGraph,
+        // When idle or finished, drop the cached graph sample rate immediately
+        // so the next utterance reconfigures AVAudioEngine for the new device.
+        // When audio is currently buffered or playing, defer reconfiguration to
+        // `recoverAudioConfiguration` (or `finishStopping` / `play` if recovery
+        // is canceled early) so progressive `enqueue()` calls during the
+        // debounce window never call `player.stop()` and drop scheduled frames.
+        guard configuredSampleRate != nil,
               hasStoredAudio,
               state != .idle,
               state != .finished else {
+            configuredSampleRate = nil
+            audioGraphNeedsReconfiguration = false
             return
         }
+        audioGraphNeedsReconfiguration = true
         let previousState = state
         let resumeTime = AudioRouteRecoveryPolicy.stableAnchor(
             lastRendered: lastStablePlaybackTime,

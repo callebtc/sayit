@@ -20,8 +20,8 @@ import MLXNN
 /// - Replaces Mimi's dense `eye(512)` depthwise transposed-conv upsample with
 ///   exact broadcast-multiply overlap-add (512x fewer FLOPs, zero eye allocation).
 /// - Uses a tight 2-frame opening Mimi flush for instant first audio, a
-///   synchronous 14-frame second flush so cold playback crosses the 1.2 s
-///   start buffer by frame 16, then 32-frame steady batches overlapped
+///   synchronous 16-frame second flush so cold playback crosses the 1.2 s
+///   start buffer by frame 18 (1.44 s), then 32-frame steady batches overlapped
 ///   asynchronously (`asyncEval`) with the next FlowLM batch.
 enum PocketTTSStreamRunner {
     private static let defaultAudioPrompt = "alba"
@@ -300,15 +300,16 @@ enum PocketTTSStreamRunner {
         )
         // Use a tight 2-frame opening flush (160 ms audio, above the 150 ms
         // minimum sustainable playback buffer) for instant warm first audio,
-        // a synchronous 14-frame second flush so cold playback crosses its
-        // 1.2 s start threshold by frame 16 (1.28 s), then 32-frame steady
-        // batches overlapped asynchronously with FlowLM.
+        // a synchronous 16-frame second flush (aligned to quadStepSize = 4)
+        // so cold playback crosses its 1.2 s start threshold by frame 18
+        // (1.44 s), then 32-frame steady batches overlapped asynchronously
+        // with FlowLM.
         let firstFlushFrames = streamingInterval >= 1.5
             ? requestedInitial
             : min(2, requestedInitial)
         let secondFlushFrames = streamingInterval >= 1.5
             ? requestedInitial
-            : max(firstFlushFrames, 14)
+            : max(firstFlushFrames, 16)
         let steadyBatchFrames = max(secondFlushFrames, 32)
         var emittedFlushes = 0
 

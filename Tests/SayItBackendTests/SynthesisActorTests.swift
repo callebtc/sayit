@@ -139,6 +139,59 @@ struct SynthesisActorTests {
         #expect(SynthesisActor.resampleMono(input, from: 24_000, to: 24_000) == input)
         #expect(SynthesisActor.resampleMono([], from: 16_000, to: 24_000).isEmpty)
     }
+
+    @Test("Automatic voice anchor policy covers single-chunk, threshold boundaries, and retry splits")
+    func automaticStableAnchorPolicy() {
+        // Single-chunk requests skip anchor synthesis altogether.
+        #expect(
+            SynthesisActor.automaticStableAnchorAction(
+                voiceMode: .automaticStable,
+                supportsRandomVoiceSampling: true,
+                hasReferenceAudio: false,
+                chunkCount: 1,
+                firstChunkLength: 100
+            ) == .none
+        )
+        // Multi-chunk below the 36-char threshold synthesizes an upfront anchor.
+        #expect(
+            SynthesisActor.automaticStableAnchorAction(
+                voiceMode: .automaticStable,
+                supportsRandomVoiceSampling: true,
+                hasReferenceAudio: false,
+                chunkCount: 2,
+                firstChunkLength: 35
+            ) == .synthesizeAnchorUpfront
+        )
+        // Multi-chunk at or above 36 chars self-anchors on chunk 0.
+        #expect(
+            SynthesisActor.automaticStableAnchorAction(
+                voiceMode: .automaticStable,
+                supportsRandomVoiceSampling: true,
+                hasReferenceAudio: false,
+                chunkCount: 2,
+                firstChunkLength: 36
+            ) == .selfAnchorFirstChunk
+        )
+        // Existing reference audio or non-automatic modes never re-anchor.
+        #expect(
+            SynthesisActor.automaticStableAnchorAction(
+                voiceMode: .automaticStable,
+                supportsRandomVoiceSampling: true,
+                hasReferenceAudio: true,
+                chunkCount: 3,
+                firstChunkLength: 40
+            ) == .none
+        )
+        #expect(
+            SynthesisActor.automaticStableAnchorAction(
+                voiceMode: .standard,
+                supportsRandomVoiceSampling: true,
+                hasReferenceAudio: false,
+                chunkCount: 3,
+                firstChunkLength: 40
+            ) == .none
+        )
+    }
 }
 
 private actor ModelIDRecorder {

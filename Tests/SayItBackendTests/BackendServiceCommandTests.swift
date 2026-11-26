@@ -170,15 +170,64 @@ struct BackendServiceCommandTests {
         let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
         #expect(current.statusText != "Ready to speak")
 
-        // Release permits for both the canceled first stream and the active second stream.
+        // Release permits for both the canceled first stream and the active second stream,
+        // waiting explicitly for the replacement job's second audio enqueue before finishing.
         for _ in 0..<4 {
             await gate.releaseNext()
         }
-        for _ in 0..<100 where fixture.playback.generatedDuration < 2 {
+        for _ in 0..<200 where (fixture.playback.enqueuedChunksByRequestID[second.id] ?? 0) < 2 {
             try await Task.sleep(for: .milliseconds(5))
         }
+        #expect((fixture.playback.enqueuedChunksByRequestID[second.id] ?? 0) >= 2)
         fixture.playback.finishForTesting()
         try await waitForJobState(.completed, id: second.id, service: fixture.service)
+    }
+
+    @Test("Older fade-out completion does not overwrite long-text confirmation status")
+    func overlappingInterruptionPreservesConfirmationStatus() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fadeEntered = BackendSynthesisEventGate()
+        let fadeRelease = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+        fixture.playback.smoothStopEnteredGate = fadeEntered
+        fixture.playback.smoothStopReleaseGate = fadeRelease
+
+        let first = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: String(repeating: "First spoken passage for confirmation overlap test. ", count: 80),
+                source: .commandLine
+            )
+        ))))
+        try await waitForJobState(.playing, id: first.id, service: fixture.service)
+
+        let stopTask = Task { @MainActor in
+            await fixture.service.handle(.init(command: .cancelJob(first.id)))
+        }
+        await fadeEntered.wait()
+
+        // Submit a long text that enters .awaitingConfirmation (which clears activeJobID).
+        let longText = String(repeating: "Confirm this long speech. ", count: 5_000)
+        let second = try submittedJob(await fixture.service.handle(.init(command: .submit(
+            SpeechSubmission(
+                text: longText,
+                source: .selection,
+                permitsLongText: false
+            )
+        ))))
+        try await waitForJobState(.awaitingConfirmation, id: second.id, service: fixture.service)
+
+        await fadeRelease.releaseNext()
+        _ = await stopTask.value
+
+        let current = try snapshot(await fixture.service.handle(.init(command: .snapshot)))
+        #expect(current.statusText == "Long text needs confirmation")
+        for _ in 0..<4 {
+            await gate.releaseNext()
+        }
     }
 
     @Test("Phonon voice imports validate, persist, and route embeddings for previews")
@@ -3219,6 +3268,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var pauseCount = 0
     private(set) var stopCount = 0
     private(set) var playedFileTitle: String?
+    private(set) var enqueuedChunksByRequestID: [UUID: Int] = [:]
     private var stopTransitionGeneration: UInt64 = 0
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
@@ -3238,6 +3288,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         modelID: String?
     ) {
         stopTransitionGeneration &+= 1
+        generatedDuration = 0
         currentTitle = title
         currentModelID = modelID
         self.estimatedDuration = estimatedDuration
@@ -3252,6 +3303,7 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         if let enqueueError {
             throw enqueueError
         }
+        enqueuedChunksByRequestID[chunk.requestID, default: 0] += 1
         generatedDuration += chunk.duration
         state = .buffering
     }

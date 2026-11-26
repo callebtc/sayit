@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import MLX
 import Testing
 @testable import SayItBackend
 
@@ -155,6 +156,43 @@ struct PocketTTSStreamRunnerTests {
             #expect(streamed[c].count == expected[c].count)
             for i in 0..<expected[c].count {
                 #expect(abs(streamed[c][i] - expected[c][i]) < 1e-6)
+            }
+        }
+
+        // Also run the exact production MLX `fastDepthwiseUpsampleStep` on CPU
+        // across the same irregular chunk boundaries to verify tensor shapes,
+        // weight layout, and carried `prevInput` state match bit-for-bit.
+        Device.withDefaultDevice(.cpu) {
+            let wFirstArray = MLXArray(wFirst.flatMap { $0 }, [1, channels, 1, stride])
+            let wSecondArray = MLXArray(wSecond.flatMap { $0 }, [1, channels, 1, stride])
+            var mlxPrev: MLXArray?
+            var mlxStreamed = Array(repeating: [Float](), count: channels)
+            var mlxOffset = 0
+            for size in chunkSizes {
+                let chunkFlat = (0..<channels).flatMap { c in
+                    Array(input[c][mlxOffset..<(mlxOffset + size)])
+                }
+                let x = MLXArray(chunkFlat, [1, channels, size])
+                let out = PocketTTSStreamRunner.fastDepthwiseUpsampleStep(
+                    x,
+                    wFirst: wFirstArray,
+                    wSecond: wSecondArray,
+                    stride: stride,
+                    prevInput: &mlxPrev
+                )
+                let outValues = out.asArray(Float.self)
+                let outSteps = size * stride
+                for c in 0..<channels {
+                    let start = c * outSteps
+                    mlxStreamed[c].append(contentsOf: outValues[start..<(start + outSteps)])
+                }
+                mlxOffset += size
+            }
+            for c in 0..<channels {
+                #expect(mlxStreamed[c].count == expected[c].count)
+                for i in 0..<expected[c].count {
+                    #expect(abs(mlxStreamed[c][i] - expected[c][i]) < 1e-5)
+                }
             }
         }
     }
