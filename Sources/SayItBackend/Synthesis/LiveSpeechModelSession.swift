@@ -18,6 +18,7 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
     private var textProcessor: (any TextProcessor)?
     private var retainedReferenceAudio: MLXArray?
     private var retainedReferenceSamples: [Float]?
+    private var retainedReferenceTranscript: String?
 
     init(
         descriptor: ModelDescriptor,
@@ -36,17 +37,19 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         reference: SpeechModelReference?,
         language: String?,
         tuning: VoiceSynthesisTuning?,
-        seed: UInt64?
+        seed: UInt64?,
+        allowTuningSelectedGeneration: Bool
     ) async throws -> [Float] {
         guard let model else {
             throw SynthesisError.generatedNoAudio
         }
         applyModelSpecificTuning(tuning, to: model)
         let referenceAudio = reference.map {
-            SerializedMLXArray(referenceArray(for: $0.samples))
+            SerializedMLXArray(referenceArray(for: $0))
         } ?? SerializedMLXArray(nil)
         do {
-            if let omniVoice = model as? OmniVoiceModel,
+            if allowTuningSelectedGeneration,
+               let omniVoice = model as? OmniVoiceModel,
                let tuning,
                tuning.parameters["diffusionSteps"] != nil {
                 return try await SerializedSpeechModel(omniVoice)
@@ -83,8 +86,7 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         reference: SpeechModelReference?,
         language: String?,
         tuning: VoiceSynthesisTuning?,
-        seed: UInt64?,
-        streamingInterval: Double
+        seed: UInt64?
     ) -> AsyncThrowingStream<[Float], Error> {
         guard let model else {
             return Self.failedStream(SynthesisError.generatedNoAudio)
@@ -93,31 +95,27 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         // delivers its one-shot result as a single streamed buffer.
         if model is OmniVoiceModel,
            tuning?.parameters["diffusionSteps"] != nil {
-            return AsyncThrowingStream { continuation in
-                let task = Task {
-                    do {
-                        let samples = try await self.generateSamples(
-                            text: text,
-                            voice: voice,
-                            reference: reference,
-                            language: language,
-                            tuning: tuning,
-                            seed: seed
-                        )
-                        continuation.yield(samples)
-                        continuation.finish()
-                    } catch {
-                        continuation.finish(throwing: error)
-                    }
-                }
-                continuation.onTermination = { @Sendable _ in
-                    task.cancel()
+            return Self.bridgedStream { continuation in
+                do {
+                    let samples = try await self.generateSamples(
+                        text: text,
+                        voice: voice,
+                        reference: reference,
+                        language: language,
+                        tuning: tuning,
+                        seed: seed,
+                        allowTuningSelectedGeneration: true
+                    )
+                    continuation.yield(samples)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
                 }
             }
         }
         applyModelSpecificTuning(tuning, to: model)
         let referenceAudio = reference.map {
-            SerializedMLXArray(referenceArray(for: $0.samples))
+            SerializedMLXArray(referenceArray(for: $0))
         } ?? SerializedMLXArray(nil)
         let underlying = SerializedSpeechModel(model)
             .generateSamplesStream(
@@ -131,21 +129,17 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
                     tuning: tuning,
                     seed: seed
                 ),
-                streamingInterval: streamingInterval
+                streamingInterval: descriptor.playbackMode
+                    == .progressive ? 0.32 : 2
             )
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    for try await samples in underlying {
-                        continuation.yield(samples)
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: Self.classified(error))
+        return Self.bridgedStream { continuation in
+            do {
+                for try await samples in underlying {
+                    continuation.yield(samples)
                 }
-            }
-            continuation.onTermination = { @Sendable _ in
-                task.cancel()
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: Self.classified(error))
             }
         }
     }
@@ -219,6 +213,7 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         guard model != nil || retainedReferenceAudio != nil else {
             textProcessor = nil
             retainedReferenceSamples = nil
+            retainedReferenceTranscript = nil
             return
         }
         Stream.gpu.synchronize()
@@ -226,6 +221,7 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
         textProcessor = nil
         retainedReferenceAudio = nil
         retainedReferenceSamples = nil
+        retainedReferenceTranscript = nil
         Memory.clearCache()
     }
 
@@ -290,17 +286,38 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
     // pinned Qwen3 wrapper caches reference conditioning by the array's
     // ObjectIdentifier without retaining it, so a freed address reused by
     // the next array would falsely hit that cache and replay stale audio.
-    // Identical samples reuse the retained array, so conditioning for one
-    // reference keeps a stable identity across generation calls.
-    private func referenceArray(for samples: [Float]) -> MLXArray {
+    // A reference with identical samples and transcript reuses the
+    // retained array, so conditioning for one reference keeps a stable
+    // identity across generation calls without ever replaying
+    // conditioning captured for a different transcript.
+    private func referenceArray(
+        for reference: SpeechModelReference
+    ) -> MLXArray {
         if let retainedReferenceAudio,
-           retainedReferenceSamples == samples {
+           retainedReferenceSamples == reference.samples,
+           retainedReferenceTranscript == reference.transcript {
             return retainedReferenceAudio
         }
-        let array = MLXArray(samples)
+        let array = MLXArray(reference.samples)
         retainedReferenceAudio = array
-        retainedReferenceSamples = samples
+        retainedReferenceSamples = reference.samples
+        retainedReferenceTranscript = reference.transcript
         return array
+    }
+
+    private static func bridgedStream(
+        _ operation: @escaping @Sendable (
+            AsyncThrowingStream<[Float], Error>.Continuation
+        ) async -> Void
+    ) -> AsyncThrowingStream<[Float], Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                await operation(continuation)
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
     }
 
     private static func failedStream(
@@ -312,7 +329,9 @@ final class LiveSpeechModelSession: SpeechModelSession, @unchecked Sendable {
     }
 
     private static func classified(_ error: Error) -> Error {
-        isInputLengthError(error) ? SpeechModelInputTooLongError() : error
+        isInputLengthError(error)
+            ? SpeechModelInputTooLongError(underlyingError: error)
+            : error
     }
 
     private static func isInputLengthError(_ error: Error) -> Bool {

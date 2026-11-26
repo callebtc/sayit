@@ -208,14 +208,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 transcript: reference.transcript
             )
         }
-        let samples = try await loadedSession.generateSamples(
-            text: text,
-            voice: nil,
-            reference: generationReference,
-            language: language,
-            tuning: tuning,
-            seed: seed
-        )
+        let samples: [Float]
+        do {
+            samples = try await loadedSession.generateSamples(
+                text: text,
+                voice: nil,
+                reference: generationReference,
+                language: language,
+                tuning: tuning,
+                seed: seed,
+                allowTuningSelectedGeneration: true
+            )
+        } catch {
+            throw Self.surfacedGenerationError(error)
+        }
         try checkOperation(operationID)
         guard !samples.isEmpty else {
             throw SynthesisError.generatedNoAudio
@@ -267,14 +273,20 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             let anchorVoice = request.model.capabilities.voiceDescription
                 ? request.voiceDescription
                 : nil
-            let anchorSamples = try await loadedSession.generateSamples(
-                text: anchorText,
-                voice: anchorVoice,
-                reference: nil,
-                language: request.language,
-                tuning: request.voiceTuning,
-                seed: nil
-            )
+            let anchorSamples: [Float]
+            do {
+                anchorSamples = try await loadedSession.generateSamples(
+                    text: anchorText,
+                    voice: anchorVoice,
+                    reference: nil,
+                    language: request.language,
+                    tuning: request.voiceTuning,
+                    seed: nil,
+                    allowTuningSelectedGeneration: false
+                )
+            } catch {
+                throw Self.surfacedGenerationError(error)
+            }
             try checkOperation(operationID)
             guard !anchorSamples.isEmpty else {
                 throw SynthesisError.generatedNoAudio
@@ -372,9 +384,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     reference: usesReference ? generationReference : nil,
                     language: request.language,
                     tuning: request.voiceTuning,
-                    seed: nil,
-                    streamingInterval: request.model.playbackMode
-                        == .progressive ? 0.32 : 2
+                    seed: nil
                 )
                 for try await samples in stream {
                     try checkOperation(operationID)
@@ -385,7 +395,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 guard chunkSamples == 0,
                       error is SpeechModelInputTooLongError,
                       replacements.count > 1 else {
-                    throw error
+                    throw Self.surfacedGenerationError(error)
                 }
                 conditioner = conditionerBeforeChunk
                 chunks.replaceSubrange(
@@ -612,6 +622,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
     private func quiesceSessionIfLoaded() {
         loadedSession?.quiesce()
+    }
+
+    /// The input-too-long marker only gates subchunk retry; everywhere a
+    /// generation failure leaves the actor, the original error surfaces.
+    private static func surfacedGenerationError(_ error: Error) -> Error {
+        (error as? SpeechModelInputTooLongError)?.underlyingError ?? error
     }
 
     private func scheduleIdleUnload(for operationID: UInt64) {
