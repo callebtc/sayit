@@ -785,6 +785,19 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     try checkOperation(operationID)
                     try emit(samples)
                 } else if let drama = loadedModel as? DramaLibraryModel {
+                    // Start tight on chunk 0 (10 frames ≈ 0.46 s) and stay tight
+                    // while total buffered audio is still short (< 5 s, e.g. after
+                    // a short 1-sentence opening paragraph) so chunk 1 delivers
+                    // before playback drains, then ramp to 24 frames (≈ 1.11 s),
+                    // safely below DramaTTS's 2.0 s QuietGate dead-air threshold.
+                    let dramaStreamingFrames: Int
+                    if chunkCursor == 0 {
+                        dramaStreamingFrames = 10
+                    } else if generatedSamples < loadedModel.sampleRate * 5 {
+                        dramaStreamingFrames = 12
+                    } else {
+                        dramaStreamingFrames = DramaLibraryModel.maximumStreamingFrames
+                    }
                     let stream = SerializedSpeechModel(drama)
                         .generateDramaSamplesStream(
                             text: chunk.text,
@@ -793,7 +806,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                             ),
                             refText: usesReference ? referenceText : nil,
                             generationParameters: parameters,
-                            streamingFrames: chunkCursor == 0 ? 8 : 64
+                            streamingFrames: dramaStreamingFrames
                         )
                     for try await samples in stream {
                         try checkOperation(operationID)
@@ -1350,6 +1363,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     }
 
     private func isInputLengthError(_ error: Error) -> Bool {
+        if case .generationLimit = error as? Drama3Error {
+            return true
+        }
         let message: String
         if case .invalidInput(let detail) = error as? AudioGenerationError {
             message = detail

@@ -12,6 +12,24 @@ struct DramaLibraryTests {
         #expect(DramaLibraryModel.promptText("One.\n\nTwo.") == "One.  Two.")
     }
 
+    @Test("Drama streaming frames stay below QuietGate dead-air window")
+    func streamingFrameBounds() {
+        #expect(DramaLibraryModel.clampedStreamingFrames(0) == 1)
+        #expect(DramaLibraryModel.clampedStreamingFrames(10) == 10)
+        #expect(DramaLibraryModel.clampedStreamingFrames(24) == 24)
+        #expect(DramaLibraryModel.clampedStreamingFrames(64) == 24)
+        #expect(DramaLibraryModel.clampedStreamingFrames(128) == 24)
+    }
+
+    @Test("Drama generation limit only aborts when a chunk emitted zero audio")
+    func generationLimitOnlyAbortsEmptyChunk() {
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 0, emittedSampleCount: 0))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 44_100))
+        #expect(!DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 44_100))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 0, silencedChunks: 1, emittedSampleCount: 0))
+        #expect(DramaLibraryModel.shouldAbortForReport(cappedChunks: 1, silencedChunks: 0, emittedSampleCount: 0))
+    }
+
     @Test("Installed Q4 streams finite speech and recovers after cancellation")
     func installedQ4() async throws {
         let environment = ProcessInfo.processInfo.environment
