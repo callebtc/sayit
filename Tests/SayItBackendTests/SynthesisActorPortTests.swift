@@ -1,6 +1,5 @@
 import Foundation
 import SayItCore
-import Synchronization
 import Testing
 @testable import SayItBackend
 
@@ -9,7 +8,7 @@ struct SynthesisActorPortTests {
     @Test("Streamed synthesis runs through the scripted session and clock")
     func streamedSynthesisThroughPort() async throws {
         let session = ScriptedSpeechModelSession()
-        let clock = ManualSynthesisClock()
+        let clock = ControllableSynthesisClock()
         let synthesizer = makeSynthesizer(session: session, clock: clock)
         await synthesizer.updateConfiguration(
             chunkTarget: 20,
@@ -51,10 +50,10 @@ struct SynthesisActorPortTests {
     @Test("Input-too-long marker retries with subchunks")
     func inputTooLongMarkerRetries() async throws {
         let session = ScriptedSpeechModelSession()
-        session.failNextStreamsWithMarker(count: 1)
+        session.enqueueStreamFailure(.inputTooLong)
         let synthesizer = makeSynthesizer(
             session: session,
-            clock: ManualSynthesisClock()
+            clock: ControllableSynthesisClock()
         )
         await synthesizer.updateConfiguration(
             chunkTarget: 650,
@@ -84,16 +83,16 @@ struct SynthesisActorPortTests {
         }
         #expect(sawCompleted)
         #expect(metricsCount == 2)
-        #expect(session.streamCallCount == 3)
+        #expect(session.streamCalls.count == 3)
     }
 
     @Test("Unretryable input-too-long failures surface the original error")
     func unretryableMarkerSurfacesOriginalError() async throws {
         let session = ScriptedSpeechModelSession()
-        session.failAllStreamsWithMarker()
+        session.enqueueStreamFailure(.inputTooLong)
         let synthesizer = makeSynthesizer(
             session: session,
-            clock: ManualSynthesisClock()
+            clock: ControllableSynthesisClock()
         )
         await synthesizer.updateConfiguration(
             chunkTarget: 650,
@@ -108,7 +107,7 @@ struct SynthesisActorPortTests {
         do {
             for try await _ in stream {}
             Issue.record("Expected synthesis to fail")
-        } catch let error as ScriptedPortError {
+        } catch let error as ScriptedSpeechModelError {
             #expect(error == .inputTooLong)
         } catch {
             Issue.record("Expected the original error, got: \(error)")
@@ -120,7 +119,7 @@ struct SynthesisActorPortTests {
         let session = ScriptedSpeechModelSession()
         let synthesizer = makeSynthesizer(
             session: session,
-            clock: ManualSynthesisClock()
+            clock: ControllableSynthesisClock()
         )
         await synthesizer.updateConfiguration(
             chunkTarget: 650,
@@ -138,7 +137,11 @@ struct SynthesisActorPortTests {
         )
         for try await _ in stream {}
         await synthesizer.cancelCurrentRequest()
-        #expect(session.oneShotAllowFlags == [false])
+        let anchorFlags: [Bool?] = [false]
+        #expect(
+            session.oneShotCalls.map(\.allowTuningSelectedGeneration)
+                == anchorFlags
+        )
 
         _ = try await synthesizer.generateVoiceSample(
             model: omniVoice,
@@ -147,7 +150,11 @@ struct SynthesisActorPortTests {
             tuning: VoiceSynthesisTuning(preset: "natural", parameters: [:]),
             seed: 7
         )
-        #expect(session.oneShotAllowFlags == [false, true])
+        let allFlags: [Bool?] = [false, true]
+        #expect(
+            session.oneShotCalls.map(\.allowTuningSelectedGeneration)
+                == allFlags
+        )
     }
 
     @Test("Loader failures surface unchanged and leave no loaded session")
@@ -156,10 +163,10 @@ struct SynthesisActorPortTests {
         let synthesizer = SynthesisActor(
             modelURLProvider: { _ in URL(filePath: "/tmp/scripted-model") },
             loader: loader,
-            clock: ManualSynthesisClock()
+            clock: ControllableSynthesisClock()
         )
         let model = try firstModel()
-        await #expect(throws: ScriptedPortError.self) {
+        await #expect(throws: ScriptedSpeechModelError.self) {
             _ = try await synthesizer.generateVoiceSample(
                 model: model,
                 text: "Sample",
@@ -171,14 +178,14 @@ struct SynthesisActorPortTests {
                 seed: 1
             )
         }
-        #expect(await loader.loadCount == 1)
+        #expect(loader.loadCount == 1)
         await synthesizer.unloadModel()
     }
 
     @Test("Idle unload fires through the clock after an operation finishes")
     func idleUnloadThroughClock() async throws {
         let session = ScriptedSpeechModelSession()
-        let clock = ManualSynthesisClock()
+        let clock = ControllableSynthesisClock()
         let synthesizer = makeSynthesizer(session: session, clock: clock)
         await synthesizer.updateConfiguration(
             chunkTarget: 650,
@@ -200,7 +207,7 @@ struct SynthesisActorPortTests {
 
     private func makeSynthesizer(
         session: ScriptedSpeechModelSession,
-        clock: ManualSynthesisClock
+        clock: ControllableSynthesisClock
     ) -> SynthesisActor {
         SynthesisActor(
             modelURLProvider: { _ in URL(filePath: "/tmp/scripted-model") },
@@ -240,167 +247,5 @@ struct SynthesisActorPortTests {
                 $0.modelType.lowercased() == "omnivoice"
             }
         )
-    }
-}
-
-private enum ScriptedPortError: Error {
-    case inputTooLong
-    case loadFailed
-}
-
-private actor ScriptedSpeechModelLoader: SpeechModelLoading {
-    private let session: ScriptedSpeechModelSession?
-    private(set) var loadCount = 0
-
-    init(session: ScriptedSpeechModelSession?) {
-        self.session = session
-    }
-
-    func load(
-        model: ModelDescriptor,
-        directory: URL
-    ) async throws -> any SpeechModelSession {
-        loadCount += 1
-        guard let session else {
-            throw ScriptedPortError.loadFailed
-        }
-        return session
-    }
-
-    func prepareDependencies(for model: ModelDescriptor) async throws {}
-}
-
-private final class ScriptedSpeechModelSession: SpeechModelSession,
-    @unchecked Sendable {
-    let sampleRate = 24_000.0
-
-    private struct State {
-        var oneShotAllowFlags: [Bool] = []
-        var streamCallCount = 0
-        var quiesceCount = 0
-        var shutdownCount = 0
-        var markerFailuresRemaining = 0
-        var alwaysFailsWithMarker = false
-    }
-
-    private let state = Mutex(State())
-
-    var oneShotAllowFlags: [Bool] {
-        state.withLock { $0.oneShotAllowFlags }
-    }
-
-    var streamCallCount: Int {
-        state.withLock { $0.streamCallCount }
-    }
-
-    var quiesceCount: Int {
-        state.withLock { $0.quiesceCount }
-    }
-
-    var shutdownCount: Int {
-        state.withLock { $0.shutdownCount }
-    }
-
-    func failNextStreamsWithMarker(count: Int) {
-        state.withLock { $0.markerFailuresRemaining = count }
-    }
-
-    func failAllStreamsWithMarker() {
-        state.withLock { $0.alwaysFailsWithMarker = true }
-    }
-
-    func generateSamples(
-        text: String,
-        voice: String?,
-        reference: SpeechModelReference?,
-        language: String?,
-        tuning: VoiceSynthesisTuning?,
-        seed: UInt64?,
-        allowTuningSelectedGeneration: Bool
-    ) async throws -> [Float] {
-        state.withLock {
-            $0.oneShotAllowFlags.append(allowTuningSelectedGeneration)
-        }
-        return [Float](repeating: 0.1, count: 4_800)
-    }
-
-    func generateSamplesStream(
-        text: String,
-        voice: String?,
-        reference: SpeechModelReference?,
-        language: String?,
-        tuning: VoiceSynthesisTuning?,
-        seed: UInt64?
-    ) -> AsyncThrowingStream<[Float], Error> {
-        let shouldFail = state.withLock { state -> Bool in
-            state.streamCallCount += 1
-            if state.alwaysFailsWithMarker {
-                return true
-            }
-            if state.markerFailuresRemaining > 0 {
-                state.markerFailuresRemaining -= 1
-                return true
-            }
-            return false
-        }
-        if shouldFail {
-            return AsyncThrowingStream { continuation in
-                continuation.finish(
-                    throwing: SpeechModelInputTooLongError(
-                        underlyingError: ScriptedPortError.inputTooLong
-                    )
-                )
-            }
-        }
-        return AsyncThrowingStream { continuation in
-            continuation.yield([Float](repeating: 0.1, count: 4_800))
-            continuation.finish()
-        }
-    }
-
-    func fittingPieces(
-        for chunk: SpeechChunk,
-        language: String?,
-        voice: String?,
-        chunker: TextChunker
-    ) async throws -> [SpeechChunk] {
-        [chunk]
-    }
-
-    func applySpeakingPace(_ pace: SpeakingPace) throws {}
-
-    func quiesce() {
-        state.withLock { $0.quiesceCount += 1 }
-    }
-
-    func shutdown() {
-        state.withLock { $0.shutdownCount += 1 }
-    }
-}
-
-private final class ManualSynthesisClock: SynthesisClock,
-    @unchecked Sendable {
-    private struct State {
-        var instant: ContinuousClock.Instant
-        var sleeps: [Duration] = []
-    }
-
-    private let state = Mutex(State(instant: ContinuousClock.now))
-
-    var now: ContinuousClock.Instant {
-        state.withLock { $0.instant }
-    }
-
-    var recordedSleeps: [Duration] {
-        state.withLock { $0.sleeps }
-    }
-
-    func sleep(for duration: Duration) async throws {
-        try Task.checkCancellation()
-        state.withLock { state in
-            state.instant = state.instant.advanced(by: duration)
-            state.sleeps.append(duration)
-        }
-        await Task.yield()
     }
 }
