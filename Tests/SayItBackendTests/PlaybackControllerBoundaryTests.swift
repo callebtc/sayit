@@ -84,6 +84,26 @@ struct PlaybackControllerBoundaryTests {
             startsParagraph: false
         ))
         #expect(playback.audioGraphConfigurationCount == 4)
+
+        // A route change while audio is buffered must also invalidate the cached
+        // sample rate even if stop() cancels the debounced recovery task.
+        playback.handleAudioConfigurationChangeForTesting()
+        playback.stop()
+        let postBufferedRouteID = UUID()
+        playback.prepare(
+            requestID: postBufferedRouteID,
+            title: "Post-buffered-route change",
+            estimatedDuration: 0.5,
+            modelID: "rate-test"
+        )
+        try playback.enqueue(AudioChunk(
+            requestID: postBufferedRouteID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(playback.audioGraphConfigurationCount == 5)
         playback.stop()
     }
 

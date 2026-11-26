@@ -966,16 +966,16 @@ enum PocketTTSStreamRunner {
         flowDType: DType,
         useExactGELU: Bool,
         eosThreshold: Float,
-        invSteps: MLXArray,
         timeConds: [MLXArray],
         condEmb: MLXArray?,
-        posWrite: MLXArray,
-        posMask: MLXArray,
-        zeroMaskVal: MLXArray,
-        negInfMaskVal: MLXArray
+        constants: FlowStepConstants
     ) -> (latent: MLXArray, isEos: MLXArray) {
-        let writeMask = posWrite .== offsetArray
-        let attnMask = MLX.where(posMask .<= offsetArray, zeroMaskVal, negInfMaskVal)
+        let writeMask = constants.posWrite .== offsetArray
+        let attnMask = MLX.where(
+            constants.posMask .<= offsetArray,
+            constants.zeroMaskVal,
+            constants.negInfMaskVal
+        )
 
         var h = flowLM.input_linear(sequence)
         if let condEmb {
@@ -1053,7 +1053,7 @@ enum PocketTTSStreamRunner {
                 xx = block(xx, y).asType(flowDType)
             }
             let flowDir = flowNet.final_layer(xx, y).asType(flowDType)
-            current = current + flowDir * invSteps
+            current = current + flowDir * constants.invSteps
         }
 
         return (current.expandedDimensions(axis: 1), isEos)
@@ -1124,13 +1124,9 @@ enum PocketTTSStreamRunner {
                 flowDType: flowDType,
                 useExactGELU: useExactGELU,
                 eosThreshold: eosThreshold,
-                invSteps: constants.invSteps,
                 timeConds: timeConds,
                 condEmb: condEmb,
-                posWrite: constants.posWrite,
-                posMask: constants.posMask,
-                zeroMaskVal: constants.zeroMaskVal,
-                negInfMaskVal: constants.negInfMaskVal
+                constants: constants
             )
 
             var outputs: [MLXArray] = []
@@ -1203,13 +1199,9 @@ enum PocketTTSStreamRunner {
                     flowDType: flowDType,
                     useExactGELU: useExactGELU,
                     eosThreshold: eosThreshold,
-                    invSteps: constants.invSteps,
                     timeConds: timeConds,
                     condEmb: condEmb,
-                    posWrite: constants.posWrite,
-                    posMask: constants.posMask,
-                    zeroMaskVal: constants.zeroMaskVal,
-                    negInfMaskVal: constants.negInfMaskVal
+                    constants: constants
                 )
                 latents.append(nextLatent)
                 eosFlags.append(isEos)
@@ -1338,7 +1330,14 @@ enum PocketTTSStreamRunner {
             voiceKey: referenceAudio == nil ? (voice ?? "").lowercased() : "",
             referenceAudioID: referenceAudio.map(ObjectIdentifier.init)
         )
-        if let cached = cacheLock.withLock({ cacheStore.voiceStates[key] }) {
+        if let cached = cacheLock.withLock({ () -> CachedVoiceState? in
+            guard let state = cacheStore.voiceStates[key] else { return nil }
+            if let existingIndex = cacheStore.voiceStateOrder.firstIndex(of: key) {
+                cacheStore.voiceStateOrder.remove(at: existingIndex)
+                cacheStore.voiceStateOrder.append(key)
+            }
+            return state
+        }) {
             return cached
         }
 

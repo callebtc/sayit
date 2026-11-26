@@ -902,14 +902,17 @@ final class PlaybackController: BackendPlaybackControlling {
         guard !isReconfiguringAudioGraph else {
             return
         }
-        // If the hardware route changes while idle or finished, drop the cached
-        // graph sample rate so the next utterance reconfigures AVAudioEngine for
-        // the new output device instead of reusing a stale graph.
-        guard configuredSampleRate != nil,
+        // Always invalidate the cached graph sample rate immediately on a
+        // hardware/route change, even if audio is currently buffered or playing:
+        // if the user stops or starts a replacement before the debounced
+        // recovery task runs, the next utterance must rebuild the graph for
+        // the new output device rather than reusing a stale cached rate.
+        let hadConfiguredGraph = configuredSampleRate != nil
+        configuredSampleRate = nil
+        guard hadConfiguredGraph,
               hasStoredAudio,
               state != .idle,
               state != .finished else {
-            configuredSampleRate = nil
             return
         }
         let previousState = state

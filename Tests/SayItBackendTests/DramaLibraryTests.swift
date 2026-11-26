@@ -45,6 +45,39 @@ struct DramaLibraryTests {
         )
     }
 
+    @Test("Drama voicing gate holds back dead air so silent limit failures emit zero samples for retry")
+    func voicingGateHoldsBackDeadAirBeforeRetry() throws {
+        let deadAirTail = [Float](repeating: 0.003, count: 22_050)
+        let voicedPiece = [Float](repeating: 0.05, count: 22_050)
+
+        // Quiet dead-air piece followed by silenced report must emit zero samples
+        // before throwing generationLimit so SynthesisActor sees chunkSamples == 0 and retries.
+        var silentGate = DramaLibraryModel.StreamVoicingGate()
+        let first = try silentGate.receive(samples: deadAirTail, cappedChunks: 0, silencedChunks: 0)
+        #expect(first.isEmpty)
+        do {
+            _ = try silentGate.receive(samples: [], cappedChunks: 0, silencedChunks: 1)
+            Issue.record("Expected Drama3Error.generationLimit")
+        } catch Drama3Error.generationLimit {}
+        #expect(silentGate.finish().isEmpty)
+
+        // Quiet lead followed by voiced speech flushes both and tolerates trailing silence report.
+        var voicedGate = DramaLibraryModel.StreamVoicingGate()
+        #expect(try voicedGate.receive(samples: deadAirTail, cappedChunks: 0, silencedChunks: 0).isEmpty)
+        let flushed = try voicedGate.receive(samples: voicedPiece, cappedChunks: 0, silencedChunks: 1)
+        #expect(flushed.count == 2)
+        #expect(flushed[0].count == deadAirTail.count)
+        #expect(flushed[1].count == voicedPiece.count)
+        #expect(voicedGate.emittedVoicedAudio)
+
+        // Intentional soft audio completing without any limit report flushes cleanly on finish().
+        var whisperGate = DramaLibraryModel.StreamVoicingGate()
+        #expect(try whisperGate.receive(samples: deadAirTail, cappedChunks: 0, silencedChunks: 0).isEmpty)
+        let remaining = whisperGate.finish()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].count == deadAirTail.count)
+    }
+
     @Test("Installed Q4 streams finite speech and recovers after cancellation")
     func installedQ4() async throws {
         let environment = ProcessInfo.processInfo.environment

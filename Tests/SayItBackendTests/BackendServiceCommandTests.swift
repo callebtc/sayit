@@ -131,12 +131,15 @@ struct BackendServiceCommandTests {
     @Test("Overlapping interruption during fade-out does not cancel a newly started job")
     func overlappingInterruptionPreservesNewJob() async throws {
         let gate = BackendSynthesisEventGate()
+        let fadeEntered = BackendSynthesisEventGate()
+        let fadeRelease = BackendSynthesisEventGate()
         let fixture = try ServiceFixture(synthesizesAudio: true, synthesisEventGate: gate)
         defer { fixture.remove() }
         try fixture.seedInstallation(modelID: fixture.seedModelID)
         await fixture.service.start()
         fixture.playback.shouldStartWhenBuffered = true
-        fixture.playback.smoothStopFadeDuration = .milliseconds(80)
+        fixture.playback.smoothStopEnteredGate = fadeEntered
+        fixture.playback.smoothStopReleaseGate = fadeRelease
 
         let first = try submittedJob(await fixture.service.handle(.init(command: .submit(
             SpeechSubmission(
@@ -149,7 +152,7 @@ struct BackendServiceCommandTests {
         let stopTask = Task { @MainActor in
             await fixture.service.handle(.init(command: .cancelJob(first.id)))
         }
-        try await Task.sleep(for: .milliseconds(15))
+        await fadeEntered.wait()
         let cancelsBeforeSecond = await fixture.synthesizer.cancelCount
 
         let second = try submittedJob(await fixture.service.handle(.init(command: .submit(
@@ -158,6 +161,7 @@ struct BackendServiceCommandTests {
                 source: .commandLine
             )
         ))))
+        await fadeRelease.releaseNext()
         _ = await stopTask.value
 
         try await waitForJobState(.playing, id: second.id, service: fixture.service)
@@ -3219,6 +3223,8 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var enqueueError: Error?
     var shouldStartWhenBuffered = false
     var smoothStopFadeDuration: Duration?
+    var smoothStopEnteredGate: BackendSynthesisEventGate?
+    var smoothStopReleaseGate: BackendSynthesisEventGate?
     var showTitleInNowPlaying = false
     var rate: Double = 1
     var volume: Double = 1
@@ -3286,7 +3292,11 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     func stopSmoothly() async {
         stopTransitionGeneration &+= 1
         let generation = stopTransitionGeneration
-        if let smoothStopFadeDuration, state == .playing {
+        if let smoothStopEnteredGate, let smoothStopReleaseGate, state == .playing {
+            state = .paused
+            await smoothStopEnteredGate.releaseNext()
+            await smoothStopReleaseGate.wait()
+        } else if let smoothStopFadeDuration, state == .playing {
             state = .paused
             try? await Task.sleep(for: smoothStopFadeDuration)
         }

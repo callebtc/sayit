@@ -891,6 +891,29 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                     chunkCursor...chunkCursor,
                     with: replacements
                 )
+                // If an initially single-chunk automaticStable request split
+                // into multiple pieces on retry, re-enable voice anchoring so
+                // replacement pieces share one consistent voice.
+                if chunkCursor == 0,
+                   referenceAudio == nil,
+                   chunks.count > 1,
+                   request.voiceMode == .automaticStable,
+                   request.model.capabilities.supportsRandomVoiceSampling {
+                    if chunks[0].text.count >= 36 {
+                        captureChunk0AsSelfAnchor = true
+                    } else {
+                        let anchor = try await synthesizeArticleVoiceAnchor(
+                            for: request,
+                            model: loadedModel,
+                            operationID: operationID,
+                            continuation: continuation
+                        )
+                        referenceAudio = MLXArray(anchor.samples)
+                        retainedReferenceAudio = referenceAudio
+                        referenceText = anchor.text
+                        captureChunk0AsSelfAnchor = false
+                    }
+                }
                 continue
             }
 
@@ -935,7 +958,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             if capturingSelfAnchorThisChunk {
                 captureChunk0AsSelfAnchor = false
                 if chunkCursor + 1 < chunks.count {
-                    let minAnchorFrames = Int(Double(loadedModel.sampleRate) * 0.4)
+                    let minAnchorFrames = Int(Double(loadedModel.sampleRate) * 0.25)
                     let maxAnchorFrames = Int(Double(loadedModel.sampleRate) * 25.0)
                     if selfAnchorSamples.count >= minAnchorFrames,
                        selfAnchorSamples.count <= maxAnchorFrames {

@@ -30,26 +30,28 @@ struct CachingTextProcessorTests {
         #expect(base.callCount == 2)
     }
 
-    @Test("Evicts oldest entries beyond capacity and clears on demand")
+    @Test("Evicts least-recently-used entries beyond capacity and clears on demand")
     func evictsAndClears() throws {
         let base = CountingTextProcessor()
         let cached = CachingTextProcessor(base, capacity: 2)
 
         _ = try cached.process(text: "a", language: "en")
         _ = try cached.process(text: "b", language: "en")
-        _ = try cached.process(text: "c", language: "en")
-        #expect(base.callCount == 3)
-
-        // "b" and "c" remain cached; "a" was evicted.
-        _ = try cached.process(text: "b", language: "en")
-        _ = try cached.process(text: "c", language: "en")
-        #expect(base.callCount == 3)
-
+        // Promote "a" via cache hit so "b" becomes least-recently-used.
         _ = try cached.process(text: "a", language: "en")
+        _ = try cached.process(text: "c", language: "en")
+        #expect(base.callCount == 3)
+
+        // "a" and "c" remain cached; "b" was evicted.
+        _ = try cached.process(text: "a", language: "en")
+        _ = try cached.process(text: "c", language: "en")
+        #expect(base.callCount == 3)
+
+        _ = try cached.process(text: "b", language: "en")
         #expect(base.callCount == 4)
 
         cached.clearCache()
-        _ = try cached.process(text: "a", language: "en")
+        _ = try cached.process(text: "b", language: "en")
         #expect(base.callCount == 5)
     }
 }

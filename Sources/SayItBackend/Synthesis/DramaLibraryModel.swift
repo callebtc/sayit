@@ -53,6 +53,55 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         (cappedChunks > 0 || silencedChunks > 0) && !emittedVoicedAudio
     }
 
+    /// Holds back initial unvoiced pieces (such as a QuietGate dead-air tail)
+    /// until voiced audio is observed or the stream ends cleanly. If Drama 3
+    /// reports a silence/frame limit before any voiced speech appears, the
+    /// held-back noise is discarded and `Drama3Error.generationLimit` is thrown
+    /// with zero samples emitted so `SynthesisActor` can sub-split and retry.
+    struct StreamVoicingGate {
+        private(set) var emittedVoicedAudio = false
+        private var unvoicedLeadPieces: [[Float]] = []
+
+        mutating func receive(
+            samples: [Float],
+            cappedChunks: Int,
+            silencedChunks: Int
+        ) throws -> [[Float]] {
+            guard samples.allSatisfy(\.isFinite) else {
+                throw Drama3Error.emptyAudio
+            }
+            var ready: [[Float]] = []
+            if !samples.isEmpty {
+                if emittedVoicedAudio {
+                    ready.append(samples)
+                } else if DramaLibraryModel.pieceContainsVoicedAudio(samples) {
+                    emittedVoicedAudio = true
+                    ready.append(contentsOf: unvoicedLeadPieces)
+                    unvoicedLeadPieces.removeAll(keepingCapacity: false)
+                    ready.append(samples)
+                } else {
+                    unvoicedLeadPieces.append(samples)
+                }
+            }
+            if DramaLibraryModel.shouldAbortForReport(
+                cappedChunks: cappedChunks,
+                silencedChunks: silencedChunks,
+                emittedVoicedAudio: emittedVoicedAudio
+            ) {
+                unvoicedLeadPieces.removeAll(keepingCapacity: false)
+                throw Drama3Error.generationLimit
+            }
+            return ready
+        }
+
+        mutating func finish() -> [[Float]] {
+            guard !unvoicedLeadPieces.isEmpty else { return [] }
+            let remaining = unvoicedLeadPieces
+            unvoicedLeadPieces.removeAll(keepingCapacity: false)
+            return remaining
+        }
+    }
+
     private init(engine: DramaEngine) {
         self.engine = engine
         super.init()
@@ -201,24 +250,20 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var emittedVoicedAudio = false
+                    var gate = StreamVoicingGate()
                     for try await piece in engine.chunks(Self.promptText(text), references: input.references, settings: input.settings) {
                         try Task.checkCancellation()
-                        guard piece.samples.allSatisfy(\.isFinite) else { throw Drama3Error.emptyAudio }
-                        if !piece.samples.isEmpty {
-                            if !emittedVoicedAudio, Self.pieceContainsVoicedAudio(piece.samples) {
-                                emittedVoicedAudio = true
-                            }
-                            continuation.yield(piece.samples)
+                        let ready = try gate.receive(
+                            samples: piece.samples,
+                            cappedChunks: piece.report?.cappedChunks ?? 0,
+                            silencedChunks: piece.report?.silencedChunks ?? 0
+                        )
+                        for samples in ready {
+                            continuation.yield(samples)
                         }
-                        if let report = piece.report,
-                           Self.shouldAbortForReport(
-                               cappedChunks: report.cappedChunks,
-                               silencedChunks: report.silencedChunks,
-                               emittedVoicedAudio: emittedVoicedAudio
-                           ) {
-                            throw Drama3Error.generationLimit
-                        }
+                    }
+                    for samples in gate.finish() {
+                        continuation.yield(samples)
                     }
                     continuation.finish()
                 } catch { continuation.finish(throwing: Task.isCancelled ? CancellationError() : error) }
