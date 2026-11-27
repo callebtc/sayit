@@ -16,6 +16,7 @@ final class PlaybackController: BackendPlaybackControlling {
     static let schedulingHorizon: TimeInterval = 12
     static let schedulingChunkDuration: TimeInterval = 2
     static let fileReadFrameCount = 65_536
+    nonisolated static let displayAmplitudeBucketCount = 192
 
     static func preferredStartBufferDuration(
         for rate: Double
@@ -1191,7 +1192,10 @@ final class PlaybackController: BackendPlaybackControlling {
             }
         }
         if windowsAdded > 0 {
-            amplitudes = displayAmplitudeBuckets(count: 96)
+            amplitudes = Self.displayAmplitudeBuckets(
+                from: amplitudeWindows,
+                count: Self.displayAmplitudeBucketCount
+            )
         }
     }
 
@@ -1218,23 +1222,34 @@ final class PlaybackController: BackendPlaybackControlling {
         amplitudePendingSampleCount = 0
     }
 
-    private func displayAmplitudeBuckets(count: Int) -> [Float] {
-        guard !amplitudeWindows.isEmpty, count > 0 else { return [] }
-        let total = amplitudeWindows.count
-        let windowSize = max(
-            Int(ceil(Double(total) / Double(count))),
-            1
-        )
-        let bucketCount = min((total + windowSize - 1) / windowSize, count)
-        var result = [Float](repeating: 0, count: bucketCount)
-        amplitudeWindows.withUnsafeBufferPointer { buffer in
+    nonisolated static func displayAmplitudeBuckets(
+        from windows: [Float],
+        count: Int
+    ) -> [Float] {
+        guard !windows.isEmpty, count > 0 else { return [] }
+        let total = windows.count
+        guard total > count else { return windows }
+
+        var result = [Float](repeating: 0, count: count)
+        let windowsPerBucket = Double(total) / Double(count)
+        windows.withUnsafeBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return }
-            for bucketIndex in 0..<bucketCount {
-                let start = bucketIndex * windowSize
-                let length = min(windowSize, total - start)
-                var energy: Float = 0
-                vDSP_svesq(base.advanced(by: start), 1, &energy, vDSP_Length(length))
-                result[bucketIndex] = sqrt(energy / Float(length))
+            for bucketIndex in 0..<count {
+                let rangeStart = Double(bucketIndex) * windowsPerBucket
+                let rangeEnd = Double(bucketIndex + 1) * windowsPerBucket
+                let first = min(Int(floor(rangeStart)), total - 1)
+                let last = min(max(Int(ceil(rangeEnd)) - 1, first), total - 1)
+                var weightedEnergy = 0.0
+                for windowIndex in first...last {
+                    let overlap = min(Double(windowIndex + 1), rangeEnd)
+                        - max(Double(windowIndex), rangeStart)
+                    guard overlap > 0 else { continue }
+                    let sample = Double(base[windowIndex])
+                    weightedEnergy += overlap * sample * sample
+                }
+                result[bucketIndex] = Float(
+                    sqrt(weightedEnergy / windowsPerBucket)
+                )
             }
         }
         return result
