@@ -40,6 +40,19 @@ actor CommunityModelResolver {
             HuggingFaceModelResponse.self,
             from: metadataData
         )
+        let repositoryName = normalizedRepository.split(separator: "/").last
+            .map(String.init) ?? normalizedRepository
+        let safeID = normalizedRepository
+            .lowercased()
+            .replacing("/", with: "-")
+            .replacing("_", with: "-")
+        let modelID = "community-\(safeID)-\(metadata.sha.prefix(8))"
+        do {
+            _ = try ContainedRelativePath.component(modelID)
+            _ = try ContainedRelativePath.component(metadata.sha)
+        } catch {
+            throw ModelManagerError.unsafePath
+        }
 
         guard let configURL = URL(
             string: "https://huggingface.co/\(normalizedRepository)/resolve/\(metadata.sha)/config.json"
@@ -79,19 +92,13 @@ actor CommunityModelResolver {
             nil
         }
 
-        let repositoryName = normalizedRepository.split(separator: "/").last
-            .map(String.init) ?? normalizedRepository
-        let safeID = normalizedRepository
-            .lowercased()
-            .replacing("/", with: "-")
-            .replacing("_", with: "-")
         let licenseID = metadata.cardData?.license ?? "See model card"
         let licenseURL = URL(
             string: "https://huggingface.co/\(normalizedRepository)"
         ) ?? URL(filePath: "/")
 
         return ModelDescriptor(
-            id: ModelID("community-\(safeID)-\(metadata.sha.prefix(8))"),
+            id: ModelID(modelID),
             displayName: repositoryName,
             family: "Community model",
             repository: normalizedRepository,

@@ -65,9 +65,9 @@ actor ModelManager: ModelManaging {
         }
         let hasInstalledSnapshot = rawInstallation(for: model) != nil
         if hasInstalledSnapshot, installation(for: model) != nil {
-            let staleStaging = directories.downloads.appending(
-                path: "\(model.id.rawValue)-\(model.revision).partial",
-                directoryHint: .isDirectory
+            let staleStaging = try stagingDirectory(
+                for: model,
+                suffix: "partial"
             )
             try? FileManager.default.removeItem(at: staleStaging)
             return
@@ -165,6 +165,7 @@ actor ModelManager: ModelManaging {
     }
 
     func addCommunityModel(_ model: ModelDescriptor) throws {
+        _ = try installLocation(for: model)
         if let index = modelList.firstIndex(where: { $0.id == model.id }) {
             modelList[index] = model
         } else {
@@ -177,17 +178,17 @@ actor ModelManager: ModelManaging {
         _ model: ModelDescriptor,
         from source: URL
     ) throws {
-        try preflight(requiredBytes: model.estimatedDiskBytes)
-        let staging = directories.downloads.appending(
-            path: "\(model.id.rawValue)-\(model.revision).importing",
-            directoryHint: .isDirectory
+        let location = try installLocation(for: model)
+        let staging = try stagingDirectory(
+            for: model,
+            suffix: "importing"
         )
+        try preflight(requiredBytes: model.estimatedDiskBytes)
         if FileManager.default.fileExists(atPath: staging.path) {
             try FileManager.default.removeItem(at: staging)
         }
         try FileManager.default.copyItem(at: source, to: staging)
         do {
-            let relativePath = "\(model.id.rawValue)/\(model.revision)"
             let installation = ModelInstallation(
                 modelID: model.id,
                 revision: model.revision,
@@ -196,17 +197,14 @@ actor ModelManager: ModelManaging {
                 dependenciesVerifiedAt: requiresManagedDependencies(model)
                     ? nil
                     : .now,
-                relativePath: relativePath
+                relativePath: location.relativePath
             )
             let metadata = try JSONEncoder.sayIt.encode(installation)
             try metadata.write(
                 to: staging.appending(path: "installation.json"),
                 options: .atomic
             )
-            let finalURL = directories.models.appending(
-                path: relativePath,
-                directoryHint: .isDirectory
-            )
+            let finalURL = location.directory
             try FileManager.default.createDirectory(
                 at: finalURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -226,6 +224,10 @@ actor ModelManager: ModelManaging {
         _ model: ModelDescriptor,
         progress: @escaping ProgressHandler
     ) async throws {
+        if model.id.rawValue.hasPrefix("community-")
+            || model.repository == "local-import" {
+            _ = try installLocation(for: model)
+        }
         var files = model.files
         if files.isEmpty {
             files = try await resolveManifest(for: model)
@@ -233,6 +235,7 @@ actor ModelManager: ModelManaging {
         guard !files.isEmpty else {
             throw ModelManagerError.incompleteSnapshot
         }
+        try validateInstallPaths(model, files: files)
 
         let dependencies = dependencies(for: model)
         let dependencyBytes = dependencies.reduce(Int64(0)) {
@@ -242,17 +245,19 @@ actor ModelManager: ModelManaging {
             + dependencyBytes
         try preflight(requiredBytes: max(totalBytes, model.estimatedDiskBytes))
 
-        let stagingName = "\(model.id.rawValue)-\(model.revision).partial"
-        let staging = directories.downloads.appending(
-            path: stagingName,
-            directoryHint: .isDirectory
+        let staging = try stagingDirectory(
+            for: model,
+            suffix: "partial"
         )
         try FileManager.default.createDirectory(
             at: staging,
             withIntermediateDirectories: true
         )
 
-        var completedBytes = existingVerifiedBytes(in: staging, files: files)
+        var completedBytes = try existingManifestBytes(
+            in: staging,
+            files: files
+        )
         for dependency in dependencies {
             let installed = dependencyDestination(dependency)
             if dependencyIsValid(dependency, at: installed) {
@@ -283,7 +288,10 @@ actor ModelManager: ModelManaging {
         do {
             for file in files {
                 try Task.checkCancellation()
-                let destination = staging.appending(path: file.path)
+                let destination = try manifestFileURL(
+                    file.path,
+                    in: staging
+                )
                 if isValidExistingFile(destination, descriptor: file) {
                     continue
                 }
@@ -464,7 +472,7 @@ actor ModelManager: ModelManaging {
                 at: staging.appending(path: "__dependencies")
             )
 
-            let relativePath = "\(model.id.rawValue)/\(model.revision)"
+            let location = try installLocation(for: model)
             let installation = ModelInstallation(
                 modelID: model.id,
                 revision: model.revision,
@@ -473,7 +481,7 @@ actor ModelManager: ModelManaging {
                 dependenciesVerifiedAt: requiresManagedDependencies(model)
                     ? nil
                     : .now,
-                relativePath: relativePath
+                relativePath: location.relativePath
             )
             let metadata = try JSONEncoder.sayIt.encode(installation)
             try metadata.write(
@@ -481,10 +489,7 @@ actor ModelManager: ModelManaging {
                 options: .atomic
             )
 
-            let finalURL = directories.models.appending(
-                path: relativePath,
-                directoryHint: .isDirectory
-            )
+            let finalURL = location.directory
             try FileManager.default.createDirectory(
                 at: finalURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -519,9 +524,9 @@ actor ModelManager: ModelManaging {
             $0 + $1.files.reduce(Int64(0)) { $0 + $1.byteCount }
         }
         try preflight(requiredBytes: totalBytes)
-        let staging = directories.downloads.appending(
-            path: "\(model.id.rawValue)-\(model.revision).dependencies.partial",
-            directoryHint: .isDirectory
+        let staging = try stagingDirectory(
+            for: model,
+            suffix: "dependencies.partial"
         )
         try FileManager.default.createDirectory(
             at: staging,
@@ -877,7 +882,10 @@ actor ModelManager: ModelManaging {
             throw ModelManagerError.incompleteSnapshot
         }
         for file in files {
-            try verify(url.appending(path: file.path), descriptor: file)
+            try verify(
+                try manifestFileURL(file.path, in: url),
+                descriptor: file
+            )
         }
 
         let declaredType = (
@@ -914,10 +922,10 @@ actor ModelManager: ModelManaging {
     private func rawInstallation(
         for model: ModelDescriptor
     ) -> ModelInstallation? {
-        let relativePath = "\(model.id.rawValue)/\(model.revision)"
-        let url = directories.models
-            .appending(path: relativePath)
-            .appending(path: "installation.json")
+        guard let directory = try? installLocation(for: model).directory else {
+            return nil
+        }
+        let url = directory.appending(path: "installation.json")
         guard let data = try? Data(contentsOf: url),
               let installation = try? JSONDecoder.sayIt.decode(
                   ModelInstallation.self,
@@ -1036,5 +1044,101 @@ actor ModelManager: ModelManaging {
             try? FileManager.default.removeItem(at: url)
             throw ModelManagerError.checksumMismatch(path: descriptor.path)
         }
+    }
+
+    private func validateInstallPaths(
+        _ model: ModelDescriptor,
+        files: [ModelFileDescriptor]
+    ) throws {
+        if model.id.rawValue.hasPrefix("community-") {
+            _ = try installLocation(for: model)
+        }
+        for file in files {
+            _ = try manifestFileURL(file.path, in: directories.models)
+        }
+    }
+
+    private func installLocation(
+        for model: ModelDescriptor
+    ) throws -> (relativePath: String, directory: URL) {
+        let relativePath = if model.id.rawValue.hasPrefix("community-")
+            || model.repository == "local-import" {
+            let id = try installPathComponent(model.id.rawValue)
+            let revision = try installPathComponent(model.revision)
+            "\(id)/\(revision)"
+        } else {
+            "\(model.id.rawValue)/\(model.revision)"
+        }
+        return (
+            relativePath,
+            try containedDirectory(relativePath, in: directories.models)
+        )
+    }
+
+    private func stagingDirectory(
+        for model: ModelDescriptor,
+        suffix: String
+    ) throws -> URL {
+        let id = try installPathComponent(model.id.rawValue)
+        let revision = try installPathComponent(model.revision)
+        return try containedDirectory(
+            "\(id)-\(revision).\(suffix)",
+            in: directories.downloads
+        )
+    }
+
+    private func manifestFileURL(
+        _ relativePath: String,
+        in directory: URL
+    ) throws -> URL {
+        do {
+            _ = try ContainedRelativePath.fileURL(
+                relativePath,
+                rootedAt: directory
+            )
+        } catch {
+            throw ModelManagerError.unsafePath
+        }
+        return directory.appending(path: relativePath)
+    }
+
+    private func containedDirectory(
+        _ relativePath: String,
+        in root: URL
+    ) throws -> URL {
+        do {
+            _ = try ContainedRelativePath.fileURL(
+                relativePath,
+                rootedAt: root
+            )
+        } catch {
+            throw ModelManagerError.unsafePath
+        }
+        return root.appending(
+            path: relativePath,
+            directoryHint: .isDirectory
+        )
+    }
+
+    private func installPathComponent(_ value: String) throws -> String {
+        do {
+            return try ContainedRelativePath.component(value)
+        } catch {
+            throw ModelManagerError.unsafePath
+        }
+    }
+
+    private func existingManifestBytes(
+        in directory: URL,
+        files: [ModelFileDescriptor]
+    ) throws -> Int64 {
+        var total: Int64 = 0
+        for file in files {
+            let url = try manifestFileURL(file.path, in: directory)
+            if isValidExistingFile(url, descriptor: file) {
+                total += file.byteCount
+            }
+        }
+        return total
     }
 }

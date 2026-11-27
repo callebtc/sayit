@@ -110,6 +110,35 @@ struct CommunityModelResolverTests {
         }
     }
 
+    @Test("Remote resolution rejects a revision that is not one path component")
+    func rejectsUnsafeRevisionPath() async {
+        let session = makeStubSession { request in
+            if request.url?.path.hasPrefix("/api/models/") == true {
+                return try response(
+                    request: request,
+                    json: [
+                        "sha": "../escape",
+                        "siblings": [
+                            ["rfilename": "model.safetensors", "size": 4]
+                        ]
+                    ]
+                )
+            }
+            return try response(
+                request: request,
+                json: ["model_type": "kokoro"]
+            )
+        }
+
+        await #expect(throws: ModelManagerError.unsafePath) {
+            _ = try await CommunityModelResolver(session: session).resolve(
+                repository: "owner/model",
+                revision: "main",
+                token: nil
+            )
+        }
+    }
+
     @Test("Remote resolution rejects malformed inputs and responses")
     func rejectsBadRemoteResponses() async {
         let invalidRepository = CommunityModelResolver()

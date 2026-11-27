@@ -1,4 +1,5 @@
 import Foundation
+import SayItBackend
 
 actor ModelArchiveImporter {
     struct Extraction: Sendable {
@@ -127,20 +128,14 @@ actor ModelArchiveImporter {
         for path: String,
         in destination: URL
     ) throws -> URL {
-        let components = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard !path.hasPrefix("/"),
-              !components.isEmpty,
-              components.allSatisfy({ $0 != "." && $0 != ".." }) else {
+        do {
+            return try ContainedRelativePath.fileURL(
+                path,
+                rootedAt: destination
+            )
+        } catch {
             throw ModelArchiveError.unsafePath
         }
-        let target = components.reduce(destination) {
-            $0.appending(path: String($1))
-        }.standardizedFileURL
-        let allowedPrefix = destination.standardizedFileURL.path + "/"
-        guard target.path.hasPrefix(allowedPrefix) else {
-            throw ModelArchiveError.unsafePath
-        }
-        return target
     }
 
     private func findModelDirectory(in directory: URL) throws -> URL {

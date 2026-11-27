@@ -466,6 +466,270 @@ struct ModelManagerTests {
         )
         #expect(await afterRemoval.models().isEmpty)
     }
+
+    @Test("Community manifest filenames cannot escape the install directory")
+    func communityManifestFilenamesStayContained() async throws {
+        let config = Data(#"{"model_type":"qwen3_tts"}"#.utf8)
+        let weights = Data([1, 2, 3, 4])
+        for filename in [
+            "../../escaped/payload.safetensors",
+            "weights/../../escaped/payload.safetensors",
+            "weights/./model.safetensors",
+            "./config.json",
+            "..",
+            "."
+        ] {
+            let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+            defer { fixture.remove() }
+            let filenames = [
+                filename,
+                fixture.root
+                    .appending(path: "escaped")
+                    .appending(path: "absolute.safetensors")
+                    .path
+            ]
+            for unsafeFilename in filenames {
+                let model = makeModel(
+                    id: "community-manifest-case",
+                    revision: "safe-revision",
+                    files: [
+                        .init(
+                            path: "config.json",
+                            byteCount: Int64(config.count),
+                            sha256: nil
+                        ),
+                        .init(
+                            path: "model.safetensors",
+                            byteCount: Int64(weights.count),
+                            sha256: nil
+                        ),
+                        .init(path: unsafeFilename, byteCount: 1, sha256: nil)
+                    ]
+                )
+                let staging = fixture.directories.downloads.appending(
+                    path: "community-manifest-case-safe-revision.partial"
+                )
+                try FileManager.default.createDirectory(
+                    at: staging,
+                    withIntermediateDirectories: true
+                )
+                try config.write(to: staging.appending(path: "config.json"))
+                try weights.write(to: staging.appending(path: "model.safetensors"))
+                let manager = ModelManager(
+                    catalog: makeCatalog(models: [model]),
+                    directories: fixture.directories,
+                    activeModelID: ModelID("active"),
+                    session: failingManifestSession()
+                )
+
+                await #expect(throws: ModelManagerError.unsafePath) {
+                    try await manager.install(model.id)
+                }
+
+                #expect(await manager.installedModelIDs().isEmpty)
+                #expect(
+                    !FileManager.default.fileExists(
+                        atPath: fixture.directories.downloads
+                            .deletingLastPathComponent()
+                            .appending(path: "escaped")
+                            .path
+                    )
+                )
+                #expect(
+                    !FileManager.default.fileExists(
+                        atPath: fixture.root.appending(path: "escaped").path
+                    )
+                )
+            }
+        }
+    }
+
+    @Test("A remote community manifest with an unsafe filename is rejected")
+    func remoteCommunityManifestFilenameIsRejected() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+        defer { fixture.remove() }
+        let model = makeModel(
+            id: "community-remote-manifest",
+            revision: "abcdef0123456789",
+            files: []
+        )
+        let session = manifestSession { request in
+            let url = try #require(request.url)
+            let body = try JSONSerialization.data(
+                withJSONObject: [
+                    "sha": "abcdef0123456789",
+                    "siblings": [
+                        ["rfilename": "config.json", "size": 24],
+                        ["rfilename": "model.safetensors", "size": 4],
+                        [
+                            "rfilename": "../../escaped/payload.safetensors",
+                            "size": 4
+                        ]
+                    ]
+                ]
+            )
+            return (
+                HTTPURLResponse(
+                    url: url,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!,
+                body
+            )
+        }
+        let manager = ModelManager(
+            catalog: makeCatalog(models: [model]),
+            directories: fixture.directories,
+            activeModelID: ModelID("active"),
+            session: session
+        )
+
+        await #expect(throws: ModelManagerError.unsafePath) {
+            try await manager.install(model.id)
+        }
+        #expect(await manager.installedModelIDs().isEmpty)
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.directories.downloads
+                    .deletingLastPathComponent()
+                    .appending(path: "escaped")
+                    .path
+            )
+        )
+    }
+
+    @Test("Community model id and revision are each one safe path component")
+    func communityIdentityIsOneSafePathComponent() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+        defer { fixture.remove() }
+        let source = fixture.root.appending(path: "source")
+        try FileManager.default.createDirectory(
+            at: source,
+            withIntermediateDirectories: true
+        )
+        try Data(#"{"model_type":"qwen3_tts"}"#.utf8).write(
+            to: source.appending(path: "config.json")
+        )
+        try Data([1]).write(to: source.appending(path: "model.safetensors"))
+        let absoluteRevision = fixture.root
+            .appending(path: "escaped-revision")
+            .path
+        let identities = [
+            ("community-../escaped", "safe-revision"),
+            ("community-ok", "../../escaped"),
+            ("community-ok", absoluteRevision),
+            ("community-foo/bar", "safe-revision"),
+            ("community-ok", "."),
+            ("community-ok", ".."),
+            ("community-ok", "foo/bar"),
+            ("community-ok", "")
+        ]
+        for (id, revision) in identities {
+            let model = makeModel(
+                id: id,
+                revision: revision,
+                repository: "local-import",
+                files: [
+                    .init(path: "config.json", byteCount: 24, sha256: nil),
+                    .init(path: "model.safetensors", byteCount: 1, sha256: nil)
+                ],
+                estimatedDiskBytes: 1
+            )
+            let manager = ModelManager(
+                catalog: makeCatalog(models: [model]),
+                directories: fixture.directories,
+                activeModelID: ModelID("active"),
+                session: failingManifestSession()
+            )
+            let empty = ModelManager(
+                catalog: makeCatalog(models: []),
+                directories: fixture.directories,
+                activeModelID: ModelID("active")
+            )
+
+            await #expect(throws: ModelManagerError.unsafePath) {
+                try await manager.install(model.id)
+            }
+            await #expect(throws: ModelManagerError.unsafePath) {
+                try await manager.importLocalModel(model, from: source)
+            }
+            await #expect(throws: ModelManagerError.unsafePath) {
+                try await empty.addCommunityModel(model)
+            }
+            #expect(await empty.models().isEmpty)
+            #expect(await manager.installedModelIDs().isEmpty)
+        }
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.root.appending(path: "escaped").path
+            )
+        )
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.root.appending(path: "escaped-revision").path
+            )
+        )
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.directories.applicationSupport
+                    .appending(path: "escaped")
+                    .path
+            )
+        )
+    }
+
+    @Test("A nested community manifest filename still installs")
+    func nestedCommunityManifestFilenameInstalls() async throws {
+        let fixture = try TemporaryBackendFixture(prefix: "SayItModelTests")
+        defer { fixture.remove() }
+        let config = Data(#"{"model_type":"qwen3_tts"}"#.utf8)
+        let weights = Data([1, 2, 3, 4])
+        let model = makeModel(
+            id: "community-nested",
+            revision: "nested-revision",
+            files: [
+                .init(
+                    path: "config.json",
+                    byteCount: Int64(config.count),
+                    sha256: sha256(config)
+                ),
+                .init(
+                    path: "weights/model.safetensors",
+                    byteCount: Int64(weights.count),
+                    sha256: sha256(weights)
+                )
+            ]
+        )
+        let manager = ModelManager(
+            catalog: makeCatalog(models: [model]),
+            directories: fixture.directories,
+            activeModelID: ModelID("active")
+        )
+        let staging = fixture.directories.downloads.appending(
+            path: "community-nested-nested-revision.partial"
+        )
+        try FileManager.default.createDirectory(
+            at: staging.appending(path: "weights"),
+            withIntermediateDirectories: true
+        )
+        try config.write(to: staging.appending(path: "config.json"))
+        try weights.write(
+            to: staging.appending(path: "weights/model.safetensors")
+        )
+
+        try await manager.install(model.id)
+
+        #expect(await manager.installedModelIDs() == [model.id])
+        let installedURL = try #require(await manager.installedURL(for: model.id))
+        #expect(
+            FileManager.default.fileExists(
+                atPath: installedURL
+                    .appending(path: "weights/model.safetensors")
+                    .path
+            )
+        )
+    }
 }
 
 private actor ProgressRecorder {
@@ -543,4 +807,70 @@ private func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map {
         String($0, radix: 16).leftPadding(toLength: 2, withPad: "0")
     }.joined()
+}
+
+private func failingManifestSession() -> URLSession {
+    manifestSession { request in
+        let url = try #require(request.url)
+        return (
+            HTTPURLResponse(
+                url: url,
+                statusCode: 500,
+                httpVersion: nil,
+                headerFields: nil
+            )!,
+            Data()
+        )
+    }
+}
+
+private func manifestSession(
+    handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
+) -> URLSession {
+    ManifestStubURLProtocol.setHandler(handler)
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ManifestStubURLProtocol.self]
+    return URLSession(configuration: configuration)
+}
+
+private final class ManifestStubURLProtocol: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var handler:
+        (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    static func setHandler(
+        _ newHandler:
+            @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
+    ) {
+        lock.withLock {
+            handler = newHandler
+        }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        do {
+            let current = Self.lock.withLock { Self.handler }
+            let handler = try #require(current)
+            let (response, data) = try handler(request)
+            client?.urlProtocol(
+                self,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }
