@@ -92,7 +92,7 @@ struct CircularIconButtonStyle: ButtonStyle {
 }
 
 struct SayItBadge: View {
-    let title: String
+    let title: LocalizedStringKey
     var tint: Color = .accentColor
 
     var body: some View {

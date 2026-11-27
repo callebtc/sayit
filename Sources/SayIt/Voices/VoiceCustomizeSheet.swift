@@ -32,7 +32,7 @@ struct VoiceCustomizeSheet: View {
             )
         }
         _tuning = State(initialValue: initial)
-        _copyName = State(initialValue: "\(profile.displayName) Copy")
+        _copyName = State(initialValue: String(localized: "\(profile.displayName) Copy"))
     }
 
     var body: some View {
@@ -84,7 +84,9 @@ struct VoiceCustomizeSheet: View {
                         )
                     )
                     .accessibilityLabel(
-                        isPlayingThis ? "Stop preview" : "Play preview"
+                        isPlayingThis
+                            ? String(localized: "Stop preview")
+                            : String(localized: "Play preview")
                     )
                     .disabled(
                         isPreviewing || previewTextIsInvalid || !isModelInstalled
@@ -104,7 +106,7 @@ struct VoiceCustomizeSheet: View {
 
             HStack(spacing: DesignTokens.standardSpacing) {
                 Button("Save as New Voice…") {
-                    copyName = "\(profile.displayName) Copy"
+                    copyName = String(localized: "\(profile.displayName) Copy")
                     isNamingCopy = true
                 }
                 .buttonStyle(.borderless)

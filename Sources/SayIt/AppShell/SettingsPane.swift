@@ -14,14 +14,14 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: "General"
-        case .service: "Service"
-        case .speech: "Speech"
-        case .voices: "Voices"
-        case .models: "Models"
-        case .history: "History"
-        case .diagnostics: "Diagnostics"
-        case .about: "About"
+        case .general: String(localized: "General")
+        case .service: String(localized: "Service")
+        case .speech: String(localized: "Speech")
+        case .voices: String(localized: "Voices")
+        case .models: String(localized: "Models")
+        case .history: String(localized: "History")
+        case .diagnostics: String(localized: "Diagnostics")
+        case .about: String(localized: "About")
         }
     }
 

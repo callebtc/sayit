@@ -53,22 +53,24 @@ final class BackgroundServiceController {
 
     var statusDescription: String {
         if isWorking {
-            return "Working…"
+            return String(localized: "Working…")
         }
         #if DEBUG || SAYIT_LOCAL_BUILD
-        return isDevelopmentServiceRunning ? "Running" : "Off"
+        return isDevelopmentServiceRunning
+            ? String(localized: "Running")
+            : String(localized: "Off")
         #else
         return switch status {
         case .notRegistered:
-            "Off"
+            String(localized: "Off")
         case .enabled:
-            "Registered"
+            String(localized: "Registered")
         case .requiresApproval:
-            "Approval required"
+            String(localized: "Approval required")
         case .notFound:
-            "Service missing"
+            String(localized: "Service missing")
         @unknown default:
-            "Unknown"
+            String(localized: "Unknown")
         }
         #endif
     }

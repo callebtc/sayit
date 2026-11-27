@@ -58,7 +58,7 @@ struct HistoryDetailView: View {
                 )
 
                 Button(
-                    item.isPinned ? "Unpin" : "Pin",
+                    item.isPinned ? String(localized: "Unpin") : String(localized: "Pin"),
                     systemImage: item.isPinned ? "pin.slash" : "pin",
                     action: togglePinned
                 )

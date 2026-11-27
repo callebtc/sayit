@@ -61,7 +61,9 @@ final class CommandLineInstallController {
         do {
             if FileManager.default.fileExists(atPath: link.path) {
                 guard isCommandLineSymlink(at: link) else {
-                    errorMessage = "A file named “sayit” already exists in \(abbreviatedPath(for: directory)). Remove it manually or choose another folder."
+                    errorMessage = String(
+                        localized: "A file named “sayit” already exists in \(abbreviatedPath(for: directory)). Remove it manually or choose another folder."
+                    )
                     return
                 }
                 try FileManager.default.removeItem(at: link)
@@ -81,7 +83,9 @@ final class CommandLineInstallController {
         errorMessage = nil
         guard case .installed(let link) = status else { return }
         guard isCommandLineSymlink(at: link) else {
-            errorMessage = "The “sayit” command does not point to this app and was left untouched."
+            errorMessage = String(
+                localized: "The “sayit” command does not point to this app and was left untouched."
+            )
             status = .notInstalled
             return
         }
@@ -118,8 +122,10 @@ final class CommandLineInstallController {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "Install Here"
-        panel.message = "Choose a folder in your shell’s PATH. The “sayit” command will be linked into it."
+        panel.prompt = String(localized: "Install Here")
+        panel.message = String(
+            localized: "Choose a folder in your shell’s PATH. The “sayit” command will be linked into it."
+        )
         let preferred = preferredInstallDirectory
         panel.directoryURL = FileManager.default.fileExists(atPath: preferred.path)
             ? preferred

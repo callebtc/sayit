@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ShortcutRecorderView: View {
     let shortcut: GlobalShortcut
-    let accessibilityLabel: String
+    let accessibilityLabel: LocalizedStringKey
     let onRecord: (GlobalShortcut) -> Void
 
     @State private var isRecording = false
@@ -11,14 +11,14 @@ struct ShortcutRecorderView: View {
 
     var body: some View {
         Button(
-            isRecording ? "Type shortcut…" : shortcut.displayName,
+            isRecording ? String(localized: "Type shortcut…") : shortcut.displayName,
             action: beginRecording
         )
         .font(.body.monospaced())
         .buttonStyle(.bordered)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(
-            isRecording ? "Waiting for shortcut" : shortcut.displayName
+            isRecording ? String(localized: "Waiting for shortcut") : shortcut.displayName
         )
         .onDisappear(perform: stopRecording)
     }

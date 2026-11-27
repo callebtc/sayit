@@ -9,9 +9,9 @@ enum ExportKind: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .m4a: "M4A Audio"
-        case .wav: "WAV Audio"
-        case .text: "Text"
+        case .m4a: String(localized: "M4A Audio")
+        case .wav: String(localized: "WAV Audio")
+        case .text: String(localized: "Text")
         }
     }
 }

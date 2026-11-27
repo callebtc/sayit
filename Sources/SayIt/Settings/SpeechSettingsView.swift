@@ -73,8 +73,7 @@ struct SpeechSettingsView: View {
                     step: PlaybackRate.step
                 ) {
                     Text(
-                        "Playback speed · "
-                            + PlaybackRate.formatted(settings.playbackRate)
+                        "Playback speed · \(PlaybackRate.formatted(settings.playbackRate))"
                     )
                 } minimumValueLabel: {
                     Text(PlaybackRate.formatted(PlaybackRate.minimum))
@@ -146,9 +145,9 @@ struct SpeechSettingsView: View {
 
     private var speakingPaceExplanation: String {
         if activeModel?.supportsNativeSpeakingPace == true {
-            "Shapes phoneme timing while generating new audio. Existing history is unchanged."
+            String(localized: "Shapes phoneme timing while generating new audio. Existing history is unchanged.")
         } else {
-            "The selected model does not expose native speaking pace. New audio uses its natural pace."
+            String(localized: "The selected model does not expose native speaking pace. New audio uses its natural pace.")
         }
     }
 
@@ -158,17 +157,17 @@ struct SpeechSettingsView: View {
         )
         let description = switch pace {
         case .slower:
-            "Slower"
+            String(localized: "Slower")
         case .slow:
-            "Slow"
+            String(localized: "Slow")
         case .natural:
-            "Natural"
+            String(localized: "Natural")
         case .brisk:
-            "Brisk"
+            String(localized: "Brisk")
         case .fast:
-            "Fast"
+            String(localized: "Fast")
         case .faster:
-            "Faster"
+            String(localized: "Faster")
         }
         return "\(description) · \(rate)×"
     }

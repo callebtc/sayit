@@ -123,11 +123,11 @@ final class VoiceRecordingSink: @unchecked Sendable {
     private static func message(for error: Error) -> String {
         switch error {
         case SinkError.unsupportedFormat:
-            "The microphone supplied an unsupported audio format. Reconnect it, wait a moment, and record again."
+            String(localized: "The microphone supplied an unsupported audio format. Reconnect it, wait a moment, and record again.")
         case SinkError.formatChanged:
-            "The microphone changed audio format while recording. Wait for it to reconnect, then record again."
+            String(localized: "The microphone changed audio format while recording. Wait for it to reconnect, then record again.")
         default:
-            "The microphone recording could not be saved. Check available disk space and try again."
+            String(localized: "The microphone recording could not be saved. Check available disk space and try again.")
         }
     }
 

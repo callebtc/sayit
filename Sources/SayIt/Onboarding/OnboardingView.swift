@@ -48,11 +48,11 @@ struct OnboardingView: View {
 
     private var nextButtonTitle: String {
         if step == .anywhere {
-            "Finish"
+            String(localized: "Finish")
         } else if step == .voice && state.installedModelIDs.isEmpty {
-            "Continue Without a Model"
+            String(localized: "Continue Without a Model")
         } else {
-            "Continue"
+            String(localized: "Continue")
         }
     }
 

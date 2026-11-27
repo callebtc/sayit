@@ -2,8 +2,8 @@ import SwiftUI
 
 struct OnboardingPage<Content: View>: View {
     let symbol: String
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     @ViewBuilder let content: Content
 
     var body: some View {

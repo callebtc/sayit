@@ -23,8 +23,8 @@ struct ReadClipboardButton: View {
         .disabled(!state.isServiceOnline)
         .accessibilityHint(
             state.isServiceOnline
-                ? "Reads the clipboard once and speaks its text locally"
-                : "Unavailable until the background service connects"
+                ? String(localized: "Reads the clipboard once and speaks its text locally")
+                : String(localized: "Unavailable until the background service connects")
         )
     }
 }

@@ -82,29 +82,29 @@ struct GeneralSettingsView: View {
 
             Section {
                 advancedSlider(
-                    title: "Text block size",
+                    title: String(localized: "Text block size"),
                     value: chunkTargetBinding,
                     range: 1...2_000,
                     step: nil,
-                    label: "\(settings.chunkCharacterTarget) characters"
+                    label: String(localized: "\(settings.chunkCharacterTarget) characters")
                 )
                 advancedSlider(
-                    title: "Delay between blocks",
+                    title: String(localized: "Delay between blocks"),
                     value: $settings.chunkDelaySeconds,
                     range: 0...2,
                     step: 0.1,
                     label: settings.chunkDelaySeconds < 0.05
-                        ? "Off"
-                        : String(format: "%.1f s", settings.chunkDelaySeconds)
+                        ? String(localized: "Off")
+                        : String(localized: "\(settings.chunkDelaySeconds, format: .number.precision(.fractionLength(1))) s")
                 )
                 advancedSlider(
-                    title: "Pause between paragraphs",
+                    title: String(localized: "Pause between paragraphs"),
                     value: $settings.paragraphPauseSeconds,
                     range: 0...1,
                     step: 0.05,
                     label: settings.paragraphPauseSeconds < 0.025
-                        ? "Off"
-                        : String(format: "%.2f s", settings.paragraphPauseSeconds)
+                        ? String(localized: "Off")
+                        : String(localized: "\(settings.paragraphPauseSeconds, format: .number.precision(.fractionLength(2))) s")
                 )
 
                 Picker(

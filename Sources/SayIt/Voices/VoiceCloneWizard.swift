@@ -11,9 +11,9 @@ struct VoiceCloneWizard: View {
 
         var title: String {
             switch self {
-            case .prepare: "Prepare"
-            case .record: "Record"
-            case .preview: "Preview & Save"
+            case .prepare: String(localized: "Prepare")
+            case .record: String(localized: "Record")
+            case .preview: String(localized: "Preview & Save")
             }
         }
     }
@@ -216,12 +216,12 @@ struct VoiceCloneWizard: View {
                     guidanceRow(
                         icon: "lock.shield",
                         tint: .accentColor,
-                        text: "The recording and generated voice stay on this Mac."
+                        text: String(localized: "The recording and generated voice stay on this Mac.")
                     )
                     guidanceRow(
                         icon: "waveform.path",
                         tint: .accentColor,
-                        text: "Cloning uses your recording as a reference; it does not fine-tune model weights."
+                        text: String(localized: "Cloning uses your recording as a reference; it does not fine-tune model weights.")
                     )
                     if let requirements {
                         guidanceRow(
@@ -254,7 +254,7 @@ struct VoiceCloneWizard: View {
     }
 
     private func pickerRow<Content: View>(
-        title: String,
+        title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
         HStack {
@@ -344,13 +344,13 @@ struct VoiceCloneWizard: View {
                         .buttonStyle(CircularIconButtonStyle(size: 32))
                         .help(
                             state.voicePreview.isPlaying
-                                ? "Stop playback"
-                                : "Play recording"
+                                ? String(localized: "Stop playback")
+                                : String(localized: "Play recording")
                         )
                         .accessibilityLabel(
                             state.voicePreview.isPlaying
-                                ? "Stop recording playback"
-                                : "Play recording"
+                                ? String(localized: "Stop recording playback")
+                                : String(localized: "Play recording")
                         )
                         .transition(
                             .opacity.combined(with: .scale(scale: 0.6))
@@ -451,7 +451,9 @@ struct VoiceCloneWizard: View {
         .opacity(!recorder.isRecording && recorder.access != .granted ? 0.4 : 1)
         .animation(DesignTokens.quickAnimation, value: recorder.access)
         .accessibilityLabel(
-            recorder.isRecording ? "Stop recording" : "Start recording"
+            recorder.isRecording
+                ? String(localized: "Stop recording")
+                : String(localized: "Start recording")
         )
     }
 
@@ -513,7 +515,7 @@ struct VoiceCloneWizard: View {
 
     private func statusRow<Content: View>(
         icon: String,
-        text: String,
+        text: LocalizedStringKey,
         @ViewBuilder action: () -> Content
     ) -> some View {
         HStack(spacing: DesignTokens.standardSpacing) {
@@ -593,10 +595,10 @@ struct VoiceCloneWizard: View {
                 }
                 VoiceGenerationButton(
                     title: studio.candidates.isEmpty
-                        ? "Generate Samples"
-                        : "Regenerate Samples",
+                        ? String(localized: "Generate Samples")
+                        : String(localized: "Regenerate Samples"),
                     systemImage: "arrow.clockwise",
-                    generatingTitle: "Generating samples…",
+                    generatingTitle: String(localized: "Generating samples…"),
                     isGenerating: studio.state == .generating,
                     completedCount: studio.completedCount,
                     totalCount: studio.totalCount,
@@ -680,7 +682,11 @@ struct VoiceCloneWizard: View {
     private var footer: some View {
         HStack(spacing: DesignTokens.standardSpacing) {
             if step != .prepare {
-                Button(step == .preview ? "Re-record" : "Back") {
+                Button(
+                    step == .preview
+                        ? String(localized: "Re-record")
+                        : String(localized: "Back")
+                ) {
                     if step == .preview {
                         reRecord()
                     } else {
@@ -753,7 +759,9 @@ struct VoiceCloneWizard: View {
 
     private var targetDurationText: String {
         guard let requirements else { return "" }
-        return "Aim for \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) seconds"
+        return String(
+            localized: "Aim for \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) seconds"
+        )
     }
 
     private var showsRecordingPlayback: Bool {
@@ -793,7 +801,9 @@ struct VoiceCloneWizard: View {
     private func durationGuidance(
         _ requirements: VoiceCloneRequirements
     ) -> String {
-        "Record \(Int(requirements.minimumDuration))–\(Int(requirements.maximumDuration)) seconds; \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) works best."
+        String(
+            localized: "Record \(Int(requirements.minimumDuration))–\(Int(requirements.maximumDuration)) seconds; \(Int(requirements.recommendedMinimumDuration))–\(Int(requirements.recommendedMaximumDuration)) works best."
+        )
     }
 
     private func changeStep(_ newStep: Step) {
@@ -844,8 +854,9 @@ struct VoiceCloneWizard: View {
               let requirements else {
             analysis = nil
             referenceURL = nil
-            recordingError =
-                "No microphone audio was captured. Check the selected input device and record again."
+            recordingError = String(
+                localized: "No microphone audio was captured. Check the selected input device and record again."
+            )
             return
         }
         do {

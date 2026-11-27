@@ -74,11 +74,11 @@ enum RegisteredServiceStartup {
         var errorDescription: String? {
             switch self {
             case .approvalRequired:
-                "Allow Say It in System Settings → General → Login Items & Extensions to finish starting the service."
+                String(localized: "Allow Say It in System Settings → General → Login Items & Extensions to finish starting the service.")
             case .registrationTimedOut:
-                "The background service could not be registered in time. Try restarting Say It."
+                String(localized: "The background service could not be registered in time. Try restarting Say It.")
             case .unregistrationTimedOut:
-                "The older service could not be unregistered in time. Try restarting Say It."
+                String(localized: "The older service could not be unregistered in time. Try restarting Say It.")
             }
         }
     }

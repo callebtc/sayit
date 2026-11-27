@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         } catch {
             AppState.shared.presentError(
-                "The Control–Option–V shortcut is already in use."
+                String(localized: "The Control–Option–V shortcut is already in use.")
             )
         }
         do {
@@ -68,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         } catch {
             AppState.shared.presentError(
-                "The Control–Option–S shortcut is already in use."
+                String(localized: "The Control–Option–S shortcut is already in use.")
             )
         }
 #endif

@@ -94,21 +94,21 @@ struct OnboardingModelDownloadView: View {
     private var statusTitle: String {
         switch progress.state {
         case .notInstalled:
-            "Ready to download \(modelName)"
+            String(localized: "Ready to download \(modelName)")
         case .queued:
-            "Preparing \(modelName) download"
+            String(localized: "Preparing \(modelName) download")
         case .canceling:
-            "Canceling \(modelName) download"
+            String(localized: "Canceling \(modelName) download")
         case .paused:
-            "\(modelName) download paused"
+            String(localized: "\(modelName) download paused")
         case .failed:
-            "Download failed"
+            String(localized: "Download failed")
         case .verifying:
-            "Finishing \(modelName) setup"
+            String(localized: "Finishing \(modelName) setup")
         case .installed:
-            "Finishing \(modelName) setup"
+            String(localized: "Finishing \(modelName) setup")
         case .downloading:
-            "Downloading \(modelName)"
+            String(localized: "Downloading \(modelName)")
         }
     }
 

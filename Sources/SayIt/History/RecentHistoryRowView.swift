@@ -45,17 +45,17 @@ struct RecentHistoryRowView: View {
 
     private var accessibilityLabel: String {
         if item.hasAudio {
-            "Play \(item.title)"
+            String(localized: "Play \(item.title)")
         } else {
-            "Regenerate \(item.title)"
+            String(localized: "Regenerate \(item.title)")
         }
     }
 
     private var accessibilityHint: String {
         if item.hasAudio {
-            "Loads this recording into the player and starts playback"
+            String(localized: "Loads this recording into the player and starts playback")
         } else {
-            "Generates this speech again and starts playback"
+            String(localized: "Generates this speech again and starts playback")
         }
     }
 

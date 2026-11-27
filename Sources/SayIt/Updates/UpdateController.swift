@@ -7,7 +7,7 @@ import SwiftUI
 @Observable
 final class UpdateController: NSObject, NSWindowDelegate {
     private(set) var phase: UpdatePhase = .idle
-    private(set) var status = "Not checked yet"
+    private(set) var status = String(localized: "Not checked yet")
     private(set) var availableVersion: String?
     private(set) var releaseNotesURL: URL?
     private(set) var progress: Double?
@@ -45,14 +45,14 @@ final class UpdateController: NSObject, NSWindowDelegate {
         guard updater == nil else { return }
         #if DEBUG || SAYIT_LOCAL_BUILD || SAYIT_MODEL_AUDIT_BUILD
         phase = .unavailable
-        status = "Updates are unavailable in development builds"
+        status = String(localized: "Updates are unavailable in development builds")
         return
         #else
         let location = Bundle.main.bundleURL
         let volume = try? location.resourceValues(forKeys: [.volumeIsReadOnlyKey])
         if volume?.volumeIsReadOnly == true || location.pathComponents.contains("AppTranslocation") {
             phase = .unavailable
-            status = "Move Say It to Applications, then reopen it to install updates."
+            status = String(localized: "Move Say It to Applications, then reopen it to install updates.")
             return
         }
         preferences.migrate()
@@ -68,7 +68,7 @@ final class UpdateController: NSObject, NSWindowDelegate {
               let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
               Data(base64Encoded: key)?.count == 32 else {
             phase = .unavailable
-            status = "Update feed is not configured"
+            status = String(localized: "Update feed is not configured")
             return
         }
         let updater = SPUUpdater(
@@ -83,7 +83,7 @@ final class UpdateController: NSObject, NSWindowDelegate {
         } catch {
             self.updater = nil
             phase = .unavailable
-            status = "The updater could not start. Reopen Say It to try again."
+            status = String(localized: "The updater could not start. Reopen Say It to try again.")
         }
         #endif
     }
@@ -179,7 +179,7 @@ final class UpdateController: NSObject, NSWindowDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "Software Update"
+            window.title = String(localized: "Software Update")
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.contentView = NSHostingView(rootView: UpdateView(controller: self))
@@ -201,7 +201,7 @@ extension UpdateController: SPUUserDriver {
         self.cancellation = cancellation
         canCancel = true
         phase = .checking
-        status = "Checking for updates…"
+        status = String(localized: "Checking for updates…")
         showWindow()
     }
 
@@ -229,7 +229,7 @@ extension UpdateController: SPUUserDriver {
         availableVersion = offer.version
         releaseNotesURL = offer.notesURL
         informationOnly = offer.informationOnly
-        status = "Say It \(offer.version) is available"
+        status = String(localized: "Say It \(offer.version) is available")
         phase = .available
         self.userInitiated = userInitiated
         if !userInitiated && (!preferences.mayRemind || !isUserInteracting()) {
@@ -269,13 +269,13 @@ extension UpdateController: SPUUserDriver {
         // Do not expose installer paths or raw launchctl output in the dialog.
         switch (error as NSError).code {
         case Int(SUError.signatureError.rawValue), Int(SUError.validationError.rawValue):
-            status = "The update couldn’t be verified. Your installed app is unchanged. Check for updates again to retry the download."
+            status = String(localized: "The update couldn’t be verified. Your installed app is unchanged. Check for updates again to retry the download.")
         case Int(SUError.runningFromDiskImageError.rawValue), Int(SUError.runningTranslocated.rawValue):
-            status = "Move Say It to Applications, then reopen it to install updates."
+            status = String(localized: "Move Say It to Applications, then reopen it to install updates.")
         case Int(SUError.installationCanceledError.rawValue), Int(SUError.authenticationFailure.rawValue):
-            status = "Installation was canceled or couldn’t be authorized. Check for updates when you’re ready to try again."
+            status = String(localized: "Installation was canceled or couldn’t be authorized. Check for updates when you’re ready to try again.")
         default:
-            status = "Update failed. Try again."
+            status = String(localized: "Update failed. Try again.")
         }
         self.acknowledgement = acknowledgement
         showWindow()
@@ -288,7 +288,7 @@ extension UpdateController: SPUUserDriver {
         expectedBytes = 0
         progress = nil
         phase = .downloading
-        status = "Downloading update…"
+        status = String(localized: "Downloading update…")
         showWindow()
     }
 
@@ -312,7 +312,7 @@ extension UpdateController: SPUUserDriver {
         canCancel = false
         progress = nil
         phase = .extracting
-        status = "Verifying and preparing update…"
+        status = String(localized: "Verifying and preparing update…")
     }
 
     func showExtractionReceivedProgress(_ progress: Double) {
@@ -325,7 +325,7 @@ extension UpdateController: SPUUserDriver {
             return
         }
         phase = .preparing
-        status = "Stopping background services…"
+        status = String(localized: "Stopping background services…")
         progress = nil
         preparationTask = Task { [weak self] in
             guard let self else { reply(.skip); return }
@@ -334,13 +334,13 @@ extension UpdateController: SPUUserDriver {
                 try await prepareForInstallation()
                 try Task.checkCancellation()
                 phase = .installing
-                status = "Installing and restarting Say It…"
+                status = String(localized: "Installing and restarting Say It…")
                 reply(.install)
             } catch {
                 reply(.skip)
                 await recoverIfNeeded()
                 phase = .failed
-                status = "Say It couldn’t stop its background services. The update was canceled. Try again when active work has finished."
+                status = String(localized: "Say It couldn’t stop its background services. The update was canceled. Try again when active work has finished.")
                 showWindow()
             }
             preparationTask = nil
@@ -349,7 +349,7 @@ extension UpdateController: SPUUserDriver {
 
     func showInstallingUpdate(withApplicationTerminated applicationTerminated: Bool, retryTerminatingApplication: @escaping () -> Void) {
         phase = .installing
-        status = "Installing and restarting Say It…"
+        status = String(localized: "Installing and restarting Say It…")
     }
 
     func showUpdateInstalledAndRelaunched(_ relaunched: Bool, acknowledgement: @escaping () -> Void) {
@@ -394,7 +394,7 @@ extension UpdateController: SPUUpdaterDelegate {
         if let error, (error as NSError).code == SUError.noUpdateError.rawValue {
             availableVersion = nil
             availableBuild = nil
-            status = "Up to date"
+            status = String(localized: "Up to date")
         }
     }
 }

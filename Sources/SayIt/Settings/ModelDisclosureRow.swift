@@ -40,13 +40,13 @@ struct ModelDisclosureRow: View {
         .accessibilityLabel(title)
         .accessibilityValue(
             isExpanded
-                ? "Expanded, \(count) models"
-                : "Collapsed, \(count) models"
+                ? String(localized: "Expanded, \(count) models")
+                : String(localized: "Collapsed, \(count) models")
         )
         .accessibilityHint(
             isExpanded
-                ? "Collapses the \(title.lowercased()) list"
-                : "Shows the \(title.lowercased()) list"
+                ? String(localized: "Collapses the \(title.lowercased()) list")
+                : String(localized: "Shows the \(title.lowercased()) list")
         )
         .animation(
             reduceMotion ? nil : DesignTokens.springAnimation,

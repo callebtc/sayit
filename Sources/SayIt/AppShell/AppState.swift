@@ -59,7 +59,7 @@ final class AppState {
     private(set) var modelInstallError: (modelID: ModelID, message: String)?
     private(set) var requestedModelInstallID: ModelID?
     private(set) var isCancelingModelInstall = false
-    private(set) var statusText = "Connecting to service"
+    private(set) var statusText = String(localized: "Connecting to service")
     private(set) var errorMessage: String?
     private(set) var errorRecoveryAction: AppErrorRecoveryAction?
     private(set) var needsLongTextConfirmation = false
@@ -130,7 +130,7 @@ final class AppState {
             )
         } catch {
             presentError(
-                "Existing Say It data could not be migrated. The original data was left unchanged."
+                String(localized: "Existing Say It data could not be migrated. The original data was left unchanged.")
             )
             serviceConnection = .offline
             return
@@ -216,7 +216,7 @@ final class AppState {
     func openSelectionAccessibilitySettings() {
         guard selectionService.openAccessibilitySettings() else {
             presentError(
-                "Accessibility Settings couldn’t be opened. Open System Settings, choose Privacy & Security, then Accessibility.",
+                String(localized: "Accessibility Settings couldn’t be opened. Open System Settings, choose Privacy & Security, then Accessibility."),
                 recoveryAction: .openAccessibilitySettings
             )
             return
@@ -395,7 +395,7 @@ final class AppState {
     ) {
         guard isServiceOnline else {
             presentError(
-                "The background service is not ready. Try again in a moment."
+                String(localized: "The background service is not ready. Try again in a moment.")
             )
             return
         }
@@ -519,7 +519,7 @@ final class AppState {
         settingsPushTask?.cancel()
         modelSelectionTask?.cancel()
         modelSelectionGeneration &+= 1
-        statusText = "Switching model"
+        statusText = String(localized: "Switching model")
         performAndReload(.switchPlaybackModel(model.id.rawValue))
     }
 
@@ -770,8 +770,8 @@ final class AppState {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "Import"
-        panel.message = "Choose an MLX Audio Swift model folder containing config.json."
+        panel.prompt = String(localized: "Import")
+        panel.message = String(localized: "Choose an MLX Audio Swift model folder containing config.json.")
         guard panel.runModal() == .OK, let source = panel.url else { return }
         do {
             let bookmark = try source.bookmarkData(
@@ -791,7 +791,7 @@ final class AppState {
     ) {
         errorMessage = message
         errorRecoveryAction = recoveryAction
-        statusText = "Needs attention"
+        statusText = String(localized: "Needs attention")
     }
 
     func clearError() {
@@ -840,7 +840,7 @@ final class AppState {
                 previous,
                 for: .readClipboard
             )
-            presentError("That shortcut is already in use.")
+            presentError(String(localized: "That shortcut is already in use."))
         }
     }
 
@@ -859,7 +859,7 @@ final class AppState {
                 previous,
                 for: .speakSelection
             )
-            presentError("That shortcut is already in use.")
+            presentError(String(localized: "That shortcut is already in use."))
         }
     }
 
@@ -1175,8 +1175,9 @@ final class AppState {
                     if self.serviceConnection != .updateRequired {
                         self.serviceConnection = .updateRequired
                     }
-                    if self.statusText != "Service update required" {
-                        self.statusText = "Service update required"
+                    let updateRequiredStatus = String(localized: "Service update required")
+                    if self.statusText != updateRequiredStatus {
+                        self.statusText = updateRequiredStatus
                     }
                     self.scheduleServiceRepair(afterMismatch: true)
                     try? await Task.sleep(for: .seconds(2))
@@ -1187,8 +1188,9 @@ final class AppState {
                     if self.serviceConnection != .offline {
                         self.serviceConnection = .offline
                     }
-                    if self.statusText != "Background service unavailable" {
-                        self.statusText = "Background service unavailable"
+                    let unavailableStatus = String(localized: "Background service unavailable")
+                    if self.statusText != unavailableStatus {
+                        self.statusText = unavailableStatus
                     }
                     await self.client.invalidate()
                     self.scheduleServiceRepair()
@@ -1214,7 +1216,7 @@ final class AppState {
         if automatically && !automaticServiceRecovery.beginAttempt() { return }
         let failedState: ServiceConnectionState = afterMismatch ? .updateRequired : .offline
         serviceConnection = .recovering
-        statusText = "Reconnecting background service…"
+        statusText = String(localized: "Reconnecting background service…")
         // Invalidate requests already in flight before yielding to the repair task.
         resetServiceRevisionTracking()
         serviceRepairTask = Task { [weak self] in
@@ -1236,12 +1238,12 @@ final class AppState {
                 await self.client.invalidate()
                 if self.backgroundService.errorMessage != nil {
                     self.serviceConnection = failedState
-                    self.statusText = "Background service needs attention"
+                    self.statusText = String(localized: "Background service needs attention")
                 } else {
                     // Registration isn't proof of health. Polling must obtain a
                     // compatible snapshot before restoring playback or retry budget.
                     self.serviceConnection = .recovering
-                    self.statusText = "Connecting to service"
+                    self.statusText = String(localized: "Connecting to service")
                 }
             } catch is CancellationError {
                 return
@@ -1278,7 +1280,7 @@ final class AppState {
             try requireSuccess(response)
             throw ServiceFailure(
                 code: "service.invalid_events",
-                message: "The service returned an invalid event response."
+                message: String(localized: "The service returned an invalid event response.")
             )
         }
         guard let event = events.last else { return }
@@ -1300,7 +1302,7 @@ final class AppState {
               snapshot.serviceVersion == applicationVersion else {
             throw ServiceFailure(
                 code: "protocol.version_mismatch",
-                message: "The background service does not match this version of Say It."
+                message: String(localized: "The background service does not match this version of Say It.")
             )
         }
     }
@@ -1360,7 +1362,7 @@ final class AppState {
             try requireSuccess(response)
             throw ServiceFailure(
                 code: "service.invalid_snapshot",
-                message: "The service returned an invalid state snapshot."
+                message: String(localized: "The service returned an invalid state snapshot.")
             )
         }
         try Self.validateServiceSnapshot(snapshot, applicationVersion: applicationVersion)
@@ -1384,9 +1386,10 @@ final class AppState {
         if serviceConnection != onlineConnection {
             serviceConnection = onlineConnection
         }
+        let localizedStatus = Self.localizedServiceStatus(snapshot.statusText)
         if let serviceError = snapshot.lastError {
-            if statusText != snapshot.statusText {
-                statusText = snapshot.statusText
+            if statusText != localizedStatus {
+                statusText = localizedStatus
             }
             if errorMessage != serviceError {
                 errorMessage = serviceError
@@ -1398,8 +1401,8 @@ final class AppState {
             serviceError: snapshot.lastError,
             playbackState: snapshot.playback.state
         ) {
-            if statusText != snapshot.statusText {
-                statusText = snapshot.statusText
+            if statusText != localizedStatus {
+                statusText = localizedStatus
             }
             if errorMessage != nil {
                 errorMessage = nil
@@ -1408,8 +1411,8 @@ final class AppState {
                 errorRecoveryAction = nil
             }
         } else if errorRecoveryAction == nil {
-            if statusText != snapshot.statusText {
-                statusText = snapshot.statusText
+            if statusText != localizedStatus {
+                statusText = localizedStatus
             }
             if errorMessage != nil {
                 errorMessage = nil
@@ -1669,7 +1672,7 @@ final class AppState {
         modelSelectionTask?.cancel()
         modelSelectionGeneration &+= 1
         let generation = modelSelectionGeneration
-        statusText = "Switching model"
+        statusText = String(localized: "Switching model")
         modelSelectionTask = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -1749,7 +1752,7 @@ final class AppState {
                 requestedModelInstallID = nil
                 resetServiceRevisionTracking()
                 serviceConnection = .offline
-                statusText = "Background service unavailable"
+                statusText = String(localized: "Background service unavailable")
                 await client.invalidate()
             }
             throw error
@@ -1832,6 +1835,57 @@ final class AppState {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "0.1.0"
+    }
+
+    nonisolated static func localizedServiceStatus(_ status: String) -> String {
+        if status.hasPrefix("Loading ") {
+            let modelName = String(status.dropFirst("Loading ".count))
+            return String(localized: "Loading \(modelName)")
+        }
+        return switch status {
+        case "Starting service":
+            String(localized: "Starting service")
+        case "Ready to speak":
+            String(localized: "Ready to speak")
+        case "Stopping service":
+            String(localized: "Stopping service")
+        case "Service stopped":
+            String(localized: "Service stopped")
+        case "Needs attention":
+            String(localized: "Needs attention")
+        case "Cleaning text":
+            String(localized: "Cleaning text")
+        case "Long text needs confirmation":
+            String(localized: "Long text needs confirmation")
+        case "Preparing speech":
+            String(localized: "Preparing speech")
+        case "Generating speech":
+            String(localized: "Generating speech")
+        case "Creating an article voice":
+            String(localized: "Creating an article voice")
+        case "Playing":
+            String(localized: "Playing")
+        case "Buffering":
+            String(localized: "Buffering")
+        case "Switching model":
+            String(localized: "Switching model")
+        case "Model switch failed":
+            String(localized: "Model switch failed")
+        case "Preparing model download":
+            String(localized: "Preparing model download")
+        case "Canceling model download":
+            String(localized: "Canceling model download")
+        case "Finishing model setup":
+            String(localized: "Finishing model setup")
+        case "Downloading model":
+            String(localized: "Downloading model")
+        case "Download paused":
+            String(localized: "Download paused")
+        case "Model download failed":
+            String(localized: "Model download failed")
+        default:
+            status
+        }
     }
 }
 

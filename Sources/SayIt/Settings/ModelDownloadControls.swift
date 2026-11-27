@@ -47,7 +47,11 @@ struct ModelDownloadControls: View {
                             .foregroundStyle(.secondary)
                     }
                     if [.failed, .paused].contains(progress.state) {
-                        Text(progress.state == .paused ? "Paused" : "Failed")
+                        Text(
+                            progress.state == .paused
+                                ? String(localized: "Paused")
+                                : String(localized: "Failed")
+                        )
                             .foregroundStyle(.secondary)
                         Button("Retry", systemImage: "arrow.clockwise", action: onRetry)
                             .labelStyle(.iconOnly)
@@ -78,11 +82,11 @@ struct ModelDownloadControls: View {
 
     private func statusTitle(for state: ModelInstallationState) -> String {
         switch state {
-        case .notInstalled: "Waiting"
-        case .queued: "Starting…"
-        case .canceling: "Canceling…"
-        case .verifying, .installed: "Finishing…"
-        case .downloading, .paused, .failed: "Downloading…"
+        case .notInstalled: String(localized: "Waiting")
+        case .queued: String(localized: "Starting…")
+        case .canceling: String(localized: "Canceling…")
+        case .verifying, .installed: String(localized: "Finishing…")
+        case .downloading, .paused, .failed: String(localized: "Downloading…")
         }
     }
 }

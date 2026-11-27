@@ -17,7 +17,9 @@ final class ServiceProvider: NSObject {
         guard payload.html != nil
                 || payload.richText != nil
                 || payload.plainText != nil else {
-            errorPointer.pointee = "No readable text was selected."
+            errorPointer.pointee = String(
+                localized: "No readable text was selected."
+            ) as NSString
             return
         }
         AppState.shared.receive(payload)

@@ -1,10 +1,12 @@
+import Foundation
+
 enum AppErrorRecoveryAction: Equatable {
     case openAccessibilitySettings
 
     var buttonTitle: String {
         switch self {
         case .openAccessibilitySettings:
-            "Open Accessibility Settings…"
+            String(localized: "Open Accessibility Settings…")
         }
     }
 }

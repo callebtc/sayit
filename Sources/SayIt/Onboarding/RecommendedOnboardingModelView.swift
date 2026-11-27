@@ -60,8 +60,8 @@ struct RecommendedOnboardingModelView: View {
                     .controlSize(.small)
                 Text(
                     state.isCancelingModelInstall
-                        ? "Canceling download…"
-                        : "Starting download…"
+                        ? String(localized: "Canceling download…")
+                        : String(localized: "Starting download…")
                 )
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -106,9 +106,9 @@ struct RecommendedOnboardingModelView: View {
         if let defaultVoice = model.defaultVoice {
             defaultVoice
         } else if model.capabilities.voiceDescription {
-            "Designed voice"
+            String(localized: "Designed voice")
         } else {
-            "Generated voice"
+            String(localized: "Generated voice")
         }
     }
 }

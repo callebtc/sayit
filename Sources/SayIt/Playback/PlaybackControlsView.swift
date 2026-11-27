@@ -26,7 +26,11 @@ struct PlaybackControlsView: View {
                         )
                         .contentTransition(.symbolEffect(.replace.offUp))
                     }
-                    .accessibilityLabel(state.playback.state == .playing ? "Pause" : "Play")
+                    .accessibilityLabel(
+                        state.playback.state == .playing
+                            ? String(localized: "Pause")
+                            : String(localized: "Play")
+                    )
                     .labelStyle(.iconOnly)
                     .buttonStyle(CircularIconButtonStyle(size: 36, prominent: true))
 
@@ -133,7 +137,7 @@ struct PlaybackControlsView: View {
         .accessibilityHint(
             state.isServiceOnline
                 ? ""
-                : "Playback is unavailable until the background service connects"
+                : String(localized: "Playback is unavailable until the background service connects")
         )
     }
 
