@@ -224,8 +224,7 @@ actor ModelManager: ModelManaging {
         _ model: ModelDescriptor,
         progress: @escaping ProgressHandler
     ) async throws {
-        if model.id.rawValue.hasPrefix("community-")
-            || model.repository == "local-import" {
+        if identityIsOnePathComponent(model) {
             _ = try installLocation(for: model)
         }
         var files = model.files
@@ -288,9 +287,9 @@ actor ModelManager: ModelManaging {
         do {
             for file in files {
                 try Task.checkCancellation()
-                let destination = try manifestFileURL(
+                let destination = try containedURL(
                     file.path,
-                    in: staging
+                    rootedAt: staging
                 )
                 if isValidExistingFile(destination, descriptor: file) {
                     continue
@@ -883,7 +882,7 @@ actor ModelManager: ModelManaging {
         }
         for file in files {
             try verify(
-                try manifestFileURL(file.path, in: url),
+                try containedURL(file.path, rootedAt: url),
                 descriptor: file
             )
         }
@@ -1046,23 +1045,29 @@ actor ModelManager: ModelManaging {
         }
     }
 
+    private func identityIsOnePathComponent(
+        _ model: ModelDescriptor
+    ) -> Bool {
+        model.id.rawValue.hasPrefix("community-")
+            || model.repository == "local-import"
+    }
+
     private func validateInstallPaths(
         _ model: ModelDescriptor,
         files: [ModelFileDescriptor]
     ) throws {
-        if model.id.rawValue.hasPrefix("community-") {
+        if identityIsOnePathComponent(model) {
             _ = try installLocation(for: model)
         }
         for file in files {
-            _ = try manifestFileURL(file.path, in: directories.models)
+            _ = try containedURL(file.path, rootedAt: directories.models)
         }
     }
 
     private func installLocation(
         for model: ModelDescriptor
     ) throws -> (relativePath: String, directory: URL) {
-        let relativePath = if model.id.rawValue.hasPrefix("community-")
-            || model.repository == "local-import" {
+        let relativePath = if identityIsOnePathComponent(model) {
             let id = try installPathComponent(model.id.rawValue)
             let revision = try installPathComponent(model.revision)
             "\(id)/\(revision)"
@@ -1071,7 +1076,11 @@ actor ModelManager: ModelManaging {
         }
         return (
             relativePath,
-            try containedDirectory(relativePath, in: directories.models)
+            try containedURL(
+                relativePath,
+                rootedAt: directories.models,
+                directoryHint: .isDirectory
+            )
         )
     }
 
@@ -1081,48 +1090,41 @@ actor ModelManager: ModelManaging {
     ) throws -> URL {
         let id = try installPathComponent(model.id.rawValue)
         let revision = try installPathComponent(model.revision)
-        return try containedDirectory(
+        return try containedURL(
             "\(id)-\(revision).\(suffix)",
-            in: directories.downloads
-        )
-    }
-
-    private func manifestFileURL(
-        _ relativePath: String,
-        in directory: URL
-    ) throws -> URL {
-        do {
-            _ = try ContainedRelativePath.fileURL(
-                relativePath,
-                rootedAt: directory
-            )
-        } catch {
-            throw ModelManagerError.unsafePath
-        }
-        return directory.appending(path: relativePath)
-    }
-
-    private func containedDirectory(
-        _ relativePath: String,
-        in root: URL
-    ) throws -> URL {
-        do {
-            _ = try ContainedRelativePath.fileURL(
-                relativePath,
-                rootedAt: root
-            )
-        } catch {
-            throw ModelManagerError.unsafePath
-        }
-        return root.appending(
-            path: relativePath,
+            rootedAt: directories.downloads,
             directoryHint: .isDirectory
         )
     }
 
+    private func containedURL(
+        _ relativePath: String,
+        rootedAt root: URL,
+        directoryHint: URL.DirectoryHint = .inferFromPath
+    ) throws -> URL {
+        _ = try rejectingUnsafePath {
+            try ContainedRelativePath.fileURL(
+                relativePath,
+                rootedAt: root
+            )
+        }
+        return root.appending(
+            path: relativePath,
+            directoryHint: directoryHint
+        )
+    }
+
     private func installPathComponent(_ value: String) throws -> String {
+        try rejectingUnsafePath {
+            try ContainedRelativePath.component(value)
+        }
+    }
+
+    private func rejectingUnsafePath<T>(
+        _ body: () throws -> T
+    ) throws -> T {
         do {
-            return try ContainedRelativePath.component(value)
+            return try body()
         } catch {
             throw ModelManagerError.unsafePath
         }
@@ -1134,7 +1136,7 @@ actor ModelManager: ModelManaging {
     ) throws -> Int64 {
         var total: Int64 = 0
         for file in files {
-            let url = try manifestFileURL(file.path, in: directory)
+            let url = try containedURL(file.path, rootedAt: directory)
             if isValidExistingFile(url, descriptor: file) {
                 total += file.byteCount
             }
