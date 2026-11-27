@@ -3,8 +3,11 @@ import SayItBackend
 import SayItProtocol
 import SayItXPC
 
-final class SayItXPCExportedService: NSObject, SayItXPCProtocol {
+final class SayItXPCExportedService: NSObject, SayItXPCProtocol, @unchecked Sendable {
     private let backend: SayItBackendService
+    private let taskLock = NSLock()
+    private var activeTasks: [UUID: Task<Void, Never>] = [:]
+    private var isInvalidated = false
 
     init(backend: SayItBackendService) {
         self.backend = backend
@@ -14,7 +17,11 @@ final class SayItXPCExportedService: NSObject, SayItXPCProtocol {
         _ requestData: Data,
         withReply reply: @escaping @Sendable (Data) -> Void
     ) {
-        Task { [backend] in
+        let taskID = UUID()
+        let task = Task { [weak self, backend] in
+            defer {
+                self?.removeTask(id: taskID)
+            }
             let response: ServiceResponse
             do {
                 let request = try SayItWireCodec.decode(
@@ -32,6 +39,34 @@ final class SayItXPCExportedService: NSObject, SayItXPCProtocol {
             }
             let data = (try? SayItWireCodec.encode(response)) ?? Data()
             reply(data)
+        }
+        let shouldCancel = taskLock.withLock { () -> Bool in
+            guard !isInvalidated else { return true }
+            activeTasks[taskID] = task
+            return false
+        }
+        if shouldCancel {
+            task.cancel()
+        }
+    }
+
+    func cancelAllRequests(invalidate: Bool = false) {
+        let tasksToCancel = taskLock.withLock { () -> [Task<Void, Never>] in
+            if invalidate {
+                isInvalidated = true
+            }
+            let tasks = Array(activeTasks.values)
+            activeTasks.removeAll(keepingCapacity: false)
+            return tasks
+        }
+        for task in tasksToCancel {
+            task.cancel()
+        }
+    }
+
+    private func removeTask(id: UUID) {
+        taskLock.withLock {
+            activeTasks[id] = nil
         }
     }
 }

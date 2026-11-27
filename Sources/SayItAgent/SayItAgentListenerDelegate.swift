@@ -4,7 +4,7 @@ import SayItXPC
 
 final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate,
     @unchecked Sendable {
-    private let service: SayItXPCExportedService
+    private let backend: SayItBackendService
     private let validator = SayItClientValidator()
     private let connectionLock = NSLock()
     private var connections: [ObjectIdentifier: NSXPCConnection] = [:]
@@ -14,7 +14,7 @@ final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate,
     }
 
     init(backend: SayItBackendService) {
-        service = SayItXPCExportedService(backend: backend)
+        self.backend = backend
     }
 
     func listener(
@@ -24,15 +24,20 @@ final class SayItAgentListenerDelegate: NSObject, NSXPCListenerDelegate,
         guard validator.accepts(connection) else {
             return false
         }
+        let sessionService = SayItXPCExportedService(backend: backend)
         connection.exportedInterface = NSXPCInterface(
             with: SayItXPCProtocol.self
         )
-        connection.exportedObject = service
+        connection.exportedObject = sessionService
         let identifier = ObjectIdentifier(connection)
         connectionLock.withLock {
             connections[identifier] = connection
         }
+        connection.interruptionHandler = {
+            sessionService.cancelAllRequests(invalidate: false)
+        }
         connection.invalidationHandler = { [weak self] in
+            sessionService.cancelAllRequests(invalidate: true)
             self?.connectionLock.withLock {
                 self?.connections[identifier] = nil
             }

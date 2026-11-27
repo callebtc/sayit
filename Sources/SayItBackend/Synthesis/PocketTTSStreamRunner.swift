@@ -317,23 +317,10 @@ enum PocketTTSStreamRunner {
             tokenizer: model.flow_lm.conditioner.tokenizer
         )
         let frameRate = max(model.mimi.frameRate, 1)
-        let requestedInitial = max(
-            1,
-            Int((max(0, streamingInterval) * frameRate).rounded(.up))
+        let flushPlan = Self.flushPlan(
+            streamingInterval: streamingInterval,
+            frameRate: frameRate
         )
-        // Use a tight 2-frame opening flush (160 ms audio, above the 150 ms
-        // minimum sustainable playback buffer) for instant warm first audio,
-        // a synchronous 16-frame second flush (aligned to quadStepSize = 4)
-        // so cold playback crosses its 1.2 s start threshold by frame 18
-        // (1.44 s), then 32-frame steady batches overlapped asynchronously
-        // with FlowLM.
-        let firstFlushFrames = streamingInterval >= 1.5
-            ? requestedInitial
-            : min(2, requestedInitial)
-        let secondFlushFrames = streamingInterval >= 1.5
-            ? requestedInitial
-            : max(firstFlushFrames, 16)
-        let steadyBatchFrames = max(secondFlushFrames, 32)
         var emittedFlushes = 0
 
         for chunk in chunks {
@@ -347,13 +334,67 @@ enum PocketTTSStreamRunner {
                 text: preparedChunk,
                 framesAfterEos: framesAfterEos,
                 maxFrames: generationParameters.maxTokens,
-                firstFlushFrames: firstFlushFrames,
-                secondFlushFrames: secondFlushFrames,
-                steadyBatchFrames: steadyBatchFrames,
+                flushPlan: flushPlan,
                 emittedFlushes: &emittedFlushes,
                 onSamples: onSamples
             )
         }
+    }
+
+    struct FlushPlan: Equatable, Sendable {
+        let firstFlushFrames: Int
+        let secondFlushFrames: Int
+        let thirdFlushFrames: Int
+        let steadyBatchFrames: Int
+        let synchronousFlushes: Int
+
+        func targetBatchFrames(emittedFlushes: Int) -> Int {
+            switch emittedFlushes {
+            case 0: firstFlushFrames
+            case 1: secondFlushFrames
+            case 2: thirdFlushFrames
+            default: steadyBatchFrames
+            }
+        }
+    }
+
+    static func flushPlan(
+        streamingInterval: Double,
+        frameRate: Double
+    ) -> FlushPlan {
+        let resolvedFrameRate = max(frameRate, 1)
+        let requestedInitial = max(
+            1,
+            Int((max(0, streamingInterval) * resolvedFrameRate).rounded(.up))
+        )
+        if streamingInterval >= 1.5 {
+            let steady = max(requestedInitial, 32)
+            return FlushPlan(
+                firstFlushFrames: requestedInitial,
+                secondFlushFrames: requestedInitial,
+                thirdFlushFrames: steady,
+                steadyBatchFrames: steady,
+                synchronousFlushes: 2
+            )
+        }
+        // Use a tight 2-frame opening flush (160 ms audio, above the 150 ms
+        // minimum sustainable playback buffer at 1x) for instant warm first
+        // audio, then two quad-aligned 8-frame flushes (640 ms each): flush #2
+        // arrives twice as fast as a 16-frame flush to prevent warm underruns
+        // and cross rate-scaled start thresholds up to 3x (0.45 s), while
+        // flush #3 reaches the same 18-frame (1.44 s) cold-start milestone
+        // before switching to 32-frame async-overlapped steady batches.
+        let first = min(2, requestedInitial)
+        let second = max(first, 8)
+        let third = max(second, 8)
+        let steady = max(third, 32)
+        return FlushPlan(
+            firstFlushFrames: first,
+            secondFlushFrames: second,
+            thirdFlushFrames: third,
+            steadyBatchFrames: steady,
+            synchronousFlushes: 3
+        )
     }
 
     private static func generateShortText(
@@ -363,9 +404,7 @@ enum PocketTTSStreamRunner {
         text: String,
         framesAfterEos: Int,
         maxFrames: Int?,
-        firstFlushFrames: Int,
-        secondFlushFrames: Int,
-        steadyBatchFrames: Int,
+        flushPlan: FlushPlan,
         emittedFlushes: inout Int,
         onSamples: ([Float]) -> Void
     ) throws {
@@ -422,16 +461,12 @@ enum PocketTTSStreamRunner {
         let numLayers = compiled.numLayers
 
         var pendingLatents: [MLXArray] = []
-        pendingLatents.reserveCapacity(steadyBatchFrames)
+        pendingLatents.reserveCapacity(flushPlan.steadyBatchFrames)
         var pendingFrameCount = 0
         var inFlightMimiAudio: MLXArray?
 
         func targetBatchFrames() -> Int {
-            switch emittedFlushes {
-            case 0: firstFlushFrames
-            case 1: secondFlushFrames
-            default: steadyBatchFrames
-            }
+            flushPlan.targetBatchFrames(emittedFlushes: emittedFlushes)
         }
 
         func drainInFlightMimi() {
@@ -569,7 +604,7 @@ enum PocketTTSStreamRunner {
                 let limitStep = min(maxGenLen, stopStep)
 
                 var next: (step: Int, latent: MLXArray, isEos: MLXArray)?
-                if pendingFrameCount + 1 < firstFlushFrames && nextStepIndex < limitStep {
+                if pendingFrameCount + 1 < flushPlan.firstFlushFrames && nextStepIndex < limitStep {
                     next = runSingleStep()
                 }
 
@@ -581,7 +616,7 @@ enum PocketTTSStreamRunner {
                 }
 
                 appendPending(current.latent, count: 1)
-                if pendingFrameCount >= firstFlushFrames {
+                if pendingFrameCount >= flushPlan.firstFlushFrames {
                     flushLatents(synchronous: true)
                     if let next {
                         // Consume the already-queued next frame if any.
@@ -644,7 +679,7 @@ enum PocketTTSStreamRunner {
                         consumedSteps = nextBlock.startStep + slice.keepInNext
                     }
                     if pendingFrameCount >= targetBatchFrames() {
-                        flushLatents(synchronous: emittedFlushes <= 1)
+                        flushLatents(synchronous: emittedFlushes < flushPlan.synchronousFlushes)
                     }
                     // Finish any remaining post-EOS tail frames (only if framesAfterEos > 7).
                     while consumedSteps < slice.totalAllowed && nextStepIndex < slice.totalAllowed {
@@ -658,7 +693,7 @@ enum PocketTTSStreamRunner {
 
                 appendPending(currentBlock.latents, count: quadStepSize)
                 if pendingFrameCount >= targetBatchFrames() {
-                    flushLatents(synchronous: emittedFlushes <= 1)
+                    flushLatents(synchronous: emittedFlushes < flushPlan.synchronousFlushes)
                 }
 
                 if let nextBlock {
@@ -688,7 +723,7 @@ enum PocketTTSStreamRunner {
                 }
                 appendPending(current.latent, count: 1)
                 if pendingFrameCount >= targetBatchFrames() {
-                    flushLatents(synchronous: emittedFlushes <= 1)
+                    flushLatents(synchronous: emittedFlushes < flushPlan.synchronousFlushes)
                 }
 
                 if let next {

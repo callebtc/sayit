@@ -92,7 +92,12 @@ final class DramaLibraryModel: Module, SpeechGenerationModel, @unchecked Sendabl
         var offset = 0
         while offset < samples.count {
             let end = min(offset + analysisWindow, samples.count)
-            if windowContainsVoicedAudio(samples[offset..<end], subWindow: subWindow) {
+            // Overlap-align any trailing remainder shorter than two spread
+            // sub-windows so steady hiss cannot bypass the flat-spread check.
+            let start = end - offset < subWindow * 2
+                ? max(0, end - analysisWindow)
+                : offset
+            if windowContainsVoicedAudio(samples[start..<end], subWindow: subWindow) {
                 return true
             }
             offset = end
