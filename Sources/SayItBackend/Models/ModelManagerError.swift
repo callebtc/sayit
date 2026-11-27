@@ -2,7 +2,7 @@ import Foundation
 
 import SayItCore
 
-enum ModelManagerError: LocalizedError {
+enum ModelManagerError: LocalizedError, Equatable {
     case modelNotFound
     case modelUnavailable
     case anotherDownloadIsActive
@@ -12,6 +12,7 @@ enum ModelManagerError: LocalizedError {
     case checksumMismatch(path: String)
     case incompleteSnapshot
     case activeModelCannotBeRemoved
+    case unsafePath
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +34,8 @@ enum ModelManagerError: LocalizedError {
             "The model snapshot is incomplete."
         case .activeModelCannotBeRemoved:
             "Choose a different model before deleting the active model."
+        case .unsafePath:
+            "The model path is not safe to install."
         }
     }
 }
