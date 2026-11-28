@@ -46,9 +46,9 @@ struct VoiceLevelMeter: View {
     }
 
     private var levelDescription: String {
-        if peak >= 0.995 { return "Too loud" }
-        if level < 0.01 { return "Very quiet" }
-        if level < 0.05 { return "Quiet" }
-        return "Good"
+        if peak >= 0.995 { return String(localized: "Too loud") }
+        if level < 0.01 { return String(localized: "Very quiet") }
+        if level < 0.05 { return String(localized: "Quiet") }
+        return String(localized: "Good")
     }
 }

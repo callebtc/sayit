@@ -2,6 +2,7 @@ name: SayIt
 
 options:
   bundleIdPrefix: sh.sayit
+  developmentLanguage: en
   deploymentTarget:
     macOS: "15.0"
   generateEmptyDirectories: true
@@ -334,6 +335,9 @@ targets:
       path: Config/Info.plist
       properties:
         CFBundleDisplayName: "$(SAYIT_APP_DISPLAY_NAME)"
+        CFBundleLocalizations:
+          - en
+          - zh-Hans
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"

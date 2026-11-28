@@ -69,6 +69,7 @@ struct VoiceOnboardingView: View {
     }
 
     private func modelName(for id: ModelID) -> String {
-        state.models.first { $0.id == id }?.displayName ?? "voice model"
+        state.models.first { $0.id == id }?.displayName
+            ?? String(localized: "voice model")
     }
 }

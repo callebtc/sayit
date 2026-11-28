@@ -38,7 +38,11 @@ struct AboutSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Button(state.updates.hasUpdate ? "Update Now…" : "Check for Updates…") {
+                    Button(
+                        state.updates.hasUpdate
+                            ? String(localized: "Update Now…")
+                            : String(localized: "Check for Updates…")
+                    ) {
                         if state.updates.hasUpdate {
                             state.updates.updateNow()
                         } else {

@@ -279,7 +279,7 @@ struct VoiceRibbonView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Playback position")
         .accessibilityValue(
-            "\(elapsed.formattedDuration) of \(generatedDuration.formattedDuration)"
+            String(localized: "\(elapsed.formattedDuration) of \(generatedDuration.formattedDuration)")
         )
         .accessibilityAdjustableAction { direction in
             switch direction {

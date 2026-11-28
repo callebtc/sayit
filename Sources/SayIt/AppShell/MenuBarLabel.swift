@@ -28,7 +28,11 @@ struct MenuBarLabel: View {
                 }
             }
             .accessibilityLabel("Say It")
-            .accessibilityValue(state.updates.hasUpdate ? "Update available. \(state.statusText)" : state.statusText)
+            .accessibilityValue(
+                state.updates.hasUpdate
+                    ? String(localized: "Update available. \(state.statusText)")
+                    : state.statusText
+            )
             .background {
                 AppWindowCoordinator()
             }

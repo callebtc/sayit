@@ -135,10 +135,10 @@ struct VoiceDiscoveryView: View {
 
             VoiceGenerationButton(
                 title: candidates.isEmpty
-                    ? "Generate Four Voices"
-                    : "Generate Four More",
+                    ? String(localized: "Generate Four Voices")
+                    : String(localized: "Generate Four More"),
                 systemImage: surpriseMe ? "dice" : "sparkles",
-                generatingTitle: "Voicing the same sentence four ways…",
+                generatingTitle: String(localized: "Voicing the same sentence four ways…"),
                 isGenerating: isGenerating,
                 completedCount: studio?.completedCount ?? 0,
                 totalCount: studio?.totalCount ?? 4,
@@ -210,13 +210,13 @@ struct VoiceDiscoveryView: View {
     }
 
     private var characterLabel: String {
-        if surpriseMe { return "Random" }
+        if surpriseMe { return String(localized: "Random") }
         return switch VoiceTuningSpace.nearestPreset(
             position: characterPosition
         ) {
-        case .faithful: "Faithful"
-        case .natural: "Natural"
-        case .expressive: "Expressive"
+        case .faithful: String(localized: "Faithful")
+        case .natural: String(localized: "Natural")
+        case .expressive: String(localized: "Expressive")
         }
     }
 }

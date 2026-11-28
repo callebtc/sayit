@@ -33,22 +33,24 @@ struct ServiceRepairView: View {
     }
 
     private var title: String {
-        if state.backgroundService.requiresApproval { return "Allow background service" }
+        if state.backgroundService.requiresApproval {
+            return String(localized: "Allow background service")
+        }
         return switch state.serviceConnection {
         case .disabled:
-            "Background service is off"
+            String(localized: "Background service is off")
         case .recovering:
-            "Reconnecting background service"
+            String(localized: "Reconnecting background service")
         case .updateRequired:
-            "Service update needs attention"
+            String(localized: "Service update needs attention")
         default:
-            "Can’t reach the background service"
+            String(localized: "Can’t reach the background service")
         }
     }
 
     private var detail: String {
         if state.backgroundService.requiresApproval {
-            return "Allow Say It in Login Items & Extensions to continue."
+            return String(localized: "Allow Say It in Login Items & Extensions to continue.")
         }
         if state.serviceConnection != .recovering,
            let message = state.backgroundService.errorMessage {
@@ -56,18 +58,20 @@ struct ServiceRepairView: View {
         }
         return switch state.serviceConnection {
         case .disabled:
-            "Speech and playback are unavailable until the service is turned on."
+            String(localized: "Speech and playback are unavailable until the service is turned on.")
         case .recovering:
-            "Say It is restoring its connection automatically. This should only take a moment."
+            String(localized: "Say It is restoring its connection automatically. This should only take a moment.")
         case .updateRequired:
-            "The service still doesn’t match this app. Quit other copies of Say It, then try again."
+            String(localized: "The service still doesn’t match this app. Quit other copies of Say It, then try again.")
         default:
-            "Say It can’t connect to its speech service. Restart it to continue."
+            String(localized: "Say It can’t connect to its speech service. Restart it to continue.")
         }
     }
 
     private var actionTitle: String {
-        state.serviceConnection == .disabled ? "Turn On" : "Restart Service"
+        state.serviceConnection == .disabled
+            ? String(localized: "Turn On")
+            : String(localized: "Restart Service")
     }
 
     private var symbol: String {

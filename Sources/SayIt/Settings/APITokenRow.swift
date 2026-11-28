@@ -24,14 +24,14 @@ struct APITokenRow: View {
 
     private var scopeSummary: String {
         if token.scopes == APITokenPreset.fullAccess.scopes {
-            return "Full access"
+            return String(localized: "Full access")
         }
         if token.scopes == APITokenPreset.speechControl.scopes {
-            return "Speech control"
+            return String(localized: "Speech control")
         }
         if token.scopes == APITokenPreset.readOnly.scopes {
-            return "Read only"
+            return String(localized: "Read only")
         }
-        return "\(token.scopes.count) custom scopes"
+        return String(localized: "\(token.scopes.count) custom scopes")
     }
 }

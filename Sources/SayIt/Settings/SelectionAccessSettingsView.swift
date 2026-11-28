@@ -47,11 +47,11 @@ struct SelectionAccessSettingsView: View {
     private var accessDescription: String {
         switch state.selectionService.accessibilityIsTrusted {
         case true:
-            "Allowed"
+            String(localized: "Allowed")
         case false:
-            "Not allowed"
+            String(localized: "Not allowed")
         case nil:
-            "Not checked"
+            String(localized: "Not checked")
         }
     }
 

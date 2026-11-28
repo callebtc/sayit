@@ -3,7 +3,7 @@ import SwiftUI
 struct VoiceGenerationButton: View {
     let title: String
     let systemImage: String
-    var generatingTitle: String = "Generating…"
+    var generatingTitle: String = String(localized: "Generating…")
     var isGenerating = false
     var completedCount = 0
     var totalCount = 0

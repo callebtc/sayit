@@ -60,10 +60,10 @@ struct VoiceProfileRow: View {
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .accessibilityHint(
                     canUse
-                        ? "Selects this voice for speech"
+                        ? String(localized: "Selects this voice for speech")
                         : isSelected
-                            ? "This voice is selected"
-                            : "Reinstall the model to use this voice"
+                            ? String(localized: "This voice is selected")
+                            : String(localized: "Reinstall the model to use this voice")
                 )
             }
 
@@ -162,7 +162,7 @@ struct VoiceProfileRow: View {
         isModelInstalled && !isSelected && !isRenaming
     }
 
-    private var originTitle: String {
+    private var originTitle: LocalizedStringKey {
         switch profile.origin {
         case .generated: "Discovered"
         case .recordedClone: "Cloned"

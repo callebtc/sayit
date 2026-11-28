@@ -1,39 +1,6092 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "Read Clipboard" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Read Clipboard"
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ Copy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 副本"
           }
         }
       }
     },
-    "Ready to speak" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ready to speak"
+    "%@ download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 下载"
           }
         }
       }
     },
-    "Say It" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Say It"
+    "%@ download paused": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 下载已暂停"
           }
         }
       }
+    },
+    "%@ model · %@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ model · %2$@ · %3$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 模型 · %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@ of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ of %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%@ s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 秒"
+          }
+        }
+      }
+    },
+    "%@ sec": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 秒"
+          }
+        }
+      }
+    },
+    "%@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
+    "%@/s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@/秒"
+          }
+        }
+      }
+    },
+    "%@… · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@… · %2$@"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
+    "%lld": {
+      "shouldTranslate": false
+    },
+    "%lld characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个字符"
+          }
+        }
+      }
+    },
+    "%lld custom scopes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项自定义权限"
+          }
+        }
+      }
+    },
+    "%lld installed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装 %lld 个"
+          }
+        }
+      }
+    },
+    "%lld languages": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 种语言"
+          }
+        }
+      }
+    },
+    "%lld of %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of %2$lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld / %2$lld 个"
+          }
+        }
+      }
+    },
+    "%lld seconds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 秒"
+          }
+        }
+      }
+    },
+    "30 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天"
+          }
+        }
+      }
+    },
+    "7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天"
+          }
+        }
+      }
+    },
+    "90 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "90 天"
+          }
+        }
+      }
+    },
+    "A file named “sayit” already exists in %@. Remove it manually or choose another folder.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 中已存在名为“sayit”的文件。请手动移除或选择其他文件夹。"
+          }
+        }
+      }
+    },
+    "A local reference profile — no training, nothing uploaded.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地参考音色配置——无需训练，不上传任何数据。"
+          }
+        }
+      }
+    },
+    "About": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于"
+          }
+        }
+      }
+    },
+    "Access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "权限范围"
+          }
+        }
+      }
+    },
+    "Access token created": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已创建访问令牌"
+          }
+        }
+      }
+    },
+    "Accessibility": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "辅助功能"
+          }
+        }
+      }
+    },
+    "Accessibility Settings couldn’t be opened. Open System Settings, choose Privacy & Security, then Accessibility.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开“辅助功能”设置。请前往“系统设置”→“隐私与安全性”→“辅助功能”。"
+          }
+        }
+      }
+    },
+    "Accessibility access is off. Allow the Say It selected-text helper in Accessibility Settings, then press the shortcut again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未开启辅助功能权限。请在“辅助功能”设置中允许 Say It 选中文本助手，然后再按一次快捷键。"
+          }
+        }
+      }
+    },
+    "Accessibility is used only when you invoke the selection shortcut. Clipboard text is read only when you invoke its shortcut.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在您按下朗读选中文本快捷键时才会使用辅助功能；仅在按下剪贴板快捷键时才会读取剪贴板。"
+          }
+        }
+      }
+    },
+    "Acknowledgements": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "致谢"
+          }
+        }
+      }
+    },
+    "Add Hugging Face Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加 Hugging Face 模型"
+          }
+        }
+      }
+    },
+    "Add Hugging Face Model…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加 Hugging Face 模型…"
+          }
+        }
+      }
+    },
+    "Add Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加模型"
+          }
+        }
+      }
+    },
+    "Add a model or rescan to look for local models.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请添加模型，或重新扫描以查找本地模型。"
+          }
+        }
+      }
+    },
+    "Adjust": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "微调"
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级"
+          }
+        }
+      }
+    },
+    "After 1 hour": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 小时后"
+          }
+        }
+      }
+    },
+    "After 1 minute": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 分钟后"
+          }
+        }
+      }
+    },
+    "After 10 minutes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 分钟后"
+          }
+        }
+      }
+    },
+    "After 30 minutes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 分钟后"
+          }
+        }
+      }
+    },
+    "After 5 minutes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 分钟后"
+          }
+        }
+      }
+    },
+    "Aim for %lld–%lld seconds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Aim for %1$lld–%2$lld seconds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建议录制 %1$lld–%2$lld 秒"
+          }
+        }
+      }
+    },
+    "Allow Access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许访问"
+          }
+        }
+      }
+    },
+    "Allow Say It in Login Items & Extensions to continue.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在“登录项与扩展”中允许 Say It 以继续。"
+          }
+        }
+      }
+    },
+    "Allow Say It in System Settings → General → Login Items & Extensions to finish starting the service.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在“系统设置”→“通用”→“登录项与扩展”中允许 Say It，以完成启动后台服务。"
+          }
+        }
+      }
+    },
+    "Allow background service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请允许后台服务"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已允许"
+          }
+        }
+      }
+    },
+    "Allow…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权…"
+          }
+        }
+      }
+    },
+    "Another voice creation session is in progress.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个音色创建会话正在进行中。"
+          }
+        }
+      }
+    },
+    "Applied to newly spoken text. Keeping the model in memory avoids reload delays. Block separators are a visual debugging aid.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅对之后新朗读的文本生效。将模型保留在内存中可避免重复加载延迟。分段分隔线仅用于可视化调试。"
+          }
+        }
+      }
+    },
+    "Apply Changes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用更改"
+          }
+        }
+      }
+    },
+    "Apps using %@… will immediately lose access.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 %@… 的应用将立即失去访问权限。"
+          }
+        }
+      }
+    },
+    "Audio storage limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频存储上限"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Automation access tokens": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动化访问令牌"
+          }
+        }
+      }
+    },
+    "Available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用模型"
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一步"
+          }
+        }
+      }
+    },
+    "Back %lld seconds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快退 %lld 秒"
+          }
+        }
+      }
+    },
+    "Background service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务"
+          }
+        }
+      }
+    },
+    "Background service is off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务已关闭"
+          }
+        }
+      }
+    },
+    "Background service needs attention": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务需要注意"
+          }
+        }
+      }
+    },
+    "Background service unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务不可用"
+          }
+        }
+      }
+    },
+    "Base URL": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基础 URL"
+          }
+        }
+      }
+    },
+    "Best balance of size, speed, and quality.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兼顾体积、速度与音质的最佳平衡之选。"
+          }
+        }
+      }
+    },
+    "Brisk": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "明快"
+          }
+        }
+      }
+    },
+    "Buffering": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在缓冲"
+          }
+        }
+      }
+    },
+    "CFG": {
+      "shouldTranslate": false
+    },
+    "CHARACTER": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声音特征"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Cancel download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消下载"
+          }
+        }
+      }
+    },
+    "Cancel the download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消下载"
+          }
+        }
+      }
+    },
+    "Canceling %@ download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在取消 %@ 下载"
+          }
+        }
+      }
+    },
+    "Canceling download…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在取消下载…"
+          }
+        }
+      }
+    },
+    "Canceling model download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在取消模型下载"
+          }
+        }
+      }
+    },
+    "Canceling…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在取消…"
+          }
+        }
+      }
+    },
+    "Can’t reach the background service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接到后台服务"
+          }
+        }
+      }
+    },
+    "Change diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改诊断信息"
+          }
+        }
+      }
+    },
+    "Change history": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改历史记录"
+          }
+        }
+      }
+    },
+    "Change models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理模型"
+          }
+        }
+      }
+    },
+    "Change settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改设置"
+          }
+        }
+      }
+    },
+    "Change voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理音色"
+          }
+        }
+      }
+    },
+    "Changes listening speed instantly without regenerating audio.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即时调整播放倍速，无需重新生成音频。"
+          }
+        }
+      }
+    },
+    "Character": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "特征倾向"
+          }
+        }
+      }
+    },
+    "Check for Updates…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新…"
+          }
+        }
+      }
+    },
+    "Check for updates daily": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天自动检查更新"
+          }
+        }
+      }
+    },
+    "Checking for updates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查更新"
+          }
+        }
+      }
+    },
+    "Checking for updates…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查更新…"
+          }
+        }
+      }
+    },
+    "Choose Another File…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择其他文件…"
+          }
+        }
+      }
+    },
+    "Choose Voice File…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择音色文件…"
+          }
+        }
+      }
+    },
+    "Choose a Phonon .safetensors voice file no larger than 8 MB.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择不超过 8 MB 的 Phonon .safetensors 音色文件。"
+          }
+        }
+      }
+    },
+    "Choose a folder in your shell’s PATH. The “sayit” command will be linked into it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择位于 Shell PATH 中的文件夹，“sayit”命令将链接至该目录。"
+          }
+        }
+      }
+    },
+    "Choose a model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择模型"
+          }
+        }
+      }
+    },
+    "Choose a voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择音色"
+          }
+        }
+      }
+    },
+    "Choose a voice file exported using “Download for Phonon” in Gradium. Say It saves its own copy for offline use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择在 Gradium 中通过“Download for Phonon”导出的音色文件。Say It 会保存本地副本供离线使用。"
+          }
+        }
+      }
+    },
+    "Choose an MLX Audio Swift model folder containing config.json.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择包含 config.json 的 MLX Audio Swift 模型文件夹。"
+          }
+        }
+      }
+    },
+    "Choose an item": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一条记录"
+          }
+        }
+      }
+    },
+    "Choose another recommended model…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择其他推荐模型…"
+          }
+        }
+      }
+    },
+    "Choose individual scopes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义具体权限"
+          }
+        }
+      }
+    },
+    "Class Temperature": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "类别温度"
+          }
+        }
+      }
+    },
+    "Clean up text before speaking": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读前清理文本"
+          }
+        }
+      }
+    },
+    "Cleaning text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在清理文本"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
+      }
+    },
+    "Clear History": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空历史记录"
+          }
+        }
+      }
+    },
+    "Clear History…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空历史记录…"
+          }
+        }
+      }
+    },
+    "Clear all history?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定清空全部历史记录？"
+          }
+        }
+      }
+    },
+    "Clear this and read the clipboard instead": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除当前内容并朗读剪贴板"
+          }
+        }
+      }
+    },
+    "Clearing permanently deletes saved text and generated audio.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空后将永久删除已保存的文本和生成的音频。"
+          }
+        }
+      }
+    },
+    "Clone a Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "克隆音色"
+          }
+        }
+      }
+    },
+    "Clone a Voice…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "克隆音色…"
+          }
+        }
+      }
+    },
+    "Cloned": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已克隆"
+          }
+        }
+      }
+    },
+    "Cloning uses your recording as a reference; it does not fine-tune model weights.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "克隆仅将您的录音作为参考，不会微调模型权重。"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Collapsed, %lld models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已折叠，共 %lld 个模型"
+          }
+        }
+      }
+    },
+    "Collapses the %@ list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折叠%@列表"
+          }
+        }
+      }
+    },
+    "Command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行工具"
+          }
+        }
+      }
+    },
+    "Command line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行"
+          }
+        }
+      }
+    },
+    "Community models must use a model type supported by MLX Audio Swift 0.1.3.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "社区模型必须使用 MLX Audio Swift 0.1.3 支持的模型类型。"
+          }
+        }
+      }
+    },
+    "Compare the recommended choices by size, features, and expected performance.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按模型大小、功能特性和预期性能对比推荐选项。"
+          }
+        }
+      }
+    },
+    "Comparison text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听对比文本"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已连接"
+          }
+        }
+      }
+    },
+    "Connecting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在连接"
+          }
+        }
+      }
+    },
+    "Connecting to service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在连接服务"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接状态"
+          }
+        }
+      }
+    },
+    "Continue": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "Continue Without a Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂不下载并继续"
+          }
+        }
+      }
+    },
+    "Control playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制播放"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制"
+          }
+        }
+      }
+    },
+    "Copy the manual install command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制手动安装命令"
+          }
+        }
+      }
+    },
+    "Copy this secret now. It cannot be displayed again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请立即复制此密钥，之后将无法再次查看。"
+          }
+        }
+      }
+    },
+    "Couldn’t continue": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法继续"
+          }
+        }
+      }
+    },
+    "Create": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建音色"
+          }
+        }
+      }
+    },
+    "Create Access Token": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建访问令牌"
+          }
+        }
+      }
+    },
+    "Create Access Token…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建访问令牌…"
+          }
+        }
+      }
+    },
+    "Created %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建于 %@"
+          }
+        }
+      }
+    },
+    "Creating an article voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成文章语音"
+          }
+        }
+      }
+    },
+    "Custom description": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义描述"
+          }
+        }
+      }
+    },
+    "Custom voice description": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义音色描述"
+          }
+        }
+      }
+    },
+    "Customize %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 %@"
+          }
+        }
+      }
+    },
+    "Customize…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义…"
+          }
+        }
+      }
+    },
+    "Delay between blocks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分段间隔"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除"
+          }
+        }
+      }
+    },
+    "Delete %@?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定删除 %@？"
+          }
+        }
+      }
+    },
+    "Delete Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除模型"
+          }
+        }
+      }
+    },
+    "Delete Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除音色"
+          }
+        }
+      }
+    },
+    "Delete this history item?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定删除此条历史记录？"
+          }
+        }
+      }
+    },
+    "Designed voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "描述生成音色"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断"
+          }
+        }
+      }
+    },
+    "Diffusion Steps": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扩散步数"
+          }
+        }
+      }
+    },
+    "Disabled": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已停用"
+          }
+        }
+      }
+    },
+    "Discover %@ Voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "探索 %@ 音色"
+          }
+        }
+      }
+    },
+    "Discover Voices…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "探索新音色…"
+          }
+        }
+      }
+    },
+    "Discover a voice you like, then save it here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "探索喜欢的音色并保存到这里。"
+          }
+        }
+      }
+    },
+    "Discovered": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机发现"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Dismiss download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忽略下载"
+          }
+        }
+      }
+    },
+    "Dismiss the download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忽略此下载"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载"
+          }
+        }
+      }
+    },
+    "Download %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载 %@"
+          }
+        }
+      }
+    },
+    "Download failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载失败"
+          }
+        }
+      }
+    },
+    "Download paused": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载已暂停"
+          }
+        }
+      }
+    },
+    "Download the latest voices for %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载 %@ 的最新音色包。"
+          }
+        }
+      }
+    },
+    "Downloading %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载 %@"
+          }
+        }
+      }
+    },
+    "Downloading model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载模型"
+          }
+        }
+      }
+    },
+    "Downloading update…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载更新…"
+          }
+        }
+      }
+    },
+    "Downloading…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载中…"
+          }
+        }
+      }
+    },
+    "Duration: %@ seconds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "耗时：%@ 秒"
+          }
+        }
+      }
+    },
+    "Each sample starts from a fresh voice. Save only the ones you want to keep.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次试听都会从全新音色生成，只保留您喜欢的即可。"
+          }
+        }
+      }
+    },
+    "Enable local automation API": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用本地自动化 API"
+          }
+        }
+      }
+    },
+    "Exaggeration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "情感夸张度"
+          }
+        }
+      }
+    },
+    "Existing Say It data could not be migrated. The original data was left unchanged.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法迁移现有的 Say It 数据，原始数据已保留。"
+          }
+        }
+      }
+    },
+    "Expanded, %lld models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开，共 %lld 个模型"
+          }
+        }
+      }
+    },
+    "Experimental": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实验性"
+          }
+        }
+      }
+    },
+    "Experimental English and Chinese speech with voice descriptions. Long startup delay; research and noncommercial use only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持中英文语音及音色描述（实验性）。启动延迟较长；仅限研究及非商业用途。"
+          }
+        }
+      }
+    },
+    "Experimental models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实验性模型"
+          }
+        }
+      }
+    },
+    "Export": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出"
+          }
+        }
+      }
+    },
+    "Export M4A": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出 M4A"
+          }
+        }
+      }
+    },
+    "Export Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出文本"
+          }
+        }
+      }
+    },
+    "Export WAV": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出 WAV"
+          }
+        }
+      }
+    },
+    "Export…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出…"
+          }
+        }
+      }
+    },
+    "Expressive": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "富有表现力"
+          }
+        }
+      }
+    },
+    "Extremely small and efficient; impressive for a 4-bit model, but voice quality is noticeably low.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "体积超小且高效；以 4-bit 模型而言表现不俗，但音质明显偏低。"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败"
+          }
+        }
+      }
+    },
+    "Faithful": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "忠实还原"
+          }
+        }
+      }
+    },
+    "Fast": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速"
+          }
+        }
+      }
+    },
+    "Faster": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "很快"
+          }
+        }
+      }
+    },
+    "Finish": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Finishing %@ setup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在完成 %@ 配置"
+          }
+        }
+      }
+    },
+    "Finishing model setup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在完成模型配置"
+          }
+        }
+      }
+    },
+    "Finishing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即将完成…"
+          }
+        }
+      }
+    },
+    "Forever": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久保留"
+          }
+        }
+      }
+    },
+    "Forward %lld seconds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快进 %lld 秒"
+          }
+        }
+      }
+    },
+    "Forward interval": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快进间隔"
+          }
+        }
+      }
+    },
+    "Full Access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完全访问"
+          }
+        }
+      }
+    },
+    "Full access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完全访问"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        }
+      }
+    },
+    "Generate Four More": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再生成四个音色"
+          }
+        }
+      }
+    },
+    "Generate Four Voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成四个音色"
+          }
+        }
+      }
+    },
+    "Generate Previews": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成试听"
+          }
+        }
+      }
+    },
+    "Generate Samples": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成样本"
+          }
+        }
+      }
+    },
+    "Generate a batch, compare the same sentence, and keep your favorites.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "批量生成几个音色，用同一句话试听对比，并收藏喜欢的声音。"
+          }
+        }
+      }
+    },
+    "Generate random voices and keep your favorites.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机生成多种音色并收藏喜欢的声音。"
+          }
+        }
+      }
+    },
+    "Generated voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机生成音色"
+          }
+        }
+      }
+    },
+    "Generates a fresh voice with these settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用当前设置重新生成全新音色"
+          }
+        }
+      }
+    },
+    "Generates this speech again and starts playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成此语音并开始播放"
+          }
+        }
+      }
+    },
+    "Generating it may take a while and use additional storage.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成较长文本可能需要一定时间，并会占用额外存储空间。"
+          }
+        }
+      }
+    },
+    "Generating samples…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成样本…"
+          }
+        }
+      }
+    },
+    "Generating speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成语音"
+          }
+        }
+      }
+    },
+    "Generating…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成…"
+          }
+        }
+      }
+    },
+    "Glitch-prone and often inaccurate; voice cloning can sound unstable or unlike the reference.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "易出现杂音且常不准确；音色克隆可能不够稳定或与参考声音差异较大。"
+          }
+        }
+      }
+    },
+    "Glitch-prone output that can sound unstable.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输出容易出现杂音，听感可能不稳定。"
+          }
+        }
+      }
+    },
+    "Good": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量适中"
+          }
+        }
+      }
+    },
+    "Good quality with occasional audio artifacts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音质良好，偶有轻微音频伪影。"
+          }
+        }
+      }
+    },
+    "Good voice quality, but slow and occasionally glitchy.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音质不错，但生成较慢且偶发杂音。"
+          }
+        }
+      }
+    },
+    "Guidance": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引导强度"
+          }
+        }
+      }
+    },
+    "History": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史记录"
+          }
+        }
+      }
+    },
+    "History audio is not affected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史记录中的音频不受影响。"
+          }
+        }
+      }
+    },
+    "Hugging Face Token": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hugging Face 令牌"
+          }
+        }
+      }
+    },
+    "I have permission to clone the voice I will record.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我已获得授权，可以克隆即将录制的声音。"
+          }
+        }
+      }
+    },
+    "Import": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入"
+          }
+        }
+      }
+    },
+    "Import Local Model…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入本地模型…"
+          }
+        }
+      }
+    },
+    "Import Phonon Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入 Phonon 音色"
+          }
+        }
+      }
+    },
+    "Import Voice File…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入音色文件…"
+          }
+        }
+      }
+    },
+    "Import a Phonon voice file to save it here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入 Phonon 音色文件以保存到这里。"
+          }
+        }
+      }
+    },
+    "Import a voice exported for Phonon from Gradium. Imported voices stay on this Mac and work offline.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入从 Gradium 导出的 Phonon 音色。导入的音色保存在本机并可离线使用。"
+          }
+        }
+      }
+    },
+    "Imported": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已导入"
+          }
+        }
+      }
+    },
+    "Install Here": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装到此目录"
+          }
+        }
+      }
+    },
+    "Install the model to preview its voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先安装模型以试听音色"
+          }
+        }
+      }
+    },
+    "Install “sayit” Command…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装 “sayit” 命令…"
+          }
+        }
+      }
+    },
+    "Installation was canceled or couldn’t be authorized. Check for updates when you’re ready to try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装已取消或未获授权。准备好后可再次检查更新。"
+          }
+        }
+      }
+    },
+    "Installed and verified": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装并校验通过"
+          }
+        }
+      }
+    },
+    "Installing and restarting Say It…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在安装并重启 Say It…"
+          }
+        }
+      }
+    },
+    "Installs a “sayit” link to the bundled tool. Pick a folder in your shell’s PATH, such as ~/.local/bin, or copy the manual command to run in Terminal.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将内置命令行工具链接为 “sayit”。请选择位于 Shell PATH 中的文件夹（例如 ~/.local/bin），或复制手动命令到终端中运行。"
+          }
+        }
+      }
+    },
+    "Items you speak appear here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "您朗读过的内容会显示在这里。"
+          }
+        }
+      }
+    },
+    "Its estimated peak memory exceeds 70% of this Mac’s physical memory. Other apps may become less responsive.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该模型的预估峰值内存超过此 Mac 物理内存的 70%，可能会导致其他应用响应变慢。"
+          }
+        }
+      }
+    },
+    "Japanese voice design; playback compatibility is still being evaluated.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日语声音设计模型；播放兼容性仍在评估中。"
+          }
+        }
+      }
+    },
+    "Keep history": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留历史记录"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Large": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大型"
+          }
+        }
+      }
+    },
+    "Later": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稍后"
+          }
+        }
+      }
+    },
+    "Launch Say It at login": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时启动 Say It"
+          }
+        }
+      }
+    },
+    "Loading %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载 %@"
+          }
+        }
+      }
+    },
+    "Loads this recording into the player and starts playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将此录音载入播放器并开始播放"
+          }
+        }
+      }
+    },
+    "Local automation API": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地自动化 API"
+          }
+        }
+      }
+    },
+    "Long text needs confirmation": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "长文本需要确认"
+          }
+        }
+      }
+    },
+    "Lower-storage expressive presets with short, paragraph-aware chunks that avoid the model's roughly 15-second generation ceiling; occasional glitches remain.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "占用空间更小的表现力预设模型，按段落短句切分以避开约 15 秒的生成上限；仍偶有杂音。"
+          }
+        }
+      }
+    },
+    "M4A Audio": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "M4A 音频"
+          }
+        }
+      }
+    },
+    "MLX Audio Swift": {
+      "shouldTranslate": false
+    },
+    "Manual command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动命令"
+          }
+        }
+      }
+    },
+    "May be slow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可能较慢"
+          }
+        }
+      }
+    },
+    "May be slow, glitchy, or produce lower-quality speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成速度可能较慢、偶发杂音或音质较低"
+          }
+        }
+      }
+    },
+    "Medium": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中等"
+          }
+        }
+      }
+    },
+    "Medium-fast": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中偏快"
+          }
+        }
+      }
+    },
+    "Medium-slow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中偏慢"
+          }
+        }
+      }
+    },
+    "Microphone access is denied. Allow Say It in Privacy & Security, then return here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风权限已被拒绝。请在“隐私与安全性”中允许 Say It，然后返回此处。"
+          }
+        }
+      }
+    },
+    "Microphone access is needed to record your reference.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要麦克风权限以录制您的参考声音。"
+          }
+        }
+      }
+    },
+    "Microphone access is restricted by this Mac. Ask its administrator to allow recording.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 Mac 限制了麦克风访问权限。请联系管理员允许录音。"
+          }
+        }
+      }
+    },
+    "Microphone level": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风音量"
+          }
+        }
+      }
+    },
+    "Microphone ready": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风已就绪"
+          }
+        }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        }
+      }
+    },
+    "Model download failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型下载失败"
+          }
+        }
+      }
+    },
+    "Model licenses": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型许可协议"
+          }
+        }
+      }
+    },
+    "Model switch failed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型切换失败"
+          }
+        }
+      }
+    },
+    "Model used for this audio. Pick another model to re-synthesize.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此音频使用的模型。选择其他模型即可重新合成。"
+          }
+        }
+      }
+    },
+    "Models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        }
+      }
+    },
+    "Models that cannot run in this version": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前版本无法运行的模型"
+          }
+        }
+      }
+    },
+    "Move Say It to Applications, then reopen it to install updates.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请将 Say It 移至“应用程序”文件夹后重新打开，再安装更新。"
+          }
+        }
+      }
+    },
+    "My voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我的音色"
+          }
+        }
+      }
+    },
+    "Native upstream Swift streaming with the standard Drama 3 checkpoint. Suggested unified memory: 48 GB or more.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用标准 Drama 3 检查点的原生上游 Swift 流式合成。建议统一内存：48 GB 及以上。"
+          }
+        }
+      }
+    },
+    "Natural": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自然"
+          }
+        }
+      }
+    },
+    "Needs attention": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要注意"
+          }
+        }
+      }
+    },
+    "Never": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从不"
+          }
+        }
+      }
+    },
+    "New voice name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新音色名称"
+          }
+        }
+      }
+    },
+    "No Saved Voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无已保存的音色"
+          }
+        }
+      }
+    },
+    "No access tokens": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无访问令牌"
+          }
+        }
+      }
+    },
+    "No analytics or passive microphone listening": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无数据统计，也无后台麦克风监听"
+          }
+        }
+      }
+    },
+    "No cloud speech service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不使用云端语音服务"
+          }
+        }
+      }
+    },
+    "No diagnostic events": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无诊断事件"
+          }
+        }
+      }
+    },
+    "No history yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无历史记录"
+          }
+        }
+      }
+    },
+    "No input device is available. Connect a microphone or choose one in Sound Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到可用输入设备。请连接麦克风或在“声音”设置中选择设备。"
+          }
+        }
+      }
+    },
+    "No microphone audio was captured. Check the selected input device and record again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未捕获到麦克风音频。请检查所选输入设备并重新录制。"
+          }
+        }
+      }
+    },
+    "No models available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无可用模型"
+          }
+        }
+      }
+    },
+    "No models found": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到匹配的模型"
+          }
+        }
+      }
+    },
+    "No models match “%@”.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配“%@”的模型。"
+          }
+        }
+      }
+    },
+    "No other models available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无其他可用模型"
+          }
+        }
+      }
+    },
+    "No passive clipboard monitoring": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不进行后台剪贴板监听"
+          }
+        }
+      }
+    },
+    "No readable text is selected in the frontmost app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最前方的应用中未选中可朗读的文本。"
+          }
+        }
+      }
+    },
+    "No readable text was selected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未选中可朗读的文本。"
+          }
+        }
+      }
+    },
+    "Normalize whitespace": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "规范化空白字符"
+          }
+        }
+      }
+    },
+    "Not allowed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未允许"
+          }
+        }
+      }
+    },
+    "Not checked": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检查"
+          }
+        }
+      }
+    },
+    "Not checked yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未检查"
+          }
+        }
+      }
+    },
+    "Not recommended for this Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不推荐用于此 Mac"
+          }
+        }
+      }
+    },
+    "Not supported": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Onboarding progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引导进度"
+          }
+        }
+      }
+    },
+    "Only apps or scripts using the optional local automation API need a token.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅当其他应用或脚本调用可选的本地自动化 API 时才需要令牌。"
+          }
+        }
+      }
+    },
+    "Open Accessibility Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开“辅助功能”设置…"
+          }
+        }
+      }
+    },
+    "Open History": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开历史记录"
+          }
+        }
+      }
+    },
+    "Open Login Items": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开“登录项”"
+          }
+        }
+      }
+    },
+    "Open Microphone Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开麦克风设置"
+          }
+        }
+      }
+    },
+    "Open Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置…"
+          }
+        }
+      }
+    },
+    "Optional for gated models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受限模型选填"
+          }
+        }
+      }
+    },
+    "Optional. The Say It player and command-line tool do not use this API. It accepts requests only from this Mac and requires an access token.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可选项。Say It 播放器与命令行工具不使用此 API。该接口仅接受本机请求且需要访问令牌。"
+          }
+        }
+      }
+    },
+    "Other recommended model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他推荐模型"
+          }
+        }
+      }
+    },
+    "PREVIEW": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听预览"
+          }
+        }
+      }
+    },
+    "Passage to record": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待朗读文本"
+          }
+        }
+      }
+    },
+    "Pause": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停"
+          }
+        }
+      }
+    },
+    "Pause between paragraphs": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "段落间停顿"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已暂停"
+          }
+        }
+      }
+    },
+    "Pin": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "置顶"
+          }
+        }
+      }
+    },
+    "Play": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放"
+          }
+        }
+      }
+    },
+    "Play %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放 %@"
+          }
+        }
+      }
+    },
+    "Play preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放预览"
+          }
+        }
+      }
+    },
+    "Play recording": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放录音"
+          }
+        }
+      }
+    },
+    "Play sample": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放试听"
+          }
+        }
+      }
+    },
+    "Playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放"
+          }
+        }
+      }
+    },
+    "Playback compatibility is still being evaluated.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放兼容性仍在评估中。"
+          }
+        }
+      }
+    },
+    "Playback is unavailable until the background service connects": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务连接前暂无法播放"
+          }
+        }
+      }
+    },
+    "Playback position": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放进度"
+          }
+        }
+      }
+    },
+    "Playback speed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放倍速"
+          }
+        }
+      }
+    },
+    "Playback speed · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放倍速 · %@"
+          }
+        }
+      }
+    },
+    "Playback volume": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放音量"
+          }
+        }
+      }
+    },
+    "Playing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在播放"
+          }
+        }
+      }
+    },
+    "Port": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端口"
+          }
+        }
+      }
+    },
+    "Position Temperature": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位置温度"
+          }
+        }
+      }
+    },
+    "Prepare": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备"
+          }
+        }
+      }
+    },
+    "Preparing %@ download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备下载 %@"
+          }
+        }
+      }
+    },
+    "Preparing model download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备下载模型"
+          }
+        }
+      }
+    },
+    "Preparing speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备语音"
+          }
+        }
+      }
+    },
+    "Preparing speech…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备语音…"
+          }
+        }
+      }
+    },
+    "Preparing voice previews…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备音色预览…"
+          }
+        }
+      }
+    },
+    "Press the button and read the passage aloud.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按下按钮并大声朗读上方段落。"
+          }
+        }
+      }
+    },
+    "Press the button and speak naturally.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按下按钮并自然地说话。"
+          }
+        }
+      }
+    },
+    "Preview & Save": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听并保存"
+          }
+        }
+      }
+    },
+    "Preview selected voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听所选音色"
+          }
+        }
+      }
+    },
+    "Preview text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听文本"
+          }
+        }
+      }
+    },
+    "Preview the selected voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听所选音色"
+          }
+        }
+      }
+    },
+    "Private by design": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私优先设计"
+          }
+        }
+      }
+    },
+    "Private text to speech for your Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "专为您的 Mac 打造的私密本地文本朗读工具。"
+          }
+        }
+      }
+    },
+    "Quiet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声音偏小"
+          }
+        }
+      }
+    },
+    "Quit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出"
+          }
+        }
+      }
+    },
+    "READ ALOUD": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读文本"
+          }
+        }
+      }
+    },
+    "RECORD": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制"
+          }
+        }
+      }
+    },
+    "REFINE": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精细调整"
+          }
+        }
+      }
+    },
+    "Random": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机"
+          }
+        }
+      }
+    },
+    "Random voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机音色"
+          }
+        }
+      }
+    },
+    "Random voice every paragraph": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每段随机切换音色"
+          }
+        }
+      }
+    },
+    "Re-record": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新录制"
+          }
+        }
+      }
+    },
+    "Re-roll": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新随机"
+          }
+        }
+      }
+    },
+    "Re-roll creates a fresh voice with these settings. Save keeps this voice and applies them to future speech.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“重新随机”将按当前设置生成新声音；“保存音色”会保留该声音并在后续朗读中使用这些参数。"
+          }
+        }
+      }
+    },
+    "Re-roll with these settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用当前设置重新随机生成"
+          }
+        }
+      }
+    },
+    "Read Clipboard": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read Clipboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读剪贴板"
+          }
+        }
+      }
+    },
+    "Read It": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始朗读"
+          }
+        }
+      }
+    },
+    "Read Only": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅读取"
+          }
+        }
+      }
+    },
+    "Read clipboard": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读剪贴板"
+          }
+        }
+      }
+    },
+    "Read clipboard shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读剪贴板快捷键"
+          }
+        }
+      }
+    },
+    "Read diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取诊断信息"
+          }
+        }
+      }
+    },
+    "Read history": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取历史记录"
+          }
+        }
+      }
+    },
+    "Read models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取模型列表"
+          }
+        }
+      }
+    },
+    "Read only": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅读取"
+          }
+        }
+      }
+    },
+    "Read settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取设置"
+          }
+        }
+      }
+    },
+    "Read state": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取状态"
+          }
+        }
+      }
+    },
+    "Read voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取音色列表"
+          }
+        }
+      }
+    },
+    "Reads the clipboard once and speaks its text locally": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取一次剪贴板内容并在本地朗读"
+          }
+        }
+      }
+    },
+    "Ready to Listen": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备就绪"
+          }
+        }
+      }
+    },
+    "Ready to download %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备下载 %@"
+          }
+        }
+      }
+    },
+    "Ready to speak": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to speak"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备就绪"
+          }
+        }
+      }
+    },
+    "Ready: %@ seconds of usable audio": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已就绪：可用音频 %@ 秒"
+          }
+        }
+      }
+    },
+    "Recent": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近朗读"
+          }
+        }
+      }
+    },
+    "Recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐"
+          }
+        }
+      }
+    },
+    "Recommended for English speech with 37 preset voices, custom Phonon voice-file import, and offline streaming playback.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐用于英文朗读，内置 37 种预设音色，支持导入自定义 Phonon 音色文件及离线流式播放。"
+          }
+        }
+      }
+    },
+    "Recommended for dramatic, expressive speech; nine fun built-in speakers plus transcript-guided voice cloning.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐用于富有戏剧张力与表现力的朗读；内置 9 种特色说话人，并支持文本引导的音色克隆。"
+          }
+        }
+      }
+    },
+    "Recommended for high-quality voice cloning and strong generated voices; slower diffusion-based synthesis.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐用于高质量音色克隆与出色的人声生成；基于扩散模型，合成速度较慢。"
+          }
+        }
+      }
+    },
+    "Recommended for this Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐用于此 Mac"
+          }
+        }
+      }
+    },
+    "Reconnecting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在重新连接"
+          }
+        }
+      }
+    },
+    "Reconnecting background service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在重新连接后台服务"
+          }
+        }
+      }
+    },
+    "Reconnecting background service…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在重新连接后台服务…"
+          }
+        }
+      }
+    },
+    "Record": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制"
+          }
+        }
+      }
+    },
+    "Record %lld–%lld seconds; %lld–%lld works best.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Record %1$lld–%2$lld seconds; %3$lld–%4$lld works best."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可录制 %1$lld–%2$lld 秒，建议 %3$lld–%4$lld 秒效果最佳。"
+          }
+        }
+      }
+    },
+    "Record a short reference to create a voice profile.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制一段简短参考音频以创建专属音色。"
+          }
+        }
+      }
+    },
+    "Recording accepted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音可用"
+          }
+        }
+      }
+    },
+    "Recording guidance": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音指引"
+          }
+        }
+      }
+    },
+    "Recording problem: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音出现问题：%@"
+          }
+        }
+      }
+    },
+    "Recording — read the passage aloud, then stop.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在录音——请朗读上方段落，完成后停止。"
+          }
+        }
+      }
+    },
+    "Recording — speak naturally, then stop.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在录音——请自然说话，完成后停止。"
+          }
+        }
+      }
+    },
+    "Refinement": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色精细度"
+          }
+        }
+      }
+    },
+    "Regenerate": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成"
+          }
+        }
+      }
+    },
+    "Regenerate %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成 %@"
+          }
+        }
+      }
+    },
+    "Regenerate Samples": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新生成样本"
+          }
+        }
+      }
+    },
+    "Regenerate to hear and save these refinement changes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请重新生成以试听并保存调整后的效果。"
+          }
+        }
+      }
+    },
+    "Registration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "注册状态"
+          }
+        }
+      }
+    },
+    "Reinstall the model to hear changes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新安装该模型后即可试听调整效果。"
+          }
+        }
+      }
+    },
+    "Reinstall the model to use this voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新安装该模型后即可使用此音色"
+          }
+        }
+      }
+    },
+    "Release Notes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发行说明"
+          }
+        }
+      }
+    },
+    "Remove code blocks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除代码块"
+          }
+        }
+      }
+    },
+    "Rename": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名"
+          }
+        }
+      }
+    },
+    "Repetition": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复惩罚"
+          }
+        }
+      }
+    },
+    "Replay, export, or regenerate saved speech.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重播、导出或重新生成已保存的语音。"
+          }
+        }
+      }
+    },
+    "Repository": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型仓库"
+          }
+        }
+      }
+    },
+    "Rescan": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新扫描"
+          }
+        }
+      }
+    },
+    "Reset Defaults": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复默认"
+          }
+        }
+      }
+    },
+    "Reset to Defaults": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复默认设置"
+          }
+        }
+      }
+    },
+    "Restart Service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重启服务"
+          }
+        }
+      }
+    },
+    "Resume following the spoken text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复跟随朗读进度"
+          }
+        }
+      }
+    },
+    "Resume the download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续下载"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Retry the download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试下载"
+          }
+        }
+      }
+    },
+    "Reveal in Finder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在“访达”中显示"
+          }
+        }
+      }
+    },
+    "Revision": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分支 / 提交"
+          }
+        }
+      }
+    },
+    "Revoke": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "吊销"
+          }
+        }
+      }
+    },
+    "Revoke %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "吊销 %@"
+          }
+        }
+      }
+    },
+    "Revoke this access token?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定吊销此访问令牌？"
+          }
+        }
+      }
+    },
+    "Rewind interval": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快退间隔"
+          }
+        }
+      }
+    },
+    "Rules applied to selected, clipboard, and shared text before it reaches the model.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在文本发送给模型前，应用于选中文本、剪贴板和共享文本的清理规则。"
+          }
+        }
+      }
+    },
+    "Run Say It in the background": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在后台运行 Say It"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行中"
+          }
+        }
+      }
+    },
+    "SAVE TO MY VOICES": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存到我的音色"
+          }
+        }
+      }
+    },
+    "SPEAK NATURALLY": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自然口语"
+          }
+        }
+      }
+    },
+    "Sample sentence": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听例句"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        }
+      }
+    },
+    "Save Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存音色"
+          }
+        }
+      }
+    },
+    "Save as New Voice…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另存为新音色…"
+          }
+        }
+      }
+    },
+    "Saved": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存"
+          }
+        }
+      }
+    },
+    "Saved text and generated audio will be deleted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存的文本和生成的音频将被删除。"
+          }
+        }
+      }
+    },
+    "Say It": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
+    "Say It %@ is available": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It %@ 已可用"
+          }
+        }
+      }
+    },
+    "Say It can’t connect to its speech service. Restart it to continue.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 无法连接到语音后台服务。请重启服务以继续。"
+          }
+        }
+      }
+    },
+    "Say It couldn’t stop its background services. The update was canceled. Try again when active work has finished.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 无法停止后台服务，更新已取消。请在当前任务完成后重试。"
+          }
+        }
+      }
+    },
+    "Say It is restoring its connection automatically. This should only take a moment.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 正在自动恢复连接，请稍候片刻。"
+          }
+        }
+      }
+    },
+    "Say It records timings and stable error codes, never source text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 仅记录耗时与固定错误码，绝不记录源文本。"
+          }
+        }
+      }
+    },
+    "Say It resolves the revision to an immutable commit before downloading. Tokens are stored only in Keychain. Community models are untested and require license review.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 会在下载前将版本解析为不可变的提交哈希。令牌仅保存在钥匙串中。社区模型未经官方测试，使用前请先确认其许可协议。"
+          }
+        }
+      }
+    },
+    "Say It will download the update, stop active speech and recording, and restart automatically.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say It 将下载更新、停止正在进行的朗读与录音，并自动重启。"
+          }
+        }
+      }
+    },
+    "Search history": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索历史记录"
+          }
+        }
+      }
+    },
+    "Search models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索模型"
+          }
+        }
+      }
+    },
+    "Select text and use its shortcut, read the clipboard, or choose Services → Say It.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在任意应用中选中文本并按快捷键、朗读剪贴板，或选择“服务 → Say It”。"
+          }
+        }
+      }
+    },
+    "Selected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前使用"
+          }
+        }
+      }
+    },
+    "Selects this voice for speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择此音色用于朗读"
+          }
+        }
+      }
+    },
+    "Service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务"
+          }
+        }
+      }
+    },
+    "Service Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务设置…"
+          }
+        }
+      }
+    },
+    "Service stopped": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务已停止"
+          }
+        }
+      }
+    },
+    "Service update needs attention": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务更新需要注意"
+          }
+        }
+      }
+    },
+    "Service update required": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要更新后台服务"
+          }
+        }
+      }
+    },
+    "Service version": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务版本"
+          }
+        }
+      }
+    },
+    "Services fallback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务菜单备用方式"
+          }
+        }
+      }
+    },
+    "Services → Say It": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务 → Say It"
+          }
+        }
+      }
+    },
+    "Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置…"
+          }
+        }
+      }
+    },
+    "Shapes phoneme timing while generating new audio. Existing history is unchanged.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在生成新音频时调整音素节奏，不会影响已有历史记录。"
+          }
+        }
+      }
+    },
+    "Shortcuts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键"
+          }
+        }
+      }
+    },
+    "Show block separators in lyrics (debug)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在文本视图中显示分段分隔符（调试）"
+          }
+        }
+      }
+    },
+    "Show titles in system media controls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统媒体控制中显示标题"
+          }
+        }
+      }
+    },
+    "Shows the %@ list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开%@列表"
+          }
+        }
+      }
+    },
+    "Six curated description presets plus custom natural-language voice design. This checkpoint does not support reference-audio cloning.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置 6 种精选音色描述预设及自定义自然语言声音设计。此模型不支持参考音频克隆。"
+          }
+        }
+      }
+    },
+    "Slow": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "慢速"
+          }
+        }
+      }
+    },
+    "Slow generation and voices may sound unnatural.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成速度较慢，且声音可能略显不自然。"
+          }
+        }
+      }
+    },
+    "Slow generation with lower voice quality.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成速度较慢，音质较低。"
+          }
+        }
+      }
+    },
+    "Slower": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更慢"
+          }
+        }
+      }
+    },
+    "Small": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小型"
+          }
+        }
+      }
+    },
+    "Software Update": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "软件更新"
+          }
+        }
+      }
+    },
+    "Sparkle": {
+      "shouldTranslate": false
+    },
+    "Speak naturally about any topic in a clear, steady voice. Use one speaker and avoid background noise.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请用清晰平稳的声音自然谈论任意话题。仅限单人说话，并尽量避免环境噪音。"
+          }
+        }
+      }
+    },
+    "Speak selected text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读选中文本"
+          }
+        }
+      }
+    },
+    "Speak selected text shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读选中文本快捷键"
+          }
+        }
+      }
+    },
+    "Speaking pace": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合成语速"
+          }
+        }
+      }
+    },
+    "Speaking pace is generated into new audio. Playback speed changes listening instantly.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "合成语速会直接写入新生成的音频；播放倍速则可随时即时调节。"
+          }
+        }
+      }
+    },
+    "Speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音"
+          }
+        }
+      }
+    },
+    "Speech Control": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音控制"
+          }
+        }
+      }
+    },
+    "Speech and playback are unavailable until the service is turned on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在开启后台服务前，语音合成与播放功能暂不可用。"
+          }
+        }
+      }
+    },
+    "Speech control": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音控制"
+          }
+        }
+      }
+    },
+    "Spoken items appear here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读过的内容会显示在这里。"
+          }
+        }
+      }
+    },
+    "Spoken text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "朗读文本"
+          }
+        }
+      }
+    },
+    "Start recording": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始录音"
+          }
+        }
+      }
+    },
+    "Start with a tested voice model, or set one up later in Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "您可以先从经过测试的语音模型开始，或稍后在“设置”中配置。"
+          }
+        }
+      }
+    },
+    "Starting %@ download": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在开始下载 %@"
+          }
+        }
+      }
+    },
+    "Starting download…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在开始下载…"
+          }
+        }
+      }
+    },
+    "Starting service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在启动服务"
+          }
+        }
+      }
+    },
+    "Starting…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在启动…"
+          }
+        }
+      }
+    },
+    "Status": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Step %1$lld of %2$lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld / %2$lld 步"
+          }
+        }
+      }
+    },
+    "Step %lld of 3, %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Step %1$lld of 3, %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld / 3 步：%2$@"
+          }
+        }
+      }
+    },
+    "Stop playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止播放"
+          }
+        }
+      }
+    },
+    "Stop preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止试听"
+          }
+        }
+      }
+    },
+    "Stop recording": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止录音"
+          }
+        }
+      }
+    },
+    "Stop recording playback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止播放录音"
+          }
+        }
+      }
+    },
+    "Stop sample": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止试听"
+          }
+        }
+      }
+    },
+    "Stop voice preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止音色试听"
+          }
+        }
+      }
+    },
+    "Stopping background services…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止后台服务…"
+          }
+        }
+      }
+    },
+    "Stopping service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止服务"
+          }
+        }
+      }
+    },
+    "Strip HTML tags": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去除 HTML 标签"
+          }
+        }
+      }
+    },
+    "Strip Markdown formatting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去除 Markdown 格式"
+          }
+        }
+      }
+    },
+    "Strip special characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去除特殊字符"
+          }
+        }
+      }
+    },
+    "Submit speech": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提交朗读任务"
+          }
+        }
+      }
+    },
+    "Suggest a different name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "换一个随机名称"
+          }
+        }
+      }
+    },
+    "Surprise me — random settings for every voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机惊喜——为每个音色随机参数"
+          }
+        }
+      }
+    },
+    "Switch the speech model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换语音模型"
+          }
+        }
+      }
+    },
+    "Switching model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在切换模型"
+          }
+        }
+      }
+    },
+    "Temperature": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "采样温度"
+          }
+        }
+      }
+    },
+    "Test Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听音色"
+          }
+        }
+      }
+    },
+    "Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "纯文本"
+          }
+        }
+      }
+    },
+    "Text and generated audio stay local. Network access is used only for model downloads and software updates. Say It and MLX Audio Swift are distributed under the MIT License.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本和生成的音频均保留在本地。仅在下载模型和检查软件更新时连接网络。Say It 与 MLX Audio Swift 均基于 MIT 协议发布。"
+          }
+        }
+      }
+    },
+    "Text block size": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本分块大小"
+          }
+        }
+      }
+    },
+    "Text cleanup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本清理"
+          }
+        }
+      }
+    },
+    "Text, tokens, filenames, and local paths are excluded.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不包含原文、令牌、文件名或本地路径。"
+          }
+        }
+      }
+    },
+    "That shortcut is already in use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该快捷键已被占用。"
+          }
+        }
+      }
+    },
+    "The Control–Option–S shortcut is already in use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键 Control–Option–S 已被占用。"
+          }
+        }
+      }
+    },
+    "The Control–Option–V shortcut is already in use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键 Control–Option–V 已被占用。"
+          }
+        }
+      }
+    },
+    "The background service could not be registered in time. Try restarting Say It.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务未能及时完成注册，请尝试重启 Say It。"
+          }
+        }
+      }
+    },
+    "The background service does not match this version of Say It.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务与当前版本的 Say It 不匹配。"
+          }
+        }
+      }
+    },
+    "The background service is not ready. Try again in a moment.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务尚未就绪，请稍后再试。"
+          }
+        }
+      }
+    },
+    "The background service must be connected to manage models.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必须连接后台服务后才能管理模型。"
+          }
+        }
+      }
+    },
+    "The command-line tool is missing from this build.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此构建中缺少命令行工具。"
+          }
+        }
+      }
+    },
+    "The frontmost app did not expose a readable text selection.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最前方的应用未提供可读取的文本选区。"
+          }
+        }
+      }
+    },
+    "The imported voice file will be removed. Existing history audio stays available.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已导入的音色文件将被移除，但已有历史音频仍可继续播放。"
+          }
+        }
+      }
+    },
+    "The local API was turned off. %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 API 已关闭。%@"
+          }
+        }
+      }
+    },
+    "The microphone changed audio format while recording. Wait for it to reconnect, then record again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音过程中麦克风音频格式发生变化。请等待其重新连接后再试。"
+          }
+        }
+      }
+    },
+    "The microphone recording could not be saved. Check available disk space and try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存麦克风录音。请检查可用磁盘空间后重试。"
+          }
+        }
+      }
+    },
+    "The microphone supplied an unsupported audio format. Reconnect it, wait a moment, and record again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "麦克风提供了不受支持的音频格式。请重新连接后稍等片刻再试。"
+          }
+        }
+      }
+    },
+    "The older service could not be unregistered in time. Try restarting Say It.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "旧版后台服务未能及时注销，请尝试重启 Say It。"
+          }
+        }
+      }
+    },
+    "The recording and generated voice stay on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录音与生成的音色均保存在本机。"
+          }
+        }
+      }
+    },
+    "The reference recording will be removed. Existing history audio stays available.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考录音将被移除，但已有历史音频仍可继续播放。"
+          }
+        }
+      }
+    },
+    "The secret is shown once. Say It stores only a one-way digest.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥仅显示一次，Say It 仅保存其单向摘要。"
+          }
+        }
+      }
+    },
+    "The selected model does not expose native speaking pace. New audio uses its natural pace.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选模型不支持原生合成语速调节，新音频将使用自然语速。"
+          }
+        }
+      }
+    },
+    "The selected-text helper could not restart. Try reading selected text again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本助手未能重启，请重新尝试朗读选中文本。"
+          }
+        }
+      }
+    },
+    "The selected-text helper couldn’t be registered. Install the latest Say It build in Applications, then quit and reopen it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法注册选中文本助手。请将最新版 Say It 安装到“应用程序”文件夹，然后退出并重新打开。"
+          }
+        }
+      }
+    },
+    "The selected-text helper is unavailable.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本助手不可用。"
+          }
+        }
+      }
+    },
+    "The selection is longer than the %@ character safety limit.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本长度超过了 %@ 个字符的安全限制。"
+          }
+        }
+      }
+    },
+    "The selection shortcut reads the frontmost app only when pressed and requires Accessibility access. Clipboard and Services remain available without it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本快捷键仅在按下时读取当前应用选区，需要“辅助功能”权限；剪贴板与系统“服务”菜单无需此权限即可使用。"
+          }
+        }
+      }
+    },
+    "The service returned an invalid event response.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务返回了无效的事件响应。"
+          }
+        }
+      }
+    },
+    "The service returned an invalid state snapshot.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务返回了无效的状态快照。"
+          }
+        }
+      }
+    },
+    "The service still doesn’t match this app. Quit other copies of Say It, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务版本仍与当前应用不匹配。请退出其他正在运行的 Say It 实例后重试。"
+          }
+        }
+      }
+    },
+    "The update couldn’t be verified. Your installed app is unchanged. Check for updates again to retry the download.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法验证更新，当前已安装的应用未受影响。请重新检查更新以重试下载。"
+          }
+        }
+      }
+    },
+    "The updater could not start. Reopen Say It to try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新程序无法启动，请重新打开 Say It 再试。"
+          }
+        }
+      }
+    },
+    "The voice could not be imported.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法导入该音色。"
+          }
+        }
+      }
+    },
+    "The voice file is too large.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色文件过大。"
+          }
+        }
+      }
+    },
+    "The “sayit” command does not point to this app and was left untouched.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“sayit” 命令并非指向当前应用，已保持原样未作改动。"
+          }
+        }
+      }
+    },
+    "These voices stay in your library. Reinstall the model to use them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些音色仍保留在您的音色库中，重新安装对应模型后即可使用。"
+          }
+        }
+      }
+    },
+    "This is a long read": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是一段较长的文本"
+          }
+        }
+      }
+    },
+    "This permanently deletes saved text and generated audio.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此操作将永久删除已保存的文本和生成的音频。"
+          }
+        }
+      }
+    },
+    "This voice is selected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前已选中此音色"
+          }
+        }
+      }
+    },
+    "Time Shift": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间偏移"
+          }
+        }
+      }
+    },
+    "Token name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "令牌名称"
+          }
+        }
+      }
+    },
+    "Too loud": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量过大"
+          }
+        }
+      }
+    },
+    "Top K": {
+      "shouldTranslate": false
+    },
+    "Top P": {
+      "shouldTranslate": false
+    },
+    "Try Again": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Tune how this voice is performed. Preview your changes, then apply them or keep a copy.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调整该音色的表现风格。可先试听调整效果，再决定应用更改或保存副本。"
+          }
+        }
+      }
+    },
+    "Turn On": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启服务"
+          }
+        }
+      }
+    },
+    "Twenty-three languages, but current generation and cross-language cloning are unreliable and may sound unnatural.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持 23 种语言，但当前语音生成与跨语种克隆稳定性不足，声音可能不够自然。"
+          }
+        }
+      }
+    },
+    "Type shortcut…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请按下快捷键…"
+          }
+        }
+      }
+    },
+    "Unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "Unavailable in this version": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前版本不可用"
+          }
+        }
+      }
+    },
+    "Unavailable until the background service connects": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台服务连接前暂不可用"
+          }
+        }
+      }
+    },
+    "Uninstall": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卸载"
+          }
+        }
+      }
+    },
+    "Uninstall the “sayit” command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卸载 “sayit” 命令"
+          }
+        }
+      }
+    },
+    "Unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知"
+          }
+        }
+      }
+    },
+    "Unlimited generated voices and voice cloning.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持无限随机音色生成及音色克隆。"
+          }
+        }
+      }
+    },
+    "Unload model after inactivity": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空闲后自动卸载模型"
+          }
+        }
+      }
+    },
+    "Unpin": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消置顶"
+          }
+        }
+      }
+    },
+    "Up to date": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已是最新版本"
+          }
+        }
+      }
+    },
+    "Update Now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即更新"
+          }
+        }
+      }
+    },
+    "Update Now…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即更新…"
+          }
+        }
+      }
+    },
+    "Update Voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新音色"
+          }
+        }
+      }
+    },
+    "Update available. %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有可用更新。%@"
+          }
+        }
+      }
+    },
+    "Update failed. Try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新失败，请重试。"
+          }
+        }
+      }
+    },
+    "Update feed is not configured": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未配置更新源"
+          }
+        }
+      }
+    },
+    "Update required": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要更新"
+          }
+        }
+      }
+    },
+    "Updates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "软件更新"
+          }
+        }
+      }
+    },
+    "Updates are unavailable in development builds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开发构建版不支持自动更新"
+          }
+        }
+      }
+    },
+    "Updating voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在更新音色"
+          }
+        }
+      }
+    },
+    "Use": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用"
+          }
+        }
+      }
+    },
+    "Use %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 %@"
+          }
+        }
+      }
+    },
+    "Use %@?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定使用 %@？"
+          }
+        }
+      }
+    },
+    "Use Model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用此模型"
+          }
+        }
+      }
+    },
+    "Use Say It anywhere": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随时随地使用 Say It"
+          }
+        }
+      }
+    },
+    "Use voice %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用音色 %@"
+          }
+        }
+      }
+    },
+    "VALIDATION SAMPLES": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "验证样本"
+          }
+        }
+      }
+    },
+    "Verifying and preparing update…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在校验并准备更新…"
+          }
+        }
+      }
+    },
+    "Version %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %@"
+          }
+        }
+      }
+    },
+    "Very quiet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量过小"
+          }
+        }
+      }
+    },
+    "View All History…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看全部历史记录…"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色"
+          }
+        }
+      }
+    },
+    "Voice actions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色操作"
+          }
+        }
+      }
+    },
+    "Voice candidate %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "候选音色 %@"
+          }
+        }
+      }
+    },
+    "Voice character": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色特征"
+          }
+        }
+      }
+    },
+    "Voice creation is available once playback is paused or stopped.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在暂停或停止播放后再创建音色。"
+          }
+        }
+      }
+    },
+    "Voice description": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色描述"
+          }
+        }
+      }
+    },
+    "Voice generation": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音生成"
+          }
+        }
+      }
+    },
+    "Voice model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音模型"
+          }
+        }
+      }
+    },
+    "Voice name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色名称"
+          }
+        }
+      }
+    },
+    "Voice preview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色试听"
+          }
+        }
+      }
+    },
+    "Voices": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色"
+          }
+        }
+      }
+    },
+    "Voicing the same sentence four ways…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在用四种声线朗读同一句话…"
+          }
+        }
+      }
+    },
+    "WAV Audio": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WAV 音频"
+          }
+        }
+      }
+    },
+    "Waiting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待中"
+          }
+        }
+      }
+    },
+    "Waiting for microphone permission…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待麦克风权限…"
+          }
+        }
+      }
+    },
+    "Waiting for shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待输入快捷键"
+          }
+        }
+      }
+    },
+    "Welcome to Say It": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "欢迎使用 Say It"
+          }
+        }
+      }
+    },
+    "Working": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "处理中"
+          }
+        }
+      }
+    },
+    "Working…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "处理中…"
+          }
+        }
+      }
+    },
+    "You can keep using Say It while the update downloads.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载更新期间您仍可继续使用 Say It。"
+          }
+        }
+      }
+    },
+    "You have Say It %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前已安装 Say It %@。"
+          }
+        }
+      }
+    },
+    "Your text and generated audio stay on this Mac. Say It connects only when you download a model or check for an update.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "您的文本和生成的音频均保存在本机。Say It 仅在下载模型或检查更新时连接网络。"
+          }
+        }
+      }
+    },
+    "main": {
+      "shouldTranslate": false
+    },
+    "owner/repository": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户名/仓库名"
+          }
+        }
+      }
+    },
+    "voice model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音模型"
+          }
+        }
+      }
+    },
+    "·": {
+      "shouldTranslate": false
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

@@ -21,7 +21,12 @@ struct PhononVoiceImportSheet: View {
                 .font(.title2.weight(.semibold))
             Text("Choose a voice file exported using “Download for Phonon” in Gradium. Say It saves its own copy for offline use.")
                 .foregroundStyle(.secondary)
-            Button(filename.isEmpty ? "Choose Voice File…" : "Choose Another File…", action: chooseFile)
+            Button(
+                filename.isEmpty
+                    ? String(localized: "Choose Voice File…")
+                    : String(localized: "Choose Another File…"),
+                action: chooseFile
+            )
                 .disabled(isImporting)
             if !filename.isEmpty {
                 Text(filename)
@@ -70,12 +75,12 @@ struct PhononVoiceImportSheet: View {
             guard url.pathExtension.lowercased() == "safetensors",
                   let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
                   (1...8 * 1024 * 1024).contains(size) else {
-                errorMessage = "Choose a Phonon .safetensors voice file no larger than 8 MB."
+                errorMessage = String(localized: "Choose a Phonon .safetensors voice file no larger than 8 MB.")
                 return
             }
             let contents = try Data(contentsOf: url)
             guard contents.count <= 8 * 1024 * 1024 else {
-                errorMessage = "The voice file is too large."
+                errorMessage = String(localized: "The voice file is too large.")
                 return
             }
             data = contents
@@ -100,7 +105,8 @@ struct PhononVoiceImportSheet: View {
             if imported {
                 dismiss()
             } else {
-                errorMessage = state.errorMessage ?? "The voice could not be imported."
+                errorMessage = state.errorMessage
+                    ?? String(localized: "The voice could not be imported.")
             }
         }
     }

@@ -96,7 +96,9 @@ final class SelectionServiceController {
             try await verifyXPCConnection()
             UserDefaults.standard.removeObject(forKey: "restoreSelectionAfterUpdate")
         } catch {
-            errorMessage = "The selected-text helper could not restart. Try reading selected text again."
+            errorMessage = String(
+                localized: "The selected-text helper could not restart. Try reading selected text again."
+            )
         }
     }
 

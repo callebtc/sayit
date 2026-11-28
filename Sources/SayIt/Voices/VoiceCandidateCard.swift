@@ -94,7 +94,7 @@ struct VoiceCandidateCard: View {
                     ForEach(parameters, id: \.key) { parameter in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(parameter.title)
+                                Text(parameter.localizedTitle)
                                     .font(.callout)
                                 Spacer()
                                 Text(
@@ -113,7 +113,7 @@ struct VoiceCandidateCard: View {
                                 step: parameter.step
                             )
                             .controlSize(.small)
-                            .accessibilityLabel(parameter.title)
+                            .accessibilityLabel(parameter.localizedTitle)
                         }
                     }
                     Label(
@@ -132,7 +132,11 @@ struct VoiceCandidateCard: View {
                         .contentTransition(.symbolEffect(.replace.offUp))
                 }
                 .buttonStyle(CircularIconButtonStyle(size: 30, prominent: isPlayingThis))
-                .accessibilityLabel(isPlayingThis ? "Stop sample" : "Play sample")
+                .accessibilityLabel(
+                    isPlayingThis
+                        ? String(localized: "Stop sample")
+                        : String(localized: "Play sample")
+                )
 
                 if isRerolling {
                     ProgressView()
@@ -143,7 +147,9 @@ struct VoiceCandidateCard: View {
 
                 Button(action: save) {
                     Label(
-                        isSaved ? "Saved" : "Save Voice",
+                        isSaved
+                            ? String(localized: "Saved")
+                            : String(localized: "Save Voice"),
                         systemImage: isSaved ? "checkmark" : "plus"
                     )
                     .font(.callout.weight(.medium))
@@ -169,7 +175,7 @@ struct VoiceCandidateCard: View {
         parameters.map { parameter in
             let value = tuning.parameters[parameter.key]
                 ?? parameter.range.lowerBound
-            return "\(parameter.title) \(value.formatted(.number.precision(.fractionLength(parameter.step >= 1 ? 0 : 2))))"
+            return "\(parameter.localizedTitle) \(value.formatted(.number.precision(.fractionLength(parameter.step >= 1 ? 0 : 2))))"
         }
         .joined(separator: " · ")
     }

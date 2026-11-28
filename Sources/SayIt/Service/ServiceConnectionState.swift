@@ -11,17 +11,17 @@ enum ServiceConnectionState: Equatable {
     var label: String {
         switch self {
         case .disabled:
-            "Disabled"
+            String(localized: "Disabled")
         case .connecting:
-            "Connecting"
+            String(localized: "Connecting")
         case .recovering:
-            "Reconnecting"
+            String(localized: "Reconnecting")
         case .online:
-            "Connected"
+            String(localized: "Connected")
         case .offline:
-            "Unavailable"
+            String(localized: "Unavailable")
         case .updateRequired:
-            "Update required"
+            String(localized: "Update required")
         }
     }
 

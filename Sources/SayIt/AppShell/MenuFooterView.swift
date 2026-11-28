@@ -55,8 +55,8 @@ struct MenuFooterView: View {
         .accessibilityLabel(modelLabel)
         .help(
             modelLabel + "\n" + (displayedModelID == state.settings.activeModelID
-                ? "Switch the speech model"
-                : "Model used for this audio. Pick another model to re-synthesize.")
+                ? String(localized: "Switch the speech model")
+                : String(localized: "Model used for this audio. Pick another model to re-synthesize."))
         )
     }
 
@@ -97,14 +97,14 @@ struct MenuFooterView: View {
             }?.displayName
         case .automaticStable:
             if model?.capabilities.supportsRandomVoiceSampling == true {
-                voiceName = "Random voice"
+                voiceName = String(localized: "Random voice")
             } else if model?.capabilities.voiceDescription == true {
-                voiceName = "Custom description"
+                voiceName = String(localized: "Custom description")
             } else {
-                voiceName = "Automatic"
+                voiceName = String(localized: "Automatic")
             }
         case .randomPerParagraph:
-            voiceName = "Random voice every paragraph"
+            voiceName = String(localized: "Random voice every paragraph")
         }
         guard let voiceName, !voiceName.isEmpty else { return name }
         return "\(name) · \(voiceName)"

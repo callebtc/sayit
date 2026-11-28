@@ -15,8 +15,8 @@ struct VoiceSelectionPicker: View {
                 if !model.capabilities.supportsRandomVoiceSampling {
                     Text(
                         model.capabilities.voiceDescription
-                            ? "Custom description"
-                            : "Automatic"
+                            ? String(localized: "Custom description")
+                            : String(localized: "Automatic")
                     )
                         .tag(VoiceSelection.automaticStable)
                 }
@@ -50,11 +50,13 @@ struct VoiceSelectionPicker: View {
             .disabled(!canPreview)
             .help(
                 canPreview
-                    ? "Preview the selected voice"
-                    : "Install the model to preview its voices"
+                    ? String(localized: "Preview the selected voice")
+                    : String(localized: "Install the model to preview its voices")
             )
             .accessibilityLabel(
-                isPreviewBusy ? "Stop voice preview" : "Preview selected voice"
+                isPreviewBusy
+                    ? String(localized: "Stop voice preview")
+                    : String(localized: "Preview selected voice")
             )
         }
     }

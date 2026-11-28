@@ -31,7 +31,7 @@ struct ModelRowView: View {
                 Text(modelSummary)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                if let note = model.experience?.note {
+                if let note = model.experience?.localizedNote {
                     Text(note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -137,7 +137,7 @@ struct ModelRowView: View {
         .help(
             state.isServiceOnline
                 ? ""
-                : "The background service must be connected to manage models."
+                : String(localized: "The background service must be connected to manage models.")
         )
         .accessibilityElement(children: .contain)
     }
@@ -164,19 +164,20 @@ struct ModelRowView: View {
         let languageCount = model.languages.count
         let languages = languageCount == 1
             ? model.languages[0].uppercased()
-            : "\(languageCount) languages"
+            : String(localized: "\(languageCount) languages")
         if let experience = model.experience {
-            return "\(experience.size.displayName) model · "
-                + "\(experience.speed.displayName) · \(languages)"
+            return String(
+                localized: "\(experience.size.localizedDisplayName) model · \(experience.speed.localizedDisplayName) · \(languages)"
+            )
         }
         return "\(model.family) · \(model.quantization) · \(languages)"
     }
 
     private var suitabilityLabel: String {
         switch HardwareAdvisor().suitability(for: model) {
-        case .recommended: "Recommended for this Mac"
-        case .mayBeSlow: "May be slow"
-        case .notRecommended: "Not recommended for this Mac"
+        case .recommended: String(localized: "Recommended for this Mac")
+        case .mayBeSlow: String(localized: "May be slow")
+        case .notRecommended: String(localized: "Not recommended for this Mac")
         }
     }
 

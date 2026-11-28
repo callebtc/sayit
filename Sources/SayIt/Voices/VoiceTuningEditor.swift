@@ -60,7 +60,7 @@ struct VoiceTuningEditor: View {
                     ForEach(parameters, id: \.key) { parameter in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(parameter.title)
+                                Text(parameter.localizedTitle)
                                     .font(.callout)
                                 Spacer()
                                 Text(
@@ -79,7 +79,7 @@ struct VoiceTuningEditor: View {
                                 step: parameter.step
                             )
                             .controlSize(.small)
-                            .accessibilityLabel(parameter.title)
+                            .accessibilityLabel(parameter.localizedTitle)
                         }
                     }
                 }
@@ -122,6 +122,13 @@ struct VoiceTuningEditor: View {
 
 private extension VoiceTuningPreset {
     var title: String {
-        rawValue.capitalized
+        switch self {
+        case .faithful:
+            String(localized: "Faithful")
+        case .natural:
+            String(localized: "Natural")
+        case .expressive:
+            String(localized: "Expressive")
+        }
     }
 }

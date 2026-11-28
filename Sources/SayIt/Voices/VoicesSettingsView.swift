@@ -331,8 +331,8 @@ struct VoicesSettingsView: View {
     }
 
     private func creationRow(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
         icon: String,
         action: @escaping () -> Void
     ) -> some View {

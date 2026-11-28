@@ -51,8 +51,8 @@ struct ModelsSettingsView: View {
                         CollapsibleModelSection(
                             isExpanded: $isExperimentalExpanded,
                             models: experimentalModels,
-                            title: "Experimental models",
-                            detail: "May be slow, glitchy, or produce lower-quality speech",
+                            title: String(localized: "Experimental models"),
+                            detail: String(localized: "May be slow, glitchy, or produce lower-quality speech"),
                             tint: .orange
                         )
                     }
@@ -69,8 +69,8 @@ struct ModelsSettingsView: View {
                         CollapsibleModelSection(
                             isExpanded: $isUnsupportedExpanded,
                             models: unsupportedModels,
-                            title: "Not supported",
-                            detail: "Models that cannot run in this version",
+                            title: String(localized: "Not supported"),
+                            detail: String(localized: "Models that cannot run in this version"),
                             tint: .gray
                         )
                     }
@@ -146,7 +146,12 @@ struct ModelsSettingsView: View {
                 || ($0.experience?.note?.localizedStandardContains(
                     searchQuery
                 ) ?? false)
+                || ($0.experience?.localizedNote?.localizedStandardContains(
+                    searchQuery
+                ) ?? false)
                 || ($0.experience?.speed.displayName
+                    .localizedStandardContains(searchQuery) ?? false)
+                || ($0.experience?.speed.localizedDisplayName
                     .localizedStandardContains(searchQuery) ?? false)
                 || $0.languages.contains {
                     $0.localizedStandardContains(searchQuery)
