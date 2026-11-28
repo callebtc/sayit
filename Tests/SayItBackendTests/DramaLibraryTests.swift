@@ -99,6 +99,29 @@ struct DramaLibraryTests {
         #expect(remaining[0].count == deadAirTail.count)
     }
 
+    @Test("Drama flat-hiss check overlap-aligns short trailing remainders across 12, 22, and 23 frames")
+    func flatHissShortTrailingRemainder() throws {
+        // 12, 22, and 23 Drama frames (2048 samples/frame) leave remainders
+        // shorter than two 50 ms sub-windows (4410 samples) after 0.5 s slices.
+        for frameCount in [12, 22, 23] {
+            let steadyHiss = [Float](repeating: 0.01, count: frameCount * 2_048)
+            #expect(!DramaLibraryModel.pieceContainsVoicedAudio(steadyHiss))
+
+            var gate = DramaLibraryModel.StreamVoicingGate()
+            #expect(try gate.receive(samples: steadyHiss, cappedChunks: 0, silencedChunks: 0).isEmpty)
+            do {
+                _ = try gate.receive(samples: [], cappedChunks: 0, silencedChunks: 1)
+                Issue.record("Expected Drama3Error.generationLimit for \(frameCount)-frame hiss")
+            } catch Drama3Error.generationLimit {}
+        }
+
+        // A dynamic voiced burst sitting inside the short trailing remainder
+        // must still be detected as voiced.
+        let silentLead = [Float](repeating: 0, count: 22_050)
+        let trailingVoicedBurst = [Float](repeating: 0.05, count: 12 * 2_048 - 22_050)
+        #expect(DramaLibraryModel.pieceContainsVoicedAudio(silentLead + trailingVoicedBurst))
+    }
+
     @Test("Installed Q4 streams finite speech and recovers after cancellation")
     func installedQ4() async throws {
         let environment = ProcessInfo.processInfo.environment

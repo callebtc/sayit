@@ -192,6 +192,132 @@ struct SynthesisActorTests {
             ) == .none
         )
     }
+
+    @Test("Qwen3 conditioning cache only stores persistent saved profiles")
+    func qwen3ConditioningCachePolicy() {
+        #expect(SynthesisActor.shouldCacheQwen3Conditioning(voiceMode: .savedProfile))
+        #expect(!SynthesisActor.shouldCacheQwen3Conditioning(voiceMode: .automaticStable))
+        #expect(!SynthesisActor.shouldCacheQwen3Conditioning(voiceMode: .standard))
+        #expect(!SynthesisActor.shouldCacheQwen3Conditioning(voiceMode: .randomPerParagraph))
+    }
+
+    @Test("Pre-cancelled synthesis or voice-sample caller does not preempt active operation")
+    func preCancelledCallerDoesNotPreemptActiveOperation() async throws {
+        let gate = SynthesisActorCancellationGate()
+        let synthesizer = SynthesisActor { _ in
+            await gate.wait()
+            return nil
+        }
+        let model = try #require(
+            ModelCatalogLoader().bundledCatalog().models.first
+        )
+        let request = SpeechRequest(
+            cleanedText: CleanedText(
+                text: "Active request.",
+                title: "Active request",
+                detectedLanguage: "en",
+                cleanupSummary: CleanupSummary(sourceFormat: "plainText"),
+                requiresLongTextConfirmation: false
+            ),
+            model: model,
+            voice: model.defaultVoice,
+            language: model.defaultLanguage,
+            source: .frontend
+        )
+
+        let activeStream = await synthesizer.synthesize(request)
+        let activeTask = Task { () -> Bool in
+            do {
+                for try await _ in activeStream {}
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }
+        await gate.waitUntilEntered()
+
+        let cancelledSynthTask = Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            let stream = await synthesizer.synthesize(request)
+            do {
+                for try await _ in stream {}
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }
+        #expect(await cancelledSynthTask.value)
+
+        let cancelledSampleTask = Task { () -> Bool in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await synthesizer.generateVoiceSample(
+                    model: model,
+                    text: "Sample",
+                    language: model.defaultLanguage,
+                    tuning: VoiceSynthesisTuning(preset: "natural", parameters: [:]),
+                    seed: 1
+                )
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }
+        #expect(await cancelledSampleTask.value)
+
+        // The original operation must still be running, uncancelled.
+        #expect(!(await gate.observedCancellation))
+        await gate.release()
+        #expect(!(await activeTask.value))
+    }
+}
+
+private actor SynthesisActorCancellationGate {
+    private var entered = false
+    private var released = false
+    private(set) var observedCancellation = false
+    private var enterWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        entered = true
+        for waiter in enterWaiters { waiter.resume() }
+        enterWaiters.removeAll()
+        if released { return }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if released {
+                    continuation.resume()
+                } else {
+                    releaseWaiters.append(continuation)
+                }
+            }
+        } onCancel: {
+            Task { await self.markCancelled() }
+        }
+    }
+
+    private func markCancelled() {
+        observedCancellation = true
+        release()
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enterWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        for waiter in releaseWaiters { waiter.resume() }
+        releaseWaiters.removeAll()
+    }
 }
 
 private actor ModelIDRecorder {

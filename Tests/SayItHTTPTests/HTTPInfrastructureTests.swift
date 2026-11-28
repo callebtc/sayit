@@ -343,6 +343,7 @@ private final class HTTPBackendFixture {
 private final class HTTPTestPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
     var onExternalControl: (@MainActor () -> Void)?
+    var onStopRequested: (@MainActor () -> Void)?
     var onStateChange: (@MainActor (PlaybackState) -> Void)?
     private(set) var state: PlaybackState = .idle {
         didSet {

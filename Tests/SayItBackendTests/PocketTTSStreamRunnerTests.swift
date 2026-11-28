@@ -16,6 +16,27 @@ struct PocketTTSStreamRunnerTests {
         #expect(PocketTTSStreamRunner.cacheCapacity(forTotalLength: 1025) == 1280)
     }
 
+    @Test("Streaming flush plan ramps 2 -> 8 -> 8 -> 32 frames while preserving cold 18-frame threshold")
+    func streamingFlushPlanRamp() {
+        let fast = PocketTTSStreamRunner.flushPlan(streamingInterval: 0.32, frameRate: 12.5)
+        #expect(fast.firstFlushFrames == 2)
+        #expect(fast.secondFlushFrames == 8)
+        #expect(fast.thirdFlushFrames == 8)
+        #expect(fast.steadyBatchFrames == 32)
+        #expect(fast.synchronousFlushes == 3)
+        #expect(fast.firstFlushFrames + fast.secondFlushFrames + fast.thirdFlushFrames == 18)
+        #expect(fast.targetBatchFrames(emittedFlushes: 0) == 2)
+        #expect(fast.targetBatchFrames(emittedFlushes: 1) == 8)
+        #expect(fast.targetBatchFrames(emittedFlushes: 2) == 8)
+        #expect(fast.targetBatchFrames(emittedFlushes: 3) == 32)
+
+        let longInterval = PocketTTSStreamRunner.flushPlan(streamingInterval: 2.0, frameRate: 12.5)
+        #expect(longInterval.firstFlushFrames == 25)
+        #expect(longInterval.secondFlushFrames == 25)
+        #expect(longInterval.steadyBatchFrames == 32)
+        #expect(longInterval.synchronousFlushes == 2)
+    }
+
     @Test("Voice file cache refreshes on miss after new voices are installed")
     func voiceFileCacheRefreshesOnMiss() throws {
         let root = FileManager.default.temporaryDirectory

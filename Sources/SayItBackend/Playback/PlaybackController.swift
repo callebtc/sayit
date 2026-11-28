@@ -75,6 +75,9 @@ final class PlaybackController: BackendPlaybackControlling {
     var onExternalControl: (@MainActor () -> Void)?
 
     @ObservationIgnored
+    var onStopRequested: (@MainActor () -> Void)?
+
+    @ObservationIgnored
     var onStateChange: (@MainActor (PlaybackState) -> Void)?
 
     private(set) var state: PlaybackState = .idle {
@@ -98,7 +101,8 @@ final class PlaybackController: BackendPlaybackControlling {
     private var synthesisProgress: SynthesisProgress?
     private var completedSynthesisChunkIndex = -1
     var shouldStartWhenBuffered: Bool {
-        guard state == .preparing || state == .buffering else {
+        guard state == .preparing || state == .buffering,
+              !audioGraphNeedsReconfiguration else {
             return false
         }
         if let synthesisProgress,
@@ -221,8 +225,10 @@ final class PlaybackController: BackendPlaybackControlling {
         synthesisProgress = nil
         generatedDuration = Double(pcmStore.frameCount) / sampleRate
         appendAmplitudeSamples(chunk.samples)
-        try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
-        try scheduleAvailableAudio()
+        if !audioGraphNeedsReconfiguration {
+            try prepareAudioGraph(for: monoFormat(sampleRate: sampleRate))
+            try scheduleAvailableAudio()
+        }
         let stateChanged = state == .preparing
         if state == .preparing || state == .buffering {
             state = .buffering
@@ -418,12 +424,12 @@ final class PlaybackController: BackendPlaybackControlling {
     func finishBuffering() {
         synthesisIsComplete = true
         estimatedDuration = generatedDuration
-        if state == .buffering {
-            play()
-            return
-        }
         guard !audioGraphNeedsReconfiguration else {
             updateNowPlaying()
+            return
+        }
+        if state == .buffering {
+            play()
             return
         }
         do {
@@ -716,6 +722,7 @@ final class PlaybackController: BackendPlaybackControlling {
         guard generation == scheduleGeneration else { return }
         scheduledBufferCount = max(scheduledBufferCount - 1, 0)
         frameScheduler?.didComplete(frameCount: frameCount)
+        guard !audioGraphNeedsReconfiguration else { return }
         do {
             try scheduleAvailableAudio()
         } catch {
@@ -759,6 +766,7 @@ final class PlaybackController: BackendPlaybackControlling {
 
     private func scheduleAvailableAudio() throws {
         guard let pcmStore, var frameScheduler, !processingIsComplete else { return }
+        defer { self.frameScheduler = frameScheduler }
         if timeStretch == nil {
             renderRate = rate
             timeStretch = try TimeStretchStream(sampleRate: sampleRate, rate: renderRate)
@@ -787,7 +795,6 @@ final class PlaybackController: BackendPlaybackControlling {
             }
             processingIsComplete = true
         }
-        self.frameScheduler = frameScheduler
     }
 
     private func scheduleProcessedAudio(_ output: [Float]) throws {
@@ -836,6 +843,7 @@ final class PlaybackController: BackendPlaybackControlling {
         completionWatchdogTask?.cancel()
         completionWatchdogTask = nil
         invalidateScheduledAudio()
+        engine.pause()
         elapsed = generatedDuration
         lastStablePlaybackTime = elapsed
         state = .finished
@@ -966,8 +974,25 @@ final class PlaybackController: BackendPlaybackControlling {
         }
     }
 
+    var isEngineRunningForTesting: Bool {
+        engine.isRunning
+    }
+
+    func stopEngineForTesting() {
+        engine.stop()
+    }
+
     func handleAudioConfigurationChangeForTesting() {
         scheduleAudioConfigurationRecovery()
+    }
+
+    func handleRemoteStopCommand() {
+        if let onStopRequested {
+            onStopRequested()
+        } else {
+            stop()
+        }
+        onExternalControl?()
     }
 
     private func scheduleAudioConfigurationRecovery() {
@@ -1065,6 +1090,13 @@ final class PlaybackController: BackendPlaybackControlling {
         lastStablePlaybackTime = resumeTime
         if previousState == .playing {
             try startPlayback()
+        } else if previousState == .buffering || previousState == .preparing {
+            state = hasStoredAudio ? .buffering : previousState
+            if synthesisIsComplete || shouldStartWhenBuffered {
+                try startPlayback()
+            } else {
+                updateNowPlaying()
+            }
         } else {
             state = previousState == .failed ? .paused : previousState
             updateNowPlaying()
@@ -1295,8 +1327,7 @@ final class PlaybackController: BackendPlaybackControlling {
         register(commands.stopCommand) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.stop()
-                self.onExternalControl?()
+                self.handleRemoteStopCommand()
             }
             return .success
         }

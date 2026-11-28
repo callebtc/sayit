@@ -233,6 +233,114 @@ struct PlaybackControllerBoundaryTests {
         #expect(playback.state == .idle)
     }
 
+    @Test("Progressive enqueue during route-change debounce does not restart stopped engine and buffering recovery starts once finished")
+    @MainActor
+    func routeChangeDuringBufferingDefersEngineStartAndResumes() async throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "BufferingRoute", estimatedDuration: 1.0, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(playback.state == .buffering)
+        #expect(playback.isEngineRunningForTesting)
+
+        // Simulate Core Audio stopping the engine on route change.
+        playback.stopEngineForTesting()
+        playback.handleAudioConfigurationChangeForTesting()
+        #expect(!playback.isEngineRunningForTesting)
+
+        // Enqueuing additional audio during the debounce window must NOT
+        // restart the un-reconfigured engine prematurely.
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 1,
+            samples: [Float](repeating: 0.01, count: 2_400),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        #expect(!playback.isEngineRunningForTesting)
+        #expect(!playback.shouldStartWhenBuffered)
+
+        // Synthesis completing during the debounce window must also defer to
+        // recovery, and once recovery runs playback must start rather than hang.
+        playback.finishBuffering()
+        #expect(playback.state == .buffering)
+        #expect(!playback.isEngineRunningForTesting)
+
+        for _ in 0..<100 where playback.state == .buffering {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(playback.state == .playing || playback.state == .finished)
+    }
+
+    @Test("Completing playback pauses AVAudioEngine")
+    @MainActor
+    func completePlaybackPausesEngine() throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "CompletePause", estimatedDuration: 0.2, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 4_800),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+        playback.finishBuffering()
+        #expect(playback.isEngineRunningForTesting)
+
+        playback.pause()
+        playback.seek(to: playback.generatedDuration)
+        #expect(playback.state == .finished)
+        #expect(!playback.isEngineRunningForTesting)
+    }
+
+    @Test("Remote stop command delegates to onStopRequested when installed")
+    @MainActor
+    func remoteStopDelegatesToHandler() throws {
+        let playback = PlaybackController()
+        defer { playback.stop() }
+        playback.volume = 0
+
+        let requestID = UUID()
+        playback.prepare(requestID: requestID, title: "RemoteStop", estimatedDuration: 0.2, modelID: "test")
+        try playback.enqueue(AudioChunk(
+            requestID: requestID,
+            index: 0,
+            samples: [Float](repeating: 0.01, count: 4_800),
+            sampleRate: 24_000,
+            startsParagraph: false
+        ))
+
+        var stopRequestedCount = 0
+        var externalControlCount = 0
+        playback.onStopRequested = {
+            stopRequestedCount += 1
+        }
+        playback.onExternalControl = {
+            externalControlCount += 1
+        }
+        playback.handleRemoteStopCommand()
+        #expect(stopRequestedCount == 1)
+        #expect(externalControlCount == 1)
+        #expect(playback.state == .buffering)
+
+        playback.onStopRequested = nil
+        playback.handleRemoteStopCommand()
+        #expect(playback.state == .idle)
+    }
+
     @Test("Playback buffer duration grows only above normal speed")
     @MainActor
     func preferredBufferDuration() {

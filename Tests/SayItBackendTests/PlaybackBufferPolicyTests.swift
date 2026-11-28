@@ -159,29 +159,46 @@ struct PlaybackBufferPolicyTests {
             bufferedDuration: 6.41, estimatedRemainingDuration: 6))
     }
 
-    @Test("Known-sustainable generation starts with minimal buffer")
+    @Test("Known-sustainable generation starts with minimal rate-scaled buffer")
     func observedLatency() {
         var estimator = SynthesisPerformanceEstimator()
         estimator.record(
             SynthesisMetrics(
                 chunkIndex: 0,
-                generationDuration: 3,
+                generationDuration: 2,
                 audioDuration: 10
             )
         )
-        let policy = policy(.progressive, rate: 1.5, estimator: estimator)
+        let normal = policy(.progressive, rate: 1, estimator: estimator)
+        #expect(!normal.shouldStart(synthesisIsComplete: false, bufferedDuration: 0.14))
+        #expect(normal.shouldStart(synthesisIsComplete: false, bufferedDuration: 0.15))
 
-        #expect(abs(policy.preferredSourceLead - 5.1) < 0.000_001)
+        let onePointFive = policy(.progressive, rate: 1.5, estimator: estimator)
+        #expect(abs(onePointFive.preferredSourceLead - 3.6) < 0.000_001)
         #expect(
-            !policy.shouldStart(
+            !onePointFive.shouldStart(
                 synthesisIsComplete: false,
-                bufferedDuration: 0.14
+                bufferedDuration: 0.22
             )
         )
         #expect(
-            policy.shouldStart(
+            onePointFive.shouldStart(
                 synthesisIsComplete: false,
-                bufferedDuration: 0.15
+                bufferedDuration: 0.225
+            )
+        )
+
+        let triple = policy(.progressive, rate: 3, estimator: estimator)
+        #expect(
+            !triple.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 0.44
+            )
+        )
+        #expect(
+            triple.shouldStart(
+                synthesisIsComplete: false,
+                bufferedDuration: 0.45
             )
         )
     }

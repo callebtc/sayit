@@ -284,6 +284,7 @@ private extension HTTPVoiceRouteIntegrationTests {
 private final class HTTPVoiceTestPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
     var onExternalControl: (@MainActor () -> Void)?
+    var onStopRequested: (@MainActor () -> Void)?
     var onStateChange: (@MainActor (PlaybackState) -> Void)?
     private(set) var state: PlaybackState = .idle {
         didSet {

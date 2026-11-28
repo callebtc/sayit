@@ -1451,6 +1451,233 @@ struct BackendServiceCommandTests {
         #expect(jobs.first(where: { $0.id == queued.id })?.state == .canceled)
     }
 
+    @Test("Enqueued speech waits for active history replay to finish instead of interrupting it")
+    func enqueueWaitsForHistoryReplay() async throws {
+        let fixture = try ServiceFixture(
+            seedVoiceAndHistory: true,
+            synthesizesAudio: true
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        let historyID = try #require(fixture.historyID)
+
+        #expect(
+            isAccepted(
+                await fixture.service.handle(
+                    .init(command: .replayHistory(historyID))
+                )
+            )
+        )
+        #expect(fixture.playback.state == .playing)
+
+        let queued = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: "Wait for replay to finish.",
+                            source: .frontend,
+                            queuePolicy: .enqueue
+                        )
+                    )
+                )
+            )
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        let whileReplaying = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(whileReplaying.activeJob == nil)
+        #expect(whileReplaying.queuedJobs.map(\.id) == [queued.id])
+        #expect(fixture.playback.playedFileTitle == "Saved title")
+
+        fixture.playback.finishForTesting()
+        let afterReplay = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == queued.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+        #expect(afterReplay.activeJob?.id == queued.id)
+    }
+
+    @Test("Subsequent synthesis events preserve paused and failed playback states")
+    func synthesisEventsPreservePausedAndFailedStates() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+
+        let job = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: String(repeating: "Sentence one. ", count: 160)
+                                + "\n\n"
+                                + String(repeating: "Sentence two. ", count: 160),
+                            source: .frontend,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == job.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+
+        // Pause playback while synthesis continues delivering chunk 2 and completion.
+        #expect(isAccepted(await fixture.service.handle(.init(command: .pause))))
+        await gate.releaseNext()
+        try await Task.sleep(for: .milliseconds(40))
+        let pausedMidSynthesis = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(pausedMidSynthesis.playback.state == PlaybackState.paused.rawValue)
+        #expect(pausedMidSynthesis.activeJob?.state == .paused)
+
+        await gate.releaseNext()
+        try await Task.sleep(for: .milliseconds(40))
+        let pausedAfterCompleted = try snapshot(
+            await fixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(pausedAfterCompleted.playback.state == PlaybackState.paused.rawValue)
+        #expect(pausedAfterCompleted.activeJob?.state == .paused)
+
+        _ = await fixture.service.handle(.init(command: .clear))
+
+        // Playback failure mid-synthesis must preserve .failed and error status
+        // across subsequent .audio and .completed events.
+        let failGate = BackendSynthesisEventGate()
+        let failFixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: failGate
+        )
+        defer { failFixture.remove() }
+        try failFixture.seedInstallation(modelID: failFixture.seedModelID)
+        await failFixture.service.start()
+        failFixture.playback.shouldStartWhenBuffered = true
+        failFixture.playback.playFailureMessage = "Audio output unavailable."
+
+        let failJob = try submittedJob(
+            await failFixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: String(repeating: "Failure chunk one. ", count: 160)
+                                + "\n\n"
+                                + String(repeating: "Failure chunk two. ", count: 160),
+                            source: .frontend,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        let afterFirstFail = try await waitForServiceSnapshot(failFixture.service) {
+            $0.playback.state == PlaybackState.failed.rawValue
+        }
+        #expect(afterFirstFail.statusText == "Needs attention")
+
+        await failGate.releaseNext()
+        try await Task.sleep(for: .milliseconds(40))
+        let failedMidSynthesis = try snapshot(
+            await failFixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(failedMidSynthesis.playback.state == PlaybackState.failed.rawValue)
+        #expect(failedMidSynthesis.statusText == "Needs attention")
+
+        await failGate.releaseNext()
+        try await waitForJobState(.failed, id: failJob.id, service: failFixture.service)
+        let failedAfterCompleted = try snapshot(
+            await failFixture.service.handle(.init(command: .snapshot))
+        )
+        #expect(failedAfterCompleted.statusText == "Needs attention")
+        #expect(failedAfterCompleted.lastError == "Audio output unavailable.")
+    }
+
+    @Test("Remote media stop cancels active synthesis instead of leaving it running")
+    func remoteStopCancelsActiveSynthesis() async throws {
+        let gate = BackendSynthesisEventGate()
+        let fixture = try ServiceFixture(
+            synthesizesAudio: true,
+            synthesisEventGate: gate
+        )
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+        fixture.playback.shouldStartWhenBuffered = true
+
+        let job = try submittedJob(
+            await fixture.service.handle(
+                .init(
+                    command: .submit(
+                        SpeechSubmission(
+                            text: String(repeating: "Active chunk. ", count: 160)
+                                + "\n\n"
+                                + String(repeating: "Second chunk. ", count: 160),
+                            source: .frontend,
+                            permitsLongText: true
+                        )
+                    )
+                )
+            )
+        )
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob?.id == job.id
+                && $0.playback.state == PlaybackState.playing.rawValue
+        }
+
+        fixture.playback.triggerRemoteStop()
+        _ = try await waitForServiceSnapshot(fixture.service) {
+            $0.activeJob == nil && $0.playback.state == PlaybackState.idle.rawValue
+        }
+        let jobs = try jobList(
+            await fixture.service.handle(.init(command: .jobs))
+        )
+        #expect(jobs.first(where: { $0.id == job.id })?.state == .canceled)
+        #expect(await fixture.synthesizer.cancelCount >= 1)
+    }
+
+    @Test("Voice discovery forwards per-candidate tunings to sample generation")
+    func voiceDiscoveryPreservesCandidateTunings() async throws {
+        let fixture = try ServiceFixture(synthesizesAudio: true)
+        defer { fixture.remove() }
+        try fixture.seedInstallation(modelID: fixture.seedModelID)
+        await fixture.service.start()
+
+        let tuningA = VoiceTuning(preset: .faithful, parameters: ["temperature": 0.45])
+        let tuningB = VoiceTuning(preset: .expressive, parameters: ["temperature": 1.15])
+        _ = try voiceStudio(
+            await fixture.service.handle(
+                .init(
+                    command: .startVoiceDiscovery(
+                        VoiceDiscoveryRequest(
+                            modelID: fixture.seedModelID,
+                            language: "en",
+                            sampleText: "Candidate tuning forwarding test.",
+                            candidateCount: 2,
+                            candidateTunings: [tuningA, tuningB]
+                        )
+                    )
+                )
+            )
+        )
+        try await waitForVoiceStudioState(.ready, service: fixture.service)
+        let received = await fixture.synthesizer.sampleTunings
+        #expect(received.count == 2)
+        #expect(received[0].preset == VoiceTuningPreset.faithful.rawValue)
+        #expect(received[1].preset == VoiceTuningPreset.expressive.rawValue)
+        #expect(received[0].parameters["temperature"] == 0.45)
+        #expect(received[1].parameters["temperature"] == 1.15)
+    }
+
     @Test("A synthesis progress timeout fails the stalled job")
     func stalledSynthesisFailsInsteadOfOwningTheQueueForever() async throws {
         let gate = BackendSynthesisEventGate()
@@ -3115,6 +3342,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
     private(set) var requestedVoiceDescriptions: [String?] = []
     private(set) var referenceTranscripts: [String?] = []
     private(set) var referenceKinds: [VoiceReferenceKind] = []
+    private(set) var sampleTunings: [VoiceSynthesisTuning] = []
     private(set) var cancelCount = 0
     private(set) var unloadCount = 0
     private let synthesizesAudio: Bool
@@ -3228,12 +3456,13 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
         model _: ModelDescriptor,
         text _: String,
         language _: String?,
-        tuning _: VoiceSynthesisTuning,
+        tuning: VoiceSynthesisTuning,
         seed _: UInt64,
         reference: VoiceReference?
     ) async throws -> GeneratedVoiceSample {
         referenceTranscripts.append(reference?.transcript)
         if let reference { referenceKinds.append(reference.kind) }
+        sampleTunings.append(tuning)
         return GeneratedVoiceSample(
             samples: (0..<2_400).map { frame in
                 Float(
@@ -3249,6 +3478,7 @@ private actor DeterministicSynthesizer: BackendSpeechSynthesizing {
 private final class RecordingBackendPlayback: BackendPlaybackControlling {
     var onFailure: (@MainActor (String) -> Void)?
     var onExternalControl: (@MainActor () -> Void)?
+    var onStopRequested: (@MainActor () -> Void)?
     var onStateChange: (@MainActor (PlaybackState) -> Void)?
     private(set) var state: PlaybackState = .idle {
         didSet {
@@ -3271,7 +3501,17 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     private(set) var enqueuedChunksByRequestID: [UUID: Int] = [:]
     private var stopTransitionGeneration: UInt64 = 0
     var enqueueError: Error?
-    var shouldStartWhenBuffered = false
+    var playFailureMessage: String?
+    private var _shouldStartWhenBuffered = false
+    var shouldStartWhenBuffered: Bool {
+        get {
+            _shouldStartWhenBuffered
+                && (state == .preparing || state == .buffering)
+        }
+        set {
+            _shouldStartWhenBuffered = newValue
+        }
+    }
     var smoothStopFadeDuration: Duration?
     var smoothStopEnteredGate: BackendSynthesisEventGate?
     var smoothStopReleaseGate: BackendSynthesisEventGate?
@@ -3305,7 +3545,9 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
         }
         enqueuedChunksByRequestID[chunk.requestID, default: 0] += 1
         generatedDuration += chunk.duration
-        state = .buffering
+        if state == .preparing || state == .buffering {
+            state = .buffering
+        }
     }
 
     func setSpokenText(_ text: String) {
@@ -3323,6 +3565,11 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
 
     func play() {
         playCount += 1
+        if let playFailureMessage {
+            state = .failed
+            onFailure?(playFailureMessage)
+            return
+        }
         state = .playing
     }
 
@@ -3369,9 +3616,18 @@ private final class RecordingBackendPlayback: BackendPlaybackControlling {
     }
 
     func finishBuffering() {
-        if state != .finished {
+        if state == .buffering {
             state = .playing
         }
+    }
+
+    func triggerRemoteStop() {
+        if let onStopRequested {
+            onStopRequested()
+        } else {
+            stop()
+        }
+        onExternalControl?()
     }
 
     func finishForTesting() {

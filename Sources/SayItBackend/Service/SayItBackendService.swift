@@ -42,6 +42,7 @@ public final class SayItBackendService: SayItService {
     private var pendingJobs: [UUID: PendingSpeechJob] = [:]
     private var queuedJobIDs: [UUID] = []
     private var activeJobID: UUID?
+    private var isReplayingHistory = false
     private var jobTransitionGeneration: UInt64 = 0
     private var activeRequest: SpeechRequest?
     private struct RequestTiming {
@@ -227,6 +228,12 @@ public final class SayItBackendService: SayItService {
         playback.onExternalControl = { [weak self] in
             guard let self else { return }
             self.revision &+= 1
+        }
+        playback.onStopRequested = { [weak self] in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                await self?.cancelActiveJob()
+            }
         }
         playback.onStateChange = { [weak self] state in
             self?.playbackStateDidChange(state)
@@ -742,7 +749,8 @@ public final class SayItBackendService: SayItService {
                     language: request.language,
                     sampleText: sampleText,
                     candidateCount: request.candidateCount,
-                    tuning: request.tuning
+                    tuning: request.tuning,
+                    candidateTunings: request.candidateTunings
                 )
             )
         }
@@ -1553,6 +1561,7 @@ public final class SayItBackendService: SayItService {
         guard !isShuttingDown,
               !modelSwitchIsPending,
               activeJobID == nil,
+              !isReplayingHistory,
               let id = queuedJobIDs.first else {
             return
         }
@@ -1954,7 +1963,7 @@ public final class SayItBackendService: SayItService {
             if playback.state == .playing {
                 statusText = "Playing"
                 updateJob(request.id, state: .playing, progress: playbackProgress)
-            } else {
+            } else if playback.state == .buffering || playback.state == .preparing {
                 statusText = "Buffering"
                 updateJob(request.id, state: .buffering, progress: 0.2)
             }
@@ -1965,20 +1974,24 @@ public final class SayItBackendService: SayItService {
             playback.observeSynthesisProgress(progress)
             if playback.shouldStartWhenBuffered {
                 playback.play()
-                statusText = "Playing"
-                updateJob(request.id, state: .playing, progress: playbackProgress)
+                if playback.state == .playing {
+                    statusText = "Playing"
+                    updateJob(request.id, state: .playing, progress: playbackProgress)
+                }
             }
         case .metrics(let metrics):
             finalizeSpokenChunk(audioEnd: playback.generatedDuration + metrics.trailingAudioDuration)
             playback.observeSynthesisMetrics(metrics)
             if playback.shouldStartWhenBuffered {
                 playback.play()
-                statusText = "Playing"
-                updateJob(
-                    request.id,
-                    state: .playing,
-                    progress: playbackProgress
-                )
+                if playback.state == .playing {
+                    statusText = "Playing"
+                    updateJob(
+                        request.id,
+                        state: .playing,
+                        progress: playbackProgress
+                    )
+                }
             }
             await diagnostics.record(
                 DiagnosticEvent(
@@ -1994,8 +2007,10 @@ public final class SayItBackendService: SayItService {
         case .completed:
             finalizeSpokenChunk(audioEnd: playback.generatedDuration)
             playback.finishBuffering()
-            statusText = "Playing"
-            updateJob(request.id, state: .playing, progress: playbackProgress)
+            if playback.state == .playing {
+                statusText = "Playing"
+                updateJob(request.id, state: .playing, progress: playbackProgress)
+            }
             if request.source != .preview {
                 try await archiveCompletedRequest(request)
             }
@@ -2068,6 +2083,7 @@ public final class SayItBackendService: SayItService {
         forModelSwitch: Bool = false
     ) async {
         guard let id = activeJobID else {
+            isReplayingHistory = false
             if forModelSwitch {
                 await playback.stopForModelSwitch()
                 await synthesizer.cancelCurrentRequest()
@@ -2355,6 +2371,7 @@ public final class SayItBackendService: SayItService {
         }
         revision &+= 1
         if state == .finished || state == .failed || state == .idle {
+            isReplayingHistory = false
             if let id = activeJobID {
                 resumePlaybackCompletion(for: id, with: state)
             } else if let waitingID = playbackCompletionJobID {
@@ -3196,6 +3213,7 @@ public final class SayItBackendService: SayItService {
             title: item.title,
             modelID: item.modelID.rawValue
         )
+        isReplayingHistory = true
         playback.setSpokenText(item.cleanedText)
         for chunk in try history.playbackTiming(id: id) {
             playback.appendSpokenChunk(chunk)

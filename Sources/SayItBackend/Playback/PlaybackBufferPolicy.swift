@@ -84,7 +84,7 @@ struct PlaybackBufferPolicy: Sendable {
         }
         guard streamingIsSustainable else { return false }
         if estimator.hasObservations {
-            return bufferedDuration >= Self.minimumSustainableStartBuffer
+            return bufferedDuration >= Self.minimumSustainableStartBuffer * max(rate, 1)
         }
         return bufferedDuration >= preferredSourceLead
     }

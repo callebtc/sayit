@@ -100,6 +100,9 @@ actor SynthesisActor: BackendSpeechSynthesizing {
     func synthesize(
         _ request: SpeechRequest
     ) async -> AsyncThrowingStream<SynthesisEvent, Error> {
+        guard !Task.isCancelled else {
+            return cancelledStream()
+        }
         requestArrivalOrder &+= 1
         let arrivalOrder = requestArrivalOrder
         if let active = activeOperation, active.preloadingModelID == request.model.id {
@@ -108,7 +111,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 // Weights are still loading from disk: let weight loading finish
                 // instead of discarding partial work, while skipping opportunistic warmup.
                 await waitForOperationToFinish(active)
-                guard arrivalOrder == requestArrivalOrder else {
+                guard !Task.isCancelled, arrivalOrder == requestArrivalOrder else {
                     return cancelledStream()
                 }
             }
@@ -116,7 +119,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
         let (operationID, previousOperation) = reserveOperation()
         await waitForOperationToFinish(previousOperation)
-        guard operationID == operationGeneration else {
+        guard !Task.isCancelled, operationID == operationGeneration else {
             return cancelledStream()
         }
 
@@ -161,7 +164,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         voiceReference: VoiceReference?,
         language: String?
     ) async {
-        guard activeOperation == nil else { return }
+        guard !Task.isCancelled, activeOperation == nil else { return }
         cancelPreloadWarmupRequested = false
         let (operationID, _) = reserveOperation()
         let task = Task { [weak self] in
@@ -382,12 +385,14 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         seed: UInt64,
         reference: VoiceReference? = nil
     ) async throws -> GeneratedVoiceSample {
+        try Task.checkCancellation()
         requestArrivalOrder &+= 1
         let arrivalOrder = requestArrivalOrder
         if let active = activeOperation, active.preloadingModelID == model.id {
             cancelPreloadWarmupRequested = true
             if loadedModelID != model.id || loadedModel == nil {
                 await waitForOperationToFinish(active)
+                try Task.checkCancellation()
                 guard arrivalOrder == requestArrivalOrder else {
                     throw CancellationError()
                 }
@@ -396,6 +401,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
 
         let (operationID, previousOperation) = reserveOperation()
         await waitForOperationToFinish(previousOperation)
+        try Task.checkCancellation()
         guard operationID == operationGeneration else {
             throw CancellationError()
         }
@@ -651,6 +657,11 @@ actor SynthesisActor: BackendSpeechSynthesizing {
         var chunkCursor = 0
         var completedChunkCount = 0
         var generatedSamples = 0
+        var ephemeralQwen3Conditioning: (
+            audioID: ObjectIdentifier,
+            transcript: String,
+            conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning
+        )?
         while chunkCursor < chunks.count {
             try Task.checkCancellation()
             if chunkCursor > 0, chunkDelay > 0 {
@@ -874,12 +885,31 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                           let referenceAudio,
                           let referenceText,
                           !referenceText.isEmpty {
-                    let conditioning = try cachedQwen3Conditioning(
-                        for: qwen3,
-                        referenceAudio: referenceAudio,
-                        transcript: referenceText,
-                        language: request.language
-                    )
+                    let conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning
+                    if Self.shouldCacheQwen3Conditioning(voiceMode: request.voiceMode) {
+                        conditioning = try cachedQwen3Conditioning(
+                            for: qwen3,
+                            referenceAudio: referenceAudio,
+                            transcript: referenceText,
+                            language: request.language
+                        )
+                    } else if let cached = ephemeralQwen3Conditioning,
+                              cached.audioID == ObjectIdentifier(referenceAudio),
+                              cached.transcript == referenceText {
+                        conditioning = cached.conditioning
+                    } else {
+                        let prepared = try qwen3.prepareReferenceConditioning(
+                            refAudio: referenceAudio,
+                            refText: referenceText,
+                            language: request.language
+                        )
+                        ephemeralQwen3Conditioning = (
+                            ObjectIdentifier(referenceAudio),
+                            referenceText,
+                            prepared
+                        )
+                        conditioning = prepared
+                    }
                     let qwenStreamingInterval = chunkCursor == 0 ? 0.32 : 2.0
                     let managed = SerializedSpeechModel(qwen3)
                         .makeManagedQwen3SamplesStream(
@@ -1156,7 +1186,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             throw SynthesisError.modelNotInstalled
         }
         let textProcessor = makeTextProcessor(for: model)
-        let candidate: SpeechGenerationModel
+        var candidate: SpeechGenerationModel?
         do {
             switch model.modelType.lowercased() {
             case "fish_drama3":
@@ -1199,6 +1229,7 @@ actor SynthesisActor: BackendSpeechSynthesizing {
                 )
             }
         } catch {
+            candidate = nil
             Stream.gpu.synchronize()
             Memory.clearCache()
             throw error
@@ -1207,15 +1238,18 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             try checkOperation(operationID)
         } catch {
             Stream.gpu.synchronize()
-            withExtendedLifetime(candidate) {}
+            candidate = nil
             Memory.clearCache()
             throw error
+        }
+        guard let resolvedCandidate = candidate else {
+            throw SynthesisError.modelNotInstalled
         }
         Memory.cacheLimit = MLXCachePolicy.cacheLimit(
             forModelType: model.modelType,
             defaultLimit: Self.defaultMLXCacheLimit
         )
-        loadedModel = candidate
+        loadedModel = resolvedCandidate
         loadedModelID = model.id
         loadedModelURL = modelURL
         loadedTextProcessor = textProcessor
@@ -1332,6 +1366,12 @@ actor SynthesisActor: BackendSpeechSynthesizing {
             referenceAudioCache.removeValue(forKey: evicted)
         }
         return loaded
+    }
+
+    static func shouldCacheQwen3Conditioning(
+        voiceMode: VoiceSynthesisMode
+    ) -> Bool {
+        voiceMode == .savedProfile
     }
 
     private func cachedQwen3Conditioning(
